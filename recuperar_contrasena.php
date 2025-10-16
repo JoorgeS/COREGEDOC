@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="actions-row">
                 <button type="submit" class="btn-black" style="width: 48%;">RECUPERAR</button>
-                <a href="/corevota/login.php" class="btn-white" style="width: 48%; line-height: 2.2;">VOLVER</a>
+                <a href="/corevota/view/pages/login.php" class="btn-white" style="width: 48%; line-height: 2.2;">VOLVER</a>
             </div>
         </form>
     </div>
