@@ -1,0 +1,20 @@
+<?php
+// /COREVOTA/class/class.conectorDB.php
+
+// Asegúrate de que config.php ya se haya incluido con require_once
+// (Esto se hace en tu index.php, lo cual es correcto)
+
+class conectorDB extends BaseConexion { // 👈 Debe heredar de la nueva clase base
+    
+    // Al instanciar esta clase, se conecta automáticamente
+    public function __construct() {
+        // Llama al método protegido del padre para establecer la conexión 
+        // y le indica que use 'configuracion.ini'
+        $this->conectar('configuracion.ini'); 
+    }
+
+    // Método que el index.php usará: $db = $conector->getDatabase();
+    public function getDatabase() {
+        return $this->datahost;
+    }
+}
