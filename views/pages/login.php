@@ -140,7 +140,7 @@ if (isset($_SESSION['error_message'])) {
                 <label for="contrasena">CONTRASEÑA</label>
                 <input type="password" id="contrasena" name="contrasena" required>
 
-                <a href="#">RECUPERAR CONTRASEÑA</a>
+                <a href="/corevota/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
 
                 <button type="submit" class="btn">INGRESAR</button>
             </form>

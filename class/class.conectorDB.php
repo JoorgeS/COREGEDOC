@@ -171,6 +171,28 @@ class conectorDB extends BaseConexion
         return $resultado;
     } // Cierre de la función consultarBD
 
+    // Dentro de la clase conectorDB { ... }
+
+    public function guardarTokenRestablecimiento($correo_input, $token, $expira)
+    {
+        // Reemplaza 'idUsuario' por la clave primaria de tu tabla si es diferente.
+        $sql_select = "SELECT idUsuario, correo FROM t_usuario WHERE correo = :correo";
+        $stmt_select = $this->conexion->prepare($sql_select);
+        $stmt_select->execute(['correo' => $correo_input]);
+        $user = $stmt_select->fetch(PDO::FETCH_ASSOC);
+
+        if ($user) {
+            $sql_update = "UPDATE t_usuario SET reset_token = :token, reset_expira = :expira WHERE idUsuario = :id";
+            $stmt_update = $this->conexion->prepare($sql_update);
+            $stmt_update->execute([
+                'token' => $token,
+                'expira' => $expira,
+                'id' => $user['idUsuario']
+            ]);
+            return $user;
+        }
+        return null;
+    }
 } // <--- ESTA ES LA LLAVE DE CIERRE FALTANTE DE LA CLASE conectorDB
 
 // Otros métodos o código fuera de la clase irían aquí (si aplica)

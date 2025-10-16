@@ -159,7 +159,7 @@ $simulated_data = [
                     alt="Logo Gobierno Regional de Valparaíso"
                     style="max-height: 70px;">
                 <img src="/corevota/public/img/logo2.png"
-                    alt="Logo Gobierno Regional de Valparaíso"
+                    alt="Logo 2 Gobierno Regional de Valparaíso"
                     style="max-height: 70px;">
                 <p>COMISIÓN: <?php echo htmlspecialchars($simulated_data['comision']); ?></p>
             </div>
