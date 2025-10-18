@@ -292,6 +292,10 @@ if (!isset($_SESSION['idUsuario'])) {
                   <a href="/corevota/controllers/ReunionController.php?action=list" target="content-frame"
                     class="link-dark d-block rounded py-1">Listado de Reuniones</a>
                 </li>
+                <li>
+                  <a href="/corevota/views/pages/reunion_calendario.php" target="content-frame"
+                    class="link-dark d-block rounded py-1">Vista Calendario</a>
+                </li>
               </ul>
             </div>
           </li>

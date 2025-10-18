@@ -41,6 +41,29 @@ class ReunionManager extends BaseConexion
         }
     }
 
+    // En ReunionController.php (dentro de la clase ReunionManager)
+
+    public function getReunionesCalendarData()
+    {
+        try {
+            $sql = "SELECT 
+                    r.idReunion, r.nombreReunion, 
+                    r.fechaInicioReunion, r.fechaTerminoReunion, 
+                    r.t_comision_idComision, c.nombreComision
+                FROM t_reunion r
+                JOIN t_comision c ON r.t_comision_idComision = c.idComision
+                WHERE r.vigente = 1
+                ORDER BY r.fechaInicioReunion ASC";
+
+            $stmt = $this->db->query($sql);
+            $reuniones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ['status' => 'success', 'data' => $reuniones];
+        } catch (PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al obtener datos del calendario.', 'error' => $e->getMessage()];
+        }
+    }
+
     public function getReunionesList()
     {
         try {
@@ -132,7 +155,7 @@ class ReunionManager extends BaseConexion
                 ':vigente' => $data['vigente'],
                 ':comisionId' => $data['t_comision_idComision']
             ]);
-            
+
             if ($stmt->rowCount() === 0 && $data['id'] != 0) {
                 return ['status' => 'success', 'message' => 'Reunión actualizada (sin cambios).'];
             }
