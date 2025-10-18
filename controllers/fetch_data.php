@@ -10,7 +10,7 @@ class FetchData extends BaseConexion
         $this->db = $this->conectar();
     }
 
-    // 🟢 Listado de comisiones
+    // 🟢 Listado de comisiones (sin cambios)
     public function getComisiones()
     {
         $sql = "SELECT idComision, nombreComision FROM t_comision ORDER BY nombreComision ASC";
@@ -18,16 +18,29 @@ class FetchData extends BaseConexion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // 🟢 Listado de presidentes de comisión (consejeros)
-    public function getConsejeros()
+    // 🔴 Listado de PRESIDENTES (Uso: selector Presidente Comisión)
+    // Trae SOLO Presidentes Comisión (Tipo 3)
+    public function getPresidentesSolo()
     {
-        $sql = "SELECT u.idUsuario, CONCAT(u.pNombre, ' ', u.aPaterno) AS nombreCompleto,
-                    c.nombreProvincia, p.nombrePartido
+        // Uso de CONCAT_WS para manejar campos NULL y evitar espacios sobrantes.
+        $sql = "SELECT u.idUsuario, 
+                       TRIM(CONCAT_WS(' ', u.pNombre, u.sNombre, u.aPaterno, u.aMaterno)) AS nombreCompleto 
                 FROM t_usuario u
-                LEFT JOIN t_provincia c ON u.comuna_id = c.idProvincia
-                LEFT JOIN t_partido p ON u.partido_id = p.idPartido
-                WHERE u.tipoUsuario_id = 3
-                ORDER BY u.pNombre ASC";
+                WHERE u.tipoUsuario_id = 3 
+                ORDER BY u.aPaterno ASC";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // 🔵 Listado de TODOS LOS USUARIOS (Uso: selector de Asistencia)
+    // Trae TODOS los usuarios, independientemente de su tipo.
+    public function getAllUsuarios()
+    {
+        // Uso de CONCAT_WS para manejar campos NULL y evitar espacios sobrantes.
+        $sql = "SELECT u.idUsuario, 
+                       TRIM(CONCAT_WS(' ', u.pNombre, u.sNombre, u.aPaterno, u.aMaterno)) AS nombreCompleto 
+                FROM t_usuario u
+                ORDER BY u.aPaterno ASC";
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -42,8 +55,14 @@ if (isset($_GET['action'])) {
             echo json_encode($fetch->getComisiones());
             break;
 
-        case 'consejeros':
-            echo json_encode($fetch->getConsejeros());
+        case 'presidentes':
+            // Llama solo a los presidentes (Tipo 3)
+            echo json_encode($fetch->getPresidentesSolo());
+            break;
+
+        case 'asistencia_all':
+            // NUEVA ACCIÓN: Llama a todos los usuarios para la lista de asistencia
+            echo json_encode($fetch->getAllUsuarios());
             break;
 
         default:
@@ -52,4 +71,3 @@ if (isset($_GET['action'])) {
     }
 }
 ?>
-

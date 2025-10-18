@@ -366,7 +366,7 @@ function eliminarTema(btn) {
 
       // Función para cargar los consejeros (presidentes de comisión)
       function cargarConsejeros(selectId) {
-        fetch("/corevota/controllers/fetch_data.php?action=consejeros")
+        fetch("/corevota/controllers/fetch_data.php?action=presidentes")
           .then(res => res.json())
           .then(data => {
             const select = document.getElementById(selectId);
@@ -433,7 +433,7 @@ function eliminarTema(btn) {
         });
 
         function cargarConsejerosSelect() {
-          fetch("/corevota/controllers/fetch_data.php?action=consejeros")
+          fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
             .then(res => res.json())
             .then(data => {
               const select = document.getElementById("selectConsejero");
