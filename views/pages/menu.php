@@ -206,28 +206,29 @@ if (!isset($_SESSION['idUsuario'])) {
 
       <div class="flex-grow-1">
         <ul class="nav nav-pills flex-column mb-auto">
-          <?php if ($_SESSION['descPerfil'] === 'Administrador' || $_SESSION['descPerfil'] === 'Secrtario Tecnico' ): ?>
+          <?php if ($_SESSION['descPerfil'] === 'Administrador' || $_SESSION['descPerfil'] === 'Secrtario Tecnico'): ?>
 
-          <li>
-            <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
-              data-bs-toggle="collapse" data-bs-target="#minutas-collapse" aria-expanded="true">
-              <span class="d-flex align-items-center">
-                <i class="fa-solid fa-file-alt me-2"></i>
-                Minutas
-              </span>
-              <span class="toggle-icon down">▼</span>
-            </button>
-            <div class="collapse show" id="minutas-collapse">
-              <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
-                <li><a href="/corevota/views/pages/crearMinuta.php" target="content-frame"
-                    class="link-dark d-block rounded py-1">Crear Minuta</a></li>
-                <li><a href="/corevota/controllers/MinutaController.php?action=list" target="content-frame"
-                    class="link-dark d-block rounded py-1">Listado Minutas</a></li>
+            <li>
+              <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
+                data-bs-toggle="collapse" data-bs-target="#minutas-collapse" aria-expanded="true">
+                <span class="d-flex align-items-center">
+                  <i class="fa-solid fa-file-alt me-2"></i>
+                  Minutas
+                </span>
+                <span class="toggle-icon down">▼</span>
+              </button>
+              <div class="collapse show" id="minutas-collapse">
+                <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
+                  <li><a href="/corevota/views/pages/crearMinuta.php" target="content-frame"
+                      class="link-dark d-block rounded py-1">Crear Minuta</a></li>
+                  <li><a href="/corevota/controllers/MinutaController.php?action=list" target="content-frame"
+                      class="link-dark d-block rounded py-1">Listado Minutas</a></li>
 
-              </ul>
-            </div>
-          </li>
+                </ul>
+              </div>
+            </li>
           <?php endif; ?>
+
           <li>
             <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
               data-bs-toggle="collapse" data-bs-target="#usuarios-collapse" aria-expanded="true">
@@ -271,6 +272,32 @@ if (!isset($_SESSION['idUsuario'])) {
               </ul>
             </div>
           </li>
+
+          <li>
+            <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
+              data-bs-toggle="collapse" data-bs-target="#reuniones-collapse" aria-expanded="true">
+              <span class="d-flex align-items-center">
+                <i class="fa-solid fa-calendar-check me-2"></i>
+                Reuniones
+              </span>
+              <span class="toggle-icon down">▼</span>
+            </button>
+            <div class="collapse show" id="reuniones-collapse">
+              <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
+                <li>
+                  <a href="/corevota/views/pages/crearReunion.php" target="content-frame"
+                    class="link-dark d-block rounded py-1">Crear Reunión</a>
+                </li>
+                <li>
+                  <a href="/corevota/controllers/ReunionController.php?action=list" target="content-frame"
+                    class="link-dark d-block rounded py-1">Listado de Reuniones</a>
+                </li>
+              </ul>
+            </div>
+          </li>
+
+
+
         </ul>
       </div>
 

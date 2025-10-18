@@ -695,6 +695,8 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         return bloque.querySelectorAll(".editable-area")[index]?.innerHTML || "";
       }
 
+      // En tu archivo crearMinuta.php, reemplaza la función exportarPDF()
+
       function exportarPDF() {
         const bloquesTemas = document.querySelectorAll(".tema-block");
         const temasData = [];
@@ -729,15 +731,27 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           presidente2: document.getElementById('comisionMixta')?.checked ? document.getElementById('presidente2')?.options[document.getElementById('presidente2').selectedIndex].text : ''
         };
 
+        // CÓDIGO CORREGIDO Y ROBUSTO EN exportarPDF()
+        // ----------------------------------------------------
         // 3. Recoger datos de asistencia (sólo los nombres)
-        const { asistenciaNombres } = recolectarAsistencia();
+const filasAsistencia = document.querySelectorAll("#tablaAsistencia tbody tr"); 
+const asistenciaNombres = [];
 
-        // ...
+filasAsistencia.forEach(fila => {
+    // Verificamos que la fila tenga celdas de datos antes de extraer
+    if (fila.children.length > 0) { 
+        // El nombre es el texto de la primera celda
+        const nombre = fila.children[0].innerText.trim();
+        asistenciaNombres.push(nombre);
+    }
+        });
+
+
         // 4. Enviar los datos al script de generación de PDF
         const datosCompletos = {
           ...datosSesion, // Envía todos los datos de sesión/encabezado
           temas: temasData,
-          asistencia: asistenciaNombres // <-- Envía el array de NOMBRES
+          asistencia: ["Asistente DE PRUEBA UNO", "Asistente DE PRUEBA DOS"] // <-- Envía el array de NOMBRES prueba
         };
 
         // Usamos un formulario oculto para enviar datos complejos por POST
