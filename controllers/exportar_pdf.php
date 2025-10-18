@@ -27,32 +27,25 @@ $options = new Options();
 $options->set('defaultFont', 'Helvetica');
 $options->set('isHtml5ParserEnabled', true);
 $options->set('isRemoteEnabled', true); // Vital para cualquier recurso externo o local
-// 🔑 CONFIGURACIÓN CLAVE PARA IMÁGENES LOCALES: 
-// Establecer el chroot al directorio raíz del proyecto (corevota/)
+// CONFIGURACIÓN CLAVE PARA IMÁGENES LOCALES: 
 $options->set('chroot', ROOT_PATH); 
-// Permitir Dompdf acceder a archivos 'file://'
 $options->set('isPhpEnabled', true); 
 
 
 $dompdf = new Dompdf($options);
 
 // OBTENER RUTAS DEL LOGO (USANDO RUTA RELATIVA AL CHROOT)
-// Dompdf ahora buscará la imagen dentro del ROOT_PATH ('corevota/').
-// La ruta que le pasamos al HTML debe ser la ruta relativa desde ROOT_PATH.
 $logo_relative_path = 'public/img/logo2.png';
-
-// Para el HTML, usamos una URI relativa que Dompdf resolverá internamente:
-// Esto funciona cuando isRemoteEnabled es true y chroot está configurado correctamente.
 $logo_uri = $logo_relative_path;
 
 // ---------------------------------------------------------------------------------------
-// 5. Función para generar el HTML Ejecutivo de la Minuta (ESTILO EJEMPLO)
+// 5. Función para generar el HTML Ejecutivo de la Minuta
 // ---------------------------------------------------------------------------------------
 
 function generateMinutaHtml($data, $logo_uri) {
     // Generar la cadena de las comisiones (principal y mixta si existe)
-    $comisiones = htmlspecialchars($data['comision1']);
-    if ($data['comisionMixta'] && !empty($data['comision2'])) {
+    $comisiones = htmlspecialchars($data['comision1'] ?? 'N/A');
+    if (($data['comisionMixta'] ?? false) && !empty($data['comision2'])) {
         $comisiones .= ' / ' . htmlspecialchars($data['comision2']);
     }
 
@@ -143,14 +136,17 @@ function generateMinutaHtml($data, $logo_uri) {
             .content p { 
                 margin: 5px 0 10px 0; 
             }
+            
+            /* === ESTILOS DE ASISTENCIA CORREGIDOS === */
             .asistencia-list ul {
-                list-style-type: none;
-                padding: 0;
+                list-style-type: disc; /* Asegura que el marcador (punto) sea visible */
+                padding-left: 20px; /* Asegura espacio para el marcador */
                 margin: 10px 0;
-                columns: 2; 
+                columns: 2; /* Divide en dos columnas */
             }
             .asistencia-list li {
                 margin-bottom: 3px;
+                font-size: 10pt; /* Estilo de texto */
             }
 
             /* === ESTILOS DE FIRMA === */
@@ -184,23 +180,23 @@ function generateMinutaHtml($data, $logo_uri) {
             </tr>
             <tr>
                 <th>Fecha</th>
-                <td>' . htmlspecialchars($data['fecha']) . '</td>
+                <td>' . htmlspecialchars($data['fecha'] ?? 'N/A') . '</td>
                 <th>Hora</th>
-                <td>' . htmlspecialchars($data['hora']) . '</td>
+                <td>' . htmlspecialchars($data['hora'] ?? 'N/A') . '</td>
             </tr>
             <tr>
                 <th>Presidente</th>
-                <td>' . htmlspecialchars($data['presidente1']) . '</td>
+                <td>' . htmlspecialchars($data['presidente1'] ?? 'N/A') . '</td>
                 <th>Secretario Técnico</th>
-                <td>' . htmlspecialchars($data['secretario']) . '</td>
+                <td>' . htmlspecialchars($data['secretario'] ?? 'N/A') . '</td>
             </tr>
             <tr>
                 <th>N° Sesión</th>
-                <td>' . htmlspecialchars($data['nSesion']) . '</td>
+                <td>' . htmlspecialchars($data['nSesion'] ?? 'N/A') . '</td>
                 <th>Lugar</th>
                 <td>Salón de Plenarios</td>
             </tr>
-            ' . ($data['comisionMixta'] && !empty($data['comision2']) ? '
+            ' . ((($data['comisionMixta'] ?? false) && !empty($data['comision2'])) ? '
             <tr>
                 <th>Comisión Mixta</th>
                 <td>' . htmlspecialchars($data['comision2']) . '</td>
@@ -212,11 +208,16 @@ function generateMinutaHtml($data, $logo_uri) {
         <h2>ASISTENTES</h2>
         <div class="asistencia-list">
             <ul>';
-    if (!empty($data['asistencia'])) {
+    // ----------------------------------------------------
+    // LÓGICA DE ASISTENCIA CORREGIDA
+    // ----------------------------------------------------
+    if (!empty($data['asistencia']) && is_array($data['asistencia'])) {
+        // El array $data['asistencia'] ahora contiene los NOMBRES completos
         foreach ($data['asistencia'] as $consejero) {
             $html .= '<li>' . htmlspecialchars($consejero) . '</li>';
         }
     } else {
+        // Esto se muestra si el array está vacío o no es un array
         $html .= '<li>No se registraron asistentes.</li>';
     }
     $html .= '</ul>
@@ -225,32 +226,33 @@ function generateMinutaHtml($data, $logo_uri) {
     // --- Desarrollo de la Minuta (Temas) ---
     $html .= '<h2>DESARROLLO DE LA MINUTA</h2>';
 
-    if (empty($data['temas']) || (count($data['temas']) == 1 && empty($data['temas'][0]['nombreTema']))) {
+    $temas = $data['temas'] ?? [];
+    if (empty($temas) || (count($temas) == 1 && empty($temas[0]['nombreTema']))) {
         $html .= '<p>No hay temas registrados para el desarrollo de la minuta.</p>';
     } else {
-        foreach ($data['temas'] as $index => $tema) {
+        foreach ($temas as $index => $tema) {
             $num = $index + 1;
             
-            // Si el tema principal está vacío, lo saltamos
-            if (empty(strip_tags($tema['nombreTema']))) continue;
+            // Si el tema principal está vacío, lo saltamos (usando strip_tags para limpiar HTML)
+            if (empty(strip_tags($tema['nombreTema'] ?? ''))) continue;
 
             $html .= '
             <div class="tema-block">
-                <h3>TEMA ' . $num . ': ' . strip_tags($tema['nombreTema']) . '</h3>
+                <h3>TEMA ' . $num . ': ' . strip_tags($tema['nombreTema'] ?? '') . '</h3>
                 <div class="content">';
 
             // Utilizamos el contenido HTML generado por el editor de texto (contenteditable)
             if (!empty($tema['objetivo'])) {
-                $html .= '<p><strong>OBJETIVO:</strong><br>' . $tema['objetivo'] . '</p>';
+                $html .= '<p><strong>OBJETIVO:</strong><br>' . ($tema['objetivo']) . '</p>';
             }
             if (!empty($tema['descAcuerdo'])) {
-                $html .= '<p><strong>ACUERDOS ADOPTADOS:</strong><br>' . $tema['descAcuerdo'] . '</p>';
+                $html .= '<p><strong>ACUERDOS ADOPTADOS:</strong><br>' . ($tema['descAcuerdo']) . '</p>';
             }
             if (!empty($tema['compromiso'])) {
-                $html .= '<p><strong>COMPROMISOS Y RESPONSABLES:</strong><br>' . $tema['compromiso'] . '</p>';
+                $html .= '<p><strong>COMPROMISOS Y RESPONSABLES:</strong><br>' . ($tema['compromiso']) . '</p>';
             }
             if (!empty($tema['observacion'])) {
-                $html .= '<p><strong>OBSERVACIONES Y COMENTARIOS:</strong><br>' . $tema['observacion'] . '</p>';
+                $html .= '<p><strong>OBSERVACIONES Y COMENTARIOS:</strong><br>' . ($tema['observacion']) . '</p>';
             }
 
             $html .= '</div>
@@ -273,7 +275,7 @@ function generateMinutaHtml($data, $logo_uri) {
     $html .= '
         <div class="signature-box">
             <div class="signature-line"></div>
-            <p>' . htmlspecialchars($data['presidente1']) . '</p>
+            <p>' . htmlspecialchars($data['presidente1'] ?? 'N/A') . '</p>
             <p>Presidente</p>
             <p>Comisión ' . $comisiones . '</p>
         </div>
@@ -285,8 +287,8 @@ function generateMinutaHtml($data, $logo_uri) {
 }
 
 // 6. Cargar y renderizar el PDF
-$htmlContent = generateMinutaHtml($data, $logo_uri);
-
+$htmlContent = generateMinutaHtml($data, $logo_uri); 
+    
 $dompdf->loadHtml($htmlContent);
 $dompdf->setPaper('A4', 'portrait');
 $dompdf->render();
