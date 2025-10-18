@@ -249,9 +249,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           </div>
         </div>
       </div>
-      <button type="button" class="btn btn-outline-dark btn-sm" onclick="agregarTema()">
-        Agregar Tema <span class="ms-1">➕</span>
-      </button>
+
 
       <!-- BOTÓN ELIMINAR -->
       <div class="text-end mt-3">
@@ -267,13 +265,12 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
 
   <!-- BOTONES FINALES -->
   <div class="d-flex justify-content-center gap-3 mt-4">
-    <button class="btn btn-success fw-bold px-4">📧 ENVIAR POR CORREO</button>
-    <button class="btn btn-danger fw-bold px-4" onclick="exportarPDF()">📄 EXPORTAR COMO PDF</button>
+
     <div class="text-end mt-3">
 
     <!--BOTON GUARDAR -->
       <button type="button" class="btn btn-success fw-bold" onclick="guardarTodosLosTemas()">
-        💾 Guardar Temas
+        💾 Registrar Minuta
       </button>
     </div>
   </div>
