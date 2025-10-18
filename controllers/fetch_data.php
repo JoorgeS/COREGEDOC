@@ -26,7 +26,7 @@ class FetchData extends BaseConexion
                 FROM t_usuario u
                 LEFT JOIN t_provincia c ON u.comuna_id = c.idProvincia
                 LEFT JOIN t_partido p ON u.partido_id = p.idPartido
-                WHERE u.tipoUsuario_id = 1
+                WHERE u.tipoUsuario_id = 3
                 ORDER BY u.pNombre ASC";
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
