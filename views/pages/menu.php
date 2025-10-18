@@ -206,6 +206,8 @@ if (!isset($_SESSION['idUsuario'])) {
 
       <div class="flex-grow-1">
         <ul class="nav nav-pills flex-column mb-auto">
+          <?php if ($_SESSION['descPerfil'] === 'Administrador' || $_SESSION['descPerfil'] === 'Secrtario Tecnico' ): ?>
+
           <li>
             <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
               data-bs-toggle="collapse" data-bs-target="#minutas-collapse" aria-expanded="true">
@@ -225,7 +227,7 @@ if (!isset($_SESSION['idUsuario'])) {
               </ul>
             </div>
           </li>
-
+          <?php endif; ?>
           <li>
             <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
               data-bs-toggle="collapse" data-bs-target="#usuarios-collapse" aria-expanded="true">
