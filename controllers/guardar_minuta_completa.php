@@ -1,21 +1,23 @@
 <?php
-// Incluir la configuración de tu base de datos
-require_once __DIR__ . '/../cfg/config.php';
+// controllers/guardar_minuta_completa.php
 
+require_once __DIR__ . '/../cfg/config.php';
 header('Content-Type: application/json');
 
-// Obtener y decodificar los datos JSON
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
+// ❗️ Recuperamos el ID de la minuta (si existe, es una actualización)
+$idMinuta = $data['minuta']['idMinuta'] ?? null; // Asumiendo que el JS lo envía
+
 if (!isset($data['minuta']) || !isset($data['asistencia']) || !isset($data['temas'])) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Faltan datos requeridos (minuta, asistencia o temas).']);
+    echo json_encode(['status' => 'error', 'message' => 'Faltan datos requeridos.']);
     exit;
 }
 
 $datosMinuta = $data['minuta'];
-$asistenciaIDs = $data['asistencia'];
+$asistenciaIDs = $data['asistencia']; // IDs de los asistentes MARCADOS ahora
 $temasData = $data['temas'];
 
 class MinutaManager extends BaseConexion
@@ -28,63 +30,57 @@ class MinutaManager extends BaseConexion
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    public function guardarMinutaCompleta($datosMinuta, $asistenciaIDs, $temasData)
+    public function guardarMinutaCompleta($idMinuta, $datosMinuta, $asistenciaIDs, $temasData)
     {
         try {
-            // 1. INICIAR TRANSACCIÓN
             $this->db->beginTransaction();
-            $idMinuta = null;
 
-            // 2. INSERTAR EN T_MINUTA (Encabezado)
-            // Usamos los NUEVOS nombres de campos: t_comision_idComision y t_usuario_idPresidente
-            // Ejemplo del INSERT en t_minuta:
-
-            // En guardar_minuta_completa.php - Revisa la lista de columnas (13 campos en total + los 2 nuevos):
-            $sqlMinuta = "INSERT INTO t_minuta (
-                pathArchivo, 
-                t_comision_idComision, 
-                t_usuario_idPresidente, 
-                horaMinuta, 
-                fechaMinuta,
-                t_acuerdo_idAcuerdo, 
-                t_propuesta_idPropuesta,
-                t_voto_idVoto, 
-                t_voto_t_usuario_idUsuario, 
-                t_voto_t_propuesta_idPropuesta, 
-                t_voto_t_propuesta_t_acuerdo_idAcuerdo, 
-                t_voto_t_propuesta_t_acuerdo_t_tipoReunion_idTipoReunion
-              ) 
-              VALUES (
-                :path, :comision_id, :presidente_id, :hora, :fecha, 
-                NULL, NULL, NULL, NULL, NULL, NULL, NULL
-              )";
-            // TOTAL DE COLUMNAS: 12 (pathArchivo + 4 básicos + 7 FKs anidadas).
-            // TOTAL DE VALORES: 5 (parámetros) + 7 (NULL) = 12. ¡Debe coincidir!
-
-            $stmtMinuta = $this->db->prepare($sqlMinuta);
-            $stmtMinuta->execute([
-                // Los IDs se obtienen del frontend. Ya no se usa el nombreComision (VARCHAR)
-                ':comision_id' => $datosMinuta['t_comision_idComision'],
-                ':presidente_id' => $datosMinuta['t_usuario_idPresidente'],
-                ':hora' => $datosMinuta['horaMinuta'],
-                ':fecha' => $datosMinuta['fechaMinuta'],
-                ':path' => $datosMinuta['pathArchivo'] // Asumiendo que es una cadena vacía inicialmente
-            ]);
-
-            $idMinuta = $this->db->lastInsertId();
-            if (!$idMinuta) {
-                throw new Exception("Error al obtener idMinuta después de la inserción.");
+            // --- 1. GUARDAR/ACTUALIZAR MINUTA (t_minuta) ---
+            if ($idMinuta) { // ACTUALIZAR
+                $sqlMinuta = "UPDATE t_minuta SET
+                                t_comision_idComision = :comision_id,
+                                t_usuario_idPresidente = :presidente_id,
+                                horaMinuta = :hora,
+                                fechaMinuta = :fecha
+                                -- Faltaría lógica para comisión mixta si la guardas aquí
+                              WHERE idMinuta = :idMinuta";
+                $stmtMinuta = $this->db->prepare($sqlMinuta);
+                $stmtMinuta->execute([
+                    ':comision_id' => $datosMinuta['t_comision_idComision'],
+                    ':presidente_id' => $datosMinuta['t_usuario_idPresidente'],
+                    ':hora' => $datosMinuta['horaMinuta'],
+                    ':fecha' => $datosMinuta['fechaMinuta'],
+                    ':idMinuta' => $idMinuta
+                ]);
+            } else { // INSERTAR NUEVA
+                $sqlMinuta = "INSERT INTO t_minuta (pathArchivo, t_comision_idComision, t_usuario_idPresidente, horaMinuta, fechaMinuta /* ... más columnas si son necesarias ... */)
+                              VALUES (:path, :comision_id, :presidente_id, :hora, :fecha /* ... más NULLs ... */)";
+                // Asegúrate que las columnas y valores coincidan como antes
+                $stmtMinuta = $this->db->prepare($sqlMinuta);
+                $stmtMinuta->execute([
+                    ':path' => "", // Path vacío al crear
+                    ':comision_id' => $datosMinuta['t_comision_idComision'],
+                    ':presidente_id' => $datosMinuta['t_usuario_idPresidente'],
+                    ':hora' => $datosMinuta['horaMinuta'],
+                    ':fecha' => $datosMinuta['fechaMinuta']
+                    // Añadir NULLs para las otras columnas si tu INSERT lo requiere
+                ]);
+                $idMinuta = $this->db->lastInsertId(); // Obtenemos el nuevo ID
             }
 
-            // 3. INSERTAR EN T_ASISTENCIA
-            // Usando el NUEVO campo t_usuario_idUsuario
-            // Asumimos t_tipoReunion_idTipoReunion es 1 o debe ser pasado desde el frontend.
-            $idTipoReunion = 1;
+            if (!$idMinuta) throw new Exception("Error con ID de Minuta.");
 
-            $sqlAsistencia = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion) 
-                  VALUES (:idMinuta, :idUsuario, :idTipoReunion)";
+            // --- 2. ACTUALIZAR ASISTENCIA (t_asistencia) ---
+            // Borramos la asistencia ANTERIOR de esta minuta
+            $sqlDeleteAsistencia = "DELETE FROM t_asistencia WHERE t_minuta_idMinuta = :idMinuta";
+            $stmtDeleteAsistencia = $this->db->prepare($sqlDeleteAsistencia);
+            $stmtDeleteAsistencia->execute([':idMinuta' => $idMinuta]);
+
+            // Insertamos la asistencia ACTUAL (los IDs que llegaron del form)
+            $idTipoReunion = 1; // Asumido
+            $sqlAsistencia = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion)
+                              VALUES (:idMinuta, :idUsuario, :idTipoReunion)";
             $stmtAsistencia = $this->db->prepare($sqlAsistencia);
-
             foreach ($asistenciaIDs as $idUsuario) {
                 $stmtAsistencia->execute([
                     ':idMinuta' => $idMinuta,
@@ -93,62 +89,88 @@ class MinutaManager extends BaseConexion
                 ]);
             }
 
-            // 4. INSERTAR TEMAS (t_tema y t_acuerdo)
-            $idTipoReunionTema = 1; // Asumimos el mismo ID de tipo reunión
-            $idAcuerdo = null;
+            // --- 3. ACTUALIZAR TEMAS (t_tema y t_acuerdo) ---
+            // Necesitamos saber qué temas borrar (los que estaban antes pero ya no vienen)
+            $idsTemasActuales = array_filter(array_column($temasData, 'idTema')); // IDs de temas que SÍ vienen del form
+
+            if (!empty($idsTemasActuales)) {
+                // Borramos los temas asociados a la minuta que NO están en la lista actual
+                $placeholders = implode(',', array_fill(0, count($idsTemasActuales), '?'));
+                $sqlDeleteTemas = "DELETE FROM t_tema WHERE t_minuta_idMinuta = ? AND idTema NOT IN ($placeholders)";
+                $params = array_merge([$idMinuta], $idsTemasActuales);
+                $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
+                $stmtDeleteTemas->execute($params);
+            } else {
+                // Si no viene ningún tema con ID, borramos TODOS los temas anteriores de esa minuta
+                $sqlDeleteTemas = "DELETE FROM t_tema WHERE t_minuta_idMinuta = ?";
+                $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
+                $stmtDeleteTemas->execute([$idMinuta]);
+            }
+
+
+            // Preparamos las consultas para insertar/actualizar temas y acuerdos
+            $sqlInsertTema = "INSERT INTO t_tema (t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion) VALUES (:idMinuta, :nombre, :objetivo, :compromiso, :observacion)";
+            $sqlUpdateTema = "UPDATE t_tema SET nombreTema = :nombre, objetivo = :objetivo, compromiso = :compromiso, observacion = :observacion WHERE idTema = :idTema AND t_minuta_idMinuta = :idMinuta";
+            // Asumiendo que t_acuerdo tiene una relación única con t_tema
+            $sqlInsertAcuerdo = "INSERT INTO t_acuerdo (descAcuerdo, t_tipoReunion_idTipoReunion, t_tema_idTema) VALUES (:descAcuerdo, :idTipoReunion, :idTema)";
+            $sqlUpdateAcuerdo = "UPDATE t_acuerdo SET descAcuerdo = :descAcuerdo WHERE t_tema_idTema = :idTema"; // Simple, podría necesitar más lógica
+
+            $stmtInsertTema = $this->db->prepare($sqlInsertTema);
+            $stmtUpdateTema = $this->db->prepare($sqlUpdateTema);
+            $stmtInsertAcuerdo = $this->db->prepare($sqlInsertAcuerdo);
+            $stmtUpdateAcuerdo = $this->db->prepare($sqlUpdateAcuerdo);
 
             foreach ($temasData as $tema) {
-                // 4.1. Insertar en t_tema
-                // En guardar_minuta_completa.php - Revisa la lista de columnas (4 campos, ya que idTema es AUTO_INCREMENT)
-                $sqlTema = "INSERT INTO t_tema (nombreTema, objetivo, compromiso, observacion) 
-            VALUES (:nombre, :objetivo, :compromiso, :observacion)";
-                // TOTAL DE COLUMNAS: 4.
-                // TOTAL DE VALORES: 4. ¡Debe coincidir!
-                $stmtTema = $this->db->prepare($sqlTema);
-                $stmtTema->execute([
+                $idTema = $tema['idTema'] ?? null; // ID del tema que viene del form
+                $paramsTema = [
+                    ':idMinuta' => $idMinuta,
                     ':nombre' => $tema['nombreTema'],
                     ':objetivo' => $tema['objetivo'],
                     ':compromiso' => $tema['compromiso'],
                     ':observacion' => $tema['observacion']
-                ]);
-                $idTema = $this->db->lastInsertId();
+                ];
 
-                // 4.2. Insertar en t_acuerdo
-                // NOTA: T_acuerdo usa idTema y idTipoReunion (asumido 1)
-                $sqlAcuerdo = "INSERT INTO t_acuerdo (descAcuerdo, t_tipoReunion_idTipoReunion, t_tema_idTema) 
-                               VALUES (:descAcuerdo, :idTipoReunion, :idTema)";
-                $stmtAcuerdo = $this->db->prepare($sqlAcuerdo);
-                $stmtAcuerdo->execute([
-                    ':descAcuerdo' => $tema['descAcuerdo'],
-                    ':idTipoReunion' => $idTipoReunionTema,
-                    ':idTema' => $idTema
-                ]);
-                $idAcuerdo = $this->db->lastInsertId();
+                if ($idTema) { // Si tiene ID, es ACTUALIZAR tema existente
+                    $paramsTema[':idTema'] = $idTema;
+                    $stmtUpdateTema->execute($paramsTema);
+
+                    // Actualizar acuerdo asociado (simplificado)
+                    if (isset($tema['descAcuerdo'])) {
+                        $stmtUpdateAcuerdo->execute([':descAcuerdo' => $tema['descAcuerdo'], ':idTema' => $idTema]);
+                    }
+                } else { // Si no tiene ID, es INSERTAR tema nuevo
+                    $stmtInsertTema->execute($paramsTema);
+                    $idTema = $this->db->lastInsertId(); // Obtenemos el nuevo ID del tema
+
+                    // Insertar acuerdo asociado
+                    if (isset($tema['descAcuerdo']) && !empty($tema['descAcuerdo'])) {
+                        $stmtInsertAcuerdo->execute([
+                            ':descAcuerdo' => $tema['descAcuerdo'],
+                            ':idTipoReunion' => 1, // Asumido
+                            ':idTema' => $idTema
+                        ]);
+                    }
+                }
             }
-            // NOTA: Para un desarrollo completo, la tabla t_minuta DEBERÍA actualizarse con el idAcuerdo del último tema
-            // o se debería crear una tabla de relación N:M (t_minuta_has_t_tema). Por simplicidad, omitiremos la actualización de t_minuta.
 
-            // 5. COMMIT
+            // --- 4. COMMIT ---
             $this->db->commit();
-
             return ['status' => 'success', 'message' => 'Minuta guardada con éxito.', 'idMinuta' => $idMinuta];
         } catch (Exception $e) {
-            // ROLLBACK en caso de cualquier error
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
-            // Devolver el mensaje de error de la BD (solo en desarrollo)
             return ['status' => 'error', 'message' => 'Error en el proceso de base de datos.', 'error' => $e->getMessage()];
         }
     }
 }
 
-// --- Ejecución del Controlador ---
+// --- Ejecución ---
 try {
     $manager = new MinutaManager();
-    $result = $manager->guardarMinutaCompleta($datosMinuta, $asistenciaIDs, $temasData);
+    $result = $manager->guardarMinutaCompleta($idMinuta, $datosMinuta, $asistenciaIDs, $temasData);
     echo json_encode($result);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.', 'error' => $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'Error interno.', 'error' => $e->getMessage()]);
 }

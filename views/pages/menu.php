@@ -9,6 +9,11 @@ if (!isset($_SESSION['idUsuario'])) {
   header("Location: /corevota/views/pages/login.php");
   exit;
 }
+
+// ❗️ NUEVO: Capturar la página a cargar
+// Si no se especifica 'pagina', cargamos 'crear_minuta' por defecto
+$pagina = $_GET['pagina'] ?? 'crear_minuta';
+$id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -148,17 +153,15 @@ if (!isset($_SESSION['idUsuario'])) {
       width: calc(100% - var(--sidebar-width));
       height: calc(100vh - var(--header-height));
       overflow-y: auto;
-      padding: 0;
+
+      /* ❗️ ESTILO MODIFICADO: El padding ahora está aquí */
+      padding: 1.5rem;
+      /* Ajusta este padding como necesites */
+
       background-color: #f8f9fa;
     }
 
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-      background: white;
-    }
+    /* ❗️ ELIMINADO EL ESTILO DE IFRAME */
 
     /* Estilos para los botones de las secciones (Reuniones, Usuarios, Comisiones) */
     .nav-pills .btn-toggle {
@@ -219,10 +222,23 @@ if (!isset($_SESSION['idUsuario'])) {
               </button>
               <div class="collapse show" id="minutas-collapse">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
-                  <li><a href="/corevota/views/pages/crearMinuta.php" target="content-frame"
-                      class="link-dark d-block rounded py-1">Crear Minuta</a></li>
-                  <li><a href="/corevota/controllers/MinutaController.php?action=list" target="content-frame"
-                      class="link-dark d-block rounded py-1">Listado Minutas</a></li>
+
+                  <li>
+                    <a href="menu.php?pagina=crear_minuta"
+                      class="link-dark d-block rounded py-1">Crear Minuta</a>
+                  </li>
+                  <li>
+                    <a href="menu.php?pagina=minutas_pendientes"
+                      class="link-warning d-block rounded py-1">
+                      Minutas Pendientes 
+                    </a>
+                  </li>
+                  <li>
+                    <a href="menu.php?pagina=minutas_aprobadas"
+                      class="link-success d-block rounded py-1">
+                      Minutas Aprobadas 
+                    </a>
+                  </li>
 
                 </ul>
               </div>
@@ -240,10 +256,12 @@ if (!isset($_SESSION['idUsuario'])) {
             </button>
             <div class="collapse show" id="usuarios-collapse">
               <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
-                <li><a href="/corevota/views/pages/usuarios_listado.php" target="content-frame"
+
+                <li><a href="menu.php?pagina=usuarios_listado"
                     class="link-dark d-block rounded py-1">Revisar listado de usuarios registrados</a></li>
-                <li><a href="/corevota/views/pages/usuario_formulario.php?action=create" target="content-frame"
+                <li><a href="menu.php?pagina=usuario_crear"
                     class="link-dark d-block rounded py-1">Registrar un nuevo usuario</a></li>
+
               </ul>
             </div>
           </li>
@@ -259,16 +277,16 @@ if (!isset($_SESSION['idUsuario'])) {
             </button>
             <div class="collapse show" id="comisiones-collapse">
               <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
+
                 <li>
-                  <a href="/corevota/controllers/ComisionController.php?action=create"
-                    target="content-frame"
+                  <a href="menu.php?pagina=comision_crear"
                     class="link-dark d-block rounded py-1">Registrar nueva comisión</a>
                 </li>
                 <li>
-                  <a href="/corevota/controllers/ComisionController.php?action=list"
-                    target="content-frame"
+                  <a href="menu.php?pagina=comision_listado"
                     class="link-dark d-block rounded py-1">Revisar listado de comisiones guardadas</a>
                 </li>
+
               </ul>
             </div>
           </li>
@@ -284,23 +302,23 @@ if (!isset($_SESSION['idUsuario'])) {
             </button>
             <div class="collapse show" id="reuniones-collapse">
               <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
+
                 <li>
-                  <a href="/corevota/views/pages/crearReunion.php" target="content-frame"
+                  <a href="menu.php?pagina=reunion_crear"
                     class="link-dark d-block rounded py-1">Crear Reunión</a>
                 </li>
                 <li>
-                  <a href="/corevota/controllers/ReunionController.php?action=list" target="content-frame"
+                  <a href="menu.php?pagina=reunion_listado"
                     class="link-dark d-block rounded py-1">Listado de Reuniones</a>
                 </li>
                 <li>
-                  <a href="/corevota/views/pages/reunion_calendario.php" target="content-frame"
+                  <a href="menu.php?pagina=reunion_calendario"
                     class="link-dark d-block rounded py-1">Vista Calendario</a>
                 </li>
+
               </ul>
             </div>
           </li>
-
-
 
         </ul>
       </div>
@@ -332,13 +350,14 @@ if (!isset($_SESSION['idUsuario'])) {
             ?>
           </span>
           <ul class="dropdown-menu dropdown-menu-end">
+
             <li>
-              <a class="dropdown-item" href="/corevota/views/pages/perfil_usuario.php" target="content-frame">
+              <a class="dropdown-item" href="menu.php?pagina=perfil_usuario">
                 Mi perfil
               </a>
             </li>
             <li>
-              <a class="dropdown-item" href="/corevota/views/pages/configuracion_vista.php" target="content-frame">
+              <a class="dropdown-item" href="menu.php?pagina=configuracion_vista">
                 Configuración
               </a>
             </li>
@@ -352,7 +371,84 @@ if (!isset($_SESSION['idUsuario'])) {
     </header>
 
     <main>
-      <iframe src="/corevota/views/pages/crearMinuta.php" name="content-frame"></iframe>
+      <?php
+      // Este "router" decide qué archivo cargar basado en la variable $pagina de la URL
+      switch ($pagina) {
+
+        // Casos de Minutas
+        case 'crear_minuta':
+          include __DIR__ . '/crearMinuta.php';
+          break;
+        case 'minutas_pendientes':
+          $_GET['action'] = 'list'; // Preparamos las variables para el controller
+          $_GET['estado'] = 'PENDIENTE';
+          include __DIR__ . '/../../controllers/MinutaController.php';
+          break;
+        case 'minutas_aprobadas':
+          $_GET['action'] = 'list'; // Preparamos las variables para el controller
+          $_GET['estado'] = 'APROBADA';
+          include __DIR__ . '/../../controllers/MinutaController.php';
+          break;
+
+        // Casos de Usuarios
+        case 'usuarios_listado':
+          include __DIR__ . '/usuarios_listado.php';
+          break;
+        case 'usuario_crear':
+          $_GET['action'] = 'create';
+          include __DIR__ . '/usuario_formulario.php';
+          break;
+
+        // Casos de Comisiones
+        case 'comision_crear':
+          $_GET['action'] = 'create';
+          include __DIR__ . '/../../controllers/ComisionController.php';
+          break;
+        case 'comision_listado':
+          $_GET['action'] = 'list';
+          include __DIR__ . '/../../controllers/ComisionController.php';
+          break;
+
+        // Casos de Reuniones
+        case 'reunion_crear':
+          include __DIR__ . '/crearReunion.php';
+          break;
+        case 'reunion_listado':
+          $_GET['action'] = 'list';
+          include __DIR__ . '/../../controllers/ReunionController.php';
+          break;
+        case 'reunion_calendario':
+          include __DIR__ . '/reunion_calendario.php';
+          break;
+
+        // Casos del Dropdown de Perfil
+        case 'perfil_usuario':
+          include __DIR__ . '/perfil_usuario.php';
+          break;
+        case 'configuracion_vista':
+          include __DIR__ . '/configuracion_vista.php';
+          break;
+
+
+
+        // ❗️❗️ NUEVO CASE PARA EDITAR MINUTA ❗️❗️
+        case 'editar_minuta':
+          // Pasamos el ID a $_GET para que crearMinuta.php lo pueda leer
+          if ($id_param) {
+            $_GET['id'] = $id_param; // Aseguramos que $_GET['id'] esté disponible
+            include __DIR__ . '/crearMinuta.php'; // Incluimos el mismo formulario
+          } else {
+            echo "<div class='alert alert-danger'>Error: Falta el ID de la minuta para editar.</div>";
+          }
+          break;
+        // ❗️❗️ FIN NUEVO CASE ❗️❗️
+
+        // Caso por defecto (si 'pagina' no coincide con nada)
+        default:
+          echo "<div class='alert alert-warning'>Página no encontrada.</div>";
+          break;
+      }
+      ?>
     </main>
 
   </div>

@@ -12,21 +12,31 @@ $model = new MinutaModel();
 
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
+// Capturar el estado del filtro de la URL (si existe)
+$estado_filtro = $_GET['estado'] ?? null;
+
 switch ($action) {
     case 'list':
-        // ... (Código existente para listar) ...
-        $minutas = $model->getAllMinutas();
+        // 2. Filtrar solo si el estado es válido (PENDIENTE o APROBADA)
+        if ($estado_filtro === 'PENDIENTE' || $estado_filtro === 'APROBADA') {
+            $minutas = $model->getMinutasByEstado($estado_filtro);
+        } else {
+            // Si no hay filtro o es inválido, muestra todo
+            $minutas = $model->getAllMinutas();
+        }
+
+        // El listado general ahora será el filtro
         include __DIR__ . '/../views/pages/minutas_listado_general.php';
         break;
 
     case 'view':
-        // ... (Código existente para ver detalle) ...
+        // CÓDIGO ORIGINAL DEL CASO 'VIEW'
         $id = (int)$_GET['id'];
         $tema = $model->getTemaById($id);
 
         if (!$tema) {
             $_SESSION['error'] = 'Tema de minuta no encontrado.';
-            header('Location: minutaController.php?action=list');
+            header('Location: MinutaController.php?action=list');
             exit;
         }
 
@@ -34,13 +44,13 @@ switch ($action) {
         break;
 
     case 'edit':
-        // 🎯 Muestra el formulario para editar un tema
+        // CÓDIGO ORIGINAL DEL CASO 'EDIT'
         $id = (int)$_GET['id'];
         $tema = $model->getTemaById($id);
 
         if (!$tema) {
             $_SESSION['error'] = 'Tema no encontrado para edición.';
-            header('Location: minutaController.php?action=list');
+            header('Location: MinutaController.php?action=list');
             exit;
         }
         $title = "Editar Minuta (Tema #{$id})";
@@ -50,7 +60,7 @@ switch ($action) {
         break;
 
     case 'update':
-        // 🎯 Procesa la actualización del formulario
+        // CÓDIGO ORIGINAL DEL CASO 'UPDATE'
         $id = (int)($_POST['idTema'] ?? 0);
         $data = [
             'nombreTema' => trim($_POST['nombreTema'] ?? ''),
@@ -61,7 +71,7 @@ switch ($action) {
 
         if ($id === 0 || empty($data['nombreTema'])) {
             $_SESSION['error'] = 'Datos incompletos o ID inválido.';
-            header('Location: minutaController.php?action=edit&id=' . $id);
+            header('Location: MinutaController.php?action=edit&id=' . $id);
             exit;
         }
 
@@ -71,10 +81,10 @@ switch ($action) {
             $_SESSION['error'] = 'Error al actualizar la minuta.';
         }
 
-        header('Location: minutaController.php?action=list');
+        header('Location: MinutaController.php?action=list');
         exit;
 
     default:
-        header('Location: minutaController.php?action=list');
+        header('Location: MinutaController.php?action=list');
         exit;
 }
