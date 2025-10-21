@@ -83,6 +83,6 @@ $idUsuario = $_SESSION['idUsuario'] ?? 0;
     </div>
   </div>
 </div>
-<script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

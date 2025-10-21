@@ -293,12 +293,18 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
       const ahora = new Date();
       horaInput.value = ahora.toTimeString().slice(0, 5);
       fechaInput.value = ahora.toISOString().split('T')[0];
+
+
       fetch("/corevota/controllers/session_user.php").then(res => res.json()).then(data => {
         document.getElementById("secretario").value = data.nombreUsuario || "N/D";
       }).catch(() => document.getElementById("secretario").value = "Error");
-      fetch("/corevota/controllers/fetch_sesion.php").then(res => res.json()).then(data => {
-        document.getElementById("nSesion").value = data.numeroSesion ? String(data.numeroSesion).padStart(2, '0') : "N/D";
-      }).catch(() => document.getElementById("nSesion").value = "Error");
+      const nSesionInput = document.getElementById("nSesion");
+      if (idMinutaGlobal) { // Si estamos editando (idMinutaGlobal tiene un valor)
+        nSesionInput.value = String(idMinutaGlobal).padStart(2, '0'); // Muestra el ID de la minuta
+      } else { // Si es una minuta nueva
+        nSesionInput.value = "Nuevo"; // O déjalo vacío: nSesionInput.value = "";
+      }
+
     }
 
     // --- Lógica del Formulario (Comisión Mixta) ---
@@ -638,7 +644,6 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     }
   </script>
 
-  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
 </body>
 

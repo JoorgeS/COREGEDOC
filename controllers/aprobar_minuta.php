@@ -1,6 +1,8 @@
 <?php
 // controllers/aprobar_minuta.php
 header('Content-Type: application/json');
+error_reporting(E_ALL); // Mantener para ver otros errores si surgen
+ini_set('display_errors', 1); // Mantener para ver otros errores si surgen
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -8,187 +10,128 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // 1. INCLUIR DEPENDENCIAS Y CONFIGURACIÓN
 // -----------------------------------------------------------------------------
-// Ruta raíz del proyecto (subiendo un nivel desde controllers)
 define('ROOT_PATH', dirname(__DIR__) . '/');
-
 require_once ROOT_PATH . 'class/class.conectorDB.php';
-require_once ROOT_PATH . 'vendor/autoload.php'; // Autoload de Dompdf
+require_once ROOT_PATH . 'vendor/autoload.php'; // Dompdf
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+// ❗️❗️ QUITADAS LAS LÍNEAS 'use' PARA QR CODE ❗️❗️
 
 // 2. OBTENER DATOS DE ENTRADA Y SESIÓN
 // -----------------------------------------------------------------------------
 $data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $data['idMinuta'] ?? null;
 $idPresidenteLogueado = $_SESSION['idUsuario'] ?? null;
-$nombrePresidenteLogueado = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? '')); // Nombre para el PDF
+$nombrePresidenteLogueado = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? ''));
 
 if (!$idMinuta || !$idPresidenteLogueado) {
     echo json_encode(['status' => 'error', 'message' => 'Datos incompletos o sesión no válida.']);
     exit;
 }
 
-// 3. FUNCIÓN PARA GENERAR HTML 
+// 3. FUNCIÓN PARA GENERAR HTML (SIN QR)
 // -----------------------------------------------------------------------------
-function generateMinutaHtml($data, $logo_uri)
+// ❗️❗️ Modificada para no requerir $qrCodeDataUri ❗️❗️
+function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri)
 {
-    // Mapear variables a nombres más cortos para la plantilla
-    $comision1 = htmlspecialchars($data['nombreComision1'] ?? 'N/A');
-    $comision2 = htmlspecialchars($data['nombreComision2'] ?? '');
-    
-    // El HTML usa $comision2 para determinar si la sección mixta debe mostrarse.
-    $comisionMixta = !empty($comision2); 
-
-    $comisiones_display = $comision1;
-    if ($comisionMixta) {
-        $comisiones_display .= ' / ' . $comision2;
+    // ... (El inicio de la función HTML es igual que antes, incluyendo estilos y encabezado con logos) ...
+    $comisiones = htmlspecialchars($data['nombreComision1'] ?? 'N/A');
+    if (!empty($data['nombreComision2'])) {
+        $comisiones .= ' / ' . htmlspecialchars($data['nombreComision2']);
     }
 
-    // Estilos CSS integrados
-    $styles = '
-        body { font-family: Helvetica, sans-serif; margin: 0; padding: 0; font-size: 10pt; line-height: 1.5; }
-        .container { width: 90%; margin: 20px auto; }
-        .header-box { border-bottom: 1px solid #ccc; padding-bottom: 15px; margin-bottom: 15px; display: block; overflow: hidden; }
-        .logo { width: 60px; height: auto; float: left; margin-right: 15px; }
-        .header-text { float: left; width: calc(100% - 75px); }
-        .header-text p { margin: 0; font-size: 9pt; line-height: 1.2; color: #555; }
-        .header-text .main-title { font-weight: bold; font-size: 11pt; color: #000; }
-        .minuta-info { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10pt; }
-        .minuta-info th, .minuta-info td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
-        .minuta-info th { background-color: #eee; width: 30%; font-weight: bold; }
-        h2 { font-size: 14pt; margin-top: 25px; margin-bottom: 10px; color: #004d40; }
-        h3 { font-size: 11pt; margin-top: 15px; border-bottom: 2px solid #ddd; padding-bottom: 3px; color: #333; font-weight: bold; }
-        .content p { margin: 5px 0 10px 0; }
-        .asistencia-list ul { list-style-type: disc; padding-left: 20px; margin: 10px 0; columns: 2; }
-        .asistencia-list li { margin-bottom: 3px; font-size: 10pt; }
-        .signature-box { margin-top: 50px; text-align: center; }
-        .signature-line { border-top: 1px solid #000; width: 50%; margin: 30px auto 5px auto; }
-    ';
-
-    $html = '
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Minuta Aprobada CORE - ' . $comisiones_display . '</title>
-        <style>' . $styles . '</style>
-    </head>
-    <body>
-    <div class="container">
-        
-        <div class="header-box">
-            <img src="' . htmlspecialchars($logo_uri) . '" class="logo" alt="Logo CORE">
-            <div class="header-text">
-                <p>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>
-                <p class="main-title">CONSEJO REGIONAL</p>
-                <p>COMISIÓN ' . strtoupper($comisiones_display) . '</p>
-            </div>
-        </div>
-
-        <table class="minuta-info">
-            <tr>
-                <th>MINUTA DE REUNIÓN</th>
-                <td colspan="3">APROBADA</td>
-            </tr>
-            <tr>
-                <th>Fecha</th>
-                <td>' . htmlspecialchars($data['fechaMinuta'] ?? 'N/A') . '</td>
-                <th>Hora</th>
-                <td>' . htmlspecialchars($data['horaMinuta'] ?? 'N/A') . '</td>
-            </tr>
-            <tr>
-                <th>Presidente</th>
-                <td>' . htmlspecialchars($data['nombrePresidente1'] ?? 'N/A') . '</td>
-                <th>Secretario Técnico</th>
-                <td>' . htmlspecialchars($data['nombreSecretario'] ?? 'N/A') . '</td>
-            </tr>
-            <tr>
-                <th>N° Sesión</th>
-                <td>' . htmlspecialchars($data['numeroSesion'] ?? 'N/A') . '</td>
-                <th>Lugar</th>
-                <td>' . htmlspecialchars($data['lugarReunion'] ?? 'Salón de Plenarios') . '</td>
-            </tr>
-            ' . (($comisionMixta) ? '
-            <tr>
-                <th>Comisión Mixta</th>
-                <td>' . $comision2 . '</td>
-                <th>Presidente Mixta</th>
-                <td>' . htmlspecialchars($data['nombrePresidente2'] ?? 'N/A') . '</td>
-            </tr>' : '') . '
-        </table>
-
-        <h2>ASISTENTES</h2>
-        <div class="asistencia-list">
-            <ul>';
-
-    // LÓGICA DE ASISTENCIA
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Minuta Aprobada</title><style>' .
+        'body{font-family:Helvetica,sans-serif;font-size:10pt;line-height:1.4;}' .
+        '.header{margin-bottom:20px;overflow:hidden;}' .
+        '.logo-left{float:left;width:80px;height:auto;}' .
+        '.logo-right{float:right;width:120px;height:auto;margin-top:10px;}' .
+        '.header-center{text-align:center;margin:0 140px 0 90px;}' .
+        '.header-center p{margin:0;padding:0;font-size:9pt;font-weight:bold;}' .
+        '.header-center .consejo{font-size:10pt;}' .
+        '.titulo-minuta{text-align:center;font-weight:bold;font-size:12pt;margin:20px 0 15px 0;text-decoration:underline;}' .
+        '.info-tabla{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:9pt;}' .
+        '.info-tabla td{padding:4px 8px;border:1px solid #ccc;}' .
+        '.info-tabla .label{font-weight:bold;width:15%;background-color:#f2f2f2;}' .
+        '.seccion-titulo{font-weight:bold;font-size:10pt;margin:20px 0 5px 0;text-decoration:underline;}' .
+        '.asistentes-lista ul{list-style:none;padding:0;margin:0;columns:2;-webkit-columns:2;}' .
+        '.asistentes-lista li{margin-bottom:3px;font-size:9pt;line-height:1.2;}' .
+        '.sintesis-sesion, .desarrollo-tema{margin-bottom:15px;font-size:10pt;text-align:justify;}' .
+        '.desarrollo-tema h4{font-size:10pt;font-weight:bold;margin:10px 0 3px 0;}' .
+        '.desarrollo-tema p{margin:0 0 5px 0;}' .
+        '.signature-box{margin-top:50px;text-align:center;}' . // Ajustado margen superior
+        '.signature-line{border-top:1px solid #000;width:50%;margin:30px auto 5px auto;}' .
+        '</style></head><body>' .
+        '<div class="header">' .
+        '<img src="' . htmlspecialchars($logoGoreUri) . '" class="logo-left">' .
+        '<img src="' . htmlspecialchars($logoCoreUri) . '" class="logo-right">' .
+        '<div class="header-center">' .
+        '<p>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>' .
+        '<p class="consejo">CONSEJO REGIONAL</p>' .
+        '<p>COMISIÓN ' . strtoupper($comisiones) . '</p>' .
+        '<p>PRESIDENTE: ' . strtoupper(htmlspecialchars($data['nombrePresidente1'] ?? 'N/A')) . '</p>' .
+        '</div>' .
+        '</div>' .
+        '<div class="titulo-minuta">MINUTA REUNIÓN</div>' .
+        '<table class="info-tabla">' .
+        '<tr><td class="label">Fecha:</td><td>' . htmlspecialchars($data['fechaMinuta'] ?? 'N/A') . '</td><td class="label">Hora:</td><td>' . htmlspecialchars($data['horaMinuta'] ?? 'N/A') . '</td></tr>' .
+        '<tr><td class="label">Lugar:</td><td colspan="3">Salón de Plenarios</td></tr>' .
+        (!empty($data['nombreComision2']) ? '<tr><td class="label">Pdte. Mixta:</td><td colspan="3">' . htmlspecialchars($data['nombrePresidente2'] ?? 'N/A') . '</td></tr>' : '') .
+        '<tr><td class="label">Secretario T.:</td><td colspan="3">' . htmlspecialchars($data['nombreSecretario'] ?? 'N/A') . '</td></tr>' . // Añadido Secretario a la tabla
+        '</table>' .
+        '<div class="seccion-titulo">Tabla de la sesión</div><div><ol>';
+    if (!empty($data['temas']) && is_array($data['temas'])) {
+        foreach ($data['temas'] as $tema) {
+            if (!empty(strip_tags($tema['nombreTema'] ?? ''))) {
+                $html .= '<li>' . strip_tags($tema['nombreTema']) . '</li>';
+            }
+        }
+    } else {
+        $html .= '<li>N/A</li>';
+    }
+    $html .= '<li>Varios</li></ol></div>' .
+        '<div class="seccion-titulo">Asistentes:</div><div class="asistentes-lista"><ul>';
     if (!empty($data['asistentes']) && is_array($data['asistentes'])) {
         foreach ($data['asistentes'] as $asistente) {
             $html .= '<li>' . htmlspecialchars($asistente['nombreCompleto']) . '</li>';
         }
     } else {
-        $html .= '<li>No se registraron asistentes.</li>';
+        $html .= '<li>No registrados.</li>';
     }
-
-    $html .= '</ul>
-        </div>';
-
-    // --- Desarrollo de la Minuta (Temas) ---
-    $html .= '<h2>DESARROLLO DE LA MINUTA</h2>';
-
-    $temas = $data['temas'] ?? [];
-    if (empty($temas) || (count($temas) == 1 && empty(strip_tags($temas[0]['nombreTema'] ?? '')))) {
-        $html .= '<p>No hay temas registrados para el desarrollo de la minuta.</p>';
-    } else {
-        foreach ($temas as $index => $tema) {
-            $num = $index + 1;
-            
+    $html .= '</ul></div>' .
+        '<div class="seccion-titulo">Síntesis de la sesión</div><div class="sintesis-sesion"><p>' . ($data['sintesis'] ?? 'N/A') . '</p></div>' .
+        '<div class="seccion-titulo">Desarrollo / Acuerdos / Compromisos</div>';
+    if (!empty($data['temas']) && is_array($data['temas'])) {
+        foreach ($data['temas'] as $index => $tema) {
             if (empty(strip_tags($tema['nombreTema'] ?? ''))) continue;
-
-            $html .= '
-            <div class="tema-block">
-                <h3>TEMA ' . $num . ': ' . strip_tags($tema['nombreTema'] ?? '') . '</h3>
-                <div class="content">';
-
+            $html .= '<div class="desarrollo-tema"><h4>TEMA ' . ($index + 1) . ': ' . strip_tags($tema['nombreTema']) . '</h4>';
             if (!empty($tema['objetivo'])) {
-                $html .= '<p><strong>OBJETIVO:</strong><br>' . ($tema['objetivo']) . '</p>';
-            }
+                $html .= '<p><strong>Objetivo:</strong> ' . ($tema['objetivo']) . '</p>';
+            } // Añadido Objetivo aquí
             if (!empty($tema['descAcuerdo'])) {
-                $html .= '<p><strong>ACUERDOS ADOPTADOS:</strong><br>' . ($tema['descAcuerdo']) . '</p>';
+                $html .= '<p><strong>Acuerdo:</strong> ' . ($tema['descAcuerdo']) . '</p>';
             }
             if (!empty($tema['compromiso'])) {
-                $html .= '<p><strong>COMPROMISOS Y RESPONSABLES:</strong><br>' . ($tema['compromiso']) . '</p>';
+                $html .= '<p><strong>Compromiso:</strong> ' . ($tema['compromiso']) . '</p>';
             }
             if (!empty($tema['observacion'])) {
-                $html .= '<p><strong>OBSERVACIONES Y COMENTARIOS:</strong><br>' . ($tema['observacion']) . '</p>';
+                $html .= '<p><strong>Obs:</strong> ' . ($tema['observacion']) . '</p>';
             }
-
-            $html .= '</div>
-            </div>';
+            $html .= '</div>';
         }
+    } else {
+        $html .= '<p>No hay detalles registrados.</p>';
     }
-
-    // --- SECCIONES ACUERDOS GENERALES Y VARIOS ELIMINADAS ---
-
-
-    // --- FIRMA ---
-    $html .= '
-        <div class="signature-box">
-            <div class="signature-line"></div>
-            <p>' . htmlspecialchars($data['nombrePresidente1'] ?? 'N/A') . '</p>
-            <p>Presidente</p>
-            <p>Comisión ' . $comisiones_display . '</p>
-        </div>
-    </div>
-    </body>
-    </html>';
+    // ❗️❗️ SECCIÓN QR ELIMINADA ❗️❗️
+    //'<div class="qr-code">...</div>'.
+    // -- Firma (Ajustada sin QR) --
+    '<div class="signature-box"><div class="signature-line"></div><p>' . htmlspecialchars($data['nombrePresidente1'] ?? 'N/A') . '</p><p>Presidente</p><p>Comisión ' . $comisiones . '</p></div>' .
+        '</body></html>';
 
     return $html;
 }
 
-
-// 4. LÓGICA PRINCIPAL (DENTRO DE TRY...CATCH)
+// 4. LÓGICA PRINCIPAL (SIN QR)
 // -----------------------------------------------------------------------------
 $db = null;
 $pdfWebPath = null;
@@ -199,159 +142,109 @@ try {
     $pdo = $db->getDatabase();
     $pdo->beginTransaction();
 
-    // 4.1. VERIFICAR PERMISOS (Presidente asignado)
+    // 4.1. VERIFICAR PERMISOS (igual que antes)
     $sql_check = "SELECT t_usuario_idPresidente FROM t_minuta WHERE idMinuta = :idMinuta";
     $stmt_check = $pdo->prepare($sql_check);
     $stmt_check->execute([':idMinuta' => $idMinuta]);
     $minuta = $stmt_check->fetch(PDO::FETCH_ASSOC);
-
     if (!$minuta || (int)$minuta['t_usuario_idPresidente'] !== (int)$idPresidenteLogueado) {
         throw new Exception('No tiene permisos para firmar esta minuta.');
     }
 
-    // 4.2. OBTENER TODOS LOS DATOS PARA EL PDF
+    // 4.2. OBTENER DATOS COMPLETOS PARA EL PDF (igual que antes)
     $datosParaPDF = [];
-
-    // Datos básicos de la minuta
-    // Se seleccionan solo las columnas existentes en la tabla t_minuta
-    $sql_minuta_data = "SELECT m.fechaMinuta, m.horaMinuta, 
-                        m.t_comision_idComision, m.t_usuario_idPresidente
-                        FROM t_minuta m
-                        WHERE m.idMinuta = :idMinuta";
+    $sql_minuta_data = "SELECT m.fechaMinuta, m.horaMinuta, m.t_comision_idComision, m.t_usuario_idPresidente FROM t_minuta m WHERE m.idMinuta = :idMinuta";
     $stmt_minuta_data = $pdo->prepare($sql_minuta_data);
     $stmt_minuta_data->execute([':idMinuta' => $idMinuta]);
     $minutaData = $stmt_minuta_data->fetch(PDO::FETCH_ASSOC);
     if (!$minutaData) throw new Exception('Minuta no encontrada.');
-    $datosParaPDF = array_merge($datosParaPDF, $minutaData);
-
-    // ASIGNACIONES SOLICITADAS Y CORRECTAS:
-    $datosParaPDF['numeroSesion'] = $idMinuta; // Solicitado: N° Sesión = ID de Minuta
-    $datosParaPDF['lugarReunion'] = 'Salón de Plenarios'; // Solicitado: Lugar fijo
-    
-    // Variables de sesión
-    $datosParaPDF['nombreSecretario'] = $nombrePresidenteLogueado; 
-    
-    // Se inicializan las variables de comisión mixta (si no existen en la DB)
-    $datosParaPDF['nombreComision2'] = '';
-    $datosParaPDF['nombrePresidente2'] = '';
-
-    // Comisión 1 (Principal)
-    $sql_com1 = "SELECT nombreComision FROM t_comision WHERE idComision = :id";
-    $stmt_com1 = $pdo->prepare($sql_com1);
-    $stmt_com1->execute([':id' => $datosParaPDF['t_comision_idComision']]);
-    $datosParaPDF['nombreComision1'] = $stmt_com1->fetchColumn();
-
-    // Presidente 1 (Principal)
-    $sql_pres1 = "SELECT CONCAT(pNombre, ' ', aPaterno) FROM t_usuario WHERE idUsuario = :id";
-    $stmt_pres1 = $pdo->prepare($sql_pres1);
-    $stmt_pres1->execute([':id' => $datosParaPDF['t_usuario_idPresidente']]);
-    $datosParaPDF['nombrePresidente1'] = $stmt_pres1->fetchColumn();
-    
-    // Lista de Asistentes (Nombres)
-    $sql_asist = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto
-                  FROM t_asistencia a JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                  WHERE a.t_minuta_idMinuta = :idMinuta ORDER BY u.aPaterno, u.pNombre";
+    $datosParaPDF = $minutaData;
+    $datosParaPDF['nombreSecretario'] = $nombrePresidenteLogueado; // Asignar secretario
+    $sql_nombres = "SELECT c.nombreComision, CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente FROM t_comision c, t_usuario u WHERE c.idComision = :idCom AND u.idUsuario = :idPres";
+    $stmt_nombres = $pdo->prepare($sql_nombres);
+    $stmt_nombres->execute([':idCom' => $datosParaPDF['t_comision_idComision'], ':idPres' => $datosParaPDF['t_usuario_idPresidente']]);
+    $nombres = $stmt_nombres->fetch(PDO::FETCH_ASSOC);
+    $datosParaPDF['nombreComision1'] = $nombres['nombreComision'] ?? 'N/A';
+    $datosParaPDF['nombrePresidente1'] = $nombres['nombrePresidente'] ?? 'N/A';
+    // (Añadir lógica para comisión mixta si es necesario)
+    $datosParaPDF['nombreComision2'] = null;
+    $datosParaPDF['nombrePresidente2'] = null;
+    $sql_asist = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto FROM t_asistencia a JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario WHERE a.t_minuta_idMinuta = :idMinuta ORDER BY u.aPaterno, u.pNombre";
     $stmt_asist = $pdo->prepare($sql_asist);
     $stmt_asist->execute([':idMinuta' => $idMinuta]);
     $datosParaPDF['asistentes'] = $stmt_asist->fetchAll(PDO::FETCH_ASSOC);
-
-    // Lista de Temas (con Acuerdos)
-    $sql_temas = "SELECT t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                  FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                  WHERE t.t_minuta_idMinuta = :idMinuta ORDER BY t.idTema ASC";
+    $sql_temas = "SELECT t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema WHERE t.t_minuta_idMinuta = :idMinuta ORDER BY t.idTema ASC";
     $stmt_temas = $pdo->prepare($sql_temas);
     $stmt_temas->execute([':idMinuta' => $idMinuta]);
     $datosParaPDF['temas'] = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
+    $datosParaPDF['numeroSesion'] = 'XX'; // Placeholder
 
-    // 4.3. ACTUALIZAR ESTADO DE LA MINUTA
-    $sql_update_status = "UPDATE t_minuta
-                          SET estadoMinuta = 'APROBADA',
-                              fechaAprobacion = NOW()
-                          WHERE idMinuta = :idMinuta AND estadoMinuta = 'PENDIENTE'"; 
+    // ❗️❗️ SECCIÓN 5.3 ELIMINADA (GENERACIÓN QR) ❗️❗️
+
+    // 5.4. ACTUALIZAR ESTADO DE LA MINUTA (igual que antes)
+    $sql_update_status = "UPDATE t_minuta SET estadoMinuta = 'APROBADA', fechaAprobacion = NOW() WHERE idMinuta = :idMinuta AND estadoMinuta = 'PENDIENTE'";
     $stmt_update_status = $pdo->prepare($sql_update_status);
     $exito_status = $stmt_update_status->execute([':idMinuta' => $idMinuta]);
-
     if (!$exito_status || $stmt_update_status->rowCount() == 0) {
-        throw new Exception('No se pudo actualizar el estado de la minuta o ya estaba aprobada.');
+        throw new Exception('No se pudo actualizar el estado o ya estaba aprobada.');
     }
 
-    // 4.4. GENERAR Y GUARDAR EL PDF
+    // 5.5. GENERAR Y GUARDAR EL PDF FÍSICO (igual que antes, pero sin pasar QR a la función HTML)
     $options = new Options();
     $options->set('defaultFont', 'Helvetica');
     $options->set('isHtml5ParserEnabled', true);
     $options->set('isRemoteEnabled', true);
-    $options->set('chroot', ROOT_PATH); 
+    $options->set('chroot', ROOT_PATH);
     $options->set('isPhpEnabled', true);
 
     $dompdf = new Dompdf($options);
+    $logoGoreRelPath = 'public/img/logo2.png';
+    $logoCoreRelPath = 'public/img/logoCore1.png';
 
-    $logo_relative_path = 'public/img/logo2.png';
+    // ❗️ Llamada a generateMinutaHtml SIN el parámetro QR ❗️
+    $htmlContent = generateMinutaHtml($datosParaPDF, $logoGoreRelPath, $logoCoreRelPath);
 
-    // Generar HTML usando la función y los datos recolectados
-    $htmlContent = generateMinutaHtml($datosParaPDF, $logo_relative_path); 
     $dompdf->loadHtml($htmlContent);
     $dompdf->setPaper('A4', 'portrait');
     $dompdf->render();
 
-    // Definir dónde guardar y el nombre del archivo
-    $saveDir = ROOT_PATH . 'public/docs/minutas_aprobadas/'; 
+    $saveDir = ROOT_PATH . 'public/docs/minutas_aprobadas/';
     $filename = "minuta_aprobada_" . $idMinuta . "_" . date('Ymd_His') . ".pdf";
     $fullSavePath = $saveDir . $filename;
-    $pdfWebPath = "/corevota/public/docs/minutas_aprobadas/" . $filename; 
+    $pdfWebPath = "/corevota/public/docs/minutas_aprobadas/" . $filename;
 
-    // Asegurarse de que el directorio exista
     if (!is_dir($saveDir)) {
-        if (!mkdir($saveDir, 0775, true)) { 
-            throw new Exception('No se pudo crear el directorio para guardar PDFs: ' . $saveDir);
+        if (!mkdir($saveDir, 0775, true)) {
+            throw new Exception('No se pudo crear directorio PDF.');
         }
     }
-
-    // Guardar el PDF en el servidor
     if (file_put_contents($fullSavePath, $dompdf->output()) === false) {
-        throw new Exception('No se pudo guardar el archivo PDF en: ' . $fullSavePath);
+        throw new Exception('No se pudo guardar PDF.');
     }
 
-    // 4.5. INSERTAR REGISTRO EN T_DOCUMENTO
-    $sql_doc = "INSERT INTO t_documento (nombreArchivo, pathArchivo, fechaCreacion, tipoDocumento, t_usuario_idCreador)
-                VALUES (:nombre, :path, NOW(), 'MINUTA_APROBADA', :idCreador)";
+    // 5.6. INSERTAR EN T_DOCUMENTO (igual que antes)
+    $sql_doc = "INSERT INTO t_documento (nombreArchivo, pathArchivo, fechaCreacion, tipoDocumento, t_usuario_idCreador) VALUES (:nombre, :path, NOW(), 'MINUTA_APROBADA', :idCreador)";
     $stmt_doc = $pdo->prepare($sql_doc);
-    $stmt_doc->execute([
-        ':nombre' => $filename,
-        ':path' => $pdfWebPath, 
-        ':idCreador' => $idPresidenteLogueado 
-    ]);
+    $stmt_doc->execute([':nombre' => $filename, ':path' => $pdfWebPath, ':idCreador' => $idPresidenteLogueado]);
     $idDocumentoCreado = $pdo->lastInsertId();
-    if (!$idDocumentoCreado) throw new Exception('No se pudo crear el registro en t_documento.');
+    if (!$idDocumentoCreado) throw new Exception('No se pudo crear registro t_documento.');
 
-
-    // 4.6. ACTUALIZAR T_MINUTA con pathArchivo y t_documento_idFijo
-    $sql_update_links = "UPDATE t_minuta
-                         SET pathArchivo = :pathPDF,
-                             t_documento_idFijo = :idDoc
-                         WHERE idMinuta = :idMinuta";
+    // 5.7. ACTUALIZAR T_MINUTA (igual que antes)
+    $sql_update_links = "UPDATE t_minuta SET pathArchivo = :pathPDF, t_documento_idFijo = :idDoc WHERE idMinuta = :idMinuta";
     $stmt_update_links = $pdo->prepare($sql_update_links);
-    $exito_links = $stmt_update_links->execute([
-        ':pathPDF' => $pdfWebPath,
-        ':idDoc'   => $idDocumentoCreado,
-        ':idMinuta' => $idMinuta
-    ]);
+    $exito_links = $stmt_update_links->execute([':pathPDF' => $pdfWebPath, ':idDoc' => $idDocumentoCreado, ':idMinuta' => $idMinuta]);
+    if (!$exito_links) throw new Exception('No se pudo actualizar t_minuta con ruta PDF.');
 
-    if (!$exito_links) throw new Exception('No se pudo actualizar t_minuta con la ruta del PDF y el ID del documento.');
-
-    // 4.7. COMMIT FINAL
+    // 5.8. COMMIT FINAL (igual que antes)
     $pdo->commit();
 
-    // Respuesta de éxito
-    echo json_encode(['status' => 'success', 'message' => 'Minuta aprobada y PDF generado con éxito.', 'pdfPath' => $pdfWebPath]);
+    echo json_encode(['status' => 'success', 'message' => 'Minuta aprobada y PDF generado.', 'pdfPath' => $pdfWebPath]);
 } catch (Exception $e) {
-    // ROLLBACK si algo falló
     if ($pdo && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    // Loggear el error detallado
     error_log("Error en aprobar_minuta.php: " . $e->getMessage());
-    // Devolver un mensaje de error genérico al frontend
-    echo json_encode(['status' => 'error', 'message' => 'Ocurrió un error al aprobar la minuta: ' . $e->getMessage()]); 
+    echo json_encode(['status' => 'error', 'message' => 'Error al aprobar: ' . $e->getMessage()]);
 } finally {
     $pdo = null;
     $db = null;

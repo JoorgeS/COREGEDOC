@@ -230,13 +230,13 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
                   <li>
                     <a href="menu.php?pagina=minutas_pendientes"
                       class="link-warning d-block rounded py-1">
-                      Minutas Pendientes 
+                      Minutas Pendientes
                     </a>
                   </li>
                   <li>
                     <a href="menu.php?pagina=minutas_aprobadas"
                       class="link-success d-block rounded py-1">
-                      Minutas Aprobadas 
+                      Minutas Aprobadas
                     </a>
                   </li>
 
@@ -400,13 +400,24 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
           break;
 
         // Casos de Comisiones
-        case 'comision_crear':
-          $_GET['action'] = 'create';
+        // ❗️❗️ NUEVOS CASES PARA COMISIONES ❗️❗️
+        case 'comision_listado':
+          $_GET['action'] = 'list'; // Preparamos para el controller
           include __DIR__ . '/../../controllers/ComisionController.php';
           break;
-        case 'comision_listado':
-          $_GET['action'] = 'list';
+        case 'comision_crear':
+          $_GET['action'] = 'create'; // Preparamos para el controller
           include __DIR__ . '/../../controllers/ComisionController.php';
+          break;
+        case 'comision_editar':
+          // Pasamos el ID a $_GET para que ComisionController lo pueda leer
+          if ($id_param) {
+            $_GET['action'] = 'edit'; // Preparamos para el controller
+            $_GET['id'] = $id_param;
+            include __DIR__ . '/../../controllers/ComisionController.php';
+          } else {
+            echo "<div class='alert alert-danger'>Error: Falta el ID de la comisión para editar.</div>";
+          }
           break;
 
         // Casos de Reuniones
