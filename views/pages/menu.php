@@ -379,16 +379,20 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
         case 'crear_minuta':
           include __DIR__ . '/crearMinuta.php';
           break;
+
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se cambió 'MinutaController.php' a 'minutaController.php' (minúscula)
         case 'minutas_pendientes':
           $_GET['action'] = 'list'; // Preparamos las variables para el controller
           $_GET['estado'] = 'PENDIENTE';
-          include __DIR__ . '/../../controllers/MinutaController.php';
+          include __DIR__ . '/../../controllers/minutaController.php';
           break;
         case 'minutas_aprobadas':
           $_GET['action'] = 'list'; // Preparamos las variables para el controller
           $_GET['estado'] = 'APROBADA';
-          include __DIR__ . '/../../controllers/MinutaController.php';
+          include __DIR__ . '/../../controllers/minutaController.php';
           break;
+        // --- FIN DE LA CORRECCIÓN ---
 
         // Casos de Usuarios
         case 'usuarios_listado':
@@ -400,25 +404,27 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
           break;
 
         // Casos de Comisiones
-        // ❗️❗️ NUEVOS CASES PARA COMISIONES ❗️❗️
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Se cambió 'ComisionController.php' a 'comisionController.php' (minúscula)
         case 'comision_listado':
           $_GET['action'] = 'list'; // Preparamos para el controller
-          include __DIR__ . '/../../controllers/ComisionController.php';
+          include __DIR__ . '/../../controllers/comisionController.php';
           break;
         case 'comision_crear':
           $_GET['action'] = 'create'; // Preparamos para el controller
-          include __DIR__ . '/../../controllers/ComisionController.php';
+          include __DIR__ . '/../../controllers/comisionController.php';
           break;
         case 'comision_editar':
-          // Pasamos el ID a $_GET para que ComisionController lo pueda leer
+          // Pasamos el ID a $_GET para que comisionController lo pueda leer
           if ($id_param) {
             $_GET['action'] = 'edit'; // Preparamos para el controller
             $_GET['id'] = $id_param;
-            include __DIR__ . '/../../controllers/ComisionController.php';
+            include __DIR__ . '/../../controllers/comisionController.php';
           } else {
             echo "<div class='alert alert-danger'>Error: Falta el ID de la comisión para editar.</div>";
           }
           break;
+        // --- FIN DE LA CORRECCIÓN ---
 
         // Casos de Reuniones
         case 'reunion_crear':
@@ -426,7 +432,7 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
           break;
         case 'reunion_listado':
           $_GET['action'] = 'list';
-          include __DIR__ . '/../../controllers/ReunionController.php';
+          include __DIR__ . '/../../controllers/ReunionController.php'; // Este estaba correcto
           break;
         case 'reunion_calendario':
           include __DIR__ . '/reunion_calendario.php';

@@ -14,20 +14,10 @@ class MinutaModel
 
     /**
      * READ: Obtiene minutas por estado con filtros opcionales.
-     * @param string $estado 'PENDIENTE' o 'APROBADA'
-     * @param string|null $startDate Fecha de inicio (YYYY-MM-DD)
-     * @param string|null $endDate Fecha de fin (YYYY-MM-DD)
-     * @param string|null $themeName Parte del nombre del tema a buscar
-     * @return array
      */
     public function getMinutasByEstado($estado, $startDate = null, $endDate = null, $themeName = null)
     {
-        // --- INICIO DIAGNÓSTICO TEMPRANO ---
-        // Muestra los parámetros recibidos por la función
-        echo "";
-        // --- FIN DIAGNÓSTICO TEMPRANO ---
-
-        // Base de la consulta
+        // Base de la consulta (los placeholders :nombre siguen igual)
         $sql = "SELECT
                     m.idMinuta AS idMinuta,
                     m.t_usuario_idPresidente,
@@ -43,56 +33,57 @@ class MinutaModel
                 LEFT JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
                 WHERE m.estadoMinuta = :estado"; // Filtro base por estado
 
-        $valores = [':estado' => $estado];
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Construimos el array $valores con claves SIN los dos puntos ':'
+        // para que coincida con lo que espera class.conectorDB.php
+        $valores = ['estado' => $estado];
 
-        // Añadir filtros condicionales
+        // Añadir filtros condicionales (también con claves sin ':')
         if ($startDate) {
             $sql .= " AND m.fechaMinuta >= :startDate";
-            $valores[':startDate'] = $startDate;
-        }
-        if ($endDate) {
-            $sql .= " AND m.fechaMinuta <= :endDate";
-            $valores[':endDate'] = $endDate;
-        }
-        if ($themeName) {
-            // Busca en CUALQUIERA de los temas asociados a la minuta
-            $sql .= " AND t.nombreTema LIKE :themeName";
-            $valores[':themeName'] = '%' . $themeName . '%';
+            $valores['startDate'] = $startDate; // Clave 'startDate' (sin ':')
         }
 
-        // Agrupar y Ordenar
+        if ($endDate) {
+            $sql .= " AND m.fechaMinuta <= :endDateWithTime";
+            // Usamos una clave diferente ('endDateWithTime') para evitar colisiones
+            $valores['endDateWithTime'] = $endDate . ' 23:59:59'; // Clave 'endDateWithTime' (sin ':')
+        }
+
+        if ($themeName) {
+            $sql .= " AND t.nombreTema LIKE :themeName";
+            $valores['themeName'] = '%' . $themeName . '%'; // Clave 'themeName' (sin ':')
+        }
+        // --- FIN DE LA CORRECCIÓN ---
+
+        // Agrupar y Ordenar (SQL sigue igual)
         $sql .= " GROUP BY m.idMinuta
                   ORDER BY m.fechaMinuta DESC";
 
 
-        // --- INICIO DIAGNÓSTICO SQL ---
-        // Imprime la consulta SQL completa y los valores que se usarán
-        echo "";
-        echo "";
-        // --- FIN DIAGNÓSTICO SQL ---
-
-
         // --- Ejecutar ---
+        // Llamamos a consultarBD con el array $valores ahora formateado correctamente
         $result = $this->db_connector->consultarBD($sql, $valores);
 
 
-        // --- INICIO DIAGNÓSTICO RESULTADO ---
-        // Imprime lo que devolvió la base de datos (false, array vacío, o array con datos)
-        echo "";
-        // --- FIN DIAGNÓSTICO RESULTADO ---
+        // Manejo de error si la consulta falla (devuelve false)
+        if ($result === false) {
+            // Es útil registrar el error para depuración futura
+            error_log("Error en consulta SQL (getMinutasByEstado): " . $sql . " Valores: " . print_r($valores, true));
+            return []; // Devolver vacío en caso de error SQL
+        }
 
-
+        // Devolver el resultado (puede ser un array vacío si no hay coincidencias)
         return is_array($result) ? $result : [];
     } // Fin de getMinutasByEstado
 
 
-    // --- El resto de tus funciones (getAllMinutas, getTemaById, updateTema) ---
-    // (Van aquí sin cambios)
-
+    // --- El resto de tus funciones (sin cambios) ---
     public function getAllMinutas()
     {
         $sql = "SELECT idTema, t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion
                 FROM t_tema ORDER BY t_minuta_idMinuta DESC, idTema DESC";
+        // Asumiendo que esta consulta no usa parámetros o usa $valores vacío
         $result = $this->db_connector->consultarBD($sql, []);
         return is_array($result) ? $result : [];
     }
@@ -101,7 +92,8 @@ class MinutaModel
     {
         $sql = "SELECT idTema, t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion
                 FROM t_tema WHERE idTema = :idTema";
-        $valores = ['idTema' => (int)$id];
+        // Ajustamos los valores aquí también
+        $valores = ['idTema' => (int)$id]; // Clave sin ':'
         $result = $this->db_connector->consultarBD($sql, $valores);
         if (is_array($result) && count($result) > 0) {
             return $result[0];
@@ -114,13 +106,15 @@ class MinutaModel
         $sql = "UPDATE t_tema SET nombreTema = :nombreTema, objetivo = :objetivo,
                 compromiso = :compromiso, observacion = :observacion
                 WHERE idTema = :idTema";
+        // Ajustamos los valores aquí también
         $valores = [
             'nombreTema' => $data['nombreTema'],
             'objetivo' => $data['objetivo'],
             'compromiso' => $data['compromiso'],
             'observacion' => $data['observacion'],
-            'idTema' => (int)$id
+            'idTema' => (int)$id // Claves sin ':'
         ];
+        // Aquí asumimos que consultarBD devuelve true/false para UPDATE
         return $this->db_connector->consultarBD($sql, $valores);
     }
 } // Fin de la clase MinutaModel

@@ -1,6 +1,12 @@
 <?php
 // controllers/MinutaController.php
 
+// 1. FORZAR QUE SE MUESTREN LOS ERRORES (Lo mantenemos)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+// ---------------------------------------------
+
+// Ajustamos la ruta para que sea infalible, subiendo al directorio raíz
 require_once __DIR__ . '/../models/minutaModel.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -10,78 +16,83 @@ if (session_status() === PHP_SESSION_NONE) {
 /** @var MinutaModel $model */
 $model = new MinutaModel();
 
-// Determinar acción (GET o POST)
+// 1. Determinar acción y estado (vienen desde menu.php)
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
-
-// Capturar estado (siempre necesario para 'list')
-$estado_filtro = $_GET['estado'] ?? null;
+$estado_filtro = $_GET['estado'] ?? null; // menu.php nos da esto
 
 switch ($action) {
 
     case 'list':
-        // Asignar estado por defecto si no viene
-        $estado_filtro = $estado_filtro ?? 'PENDIENTE';
+        // Si 'estado' no vino por la URL, ponemos 'PENDIENTE' por defecto.
+        if ($estado_filtro === null) {
+            $estado_filtro = 'PENDIENTE';
+        }
 
         // --- INICIO DIAGNÓSTICO CONTROLLER ---
-        echo "";
+        echo ""; // (Dejamos los echos en blanco del archivo original)
         // --- FIN DIAGNÓSTICO CONTROLLER ---
 
-        // Capturar filtros de fecha y tema
-        $startDate = $_GET['startDate'] ?? null;
-        $endDate = $_GET['endDate'] ?? null;
-        $themeName = $_GET['themeName'] ?? null;
+        // 2. LÓGICA DE FECHAS POR DEFECTO (Tu nueva función)
+        $today = date('Y-m-d'); // Obtenemos la fecha de hoy
 
-        // Validar estado
+        // Capturar filtros (usar 'hoy' como default si no vienen)
+        $startDate = $_GET['startDate'] ?? $today;
+        $endDate = $_GET['endDate'] ?? $today;
+        $themeName = $_GET['themeName'] ?? null;
+        // ---------------------------------------
+
+        // 3. Validar estado y llamar al Modelo
         if ($estado_filtro !== 'PENDIENTE' && $estado_filtro !== 'APROBADA') {
             $minutas = []; // Estado inválido, no buscar nada
-            echo ""; // Mensaje extra
+            echo ""; 
         } else {
             // Llamar al modelo con todos los parámetros
             $minutas = $model->getMinutasByEstado($estado_filtro, $startDate, $endDate, $themeName);
         }
 
-        // Pasar filtros a la vista para que los recuerde
-        $filtro_startDate = $startDate;
-        $filtro_endDate = $endDate;
-        $filtro_themeName = $themeName;
+        // 4. Preparar variables para la Vista (con nombres limpios)
+        $estadoActual = $estado_filtro;
+        $currentStartDate = $startDate; // Pasa la fecha (de filtro o de hoy)
+        $currentEndDate = $endDate;     // Pasa la fecha (de filtro o de hoy)
+        $currentThemeName = $themeName;
+        // $minutas ya está definida por el modelo
 
-        // Incluir la vista
+        // 5. Incluir la Vista (Paso final)
         include __DIR__ . '/../views/pages/minutas_listado_general.php';
         break; // Fin case 'list'
 
 
     case 'view':
-        // ... (Tu código view sin cambios) ...
+        // ... (Tu código view original) ...
         $id = (int)($_GET['id'] ?? 0);
-        $tema = $model->getTemaById($id); // OJO: Esto busca por ID de TEMA, no de MINUTA
+        $tema = $model->getTemaById($id); 
         if (!$tema) {
             $_SESSION['error'] = 'Tema no encontrado.';
-            header('Location: menu.php?pagina=minutas_pendientes'); // Redirige a menu.php
+            header('Location: menu.php?pagina=minutas_pendientes');
             exit;
         }
-        include __DIR__ . '/../views/pages/minuta_detalle.php'; // Asumiendo que existe
+        include __DIR__ . '/../views/pages/minuta_detalle.php';
         break;
 
 
-    case 'edit': // Esta acción es manejada por menu.php incluyendo crearMinuta.php
-        // No debería llegar aquí directamente si la navegación es correcta.
-        // Podríamos redirigir por seguridad.
+    case 'edit': 
+        // ... (Tu código edit original) ...
         header('Location: menu.php?pagina=editar_minuta&id=' . ($_GET['id'] ?? 0));
         exit;
         break;
 
 
-    case 'update': // Esta acción SÍ se ejecuta directamente por el POST del formulario
-        // ... (Tu código update sin cambios) ...
-        $id = (int)($_POST['idTema'] ?? 0); // OJO: ¿Debería ser idMinuta? Revisa tu form.
+    case 'update': 
+        // ... (Tu código update original) ...
+        $id = (int)($_POST['idTema'] ?? 0); 
         $data = [ /* ... tus datos ... */];
-        // ... validaciones ...
-        if ($model->updateTema($id, $data)) { // OJO: updateTema actualiza t_tema, no t_minuta
+        
+        if ($model->updateTema($id, $data)) { 
             $_SESSION['success'] = 'Actualizado con éxito.';
         } else {
             $_SESSION['error'] = 'Error al actualizar.';
         }
-        header('Location: menu.php?pagina=minutas_pendientes'); // Redirige a lista en menu.php
+        header('Location: menu.php?pagina=minutas_pendientes'); 
         exit;
         break;
 

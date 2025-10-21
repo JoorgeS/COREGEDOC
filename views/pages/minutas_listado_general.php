@@ -1,16 +1,12 @@
 <?php
 // views/pages/minutas_listado_general.php
+// Esta vista es "tonta", SÓLO recibe variables del Controlador:
+// $minutas, $estadoActual, $currentStartDate, $currentEndDate, $currentThemeName
+
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 
-// Recuperar el estado actual y los valores de filtro pasados por el controlador
-$estadoActual = $estado_filtro ?? $_GET['estado'] ?? 'PENDIENTE'; // Asegura tener el estado
-$currentStartDate = $filtro_startDate ?? '';
-$currentEndDate = $filtro_endDate ?? '';
-$currentThemeName = $filtro_themeName ?? '';
-
-// Determinar el título de la página según el estado
+// Determinar el título y la página del formulario (variables vienen del Controlador)
 $pageTitle = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
-// Determinar la 'pagina' correcta para el formulario
 $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
 ?>
 
@@ -19,20 +15,21 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
 
     <form method="GET" class="mb-4 p-3 border rounded bg-light">
         <input type="hidden" name="pagina" value="<?php echo $paginaForm; ?>">
+        
         <input type="hidden" name="estado" value="<?php echo $estadoActual; ?>">
 
         <div class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label for="startDate" class="form-label">Fecha Creación Desde:</label>
-                <input type="date" class="form-control form-control-sm" id="startDate" name="startDate" value="<?php echo htmlspecialchars($currentStartDate); ?>">
+                <input type="date" class="form-control form-control-sm" id="startDate" name="startDate" value="<?php echo htmlspecialchars($currentStartDate ?? ''); ?>">
             </div>
             <div class="col-md-3">
                 <label for="endDate" class="form-label">Fecha Creación Hasta:</label>
-                <input type="date" class="form-control form-control-sm" id="endDate" name="endDate" value="<?php echo htmlspecialchars($currentEndDate); ?>">
+                <input type="date" class="form-control form-control-sm" id="endDate" name="endDate" value="<?php echo htmlspecialchars($currentEndDate ?? ''); ?>">
             </div>
             <div class="col-md-4">
                 <label for="themeName" class="form-label">Nombre del Tema:</label>
-                <input type="text" class="form-control form-control-sm" id="themeName" name="themeName" placeholder="Buscar por tema..." value="<?php echo htmlspecialchars($currentThemeName); ?>">
+                <input type="text" class="form-control form-control-sm" id="themeName" name="themeName" placeholder="Buscar por tema..." value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
@@ -73,6 +70,7 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
                             <td>
                                 <?php // Mostrar asistentes con tooltip
                                 $maxChars = 40;
+                                $asistentes = $asistentes ?? ''; // Asegura que no sea null
                                 if (strlen($asistentes) > $maxChars) {
                                     echo '<span title="' . htmlspecialchars($asistentes) . '">' . htmlspecialchars(substr($asistentes, 0, $maxChars)) . '...</span>';
                                 } else {
