@@ -1,73 +1,79 @@
 <?php
-require_once __DIR__ . '/../cfg/config.php';
+// controllers/fetch_data.php
 
-class FetchData extends BaseConexion
-{
-    private $db;
+/* * Este script centraliza la obtención de datos para los
+ * desplegables (combobox) de la aplicación.
+ */
 
-    public function __construct()
-    {
-        $this->db = $this->conectar();
-    }
+// Incluir conexión a la base de datos
+require_once __DIR__ . '/../class/class.conectorDB.php';
 
-    // 🟢 Listado de comisiones (sin cambios)
-    public function getComisiones()
-    {
-        $sql = "SELECT idComision, nombreComision FROM t_comision ORDER BY nombreComision ASC";
-        $stmt = $this->db->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+header('Content-Type: application/json');
+$action = $_GET['action'] ?? null;
+$response = ['status' => 'error', 'message' => 'Acción no válida'];
+$pdo = null; // Inicializar PDO
 
-    // 🔴 Listado de PRESIDENTES (Uso: selector Presidente Comisión)
-    // Trae SOLO Presidentes Comisión (Tipo 3)
-    public function getPresidentesSolo()
-    {
-        // Uso de CONCAT_WS para manejar campos NULL y evitar espacios sobrantes.
-        $sql = "SELECT u.idUsuario, 
-                       TRIM(CONCAT_WS(' ', u.pNombre, u.sNombre, u.aPaterno, u.aMaterno)) AS nombreCompleto 
-                FROM t_usuario u
-                WHERE u.tipoUsuario_id = 3 
-                ORDER BY u.aPaterno ASC";
-        $stmt = $this->db->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
+try {
+    $db = new conectorDB();
+    $pdo = $db->getDatabase(); // Obtener la conexión PDO
 
-    // 🔵 Listado de TODOS LOS USUARIOS (Uso: selector de Asistencia)
-    // Trae TODOS los usuarios, independientemente de su tipo.
-    public function getAllUsuarios()
-    {
-        // Uso de CONCAT_WS para manejar campos NULL y evitar espacios sobrantes.
-        $sql = "SELECT u.idUsuario, 
-                       TRIM(CONCAT_WS(' ', u.pNombre, u.sNombre, u.aPaterno, u.aMaterno)) AS nombreCompleto 
-                FROM t_usuario u
-                ORDER BY u.aPaterno ASC";
-        $stmt = $this->db->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
+    switch ($action) {
 
-// --- Controlador AJAX ---
-if (isset($_GET['action'])) {
-    $fetch = new FetchData();
-
-    switch ($_GET['action']) {
         case 'comisiones':
-            echo json_encode($fetch->getComisiones());
+            // Obtiene todas las comisiones vigentes
+            $sql = "SELECT idComision, nombreComision FROM t_comision WHERE vigencia = 1 ORDER BY nombreComision ASC";
+            $stmt = $pdo->query($sql);
+            $response = ['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
             break;
 
         case 'presidentes':
-            // Llama solo a los presidentes (Tipo 3)
-            echo json_encode($fetch->getPresidentesSolo());
+            // ❗️❗️ CONSULTA CORREGIDA ❗️❗️
+            // Obtiene solo usuarios que son Consejeros Regionales (idTipoUsuario = 1)
+            $sql = "SELECT idUsuario, CONCAT(pNombre, ' ', aPaterno) as nombreCompleto
+                    FROM t_usuario
+                    WHERE tipoUsuario_id = 1
+                    ORDER BY aPaterno, pNombre ASC";
+            $stmt = $pdo->query($sql);
+            $response = ['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
             break;
 
         case 'asistencia_all':
-            // NUEVA ACCIÓN: Llama a todos los usuarios para la lista de asistencia
-            echo json_encode($fetch->getAllUsuarios());
+            // Obtiene todos los usuarios para la lista de asistencia
+            // (Tu dump SQL muestra que la tabla t_usuario tiene perfil_id y tipoUsuario_id, usaremos eso)
+            $sql = "SELECT idUsuario, CONCAT(pNombre, ' ', aPaterno, ' ', aMaterno) as nombreCompleto
+                    FROM t_usuario
+                    /* Quizás quieras filtrar solo los que pueden asistir? 
+                       Ej: WHERE tipoUsuario_id IN (1, 2, 3, 4, 6) */
+                    ORDER BY aPaterno, aMaterno, pNombre ASC";
+            $stmt = $pdo->query($sql);
+            $response = ['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+            break;
+
+        case 'comision_presidente_map':
+            // Obtiene el mapeo [idComision => idPresidente] desde la BD
+            $sql = "SELECT idComision, t_usuario_idPresidente
+                    FROM t_comision
+                    WHERE t_usuario_idPresidente IS NOT NULL AND vigencia = 1";
+            $stmt = $pdo->query($sql);
+            $map = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // Formato [idComision => idPresidente]
+            $response = ['status' => 'success', 'data' => $map];
             break;
 
         default:
-            echo json_encode([]);
+            $response = ['status' => 'error', 'message' => 'Acción no válida solicitada.'];
             break;
     }
+} catch (PDOException $e) {
+    // Capturar cualquier error de base de datos
+    error_log("Error en fetch_data.php: " . $e->getMessage()); // Registrar error
+    $response = ['status' => 'error', 'message' => 'Error de conexión a la base de datos: ' . $e->getMessage()];
+} catch (Exception $e) {
+    // Capturar otros errores
+    error_log("Error general en fetch_data.php: " . $e->getMessage());
+    $response = ['status' => 'error', 'message' => 'Error inesperado: ' . $e->getMessage()];
+} finally {
+    $pdo = null; // Cerrar la conexión
 }
-?>
+
+echo json_encode($response);
+exit;

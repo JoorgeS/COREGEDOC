@@ -5,8 +5,12 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // 1. INCLUIR CONEXIÓN Y CARGAR DATOS (SI ES EDICIÓN)
 require_once __DIR__ . '/../../class/class.conectorDB.php';
+// ❗️ (Opcional pero recomendado) Incluir el modelo para verificar asistencia al cargar
+// require_once __DIR__ . '/../../models/minutaModel.php';
+
 $db = new conectorDB();
 $pdo = $db->getDatabase();
+// $minutaModel = new MinutaModel(); // Descomentar si incluyes el modelo
 
 $idMinutaActual = $_GET['id'] ?? null;
 // Datos por defecto
@@ -16,7 +20,8 @@ $datos_minuta = [
   'estadoMinuta' => 'PENDIENTE'
 ];
 $temas_de_la_minuta = [];
-$asistencia_guardada = []; // IDs de usuarios presentes (se espera array de strings o ints)
+$asistencia_guardada_ids = []; // IDs de usuarios presentes (se espera array de strings o ints)
+$existeAsistenciaGuardada = false; // Para habilitar/deshabilitar botón Excel al cargar
 
 if ($idMinutaActual) {
   try {
@@ -31,8 +36,8 @@ if ($idMinutaActual) {
 
     // Cargar temas asociados
     $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                  FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                  WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
     $stmt_temas = $pdo->prepare($sql_temas);
     $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
     $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -41,11 +46,15 @@ if ($idMinutaActual) {
     $sql_asistencia = "SELECT t_usuario_idUsuario FROM t_asistencia WHERE t_minuta_idMinuta = :idMinutaActual";
     $stmt_asistencia = $pdo->prepare($sql_asistencia);
     $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
-    // fetchAll con FETCH_COLUMN devuelve un array simple de los valores de la primera columna
-    $asistencia_guardada = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
+    $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    // ❗️ Verificar si hay asistencia guardada (determina estado inicial del botón)
+    $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
+    // Alternativa si usas el modelo:
+    // $existeAsistenciaGuardada = $minutaModel->verificarAsistencia($idMinutaActual);
+
   } catch (Exception $e) {
     error_log("Error cargando datos para edición: " . $e->getMessage());
-    // Considera mostrar un mensaje de error más visible si la carga falla
   }
 }
 
@@ -67,6 +76,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="/corevota/public/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
     /* Estilos específicos */
     @keyframes fadeIn {
@@ -151,9 +161,19 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
               <div id="contenedorTablaAsistenciaEstado" style="max-height: 400px; overflow-y: auto;">
                 <p class="text-muted">Cargando lista de consejeros...</p>
               </div>
-              <div class="text-end mt-3" id="botonGuardarAsistenciaContainer">
-                <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()">💾 Guardar Asistencia</button>
-                <span id="guardarAsistenciaStatus" class="ms-2 small text-muted"></span>
+              <div class="d-flex justify-content-end align-items-center mt-3 gap-2" id="botonesAsistenciaContainer">
+                <span id="guardarAsistenciaStatus" class="me-auto small text-muted"></span>
+                <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()">
+                  <i class="fas fa-save me-1"></i> Guardar Asistencia
+                </button>
+                <a href="#"
+                  class="btn btn-success btn-sm <?php echo !$existeAsistenciaGuardada ? 'disabled' : ''; ?>"
+                  id="btnExportarExcel"
+                  role="button"
+                  <?php echo $idMinutaActual ? 'data-idminuta="' . $idMinutaActual . '"' : ''; ?>
+                  <?php echo ($existeAsistenciaGuardada && $idMinutaActual) ? 'href="/corevota/controllers/exportar_asistencia_excel.php?idMinuta=' . $idMinutaActual . '"' : 'href="#"'; ?>>
+                  <i class="fas fa-file-excel me-1"></i> Exportar Asistencia (Excel)
+                </a>
               </div>
             </div>
           </div>
@@ -176,7 +196,9 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
       </div>
 
     </div>
-  </div> <template id="plantilla-tema">
+  </div>
+
+  <template id="plantilla-tema">
     <div class="tema-block mb-4 border rounded p-3 bg-white shadow-sm position-relative">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h6 class="fw-bold text-primary mb-0">Tema #</h6>
@@ -230,6 +252,8 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     </div>
   </template>
 
+  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
   <script>
     // --- Variables Globales ---
     let contadorTemas = 0;
@@ -240,16 +264,36 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     const ID_PRESIDENTE_ASIGNADO = <?php echo json_encode($idPresidenteAsignado); ?>;
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
     const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta); ?>;
-    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada); ?>;
+    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids); ?>; // Usa la variable PHP correcta
+    // ⬇️ Referencia al botón Exportar ⬇️
+    let btnExportarExcelGlobal = null;
+
 
     // --- Evento Principal de Carga ---
     document.addEventListener("DOMContentLoaded", () => {
+      // ⬇️ Guardar referencia al botón ⬇️
+      btnExportarExcelGlobal = document.getElementById('btnExportarExcel');
+
       cargarComisiones("comision1");
       cargarConsejeros("presidente1");
       cargarDatosSesion();
       cargarTablaAsistencia();
       gestionarVisibilidadBotonAprobar();
       cargarOPrepararTemas();
+
+      // ⬇️ Añadir listener para validación al hacer clic en Exportar ⬇️
+      if (btnExportarExcelGlobal) {
+        btnExportarExcelGlobal.addEventListener('click', function(event) {
+          if (this.classList.contains('disabled')) {
+            event.preventDefault(); // Evita seguir el enlace '#'
+            alert('Debe guardar la asistencia primero antes de exportar.');
+          } else if (!idMinutaGlobal) {
+            event.preventDefault();
+            alert('Error: No se ha definido el ID de la minuta para exportar.');
+          }
+          // Si no está deshabilitado y tiene ID, el enlace href funcionará normalmente.
+        });
+      }
     });
 
     // --- Funciones de Carga de Datos (FETCH) ---
@@ -335,14 +379,12 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           }
           // Asegurar que ASISTENCIA_GUARDADA_IDS sea un array de strings
           const asistenciaGuardadaStrings = Array.isArray(ASISTENCIA_GUARDADA_IDS) ? ASISTENCIA_GUARDADA_IDS.map(String) : [];
-          //console.log("Asistencia Guardada (strings):", asistenciaGuardadaStrings); // DEBUG
 
           let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
           data.forEach(c => {
             const userIdString = String(c.idUsuario); // Convertir ID a string para comparar
             const isPresent = asistenciaGuardadaStrings.includes(userIdString);
             const isAbsent = !isPresent;
-            //console.log(`Verificando ID ${userIdString}: Presente=${isPresent}`); // DEBUG
             tabla += `<tr data-userid="${c.idUsuario}"><td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td><td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''}></td><td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''}></td></tr>`;
           });
           tabla += `</tbody></table>`;
@@ -449,6 +491,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
       }
     }
 
+    // ❗️ Modificar guardarMinutaCompleta para asegurar que actualiza el idMinutaGlobal
     function guardarMinutaCompleta() {
       const com1 = document.getElementById('comision1');
       const pres1 = document.getElementById('presidente1');
@@ -461,19 +504,20 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         alert("Selecciona Presidente.");
         return;
       }
-      // Enviar idMinutaGlobal en los datos de la minuta
+
       const datosMinuta = {
-        idMinuta: idMinutaGlobal,
+        idMinuta: idMinutaGlobal, // Enviar ID actual (puede ser null)
         t_comision_idComision: com1.value,
         t_usuario_idPresidente: pres1.value,
         horaMinuta: document.getElementById('hora').value,
         fechaMinuta: document.getElementById('fecha').value,
-        pathArchivo: "",
+        pathArchivo: "", // Se genera al aprobar
         comisionMixta: mixta.checked ? {
           comision2: document.getElementById('comision2').value,
           presidente2: document.getElementById('presidente2').value
         } : null
       };
+
       const {
         asistenciaIDs
       } = recolectarAsistencia();
@@ -488,22 +532,21 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         const c = b.querySelectorAll(".editable-area");
         const n = c[0]?.innerHTML.trim() || "";
         const o = c[1]?.innerHTML.trim() || "";
-        if (!n || !o) {
-          errorTema = true;
-        }
+        if (!n || !o) errorTema = true;
         temasData.push({
           nombreTema: n,
           objetivo: o,
           descAcuerdo: c[2]?.innerHTML.trim() || "",
           compromiso: c[3]?.innerHTML.trim() || "",
           observacion: c[4]?.innerHTML.trim() || "",
-          idTema: b.dataset.idTema || null
+          idTema: b.dataset.idTema || null // Enviar ID del tema si existe
         });
       });
       if (errorTema) {
         alert("Todos los temas deben tener Nombre y Objetivo.");
         return;
       }
+
       const datosCompletos = {
         minuta: datosMinuta,
         asistencia: asistenciaIDs,
@@ -512,6 +555,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
       const btnGuardar = document.querySelector('button[onclick="guardarMinutaCompleta()"]');
       btnGuardar.disabled = true;
       btnGuardar.innerHTML = 'Guardando...';
+
       fetch("/corevota/controllers/guardar_minuta_completa.php", {
           method: "POST",
           headers: {
@@ -525,11 +569,21 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           btnGuardar.innerHTML = '💾 Guardar Borrador';
           if (resp.status === "success") {
             alert("✅ Minuta guardada correctamente. ID: " + resp.idMinuta);
-            // Si era nueva, actualiza idMinutaGlobal ANTES de redirigir
-            if (!idMinutaGlobal && resp.idMinuta) {
+            // ❗️ Actualizar idMinutaGlobal si es una nueva minuta O si cambió
+            if (resp.idMinuta && idMinutaGlobal !== resp.idMinuta) {
               idMinutaGlobal = resp.idMinuta;
+              // ❗️ Actualizar también el botón de exportar y aprobar
+              if (btnExportarExcelGlobal) {
+                btnExportarExcelGlobal.dataset.idminuta = idMinutaGlobal;
+                // Si ya se guardó asistencia, actualizar href
+                if (!btnExportarExcelGlobal.classList.contains('disabled')) {
+                  btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
+                }
+              }
+              gestionarVisibilidadBotonAprobar(); // Reevaluar si se muestra botón aprobar
             }
-            window.location.href = `menu.php?pagina=editar_minuta&id=${idMinutaGlobal || resp.idMinuta}`; // Usar el ID correcto
+            // Redirigir siempre a la URL de edición con el ID correcto
+            window.location.href = `menu.php?pagina=editar_minuta&id=${idMinutaGlobal}`;
           } else {
             alert(`⚠️ Error al guardar: ${resp.message}\nDetalles: ${resp.error || 'No disponibles'}`);
             console.error("Error guardado completo:", resp.error);
@@ -543,21 +597,26 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         });
     }
 
+
+    // ❗️ Modificar guardarAsistencia para habilitar el botón Excel en éxito
     function guardarAsistencia() {
       const {
         asistenciaIDs
       } = recolectarAsistencia();
       const status = document.getElementById('guardarAsistenciaStatus');
-      const btn = document.querySelector('#botonGuardarAsistenciaContainer button');
+      const btn = document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]'); // Seleccionar botón correcto
+
       let datos = {
         idMinuta: idMinutaGlobal,
         asistencia: asistenciaIDs
       };
+
+      // Si es minuta nueva, necesita encabezado para crearla primero
       if (!idMinutaGlobal) {
         const c1 = document.getElementById('comision1');
         const p1 = document.getElementById('presidente1');
         if (!c1.value || !p1.value) {
-          alert("Selecciona Comisión y Presidente antes de guardar asistencia.");
+          alert("Selecciona Comisión y Presidente antes de guardar asistencia por primera vez.");
           return;
         }
         datos.minutaHeader = {
@@ -565,11 +624,20 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           t_usuario_idPresidente: p1.value,
           horaMinuta: document.getElementById('hora').value,
           fechaMinuta: document.getElementById('fecha').value
+          // No incluir estado aquí, el backend lo pone por defecto
         };
       }
+
       btn.disabled = true;
       status.textContent = 'Guardando...';
-      status.className = 'ms-2 small text-muted';
+      status.className = 'me-auto small text-muted';
+      // ⬇️ Deshabilitar botón Excel mientras guarda ⬇️
+      if (btnExportarExcelGlobal) {
+        btnExportarExcelGlobal.classList.add('disabled');
+        btnExportarExcelGlobal.href = '#';
+      }
+
+
       fetch("/corevota/controllers/guardar_asistencia.php", {
           method: "POST",
           headers: {
@@ -582,35 +650,63 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
           btn.disabled = false;
           if (resp.status === "success") {
             status.textContent = "✅ Guardado";
-            status.className = 'ms-2 small text-success fw-bold';
+            status.className = 'me-auto small text-success fw-bold';
             ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String); // Actualizar estado local
+
+            // Si se creó una nueva minuta, actualizar ID global y redirigir
             if (resp.newMinutaId) {
               alert(`Minuta creada (ID ${resp.newMinutaId}) y asistencia guardada.`);
-              idMinutaGlobal = resp.newMinutaId; // Actualizar ID global
-              gestionarVisibilidadBotonAprobar(); // Actualizar botón aprobar
-              // Recargar para entrar en modo edición completo
+              idMinutaGlobal = resp.newMinutaId;
+              // ❗️ Actualizar botones ANTES de redirigir
+              if (btnExportarExcelGlobal) {
+                btnExportarExcelGlobal.dataset.idminuta = idMinutaGlobal;
+                btnExportarExcelGlobal.classList.remove('disabled'); // Habilitar ahora que hay asistencia
+                btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
+              }
+              gestionarVisibilidadBotonAprobar();
+              // Redirigir para cargar todo el entorno de edición
               window.location.href = `menu.php?pagina=editar_minuta&id=${idMinutaGlobal}`;
+              return; // Detener ejecución para evitar habilitar de nuevo
             }
+
+            // Si ya existía la minuta, solo habilitar el botón
+            if (idMinutaGlobal && btnExportarExcelGlobal) {
+              btnExportarExcelGlobal.classList.remove('disabled');
+              btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
+            }
+
             setTimeout(() => {
               status.textContent = '';
             }, 3000);
+
           } else {
             status.textContent = `⚠️ Error: ${resp.message}`;
-            status.className = 'ms-2 small text-danger';
+            status.className = 'me-auto small text-danger';
             console.error("Error BD asistencia:", resp.error);
+            // Asegurarse de que el botón Excel siga deshabilitado si falla
+            if (btnExportarExcelGlobal) {
+              btnExportarExcelGlobal.classList.add('disabled');
+              btnExportarExcelGlobal.href = '#';
+            }
           }
         })
         .catch(err => {
           btn.disabled = false;
           status.textContent = "Error conexión.";
-          status.className = 'ms-2 small text-danger';
+          status.className = 'me-auto small text-danger';
           console.error("Error fetch asistencia:", err);
           alert("Error al guardar asistencia:\n" + err.message);
+          // Asegurarse de que el botón Excel siga deshabilitado si falla
+          if (btnExportarExcelGlobal) {
+            btnExportarExcelGlobal.classList.add('disabled');
+            btnExportarExcelGlobal.href = '#';
+          }
           setTimeout(() => {
             status.textContent = '';
           }, 5000);
         });
     }
+
 
     function aprobarMinuta(idMinuta) { // Recibe idMinutaGlobal
       if (!idMinuta) {
@@ -618,6 +714,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         return;
       }
       if (!confirm("¿FIRMAR y APROBAR? ¡Irreversible!")) return;
+
       fetch("/corevota/controllers/aprobar_minuta.php", {
           method: "POST",
           headers: {
@@ -631,7 +728,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         .then(response => {
           if (response.status === 'success') {
             alert("✅ Minuta aprobada.");
-            window.location.href = 'menu.php?pagina=minutas_aprobadas';
+            window.location.href = 'menu.php?pagina=minutas_aprobadas'; // Ir a aprobadas
           } else {
             alert(`⚠️ Error: ${response.message}`);
           }
@@ -639,11 +736,9 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
         .catch(err => alert("Error de red al aprobar:\n" + err.message));
     }
 
-    function exportarPDF() {
-      alert("Exportar PDF no implementado.");
-    }
+    // Ya no es necesaria, el botón de Excel hace la llamada directa
+    // function exportarPDF() { alert("Exportar PDF no implementado."); }
   </script>
-
 
 </body>
 

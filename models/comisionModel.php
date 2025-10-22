@@ -1,40 +1,27 @@
 <?php
 // models/ComisionModel.php
-
-// Incluye tu clase de conexión existente
 require_once __DIR__ . '/../class/class.conectorDB.php';
 
-class ComisionModel {
+class ComisionModel
+{
     private $db_connector;
 
-    public function __construct() {
-        // Instancia tu clase de conexión para acceder a los métodos
-        // Asumo que tu conectorDB se conecta automáticamente en su constructor
-        $this->db_connector = new conectorDB(); 
+    public function __construct()
+    {
+        $this->db_connector = new conectorDB();
     }
 
-    /**
-     * READ: Obtiene todas las comisiones.
-     * @param bool $incluir_inactivas Si es true, incluye las comisiones con vigencia = 0.
-     * @return array
-     */
-    public function getAllComisiones($incluir_inactivas = false) {
-        $sql = "SELECT idComision, nombreComision, vigencia 
+    public function getAllComisiones($incluir_inactivas = false)
+    {
+        $sql = "SELECT idComision, nombreComision, vigencia, t_usuario_idPresidente /* Añadir si quieres mostrarlo en lista */
                 FROM t_comision";
-        
+        $valores = [];
         if (!$incluir_inactivas) {
             $sql .= " WHERE vigencia = :vigencia_activa";
-            $valores = ['vigencia_activa' => 1];
-        } else {
-            $valores = [];
+            $valores['vigencia_activa'] = 1;
         }
-        
         $sql .= " ORDER BY nombreComision ASC";
-
-        // Usar tu método genérico para ejecutar la consulta
         $result = $this->db_connector->consultarBD($sql, $valores);
-        
-        // Si result es un array (resultados) lo retornamos, si no, retornamos []
         return is_array($result) ? $result : [];
     }
 
@@ -42,39 +29,36 @@ class ComisionModel {
      * CREATE: Inserta una nueva comisión.
      * @param string $nombre
      * @param int $vigencia
+     * @param int|null $presidenteId ID del usuario presidente o null
      * @return bool
      */
-    public function createComision($nombre, $vigencia) {
-        $sql = "INSERT INTO t_comision (nombreComision, vigencia) 
-                VALUES (:nombreComision, :vigencia)";
-        
+    public function createComision($nombre, $vigencia, $presidenteId)
+    {
+        // ❗️ Query actualizada
+        $sql = "INSERT INTO t_comision (nombreComision, vigencia, t_usuario_idPresidente)
+                VALUES (:nombreComision, :vigencia, :presidenteId)";
         $valores = [
             'nombreComision' => $nombre,
-            'vigencia' => $vigencia
+            'vigencia' => $vigencia,
+            'presidenteId' => $presidenteId // PDO maneja null correctamente
         ];
-
-        // Usar tu método genérico (debería retornar true/false para INSERT)
         return $this->db_connector->consultarBD($sql, $valores);
     }
 
     /**
-     * READ: Obtiene una comisión por ID.
+     * READ: Obtiene una comisión por ID, incluyendo el ID del presidente.
      * @param int $id
      * @return array|null
      */
-    public function getComisionById($id) {
-        $sql = "SELECT idComision, nombreComision, vigencia 
+    public function getComisionById($id)
+    {
+        // ❗️ Query actualizada
+        $sql = "SELECT idComision, nombreComision, vigencia, t_usuario_idPresidente
                 FROM t_comision WHERE idComision = :idComision";
-        
-        // Asegúrate de que $id sea tratado como un entero
         $valores = ['idComision' => (int)$id];
-
-        // Usar tu método genérico
         $result = $this->db_connector->consultarBD($sql, $valores);
-        
-        // Si hay un resultado, fetchAll retorna un array de un elemento; si no, false.
         if (is_array($result) && count($result) > 0) {
-            return $result[0]; // Retornar solo la fila (el primer elemento)
+            return $result[0];
         }
         return null;
     }
@@ -84,38 +68,30 @@ class ComisionModel {
      * @param int $id
      * @param string $nombre
      * @param int $vigencia
+     * @param int|null $presidenteId
      * @return bool
      */
-    public function updateComision($id, $nombre, $vigencia) {
-        $sql = "UPDATE t_comision 
-                SET nombreComision = :nombreComision, vigencia = :vigencia 
+    public function updateComision($id, $nombre, $vigencia, $presidenteId)
+    {
+        // ❗️ Query actualizada
+        $sql = "UPDATE t_comision
+                SET nombreComision = :nombreComision,
+                    vigencia = :vigencia,
+                    t_usuario_idPresidente = :presidenteId
                 WHERE idComision = :idComision";
-        
         $valores = [
             'nombreComision' => $nombre,
             'vigencia' => $vigencia,
+            'presidenteId' => $presidenteId,
             'idComision' => $id
         ];
-
-        // Usar tu método genérico (debería retornar true/false para UPDATE)
         return $this->db_connector->consultarBD($sql, $valores);
     }
 
-    /**
-     * DELETE: Cambia la vigencia a 0 para "eliminar" lógicamente la comisión.
-     * @param int $id
-     * @return bool
-     */
-    public function deleteComision($id) {
+    public function deleteComision($id)
+    { // Solo cambia vigencia
         $sql = "UPDATE t_comision SET vigencia = :vigencia WHERE idComision = :idComision";
-        
-        $valores = [
-            'vigencia' => 0,
-            'idComision' => $id
-        ];
-
-        // Usar tu método genérico (debería retornar true/false para UPDATE)
+        $valores = ['vigencia' => 0, 'idComision' => $id];
         return $this->db_connector->consultarBD($sql, $valores);
     }
 }
-?>

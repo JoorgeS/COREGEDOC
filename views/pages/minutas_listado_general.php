@@ -15,7 +15,6 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
 
     <form method="GET" class="mb-4 p-3 border rounded bg-light">
         <input type="hidden" name="pagina" value="<?php echo $paginaForm; ?>">
-        
         <input type="hidden" name="estado" value="<?php echo $estadoActual; ?>">
 
         <div class="row g-3 align-items-end">
@@ -36,6 +35,7 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
             </div>
         </div>
     </form>
+
     <div class="table-responsive shadow-sm">
         <table class="table table-striped table-bordered align-middle">
             <thead class="table-dark sticky-top">
@@ -43,7 +43,6 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
                     <th>ID</th>
                     <th>Nombre(s) del Tema</th>
                     <th>Objetivo(s)</th>
-                    <th>Asistentes</th>
                     <th>Fecha Creación</th>
                     <th>Acciones</th>
                 </tr>
@@ -51,7 +50,7 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
             <tbody>
                 <?php if (empty($minutas) || !is_array($minutas)): ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados en este estado.</td>
+                        <td colspan="5" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados en este estado.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($minutas as $minuta): ?>
@@ -60,24 +59,14 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
                             $minutaId = $minuta['idMinuta'];
                             $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
                             $presidenteAsignado = $minuta['t_usuario_idPresidente'] ?? null;
-                            $asistentes = $minuta['asistentes'] ?? 'N/A';
-                            $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A'; // Obtener fecha
+                            // $asistentes = $minuta['asistentes'] ?? 'N/A'; // <-- Ya no se usa
+                            $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             ?>
 
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
                             <td><?php echo htmlspecialchars(substr($minuta['nombreTema'] ?? 'N/A', 0, 50)) . '...'; ?></td>
                             <td><?php echo htmlspecialchars(substr($minuta['objetivo'] ?? 'N/A', 0, 80)) . '...'; ?></td>
-                            <td>
-                                <?php // Mostrar asistentes con tooltip
-                                $maxChars = 40;
-                                $asistentes = $asistentes ?? ''; // Asegura que no sea null
-                                if (strlen($asistentes) > $maxChars) {
-                                    echo '<span title="' . htmlspecialchars($asistentes) . '">' . htmlspecialchars(substr($asistentes, 0, $maxChars)) . '...</span>';
-                                } else {
-                                    echo htmlspecialchars($asistentes);
-                                }
-                                ?>
-                            </td>
+
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
 
                             <td style="white-space: nowrap;">
@@ -99,9 +88,9 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
         </table>
     </div>
 </div>
+
 <script>
     function aprobarMinuta(idMinuta) {
-        /* ... (tu función aprobarMinuta sin cambios) ... */
         if (!confirm("¿Está seguro de FIRMAR y APROBAR esta minuta? ¡Irreversible!")) {
             return;
         }
@@ -118,7 +107,7 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
             .then(response => {
                 if (response.status === 'success') {
                     alert("✅ Minuta aprobada.");
-                    window.location.reload(); // Recarga la vista actual (pendientes o aprobadas)
+                    window.location.reload();
                 } else {
                     alert(`⚠️ Error: ${response.message}`);
                 }

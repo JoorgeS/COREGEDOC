@@ -5,10 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $model = new ComisionModel();
-$action = $_GET['action'] ?? $_POST['action'] ?? 'list';
+$action = $_POST['action'] ?? $_GET['action'] ?? 'list'; // Priorizar POST para formularios
 
-// Define la URL base para redireccionar
-$redirectUrl = '/corevota/views/pages/menu.php?pagina=comision_listado'; // <-- URL Correcta
+$redirectUrl = '/corevota/views/pages/menu.php?pagina=comision_listado';
 
 switch ($action) {
     case 'list':
@@ -22,68 +21,75 @@ switch ($action) {
         include __DIR__ . '/../views/pages/comision_form.php';
         break;
 
-    case 'store':
+    case 'store': // Se llama al CREAR
         $nombre = trim($_POST['nombreComision'] ?? '');
         $vigencia = (int)($_POST['vigencia'] ?? 1);
+        // ❗️ NUEVO: Capturar ID del presidente (puede ser string vacío si no se selecciona)
+        $presidenteId = $_POST['t_usuario_idPresidente'] ?? null;
+        // Convertir a null si es un string vacío
+        $presidenteId = ($presidenteId === '') ? null : (int)$presidenteId;
+
         if (empty($nombre)) {
             $_SESSION['error'] = 'El nombre es obligatorio.';
-            // Redirige al formulario de creación DENTRO de menu.php
             header('Location: /corevota/views/pages/menu.php?pagina=comision_crear');
             exit;
         }
-        if ($model->createComision($nombre, $vigencia)) {
+
+        // ❗️ Pasar presidenteId al modelo
+        if ($model->createComision($nombre, $vigencia, $presidenteId)) {
             $_SESSION['success'] = 'Comisión creada con éxito.';
         } else {
             $_SESSION['error'] = 'Error al crear la comisión.';
         }
-        // ❗️❗️ REDIRECCIÓN CORREGIDA ❗️❗️
         header('Location: ' . $redirectUrl);
         exit;
 
     case 'edit':
-        $id = (int)($_GET['id'] ?? 0); // Asegura obtener ID de GET
-        $comision = $model->getComisionById($id);
+        $id = (int)($_GET['id'] ?? 0);
+        $comision = $model->getComisionById($id); // getComisionById debe devolver t_usuario_idPresidente
         if (!$comision) {
             $_SESSION['error'] = 'Comisión no encontrada.';
-            header('Location: ' . $redirectUrl); // Redirige a lista si no existe
+            header('Location: ' . $redirectUrl);
             exit;
         }
         $title = "Editar Comisión: " . htmlspecialchars($comision['nombreComision']);
-        include __DIR__ . '/../views/pages/comision_form.php';
+        include __DIR__ . '/../views/pages/comision_form.php'; // Incluir form con datos
         break;
 
-    case 'update':
+    case 'update': // Se llama al EDITAR
         $id = (int)($_POST['idComision'] ?? 0);
         $nombre = trim($_POST['nombreComision'] ?? '');
-        $vigencia = isset($_POST['vigencia']) ? 1 : 0; // Checkbox o valor 1/0? Ajusta si es necesario
+        $vigencia = (int)($_POST['vigencia'] ?? 0); // Si no viene, es 0
+        // ❗️ NUEVO: Capturar ID del presidente
+        $presidenteId = $_POST['t_usuario_idPresidente'] ?? null;
+        $presidenteId = ($presidenteId === '') ? null : (int)$presidenteId;
+
         if (empty($nombre) || $id === 0) {
             $_SESSION['error'] = 'Datos incompletos.';
-            // Redirige al formulario de edición DENTRO de menu.php
             header('Location: /corevota/views/pages/menu.php?pagina=comision_editar&id=' . $id);
             exit;
         }
-        if ($model->updateComision($id, $nombre, $vigencia)) {
+
+        // ❗️ Pasar presidenteId al modelo
+        if ($model->updateComision($id, $nombre, $vigencia, $presidenteId)) {
             $_SESSION['success'] = 'Comisión actualizada.';
         } else {
             $_SESSION['error'] = 'Error al actualizar.';
         }
-        // ❗️❗️ REDIRECCIÓN CORREGIDA ❗️❗️
         header('Location: ' . $redirectUrl);
         exit;
 
     case 'delete':
-        $id = (int)($_GET['id'] ?? 0); // Asegura obtener ID de GET
-        if ($id > 0 && $model->deleteComision($id)) {
+        $id = (int)($_GET['id'] ?? 0);
+        if ($id > 0 && $model->deleteComision($id)) { // deleteComision solo cambia vigencia
             $_SESSION['success'] = 'Comisión deshabilitada.';
         } else {
             $_SESSION['error'] = 'Error al deshabilitar.';
         }
-        // ❗️❗️ REDIRECCIÓN CORREGIDA ❗️❗️
-        header('Location: /corevota/views/pages/menu.php?pagina=comision_listado');
+        header('Location: ' . $redirectUrl);
         exit;
 
     default:
-        // ❗️❗️ REDIRECCIÓN CORREGIDA ❗️❗️
         header('Location: ' . $redirectUrl);
         exit;
 }

@@ -28,21 +28,53 @@ $options->set('defaultFont', 'Helvetica');
 $options->set('isHtml5ParserEnabled', true);
 $options->set('isRemoteEnabled', true); // Vital para cualquier recurso externo o local
 // CONFIGURACIÓN CLAVE PARA IMÁGENES LOCALES: 
-$options->set('chroot', ROOT_PATH); 
-$options->set('isPhpEnabled', true); 
+$options->set('chroot', ROOT_PATH);
+$options->set('isPhpEnabled', true);
 
 
 $dompdf = new Dompdf($options);
 
 // OBTENER RUTAS DEL LOGO (USANDO RUTA RELATIVA AL CHROOT)
-$logo_relative_path = 'public/img/logo2.png';
-$logo_uri = $logo_relative_path;
+// OBTENER RUTA ABSOLUTA DEL LOGO Y CONVERTIR A DATA URI
+$logo_filesystem_path = ROOT_PATH . 'public/img/ojo.jpg'; // Construye la ruta C:/xampp/htdocs/corevota/public/img/ojo.jpg
+$logo_uri = ''; // Inicializar por si falla
 
+try {
+    $logo_uri = ImageToDataUrl($logo_filesystem_path);
+} catch (Exception $e) {
+    error_log("Error al convertir logo a Data URI: " . $e->getMessage());
+    $logo_uri = '';
+}
+
+// --- AÑADE ESTA LÍNEA PARA PROBAR ---
+die('DEBUG Data URI: ' . $logo_uri);
+// --- FIN LÍNEA DE PRUEBA ---
+
+// 6. Cargar y renderizar el PDF (Este código no se ejecutará ahora)
+$htmlContent = generateMinutaHtml($data, $logo_uri);
+// ... (resto del código)
 // ---------------------------------------------------------------------------------------
 // 5. Función para generar el HTML Ejecutivo de la Minuta
 // ---------------------------------------------------------------------------------------
 
-function generateMinutaHtml($data, $logo_uri) {
+function ImageToDataUrl(String $filename): String
+{
+    if (!file_exists($filename))
+        throw new Exception('File not found.');
+
+    $mime = mime_content_type($filename);
+    if ($mime === false)
+        throw new Exception('Illegal MIME type.');
+
+    $raw_data = file_get_contents($filename);
+    if (empty($raw_data))
+        throw new Exception('File not readable or empty.');
+
+    return "data:{$mime};base64," . base64_encode($raw_data);
+}
+
+function generateMinutaHtml($data, $logo_uri)
+{
     // Generar la cadena de las comisiones (principal y mixta si existe)
     $comisiones = htmlspecialchars($data['comision1'] ?? 'N/A');
     if (($data['comisionMixta'] ?? false) && !empty($data['comision2'])) {
@@ -232,7 +264,7 @@ function generateMinutaHtml($data, $logo_uri) {
     } else {
         foreach ($temas as $index => $tema) {
             $num = $index + 1;
-            
+
             // Si el tema principal está vacío, lo saltamos (usando strip_tags para limpiar HTML)
             if (empty(strip_tags($tema['nombreTema'] ?? ''))) continue;
 
@@ -287,14 +319,14 @@ function generateMinutaHtml($data, $logo_uri) {
 }
 
 // 6. Cargar y renderizar el PDF
-$htmlContent = generateMinutaHtml($data, $logo_uri); 
-    
+$htmlContent = generateMinutaHtml($data, $logo_uri);
+
 $dompdf->loadHtml($htmlContent);
 $dompdf->setPaper('A4', 'portrait');
 $dompdf->render();
 
 // 7. Forzar la descarga
 $filename = "Minuta_CORE_" . date('Ymd_His') . ".pdf";
-$dompdf->stream($filename, array("Attachment" => true)); 
+$dompdf->stream($filename, array("Attachment" => true));
 
 exit;
