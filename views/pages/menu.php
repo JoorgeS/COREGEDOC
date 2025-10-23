@@ -1,4 +1,6 @@
 <?php
+
+
 // SEGURIDAD: Iniciar la sesión de forma segura
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -14,7 +16,9 @@ if (!isset($_SESSION['idUsuario'])) {
 // Si no se especifica 'pagina', cargamos 'crear_minuta' por defecto
 $pagina = $_GET['pagina'] ?? 'crear_minuta';
 $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
+if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  endif; ?>
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 
@@ -316,11 +320,23 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
                     class="link-dark d-block rounded py-1">Vista Calendario</a>
                 </li>
 
+                <li class="nav-item">
+              <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link link-dark fw-bold">
+                <i class="fa-solid fa-hand-pointer me-2 text-success"></i>
+                Registrar Mi Asistencia
+              </a>
+            </li>
+
               </ul>
+
+              
             </div>
           </li>
+          
 
         </ul>
+
+
       </div>
 
     </nav>
@@ -428,7 +444,7 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
 
         // Casos de Reuniones
         case 'reunion_crear':
-          include __DIR__ . '/crearReunion.php';
+          include __DIR__ . '/reunion_form.php';
           break;
         case 'reunion_listado':
           $_GET['action'] = 'list';
@@ -459,6 +475,16 @@ $id_param = $_GET['id'] ?? null; // ❗️ Capturamos el ID también
           }
           break;
         // ❗️❗️ FIN NUEVO CASE ❗️❗️
+
+
+        case 'reunion_listado':
+          $_GET['action'] = 'list'; // Prepara para el controlador
+          include __DIR__ . '/../../controllers/ReunionController.php';
+          break;
+
+        case 'reunion_autogestion_asistencia': // Página para Consejeros
+          include __DIR__ . '/asistencia_autogestion.php';
+          break;
 
         // Caso por defecto (si 'pagina' no coincide con nada)
         default:

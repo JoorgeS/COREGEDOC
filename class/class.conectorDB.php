@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('America/Santiago');
+
 /**
  * Archivo de clases principales de conexión y consultas
  */

@@ -1,8 +1,10 @@
 <?php
-// Asegúrate de tener tu archivo de conexión disponible
-require_once __DIR__ . '/../cfg/config.php';
+// controllers/ReunionController.php
 
-// La clase para manejar la conexión (asumiendo que BaseConexion es tu clase)
+// Dependencias
+require_once __DIR__ . '/../cfg/config.php';
+require_once __DIR__ . '/../class/class.conectorDB.php';
+
 class ReunionManager extends BaseConexion
 {
     private $db;
@@ -13,199 +15,199 @@ class ReunionManager extends BaseConexion
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    public function createReunion($data)
+    /**
+     * ¡MODIFICADO!
+     * Este método ahora crea la Minuta (pendiente) y la Reunión en una sola transacción.
+     * Ya no existe una reunión "sin iniciar".
+     */
+    public function storeReunion($data)
     {
-        $sql = "INSERT INTO t_reunion (
-                    numeroReunion, nombreReunion, fechaInicioReunion, fechaTerminoReunion, 
-                    vigente, t_acuerdo_idAcuerdo, t_comision_idComision, t_minuta_idMinuta
-                ) VALUES (
-                    :numero, :nombre, :inicio, :termino, :vigente, 
-                    NULL, :comisionId, NULL
-                )";
+        // 1. Validar datos de entrada
+        $comisionId = $data['t_comision_idComision'] ?? null;
+        $nombreReunion = $data['nombreReunion'] ?? 'Reunión sin nombre';
+        $fechaInicio = $data['fechaInicioReunion'] ?? null;
+        $fechaTermino = $data['fechaTerminoReunion'] ?? null;
+
+        if (!$comisionId || !$fechaInicio || !$fechaTermino) {
+            return ['status' => 'error', 'message' => 'Faltan datos obligatorios (Comisión, Inicio o Término).'];
+        }
 
         try {
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                ':numero' => $data['numeroReunion'],
-                ':nombre' => $data['nombreReunion'],
-                ':inicio' => $data['fechaInicioReunion'],
-                ':termino' => $data['fechaTerminoReunion'],
-                ':vigente' => $data['vigente'],
-                ':comisionId' => $data['t_comision_idComision']
+            $this->db->beginTransaction();
+
+            // 2. Obtener el Presidente de la Comisión seleccionada
+            $sql_pres = "SELECT t_usuario_idPresidente FROM t_comision WHERE idComision = :comisionId";
+            $stmt_pres = $this->db->prepare($sql_pres);
+            $stmt_pres->execute([':comisionId' => $comisionId]);
+            $presidenteId = $stmt_pres->fetchColumn();
+
+            if (empty($presidenteId)) {
+                throw new Exception('La comisión seleccionada no tiene un presidente asignado.');
+            }
+
+            // 3. Crear la MINUTA primero para obtener el ID correlativo
+            // Asumimos que la fecha/hora de la minuta es la de inicio de la reunión
+            $fechaObj = new DateTime($fechaInicio);
+            $fechaMinuta = $fechaObj->format('Y-m-d');
+            $horaMinuta = $fechaObj->format('H:i:s');
+
+            $sql_minuta = "INSERT INTO t_minuta (
+                                t_comision_idComision, t_usuario_idPresidente, estadoMinuta,
+                                horaMinuta, fechaMinuta, pathArchivo
+                            ) VALUES (
+                                :comisionId, :presidenteId, 'PENDIENTE',
+                                :horaMinuta, :fechaMinuta, ''
+                            )";
+            $stmt_minuta = $this->db->prepare($sql_minuta);
+            $stmt_minuta->execute([
+                ':comisionId' => $comisionId,
+                ':presidenteId' => $presidenteId,
+                ':horaMinuta' => $horaMinuta,
+                ':fechaMinuta' => $fechaMinuta
+            ]);
+            
+            // ¡Este es el ID que querías! (Ej. 26)
+            $newIdMinuta = $this->db->lastInsertId();
+
+            // 4. Crear la REUNIÓN y vincularla al t_minuta_idMinuta
+            // Nota: Se elimina "numeroReunion", no existe en tu BBDD.
+            $sql_reunion = "INSERT INTO t_reunion (
+                                nombreReunion, fechaInicioReunion, fechaTerminoReunion,
+                                vigente, t_comision_idComision, t_minuta_idMinuta
+                            ) VALUES (
+                                :nombre, :inicio, :termino, 1, :comisionId, :idMinuta
+                            )";
+            $stmt_reunion = $this->db->prepare($sql_reunion);
+            $stmt_reunion->execute([
+                ':nombre' => $nombreReunion,
+                ':inicio' => $fechaInicio,
+                ':termino' => $fechaTermino,
+                ':comisionId' => $comisionId,
+                ':idMinuta' => $newIdMinuta // Vinculamos la reunión a la minuta
             ]);
 
-            $idReunion = $this->db->lastInsertId();
-            return ['status' => 'success', 'message' => 'Reunión creada.', 'idReunion' => $idReunion];
-        } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error de BD: ' . $e->getMessage(), 'error' => $e->errorInfo];
+            $this->db->commit();
+            
+            // Devolvemos el ID de la Minuta para la redirección
+            return [
+                'status' => 'success', 
+                'message' => 'Reunión y Minuta creadas exitosamente.',
+                'idMinuta' => $newIdMinuta 
+            ];
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log("Error DB storeReunion: " . $e->getMessage());
+            return ['status' => 'error', 'message' => 'Error al crear la reunión: ' . $e->getMessage()];
         }
     }
 
-    // En ReunionController.php (dentro de la clase ReunionManager)
-
-    public function getReunionesCalendarData()
-    {
-        try {
-            $sql = "SELECT 
-                    r.idReunion, r.nombreReunion, 
-                    r.fechaInicioReunion, r.fechaTerminoReunion, 
-                    r.t_comision_idComision, c.nombreComision
-                FROM t_reunion r
-                JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                WHERE r.vigente = 1
-                ORDER BY r.fechaInicioReunion ASC";
-
-            $stmt = $this->db->query($sql);
-            $reuniones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            return ['status' => 'success', 'data' => $reuniones];
-        } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error al obtener datos del calendario.', 'error' => $e->getMessage()];
-        }
-    }
-
+    // Método para obtener el listado de reuniones
     public function getReunionesList()
     {
         try {
+            // Query actualizada para traer el ID de la minuta y su estado
             $sql = "SELECT 
-                        r.idReunion, r.nombreReunion, r.numeroReunion, 
-                        r.fechaInicioReunion, r.fechaTerminoReunion, c.nombreComision
+                        r.idReunion, r.nombreReunion, 
+                        r.fechaInicioReunion, r.fechaTerminoReunion, c.nombreComision,
+                        r.t_minuta_idMinuta, m.estadoMinuta
                     FROM t_reunion r
-                    JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                    WHERE r.vigente = 1 /* <-- MUESTRA SOLO LAS VIGENTES */
+                    LEFT JOIN t_comision c ON r.t_comision_idComision = c.idComision
+                    LEFT JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
+                    WHERE r.vigente = 1
                     ORDER BY r.fechaInicioReunion DESC";
-
             $stmt = $this->db->query($sql);
             $reuniones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
             return ['status' => 'success', 'data' => $reuniones];
         } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error al obtener listado de BD.', 'error' => $e->getMessage()];
+            error_log("Error DB getReunionesList: " . $e->getMessage());
+            return ['status' => 'error', 'message' => 'Error al obtener listado.'];
         }
     }
 
-    // --- NUEVO MÉTODO: BORRADO LÓGICO ---
+    // Método para "borrar" reunión (borrado lógico)
     public function deleteReunion($id)
     {
-        // Borrado Lógico: Marcamos 'vigente' como 0 (Inactivo)
         $sql = "UPDATE t_reunion SET vigente = 0 WHERE idReunion = :id";
-
         try {
             $stmt = $this->db->prepare($sql);
             $stmt->execute([':id' => $id]);
-
-            if ($stmt->rowCount() > 0) {
-                return ['status' => 'success', 'message' => 'Reunión eliminada (lógicamente).'];
-            } else {
-                return ['status' => 'error', 'message' => 'Reunión no encontrada o ya estaba inactiva.'];
-            }
+            return ['status' => 'success', 'message' => 'Reunión deshabilitada.'];
         } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error de BD al eliminar lógicamente: ' . $e->getMessage(), 'error' => $e->errorInfo];
-        }
-    }
-    // ------------------------------------
-
-    public function getReunionById($id)
-    {
-        try {
-            $sql = "SELECT 
-                        r.idReunion, 
-                        r.nombreReunion, 
-                        r.numeroReunion, 
-                        r.fechaInicioReunion, 
-                        r.fechaTerminoReunion,
-                        r.t_comision_idComision
-                    FROM t_reunion r
-                    WHERE r.idReunion = :id";
-
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([':id' => $id]);
-
-            $reunion = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($reunion) {
-                return ['status' => 'success', 'data' => $reunion];
-            } else {
-                return ['status' => 'error', 'message' => 'Reunión no encontrada.'];
-            }
-        } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error de BD al buscar reunión.', 'error' => $e->getMessage()];
+            error_log("Error DB deleteReunion: " . $e->getMessage());
+            return ['status' => 'error', 'message' => 'Error al deshabilitar.'];
         }
     }
 
-    public function updateReunion($data)
-    {
-        $sql = "UPDATE t_reunion SET
-                    nombreReunion = :nombre,
-                    numeroReunion = :numero,
-                    fechaInicioReunion = :inicio,
-                    fechaTerminoReunion = :termino,
-                    t_comision_idComision = :comisionId,
-                    vigente = :vigente
-                WHERE idReunion = :id";
-
-        try {
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                ':id' => $data['id'],
-                ':nombre' => $data['nombreReunion'],
-                ':numero' => $data['numeroReunion'],
-                ':inicio' => $data['fechaInicioReunion'],
-                ':termino' => $data['fechaTerminoReunion'],
-                ':vigente' => $data['vigente'],
-                ':comisionId' => $data['t_comision_idComision']
-            ]);
-
-            if ($stmt->rowCount() === 0 && $data['id'] != 0) {
-                return ['status' => 'success', 'message' => 'Reunión actualizada (sin cambios).'];
-            }
-            return ['status' => 'success', 'message' => 'Reunión actualizada.'];
-        } catch (PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error de BD al actualizar: ' . $e->getMessage(), 'error' => $e->errorInfo];
-        }
-    }
+    // La función iniciarReunion() ya no es necesaria con este flujo.
 }
 
-// --- Enrutamiento de Acciones ---
-if (isset($_GET['action'])) {
-    $manager = new ReunionManager();
-    $action = $_GET['action'];
-    $response = ['status' => 'error', 'message' => 'Acción no válida.'];
+// --- Enrutamiento ---
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-    // Lógica para manejar peticiones POST y GET
-    if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input = file_get_contents('php://input');
-        $data = json_decode($input, true);
-        $response = $manager->createReunion($data);
-    } elseif ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input = file_get_contents('php://input');
-        $data = json_decode($input, true);
-        $response = $manager->updateReunion($data);
-    } elseif ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['id'])) { // <-- ¡NUEVO CASO!
-        $reunionId = (int)$_GET['id'];
-        $response = $manager->deleteReunion($reunionId);
-    } elseif ($action === 'list' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Lógica para devolver HTML (vista)
+$action = $_POST['action'] ?? $_GET['action'] ?? null;
+$manager = new ReunionManager();
+$redirectUrl = '/corevota/views/pages/menu.php?pagina=reunion_listado';
 
-        $response = $manager->getReunionesList();
-
-        if ($response['status'] === 'success') {
-            $reuniones = $response['data'];
-
-            // Eliminar y forzar el encabezado HTML para renderizar la vista
-            header_remove('Content-Type');
-            header('Content-Type: text/html; charset=utf-8');
-
-            // Cargar la vista de listado
-            include __DIR__ . '/../views/pages/reunion_listado.php';
+try {
+    // --- ACCIONES POST (Formularios) ---
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        
+        if ($action === 'store_reunion') {
+            $data = $_POST;
+            $response = $manager->storeReunion($data);
+            
+            if ($response['status'] === 'success') {
+                $_SESSION['success'] = $response['message'];
+                // ¡REDIRECCIÓN MODIFICADA!
+                // Redirigimos directo a editar la minuta recién creada.
+                header('Location: /corevota/views/pages/menu.php?pagina=editar_minuta&id=' . $response['idMinuta']);
+            } else {
+                $_SESSION['error'] = $response['message'];
+                // Si falla, volvemos al listado
+                header('Location: ' . $redirectUrl);
+            }
             exit;
         }
-    } elseif ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Lógica de edición manejada por crearReunion.php, aquí no hace nada especial.
+
+    // --- ACCIONES GET (Enlaces) ---
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        
+        if ($action === 'list') {
+            // Usado por menu.php para incluir la lista
+            $response = $manager->getReunionesList();
+            if ($response['status'] === 'success') {
+                $reuniones = $response['data'];
+                // Carga la vista del listado
+                include __DIR__ . '/../views/pages/reunion_listado.php';
+            } else {
+                echo "<div class='alert alert-danger'>Error: " . htmlspecialchars($response['message']) . "</div>";
+            }
+            // No hay 'exit' ni 'header' aquí
+
+        } elseif ($action === 'delete' && isset($_GET['id'])) {
+            // Esto sigue funcionando igual
+            $reunionId = (int)$_GET['id'];
+            $response = $manager->deleteReunion($reunionId);
+            if ($response['status'] === 'success') $_SESSION['success'] = $response['message'];
+            else $_SESSION['error'] = $response['message'];
+            header('Location: ' . $redirectUrl);
+            exit;
+        
+        } elseif ($action === 'iniciar_reunion') {
+             // Esta acción ya no se usa, pero por si acaso.
+             $_SESSION['error'] = 'Esta acción ya no es válida. Las reuniones se inician al crearse.';
+             header('Location: ' . $redirectUrl);
+             exit;
+        }
     }
 
-    // Si la acción no fue 'list', se devuelve el JSON (para create/update/delete/error)
-    if ($action !== 'list') {
-        echo json_encode($response);
-    }
+} catch (Exception $e) {
+    $_SESSION['error'] = 'Error inesperado del controlador.';
+    error_log("Error Controller: " . $e->getMessage());
+    header('Location: ' . $redirectUrl);
+    exit;
 }
+?>

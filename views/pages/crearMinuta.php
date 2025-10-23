@@ -17,7 +17,9 @@ $idMinutaActual = $_GET['id'] ?? null;
 $datos_minuta = [
   't_comision_idComision' => null,
   't_usuario_idPresidente' => null,
-  'estadoMinuta' => 'PENDIENTE'
+  'estadoMinuta' => 'PENDIENTE',
+  'fechaMinuta' => null,
+  'horaMinuta' => null
 ];
 $temas_de_la_minuta = [];
 $asistencia_guardada_ids = []; // IDs de usuarios presentes (se espera array de strings o ints)
@@ -25,8 +27,10 @@ $existeAsistenciaGuardada = false; // Para habilitar/deshabilitar botón Excel a
 
 if ($idMinutaActual) {
   try {
-    // Cargar datos de la minuta
-    $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta FROM t_minuta WHERE idMinuta = :idMinutaActual";
+    // ❗️ CAMBIO REQ 4: Cargar también fechaMinuta y horaMinuta
+    $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta 
+                   FROM t_minuta 
+                   WHERE idMinuta = :idMinutaActual";
     $stmt_minuta = $pdo->prepare($sql_minuta);
     $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
     $minuta_db = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
@@ -36,8 +40,8 @@ if ($idMinutaActual) {
 
     // Cargar temas asociados
     $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                  FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                  WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
     $stmt_temas = $pdo->prepare($sql_temas);
     $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
     $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -47,12 +51,7 @@ if ($idMinutaActual) {
     $stmt_asistencia = $pdo->prepare($sql_asistencia);
     $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
     $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
-
-    // ❗️ Verificar si hay asistencia guardada (determina estado inicial del botón)
     $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
-    // Alternativa si usas el modelo:
-    // $existeAsistenciaGuardada = $minutaModel->verificarAsistencia($idMinutaActual);
-
   } catch (Exception $e) {
     error_log("Error cargando datos para edición: " . $e->getMessage());
   }
@@ -65,6 +64,9 @@ $estadoMinuta = $datos_minuta['estadoMinuta'];
 $pNombre = $_SESSION['pNombre'] ?? '';
 $aPaterno = $_SESSION['aPaterno'] ?? '';
 $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
+
+$fechaMinutaGuardada = $datos_minuta['fechaMinuta'];
+$horaMinutaGuardada = $datos_minuta['horaMinuta'];
 
 ?>
 <!DOCTYPE html>
@@ -267,6 +269,8 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids); ?>; // Usa la variable PHP correcta
     // ⬇️ Referencia al botón Exportar ⬇️
     let btnExportarExcelGlobal = null;
+    const FECHA_MINUTA_GUARDADA = <?php echo json_encode($fechaMinutaGuardada); ?>;
+    const HORA_MINUTA_GUARDADA = <?php echo json_encode($horaMinutaGuardada); ?>;
 
 
     // --- Evento Principal de Carga ---
@@ -300,15 +304,17 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     function cargarComisiones(selectId) {
       fetch("/corevota/controllers/fetch_data.php?action=comisiones")
         .then(res => res.ok ? res.json() : Promise.reject(res))
-        .then(data => {
-          const select = document.getElementById(selectId);
-          select.innerHTML = '<option selected disabled value="">Seleccione...</option>';
-          data.forEach(c => {
-            const isSelected = (selectId === 'comision1' && ID_COMISION_GUARDADA != null && c.idComision == ID_COMISION_GUARDADA) ? 'selected' : '';
-            select.innerHTML += `<option value="${c.idComision}" ${isSelected}>${c.nombreComision}</option>`;
-          });
-          if (selectId === 'comision1' && ID_COMISION_GUARDADA) {
-            select.value = ID_COMISION_GUARDADA;
+        .then(response => { // <--- Cambiado a 'response'
+          if (response.status === 'success') { // <--- Añadida esta verificación
+            const select = document.getElementById(selectId);
+            select.innerHTML = '<option selected disabled value="">Seleccione...</option>';
+            response.data.forEach(c => { // <--- Cambiado a 'response.data'
+              const isSelected = (selectId === 'comision1' && ID_COMISION_GUARDADA != null && c.idComision == ID_COMISION_GUARDADA) ? 'selected' : '';
+              select.innerHTML += `<option value="${c.idComision}" ${isSelected}>${c.nombreComision}</option>`;
+            });
+            if (selectId === 'comision1' && ID_COMISION_GUARDADA) {
+              select.value = ID_COMISION_GUARDADA;
+            }
           }
         })
         .catch(err => console.error("Error cargando comisiones:", err));
@@ -317,15 +323,17 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     function cargarConsejeros(selectId) { // Carga Presidentes/Consejeros
       fetch("/corevota/controllers/fetch_data.php?action=presidentes") // Endpoint para presidentes/consejeros
         .then(res => res.ok ? res.json() : Promise.reject(res))
-        .then(data => {
-          const select = document.getElementById(selectId);
-          select.innerHTML = '<option selected disabled value="">Seleccione...</option>';
-          data.forEach(u => {
-            const isSelected = (selectId === 'presidente1' && ID_PRESIDENTE_ASIGNADO != null && u.idUsuario == ID_PRESIDENTE_ASIGNADO) ? 'selected' : '';
-            select.innerHTML += `<option value="${u.idUsuario}" ${isSelected}>${u.nombreCompleto}</option>`;
-          });
-          if (selectId === 'presidente1' && ID_PRESIDENTE_ASIGNADO) {
-            select.value = ID_PRESIDENTE_ASIGNADO;
+        .then(response => { // <--- Cambiado a 'response'
+          if (response.status === 'success') { // <--- Añadida esta verificación
+            const select = document.getElementById(selectId);
+            select.innerHTML = '<option selected disabled value="">Seleccione...</option>';
+            response.data.forEach(u => { // <--- Cambiado a 'response.data'
+              const isSelected = (selectId === 'presidente1' && ID_PRESIDENTE_ASIGNADO != null && u.idUsuario == ID_PRESIDENTE_ASIGNADO) ? 'selected' : '';
+              select.innerHTML += `<option value="${u.idUsuario}" ${isSelected}>${u.nombreCompleto}</option>`;
+            });
+            if (selectId === 'presidente1' && ID_PRESIDENTE_ASIGNADO) {
+              select.value = ID_PRESIDENTE_ASIGNADO;
+            }
           }
         })
         .catch(err => console.error("Error cargando consejeros:", err));
@@ -334,21 +342,30 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     function cargarDatosSesion() {
       const horaInput = document.getElementById("hora");
       const fechaInput = document.getElementById("fecha");
-      const ahora = new Date();
-      horaInput.value = ahora.toTimeString().slice(0, 5);
-      fechaInput.value = ahora.toISOString().split('T')[0];
 
+      // Usar datos guardados (de la minuta) si existen, si no, usar fecha/hora actual
+      if (idMinutaGlobal && FECHA_MINUTA_GUARDADA && HORA_MINUTA_GUARDADA) {
+        fechaInput.value = FECHA_MINUTA_GUARDADA;
+        horaInput.value = HORA_MINUTA_GUARDADA;
+      } else {
+        // Si es una minuta nueva (sin ID) o no tiene fecha/hora, usa la actual
+        const ahora = new Date();
+        horaInput.value = ahora.toTimeString().slice(0, 5);
+        fechaInput.value = ahora.toISOString().split('T')[0];
+      }
 
+      // Cargar Secretario (sin cambios)
       fetch("/corevota/controllers/session_user.php").then(res => res.json()).then(data => {
         document.getElementById("secretario").value = data.nombreUsuario || "N/D";
       }).catch(() => document.getElementById("secretario").value = "Error");
+
+      // Cargar N° Sesión (sin cambios, ya usa idMinutaGlobal)
       const nSesionInput = document.getElementById("nSesion");
       if (idMinutaGlobal) { // Si estamos editando (idMinutaGlobal tiene un valor)
         nSesionInput.value = String(idMinutaGlobal).padStart(2, '0'); // Muestra el ID de la minuta
       } else { // Si es una minuta nueva
-        nSesionInput.value = "Nuevo"; // O déjalo vacío: nSesionInput.value = "";
+        nSesionInput.value = "Nuevo";
       }
-
     }
 
     // --- Lógica del Formulario (Comisión Mixta) ---
@@ -368,27 +385,34 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     }
 
     // --- Lógica de ASISTENCIA (Presente/Ausente) ---
+    // --- Lógica de ASISTENCIA (Presente/Ausente) ---
     function cargarTablaAsistencia() {
       fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
         .then(res => res.ok ? res.json() : Promise.reject(res))
-        .then(data => {
+        .then(response => { // <--- CAMBIADO a 'response'
           const cont = document.getElementById("contenedorTablaAsistenciaEstado");
-          if (!data || data.length === 0) {
-            cont.innerHTML = '<p class="text-danger">No hay consejeros.</p>';
-            return;
-          }
-          // Asegurar que ASISTENCIA_GUARDADA_IDS sea un array de strings
-          const asistenciaGuardadaStrings = Array.isArray(ASISTENCIA_GUARDADA_IDS) ? ASISTENCIA_GUARDADA_IDS.map(String) : [];
 
-          let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
-          data.forEach(c => {
-            const userIdString = String(c.idUsuario); // Convertir ID a string para comparar
-            const isPresent = asistenciaGuardadaStrings.includes(userIdString);
-            const isAbsent = !isPresent;
-            tabla += `<tr data-userid="${c.idUsuario}"><td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td><td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''}></td><td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''}></td></tr>`;
-          });
-          tabla += `</tbody></table>`;
-          cont.innerHTML = tabla;
+          // AÑADIDA esta verificación (igual que en las otras funciones)
+          if (response.status === 'success' && response.data && response.data.length > 0) {
+            const data = response.data; // <--- Asignamos 'response.data' a 'data'
+
+            // (El resto de tu función original desde aquí hacia abajo)
+            // Asegurar que ASISTENCIA_GUARDADA_IDS sea un array de strings
+            const asistenciaGuardadaStrings = Array.isArray(ASISTENCIA_GUARDADA_IDS) ? ASISTENCIA_GUARDADA_IDS.map(String) : [];
+
+            let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
+            data.forEach(c => {
+              const userIdString = String(c.idUsuario); // Convertir ID a string para comparar
+              const isPresent = asistenciaGuardadaStrings.includes(userIdString);
+              const isAbsent = !isPresent;
+              tabla += `<tr data-userid="${c.idUsuario}"><td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td><td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''}></td><td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''}></td></tr>`;
+            });
+            tabla += `</tbody></table>`;
+            cont.innerHTML = tabla;
+
+          } else { // <--- Bloque 'else' añadido
+            cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar.</p>';
+          }
         })
         .catch(err => {
           console.error("Error carga asistencia:", err);
@@ -739,6 +763,7 @@ $nombreUsuario = trim($pNombre . ' ' . $aPaterno);
     // Ya no es necesaria, el botón de Excel hace la llamada directa
     // function exportarPDF() { alert("Exportar PDF no implementado."); }
   </script>
+  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
 </body>
 
