@@ -11,6 +11,8 @@ $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null; // Asumiendo que guardas tipoUsuario_id en sesión
 $response = ['status' => 'error', 'message' => 'Error desconocido.'];
 
+
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$idUsuarioLogueado) {
     echo json_encode(['status' => 'error', 'message' => 'Acceso no válido.']);
     exit;
@@ -18,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$idUsuarioLogueado) {
 
 // Solo Consejeros Regionales (idTipoUsuario = 1) pueden autogestionar
 if ($tipoUsuario != 1) {
-     echo json_encode(['status' => 'error', 'message' => 'Acción no permitida para este tipo de usuario.']);
-     exit;
+    echo json_encode(['status' => 'error', 'message' => 'Acción no permitida para este tipo de usuario.']);
+    exit;
 }
 
 $data = json_decode(file_get_contents('php://input'), true);
@@ -48,7 +50,6 @@ try {
         $stmt_update = $pdo->prepare($sql_update);
         $stmt_update->execute([':idAsistencia' => $existe['idAsistencia']]);
         $response = ['status' => 'success', 'message' => 'Asistencia re-confirmada.'];
-
     } else {
         // Si no existe, la insertamos
         $sql_insert = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
@@ -57,7 +58,6 @@ try {
         $stmt_insert->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
         $response = ['status' => 'success', 'message' => 'Asistencia registrada con éxito.'];
     }
-
 } catch (Exception $e) {
     error_log("Error en AsistenciaController: " . $e->getMessage());
     $response = ['status' => 'error', 'message' => 'Error de base de datos.'];
@@ -65,4 +65,3 @@ try {
 
 echo json_encode($response);
 exit;
-?>

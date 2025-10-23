@@ -6,9 +6,22 @@
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 
 // Determinar el título y la página del formulario (variables vienen del Controlador)
+$estadoActual = $estadoActual ?? 'PENDIENTE';
 $pageTitle = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
 $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
+// --- INICIO: LÓGICA PARA FECHAS POR DEFECTO ---
+
+// Usar fechas de la URL si existen, si no, usar mes actual
+$currentStartDate = $_GET['startDate'] ?? date('Y-m-01'); // Primer día del mes actual
+$currentEndDate = $_GET['endDate'] ?? date('Y-m-d');   // Día actual
+
+// Mantener filtro de tema si existe
+$currentThemeName = $_GET['themeName'] ?? '';
+
+// --- FIN: LÓGICA PARA FECHAS POR DEFECTO ---
 ?>
+
+
 
 <div class="container-fluid mt-4">
     <h3 class="mb-3"><?php echo $pageTitle; ?></h3>

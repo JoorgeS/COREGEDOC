@@ -36,9 +36,9 @@ switch ($action) {
         $today = date('Y-m-d'); // Obtenemos la fecha de hoy
 
         // Capturar filtros (usar 'hoy' como default si no vienen)
-        $startDate = $_GET['startDate'] ?? $today;
-        $endDate = $_GET['endDate'] ?? $today;
-        $themeName = $_GET['themeName'] ?? null;
+        $startDate = $_GET['startDate'] ?? date('Y-m-01');
+        $endDate = $_GET['endDate'] ?? date('Y-m-d');
+        $themeName = $_GET['themeName'] ?? '';
         // ---------------------------------------
 
         // 3. Validar estado y llamar al Modelo

@@ -22,6 +22,7 @@ class LoginController extends BaseConexion
     {
         try {
             $sql = "SELECT u.idUsuario, u.pNombre, u.aPaterno, u.correo, u.contrasena, 
+                        u.tipoUsuario_id,
                         p.descPerfil
                     FROM t_usuario u
                     LEFT JOIN t_perfil p ON u.perfil_id = p.idPerfil
@@ -41,6 +42,7 @@ class LoginController extends BaseConexion
                     $_SESSION["aPaterno"] = $usuario["aPaterno"];
                     $_SESSION["correo"] = $usuario["correo"];
                     $_SESSION["descPerfil"] = $usuario["descPerfil"] ?? "Sin perfil";
+                    $_SESSION["tipoUsuario_id"] = $usuario["tipoUsuario_id"];
 
                     // Redirigir al menú
                     header("Location: /corevota/views/pages/menu.php");
