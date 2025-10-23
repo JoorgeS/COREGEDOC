@@ -1,11 +1,10 @@
 <?php
 // controllers/guardar_minuta_completa.php
 
-require_once __DIR__ . '/../cfg/config.php'; // Usa BaseConexion
-require_once __DIR__ . '/../class/class.conectorDB.php'; // Asegura que la timezone esté definida si BaseConexion no lo hace
+require_once __DIR__ . '/../cfg/config.php';
+require_once __DIR__ . '/../class/class.conectorDB.php';
 header('Content-Type: application/json');
 
-// Asegurar que la sesión esté iniciada (para logs futuros o verificaciones)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -13,16 +12,17 @@ if (session_status() === PHP_SESSION_NONE) {
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
-// Recuperamos el ID de la minuta (si existe, es una actualización)
+// Recuperamos SOLO el ID de la minuta
 $idMinuta = $data['minuta']['idMinuta'] ?? null;
 
-if (!isset($data['minuta']) || !isset($data['asistencia']) || !isset($data['temas'])) {
+// Validar que tengamos ID, asistencia y temas
+if (!$idMinuta || !is_numeric($idMinuta) || !isset($data['asistencia']) || !isset($data['temas'])) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Faltan datos requeridos.']);
+    echo json_encode(['status' => 'error', 'message' => 'Faltan datos requeridos o ID de minuta inválido.']);
     exit;
 }
 
-$datosMinuta = $data['minuta'];
+// $datosMinuta = $data['minuta']; // Ya no necesitamos esto
 $asistenciaIDs = $data['asistencia']; // IDs de los asistentes MARCADOS ahora
 $temasData = $data['temas'];
 
@@ -36,95 +36,85 @@ class MinutaManager extends BaseConexion
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    public function guardarMinutaCompleta($idMinuta, $datosMinuta, $asistenciaIDs, $temasData)
+    // Modificado para recibir solo ID, asistencia y temas
+    public function guardarMinutaCompleta($idMinuta, $asistenciaIDs, $temasData)
     {
         try {
             $this->db->beginTransaction();
 
-            // --- 1. GUARDAR/ACTUALIZAR MINUTA (t_minuta) ---
+            // --- 1. ACTUALIZAR MINUTA (t_minuta) ---
+            // YA NO ES NECESARIO ACTUALIZAR EL ENCABEZADO AL GUARDAR BORRADOR
+            /* // EL SIGUIENTE BLOQUE SE ELIMINA:
             if ($idMinuta) { // ACTUALIZAR
-                $sqlMinuta = "UPDATE t_minuta SET
-                                t_comision_idComision = :comision_id,
-                                t_usuario_idPresidente = :presidente_id,
-                                horaMinuta = :hora,
-                                fechaMinuta = :fecha
-                              WHERE idMinuta = :idMinuta";
-                $stmtMinuta = $this->db->prepare($sqlMinuta);
-                $stmtMinuta->execute([
-                    ':comision_id' => $datosMinuta['t_comision_idComision'],
-                    ':presidente_id' => $datosMinuta['t_usuario_idPresidente'],
-                    ':hora' => $datosMinuta['horaMinuta'],
-                    ':fecha' => $datosMinuta['fechaMinuta'],
-                    ':idMinuta' => $idMinuta
-                ]);
-            } else { // INSERTAR NUEVA
-                // NOTA: Esta lógica asume que la minuta se crea ANTES por ReunionController.
-                // Si este script *también* puede crear minutas, la lógica debe ser revisada.
-                // Por ahora, asumimos que $idMinuta siempre tendrá un valor aquí si el flujo es correcto.
-                throw new Exception("Intento de guardar sin un ID de Minuta válido.");
-                /* // Si este script DEBE poder crear la minuta si no existe:
-                $sqlMinuta = "INSERT INTO t_minuta (pathArchivo, t_comision_idComision, t_usuario_idPresidente, horaMinuta, fechaMinuta, estadoMinuta)
-                              VALUES (:path, :comision_id, :presidente_id, :hora, :fecha, 'PENDIENTE')";
-                $stmtMinuta = $this->db->prepare($sqlMinuta);
-                $stmtMinuta->execute([
-                    ':path' => "",
-                    ':comision_id' => $datosMinuta['t_comision_idComision'],
-                    ':presidente_id' => $datosMinuta['t_usuario_idPresidente'],
-                    ':hora' => $datosMinuta['horaMinuta'],
-                    ':fecha' => $datosMinuta['fechaMinuta']
-                ]);
-                $idMinuta = $this->db->lastInsertId(); 
-                */
-            }
-
-            if (!$idMinuta) throw new Exception("Error crítico: No se pudo obtener/confirmar el ID de Minuta.");
+                 // ... (Código UPDATE t_minuta eliminado) ...
+             } else { // INSERTAR NUEVA - Esta lógica no debería estar aquí ahora
+                 throw new Exception("Intento de guardar sin un ID de Minuta válido.");
+             }
+            */
 
             // --- 2. ACTUALIZAR ASISTENCIA (t_asistencia) ---
+            // Borramos la asistencia ANTERIOR de esta minuta
             $sqlDeleteAsistencia = "DELETE FROM t_asistencia WHERE t_minuta_idMinuta = :idMinuta";
             $stmtDeleteAsistencia = $this->db->prepare($sqlDeleteAsistencia);
             $stmtDeleteAsistencia->execute([':idMinuta' => $idMinuta]);
 
-            $idTipoReunion = 1; // Asumido desde tu código de AsistenciaController
-            if (!empty($asistenciaIDs)) { // Solo insertamos si hay asistentes marcados
+            // Insertamos la asistencia ACTUAL (los IDs que llegaron del form)
+            $idTipoReunion = 1; // Asumido
+            if (!empty($asistenciaIDs)) {
                 $sqlAsistencia = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
-                                  VALUES (:idMinuta, :idUsuario, :idTipoReunion, NOW())"; // Añadido NOW()
+                                  VALUES (:idMinuta, :idUsuario, :idTipoReunion, NOW())";
                 $stmtAsistencia = $this->db->prepare($sqlAsistencia);
                 foreach ($asistenciaIDs as $idUsuario) {
-                    // Validar que el ID sea numérico antes de insertar
-                    if (is_numeric($idUsuario)) {
+                    if (is_numeric($idUsuario)) { // Validar
                         $stmtAsistencia->execute([
                             ':idMinuta' => $idMinuta,
                             ':idUsuario' => $idUsuario,
                             ':idTipoReunion' => $idTipoReunion
                         ]);
                     } else {
-                        // Opcional: Registrar un warning si un ID no es válido
-                        error_log("Warning: ID de asistencia no válido encontrado para minuta {$idMinuta}: " . print_r($idUsuario, true));
+                        error_log("Warning: ID de asistencia no válido ignorado para minuta {$idMinuta}: " . print_r($idUsuario, true));
                     }
                 }
             }
 
             // --- 3. ACTUALIZAR TEMAS Y ACUERDOS (t_tema y t_acuerdo) ---
-            $idsTemasActuales = array_filter(array_column($temasData, 'idTema'));
-
-            if (!empty($idsTemasActuales)) {
-                $placeholders = implode(',', array_fill(0, count($idsTemasActuales), '?'));
-                // Asegurarse de que t_acuerdo se borre si el tema se borra (ON DELETE CASCADE ya lo hace)
-                $sqlDeleteTemas = "DELETE FROM t_tema WHERE t_minuta_idMinuta = ? AND idTema NOT IN ($placeholders)";
-                $params = array_merge([$idMinuta], $idsTemasActuales);
-                $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
-                $stmtDeleteTemas->execute($params);
-            } else {
-                // Si no vienen temas con ID, borramos todos los temas de esta minuta
-                // ON DELETE CASCADE se encargará de los acuerdos asociados
-                $sqlDeleteTemas = "DELETE FROM t_tema WHERE t_minuta_idMinuta = ?";
-                $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
-                $stmtDeleteTemas->execute([$idMinuta]);
+            // Obtenemos los IDs de los temas que SÍ vienen en los datos actuales
+            $idsTemasActuales = [];
+            foreach ($temasData as $tema) {
+                if (!empty($tema['idTema']) && is_numeric($tema['idTema'])) {
+                    $idsTemasActuales[] = $tema['idTema'];
+                }
             }
 
+            // --- INICIO CORRECCIÓN DELETE ---
+            // A. Obtener IDs de temas a borrar (los que están en DB pero NO en $idsTemasActuales)
+            $sqlTemasEnDB = "SELECT idTema FROM t_tema WHERE t_minuta_idMinuta = :idMinuta";
+            $stmtTemasEnDB = $this->db->prepare($sqlTemasEnDB);
+            $stmtTemasEnDB->execute([':idMinuta' => $idMinuta]);
+            $idsTemasEnDB = $stmtTemasEnDB->fetchAll(PDO::FETCH_COLUMN, 0);
+
+            $idsTemasABorrar = array_diff($idsTemasEnDB, $idsTemasActuales);
+
+            if (!empty($idsTemasABorrar)) {
+                $placeholdersBorrar = implode(',', array_fill(0, count($idsTemasABorrar), '?'));
+
+                // B. BORRAR PRIMERO los acuerdos asociados a los temas que se van a eliminar
+                $sqlDeleteAcuerdos = "DELETE FROM t_acuerdo WHERE t_tema_idTema IN ($placeholdersBorrar)";
+                $stmtDeleteAcuerdos = $this->db->prepare($sqlDeleteAcuerdos);
+                $stmtDeleteAcuerdos->execute($idsTemasABorrar);
+
+                // C. BORRAR AHORA los temas
+                $sqlDeleteTemas = "DELETE FROM t_tema WHERE idTema IN ($placeholdersBorrar) AND t_minuta_idMinuta = ?"; // Doble check con idMinuta
+                $paramsBorrarTemas = array_merge($idsTemasABorrar, [$idMinuta]);
+                $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
+                $stmtDeleteTemas->execute($paramsBorrarTemas);
+            }
+            // --- FIN CORRECCIÓN DELETE ---
+
+
+            // Preparamos las consultas para insertar/actualizar temas y acuerdos (sin cambios)
             $sqlInsertTema = "INSERT INTO t_tema (t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion) VALUES (:idMinuta, :nombre, :objetivo, :compromiso, :observacion)";
             $sqlUpdateTema = "UPDATE t_tema SET nombreTema = :nombre, objetivo = :objetivo, compromiso = :compromiso, observacion = :observacion WHERE idTema = :idTema AND t_minuta_idMinuta = :idMinuta";
-            // Usamos INSERT ... ON DUPLICATE KEY UPDATE para simplificar acuerdos (asume que t_tema_idTema es UNIQUE o PK en t_acuerdo)
             $sqlUpsertAcuerdo = "INSERT INTO t_acuerdo (descAcuerdo, t_tipoReunion_idTipoReunion, t_tema_idTema) 
                                  VALUES (:descAcuerdo, :idTipoReunion, :idTema)
                                  ON DUPLICATE KEY UPDATE descAcuerdo = VALUES(descAcuerdo)";
@@ -133,51 +123,51 @@ class MinutaManager extends BaseConexion
             $stmtUpdateTema = $this->db->prepare($sqlUpdateTema);
             $stmtUpsertAcuerdo = $this->db->prepare($sqlUpsertAcuerdo);
 
+            // Procesar temas enviados (sin cambios)
             foreach ($temasData as $tema) {
                 $idTema = $tema['idTema'] ?? null;
                 $paramsTema = [
                     ':idMinuta' => $idMinuta,
-                    ':nombre' => trim($tema['nombreTema'] ?? ''), // Asegurar strings vacíos si no vienen
+                    ':nombre' => trim($tema['nombreTema'] ?? ''),
                     ':objetivo' => trim($tema['objetivo'] ?? ''),
                     ':compromiso' => trim($tema['compromiso'] ?? ''),
                     ':observacion' => trim($tema['observacion'] ?? '')
                 ];
-                // Validar que al menos nombre y objetivo no estén vacíos antes de guardar
                 if (empty($paramsTema[':nombre']) && empty($paramsTema[':objetivo'])) {
-                    continue; // Saltar este tema si está completamente vacío
+                    continue; // Saltar temas totalmente vacíos
                 }
 
-
-                if ($idTema && in_array($idTema, $idsTemasActuales)) { // Es ACTUALIZAR tema existente
+                if ($idTema && in_array($idTema, $idsTemasActuales)) { // ACTUALIZAR
                     $paramsTema[':idTema'] = $idTema;
                     $stmtUpdateTema->execute($paramsTema);
-                } else { // Es INSERTAR tema nuevo
+                } else { // INSERTAR
                     $stmtInsertTema->execute($paramsTema);
-                    $idTema = $this->db->lastInsertId(); // Obtenemos el nuevo ID del tema
+                    $idTema = $this->db->lastInsertId(); // Obtenemos el nuevo ID
                 }
 
-                // Insertar o actualizar acuerdo asociado (solo si hay descripción y un idTema válido)
+                // Insertar/Actualizar acuerdo
                 $descAcuerdo = trim($tema['descAcuerdo'] ?? '');
                 if ($idTema && !empty($descAcuerdo)) {
                     $stmtUpsertAcuerdo->execute([
                         ':descAcuerdo' => $descAcuerdo,
-                        ':idTipoReunion' => $idTipoReunion, // Asumido
+                        ':idTipoReunion' => $idTipoReunion,
                         ':idTema' => $idTema
                     ]);
                 }
-                // Opcional: Borrar acuerdo si descAcuerdo está vacío
-                /* else if ($idTema && empty($descAcuerdo)) {
-                     $sqlDeleteAcuerdo = "DELETE FROM t_acuerdo WHERE t_tema_idTema = :idTema";
-                     $stmtDelAc = $this->db->prepare($sqlDeleteAcuerdo);
-                     $stmtDelAc->execute([':idTema' => $idTema]);
-                 }*/
+                // Considerar borrar acuerdo si descAcuerdo está vacío
+                else if ($idTema && empty($descAcuerdo)) {
+                    $sqlDeleteAcuerdo = "DELETE FROM t_acuerdo WHERE t_tema_idTema = :idTema";
+                    $stmtDelAc = $this->db->prepare($sqlDeleteAcuerdo);
+                    $stmtDelAc->execute([':idTema' => $idTema]);
+                }
             }
 
-            // --- 4. ACTUALIZAR HORA DE TÉRMINO DE LA REUNIÓN --- <<-- LÓGICA AÑADIDA AQUÍ
+            // --- 4. ACTUALIZAR HORA DE TÉRMINO DE LA REUNIÓN --- (Sin cambios)
             $sql_find_reunion = "SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1";
             $stmt_find = $this->db->prepare($sql_find_reunion);
             $stmt_find->execute([':idMinuta' => $idMinuta]);
             $reunion = $stmt_find->fetch(PDO::FETCH_ASSOC);
+            $mensajeExito = 'Minuta guardada con éxito.'; // Mensaje base
 
             if ($reunion) {
                 $idReunion = $reunion['idReunion'];
@@ -186,42 +176,46 @@ class MinutaManager extends BaseConexion
                 $stmt_update->execute([':idReunion' => $idReunion]);
                 $mensajeExito = 'Minuta guardada y hora de término de reunión actualizada.';
             } else {
-                // Si no se encuentra la reunión, igual guardamos la minuta pero registramos un warning
                 error_log("Warning: No se encontró reunión asociada a idMinuta {$idMinuta} para actualizar fechaTerminoReunion.");
-                $mensajeExito = 'Minuta guardada (pero no se encontró reunión asociada para actualizar hora de término).';
+                // $mensajeExito = 'Minuta guardada (pero no se encontró reunión asociada para actualizar hora de término).'; // Opcional: informar al usuario
             }
-            // --- FIN LÓGICA AÑADIDA ---
-
 
             // --- 5. COMMIT ---
             $this->db->commit();
             return ['status' => 'success', 'message' => $mensajeExito, 'idMinuta' => $idMinuta];
         } catch (Exception $e) {
-            // Asegurarse de hacer rollback si algo falla
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
-            // Registrar el error detallado en el log del servidor
             error_log("Error en guardarMinutaCompleta para idMinuta {$idMinuta}: " . $e->getMessage());
-            // Devolver un mensaje genérico al usuario
-            return ['status' => 'error', 'message' => 'Ocurrió un error al guardar los datos.', 'error' => $e->getMessage()]; // Devolver e->getMessage() opcionalmente para debug
+            // Devolvemos el mensaje SQL real para depuración, pero podrías cambiarlo
+            return ['status' => 'error', 'message' => 'Ocurrió un error al guardar los datos.', 'error' => $e->getMessage()];
+        } finally {
+            // Asegurar que la conexión se cierre si se usa 'finally'
+            $this->db = null;
         }
     }
 }
 
 // --- Ejecución ---
 try {
-    $manager = new MinutaManager();
-    $result = $manager->guardarMinutaCompleta($idMinuta, $datosMinuta, $asistenciaIDs, $temasData);
+    // Verificar que $idMinuta no sea null antes de instanciar
+    if ($idMinuta === null) {
+        throw new Exception("ID de Minuta no proporcionado en la solicitud.");
+    }
 
-    // Si hubo un error en la lógica de negocio pero no una excepción, devolver código 4xx
+    $manager = new MinutaManager();
+    // Pasar solo los parámetros necesarios
+    $result = $manager->guardarMinutaCompleta($idMinuta, $asistenciaIDs, $temasData);
+
     if ($result['status'] === 'error') {
-        http_response_code(400); // Bad request (o 500 si fue error de BD)
+        // Usar 400 para errores de lógica/datos, 500 para excepciones inesperadas
+        http_response_code(isset($result['error']) ? 500 : 400);
     }
 
     echo json_encode($result);
-} catch (Exception $e) { // Captura errores en la instanciación o llamadas fuera del método
-    http_response_code(500); // Internal Server Error
-    error_log("Error fatal en guardar_minuta_completa.php: " . $e->getMessage()); // Log detallado
-    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.']); // Mensaje genérico
+} catch (Exception $e) {
+    http_response_code(500);
+    error_log("Error fatal en guardar_minuta_completa.php: " . $e->getMessage());
+    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.']);
 }

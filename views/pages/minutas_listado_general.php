@@ -89,7 +89,7 @@ $currentThemeName = $_GET['themeName'] ?? '';
                                         <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo $minutaId; ?>)">🔒 Firmar y Aprobar</button>
                                     <?php endif; ?>
                                 <?php elseif ($estado === 'APROBADA'): ?>
-                                    <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Ver PDF Fijo</a>
+                                    <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Visualizar PDF</a>
                                 <?php else: ?>
                                     —
                                 <?php endif; ?>

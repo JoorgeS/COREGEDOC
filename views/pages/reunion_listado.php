@@ -37,7 +37,7 @@ unset($_SESSION['success'], $_SESSION['error']);
 
 <body>
     <div class="container-fluid mt-4">
-        <h3 class="mb-4">Listado de Reuniones Registradas</h3>
+        <h3 class="mb-4">Listado de Reuniones</h3>
 
         <a href="menu.php?pagina=reunion_crear" class="btn btn-primary mb-4">
             <i class="fas fa-plus me-1"></i> Crear Nueva Reunión
@@ -92,12 +92,12 @@ unset($_SESSION['success'], $_SESSION['error']);
                                         <td style="white-space: nowrap;">
                                             <?php if ($estado === 'APROBADA'): ?>
                                                 <a href="menu.php?pagina=minutas_aprobadas" class="btn btn-sm btn-success">
-                                                    <i class="fas fa-check-circle me-1"></i> Ver Aprobada
+                                                    <i class="fas fa-check-circle me-1"></i> Minuta guardada
                                                 </a>
 
                                             <?php elseif ($estado === 'PENDIENTE'): ?>
                                                 <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning">
-                                                    <i class="fas fa-edit me-1"></i> Continuar Minuta
+                                                    <i class="fas fa-edit me-1"></i> Continuar editando la minuta
                                                 </a>
                                                 <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $reunion['idReunion']; ?>"
                                                     class="btn btn-sm btn-danger"
