@@ -321,18 +321,53 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
                 </li>
 
                 <li class="nav-item">
-              <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link link-dark fw-bold">
-                <i class="fa-solid fa-hand-pointer me-2 text-success"></i>
-                Registrar Mi Asistencia
-              </a>
-            </li>
+                  <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link link-dark fw-bold">
+                    <i class="fa-solid fa-hand-pointer me-2 text-success"></i>
+                    Registrar Mi Asistencia
+                  </a>
+                </li>
 
               </ul>
 
-              
+
             </div>
           </li>
-          
+
+          <li>
+            <button class="btn btn-toggle align-items-center rounded collapsed w-100 text-start"
+              data-bs-toggle="collapse" data-bs-target="#votaciones-collapse" aria-expanded="true">
+              <span class="d-flex align-items-center">
+                <i class="fa-solid fa-list-check me-2"></i>
+                Votaciones
+              </span>
+              <span class="toggle-icon down">▼</span>
+            </button>
+
+            <div class="collapse show" id="votaciones-collapse">
+              <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
+                <li>
+                  <a href="menu.php?pagina=votacion_form"
+                    class="link-dark d-block rounded py-1">
+                    Registrar nueva votación
+                  </a>
+                </li>
+                <li>
+                  <a href="menu.php?pagina=votacion_listado"
+                    class="link-dark d-block rounded py-1">
+                    Revisar listado de votaciones
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </li>
+
+          <li class="nav-item">
+            <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link link-dark fw-bold">
+              <i class="fa-solid fa-hand-pointer me-2 text-success"></i>
+              Registrar Votación
+            </a>
+          </li>
+
 
         </ul>
 
@@ -482,8 +517,29 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
           include __DIR__ . '/../../controllers/ReunionController.php';
           break;
 
+        // Casos de Votaciones
+        case 'votacion_form':
+          include __DIR__ . '/votacion_form.php';
+          break;
+
+        case 'votacion_listado':
+          include __DIR__ . '/votacion_listado.php';
+          break;
+
+        // Casos del Dropdown de Perfil
+        case 'perfil_usuario':
+          include __DIR__ . '/perfil_usuario.php';
+          break;
+        case 'configuracion_vista':
+          include __DIR__ . '/configuracion_vista.php';
+          break;
+
         case 'reunion_autogestion_asistencia': // Página para Consejeros
           include __DIR__ . '/asistencia_autogestion.php';
+          break;
+
+        case 'votacion_autogestion_voto':
+          include __DIR__ . '/voto_autogestion.php';
           break;
 
         // Caso por defecto (si 'pagina' no coincide con nada)

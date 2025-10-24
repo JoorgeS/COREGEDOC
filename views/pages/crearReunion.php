@@ -126,7 +126,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
         // --- FUNCIÓN DE CREACIÓN (guardarReunion) ---
         function guardarReunion() {
             const nombreReunion = document.getElementById('nombreReunion').value.trim();
-            const numeroReunion = document.getElementById('numeroReunion').value.trim();
+            //const numeroReunion = document.getElementById('numeroReunion').value.trim();
             const comisionId = document.getElementById('comisionId').value;
             const fechaInicio = document.getElementById('fechaInicio').value;
             const fechaTermino = document.getElementById('fechaTermino').value;
@@ -213,7 +213,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
             }
 
             const nombreReunion = document.getElementById('nombreReunion').value.trim();
-            const numeroReunion = document.getElementById('numeroReunion').value.trim();
+           // const numeroReunion = document.getElementById('numeroReunion').value.trim();
             const comisionId = document.getElementById('comisionId').value;
             const fechaInicio = document.getElementById('fechaInicio').value;
             const fechaTermino = document.getElementById('fechaTermino').value;

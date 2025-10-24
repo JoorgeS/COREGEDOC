@@ -181,6 +181,42 @@ class ReunionManager extends BaseConexion
         }
     }
 
+    /**
+     * Obtiene los datos de una reunión específica para el formulario de edición.
+     */
+    public function getReunionById($id)
+    {
+        // Asegúrate de seleccionar todas las columnas que tu formulario necesita
+        $sql = "SELECT 
+                    idReunion,
+                    nombreReunion,
+                    fechaInicioReunion,
+                    fechaTerminoReunion,
+                    t_comision_idComision,
+                    t_comision_idComision_mixta,
+                    t_comision_idComision_mixta2
+                    /* Si agregaste 'numeroReunion' a la DB, añádelo aquí */
+                FROM t_reunion 
+                WHERE idReunion = :id AND vigente = 1";
+
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([':id' => $id]);
+            $reunion = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($reunion) {
+                // Éxito: devuelve los datos de la reunión
+                return ['status' => 'success', 'data' => $reunion];
+            } else {
+                // No se encontró la reunión
+                return ['status' => 'error', 'message' => 'Reunión no encontrada o no está vigente.'];
+            }
+        } catch (PDOException $e) {
+            error_log("Error DB getReunionById: " . $e->getMessage());
+            return ['status' => 'error', 'message' => 'Error al obtener los datos de la reunión.'];
+        }
+    }
+
     // La función iniciarReunion() ya no es necesaria con este flujo.
 }
 
