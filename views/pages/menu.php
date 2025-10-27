@@ -346,7 +346,7 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
             <div class="collapse show" id="votaciones-collapse">
               <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ps-3">
                 <li>
-                  <a href="menu.php?pagina=votacion_form"
+                  <a href="menu.php?pagina=crearVotacion"
                     class="link-dark d-block rounded py-1">
                     Registrar nueva votación
                   </a>
@@ -362,8 +362,8 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
           </li>
 
           <li class="nav-item">
-            <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link link-dark fw-bold">
-              <i class="fa-solid fa-hand-pointer me-2 text-success"></i>
+            <a href="menu.php?pagina=voto_autogestion" class="nav-link link-dark fw-bold">
+              <i class="fa-solid fa-check-to-slot me-2 text-success"></i>
               Registrar Votación
             </a>
           </li>
@@ -517,13 +517,22 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
           include __DIR__ . '/../../controllers/ReunionController.php';
           break;
 
-        // Casos de Votaciones
-        case 'votacion_form':
-          include __DIR__ . '/votacion_form.php';
+        // === VOTACIONES ===
+        case 'crearVotacion':
+        case 'votacion_crear':
+          include __DIR__ . '/crearVotacion.php';
           break;
 
         case 'votacion_listado':
           include __DIR__ . '/votacion_listado.php';
+          break;
+        
+        case 'voto_autogestion':
+          include __DIR__ . '/voto_autogestion.php';
+          break;
+
+        case 'tabla_votacion':
+          include __DIR__ . '/tablaVotacion.php';
           break;
 
         // Casos del Dropdown de Perfil

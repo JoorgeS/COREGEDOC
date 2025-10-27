@@ -1,12 +1,12 @@
 <?php
 session_start();
-require_once __DIR__ . "/class/class.conectorDB.php"; 
+require_once __DIR__ . "/../../class/class.conectorDB.php";
 
 $message = '';
 $message_type = '';
 $db = new conectorDB();
 $token = $_GET['token'] ?? '';
-$user_id = null; 
+$user_id = null;
 
 // 1. VALIDAR TOKEN
 if (empty($token)) {
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
             $message = '¡Contraseña restablecida con éxito! Ahora puede iniciar sesión.';
             $message_type = 'success';
             $user_id = null; // Invalida el formulario
-            
+
         } catch (PDOException $e) {
             $message = 'Error al actualizar la contraseña.';
             $message_type = 'error';
@@ -68,26 +68,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
 
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Restablecer Contraseña</title>
-    <style> 
+    <style>
         /* [PEGA AQUÍ LOS ESTILOS DEL PRIMER ARCHIVO (recuperar_contrasena.php)] */
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f5f5f5; }
-        .recovery-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 450px; width: 90%; text-align: center; }
-        .logo { max-width: 150px; margin-bottom: 30px; }
-        .recovery-box h2 { font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
-        .recovery-box p { margin-bottom: 25px; color: #555; }
-        .input-group { margin-bottom: 20px; text-align: left; }
-        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .input-group input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn-black { background: black; color: white; border: none; padding: 12px 0; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; text-transform: uppercase; }
-        .message-box { padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size: 0.9rem; }
-        .message-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+
+        .recovery-box {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .logo {
+            max-width: 150px;
+            margin-bottom: 30px;
+        }
+
+        .recovery-box h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .recovery-box p {
+            margin-bottom: 25px;
+            color: #555;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .btn-black {
+            background: black;
+            color: white;
+            border: none;
+            padding: 12px 0;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .message-box {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .message-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
         /* Puedes omitir las clases captcha-container y btn-white */
     </style>
 </head>
+
 <body>
     <div class="recovery-box">
         <img src="/corevota/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
@@ -102,20 +178,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
             </div>
         <?php endif; ?>
 
-        <?php if ($user_id && $message_type !== 'success'): // Muestra el formulario solo si el token es válido ?>
-        <form action="" method="post">
-            <div class="input-group">
-                <label for="contrasena">Nueva Contraseña</label>
-                <input type="password" id="contrasena" name="contrasena" required>
-            </div>
-            <div class="input-group">
-                <label for="confirmar_contrasena">Confirmar Contraseña</label>
-                <input type="password" id="confirmar_contrasena" name="confirmar_contrasena" required>
-            </div>
+        <?php if ($user_id && $message_type !== 'success'): // Muestra el formulario solo si el token es válido 
+        ?>
+            <form action="" method="post">
+                <div class="input-group">
+                    <label for="contrasena">Nueva Contraseña</label>
+                    <input type="password" id="contrasena" name="contrasena" required>
+                </div>
+                <div class="input-group">
+                    <label for="confirmar_contrasena">Confirmar Contraseña</label>
+                    <input type="password" id="confirmar_contrasena" name="confirmar_contrasena" required>
+                </div>
 
-            <button type="submit" class="btn-black">ACTUALIZAR CONTRASEÑA</button>
-        </form>
+                <button type="submit" class="btn-black">ACTUALIZAR CONTRASEÑA</button>
+            </form>
         <?php endif; ?>
     </div>
 </body>
+
 </html>

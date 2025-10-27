@@ -5,8 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Incluir clases (Ajusta la ruta si es necesario)
-require_once __DIR__ . "/class/class.conectorDB.php"; 
-require 'vendor/autoload.php'; 
+require_once __DIR__ . "/../../class/class.conectorDB.php"; 
+require __DIR__ . '/../../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mail->setFrom('no-responder@corevota.cl', 'CORE Vota');
                 $mail->addAddress($user_data['correo']);
                 
-                $reset_link = "http://localhost/corevota/restablecer_contrasena.php?token=" . $token;
+                $reset_link = "http://localhost/corevota/views/pages/restablecer_contrasena.php?token=" . $token;
 
                 $mail->isHTML(true);
                 $mail->Subject = 'Recuperación de Contraseña CORE Vota';
