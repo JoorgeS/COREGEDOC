@@ -7,7 +7,7 @@ header('Content-Type: application/json');
 $action = $_GET['action'] ?? null;
 // Respuesta por defecto estandarizada
 $response = ['status' => 'error', 'message' => 'Acción no válida.', 'data' => []];
-$pdo = null; 
+$pdo = null;
 
 if (!$action) {
     echo json_encode($response);
@@ -20,7 +20,7 @@ try {
     $data = [];
 
     switch ($action) {
-        
+
         // Caso para dropdowns de Comisión
         case 'comisiones':
             $sql = "SELECT idComision, nombreComision 
@@ -48,11 +48,12 @@ try {
             break;
 
         // Caso para la tabla de Asistencia (Consejeros tipo 1)
+
         case 'asistencia_all':
             $sql_asist = "SELECT idUsuario, pNombre, aPaterno, aMaterno
-                          FROM t_usuario 
-                          WHERE tipoUsuario_id = 1 
-                          ORDER BY aPaterno ASC, aMaterno ASC, pNombre ASC";
+             FROM t_usuario 
+             WHERE tipoUsuario_id IN (1, 3) 
+             ORDER BY aPaterno ASC, aMaterno ASC, pNombre ASC";
             $stmt_asist = $pdo->query($sql_asist);
             $usuarios_asist = $stmt_asist->fetchAll(PDO::FETCH_ASSOC);
             foreach ($usuarios_asist as $u) {
@@ -62,7 +63,7 @@ try {
                 ];
             }
             break;
-        
+
         default:
             // Si la acción no se reconoce, salimos con el error
             $response['message'] = 'Acción desconocida.';
@@ -76,12 +77,12 @@ try {
     $response = ['status' => 'success', 'data' => $data];
     echo json_encode($response);
     exit;
-
 } catch (Exception $e) {
     error_log("Error en fetch_data.php (action: $action): " . $e->getMessage());
-    if ($pdo) { $pdo = null; }
+    if ($pdo) {
+        $pdo = null;
+    }
     $response['message'] = 'Error de base de datos: ' . $e->getMessage();
     echo json_encode($response); // Devolver error estandarizado
     exit;
 }
-?>

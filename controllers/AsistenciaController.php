@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$idUsuarioLogueado) {
 }
 
 // Solo Consejeros Regionales (idTipoUsuario = 1) pueden autogestionar
-if ($tipoUsuario != 1) {
+if ($tipoUsuario != 1 and $tipoUsuario != 3) {
     echo json_encode(['status' => 'error', 'message' => 'Acción no permitida para este tipo de usuario.']);
     exit;
 }

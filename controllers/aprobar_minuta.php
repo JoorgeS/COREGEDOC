@@ -286,7 +286,7 @@ function getMinutaCompletaParaPDF($pdo, $idMinuta) {
     $sql_asist = "SELECT CONCAT(u.pNombre,' ',u.aPaterno) AS nombreCompleto
                   FROM t_asistencia a
                   JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                  WHERE a.t_minuta_idMinuta = :idMinuta AND u.tipoUsuario_id = 1
+                  WHERE a.t_minuta_idMinuta = :idMinuta AND u.tipoUsuario_id in (1,3)
                   ORDER BY u.aPaterno, u.pNombre";
     $stmt = $pdo->prepare($sql_asist);
     $stmt->execute([':idMinuta' => $idMinuta]);
