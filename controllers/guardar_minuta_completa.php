@@ -2,7 +2,12 @@
 // controllers/guardar_minuta_completa.php
 
 require_once __DIR__ . '/../cfg/config.php';
-require_once __DIR__ . '/../class/class.conectorDB.php'; // Asegúrate que incluya BaseConexion
+require_once __DIR__ . '/../class/class.conectorDB.php';
+require_once __DIR__ . '/../vendor/autoload.php'; // Incluye el autoloader de Composer/Dompdf
+
+use Dompdf\Dompdf;
+use Dompdf\Options;
+
 header('Content-Type: application/json');
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -39,7 +44,7 @@ if (!is_array($asistenciaIDs) || !is_array($temasData)) {
 }
 
 
-class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está definida o incluida
+class MinutaManager extends BaseConexion
 {
     private $db;
 
@@ -49,57 +54,201 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    // Modificado para recibir $enlaceAdjunto y usar $_FILES internamente
+    // Nuevo método para obtener los nombres de los asistentes
+    private function getNombresAsistentes(array $asistenciaIDs, int $idMinuta): array
+    {
+        if (empty($asistenciaIDs)) {
+            return [];
+        }
+
+        // Convertir IDs a placeholders para la consulta segura
+        $placeholders = implode(',', array_fill(0, count($asistenciaIDs), '?'));
+        $params = $asistenciaIDs;
+
+        // Intentar obtener el nombre de la reunión
+        $sqlReunion = "SELECT nombreReunion FROM t_reunion WHERE t_minuta_idMinuta = ?";
+        $stmtReunion = $this->db->prepare($sqlReunion);
+        $stmtReunion->execute([$idMinuta]);
+        $reunion = $stmtReunion->fetch(PDO::FETCH_ASSOC);
+        $nombreReunion = $reunion['nombreReunion'] ?? 'Reunión sin título';
+
+        // 🚨 CAMBIO CRÍTICO APLICADO AQUÍ 🚨
+        // ANTES: CONCAT(nombreUsuario, ' ', apellidoUsuario)
+        // AHORA: CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)
+        $sql = "SELECT idUsuario, TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
+                 FROM t_usuario
+                 WHERE idUsuario IN ({$placeholders})
+                 ORDER BY nombreCompleto";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $nombres = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return ['nombreReunion' => $nombreReunion, 'asistentes' => $nombres];
+    }
+
+    // Nuevo método para generar el PDF de asistencia
+    private function generarPdfAsistencia(int $idMinuta, array $dataAsistencia): string
+    {
+        $nombresAsistentes = $dataAsistencia['asistentes'];
+        $nombreReunion = $dataAsistencia['nombreReunion'];
+        // CORRECCIÓN 1: Se añade el \ a DateTime
+        $fechaGeneracion = (new \DateTime())->format('Y-m-d H:i:s');
+        $fechaParaNombreArchivo = (new \DateTime())->format('Ymd_His');
+
+        // 1. Crear el contenido HTML para el PDF
+        $html = "
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <title>Lista de Asistencia - Minuta {$idMinuta}</title>
+                <style>
+                    body { font-family: DejaVu Sans, sans-serif; font-size: 12px; }
+                    .header { text-align: center; margin-bottom: 20px; }
+                    .header h1 { font-size: 20px; color: #333; }
+                    .header h2 { font-size: 16px; color: #666; }
+                    .attendance-list { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    .attendance-list th, .attendance-list td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+                    .attendance-list th { background-color: #f2f2f2; }
+                    .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 10px; color: #999; }
+                </style>
+            </head>
+            <body>
+                <div class='header'>
+                    <h1>Listado de Asistencia</h1>
+                    <h2>Minuta N° {$idMinuta}: {$nombreReunion}</h2>
+                    <p>Fecha de la reunión: " . (new \DateTime())->format('d/m/Y') . "</p>
+                </div>
+
+                <table class='attendance-list'>
+                    <thead>
+                        <tr>
+                            <th>N°</th>
+                            <th>Nombre Completo</th>
+                            <th>Firma</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        ";
+
+        if (empty($nombresAsistentes)) {
+            $html .= "<tr><td colspan='3' style='text-align: center;'>No se registró asistencia para esta minuta.</td></tr>";
+        } else {
+            foreach ($nombresAsistentes as $index => $asistente) {
+                $html .= "
+                        <tr>
+                            <td>" . ($index + 1) . "</td>
+                            <td>" . htmlspecialchars($asistente['nombreCompleto']) . "</td>
+                            <td></td>
+                        </tr>
+                ";
+            }
+        }
+
+        $html .= "
+                    </tbody>
+                </table>
+                <div class='footer'>
+                    Documento generado automáticamente por CoreVota el {$fechaGeneracion}
+                </div>
+            </body>
+            </html>
+        ";
+
+        // 2. Configurar y generar el PDF
+        $options = new Options();
+        // Habilitar el soporte remoto para imágenes (si las hubiera) y fuentes (si las usamos)
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        // Usar la ruta absoluta para el directorio de fuentes (requerido para Dompdf)
+        $options->set('fontDir', __DIR__ . '/../vendor/dompdf/dompdf/lib/fonts');
+
+        // CORRECCIÓN 2: Se establece la fuente por defecto (soluciona el \"Undefined constant\")
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('Letter', 'portrait'); // Tamaño de papel y orientación
+        $dompdf->render();
+
+        // 3. Guardar el archivo en el servidor
+        $rutaBase = __DIR__ . '/../public/docs/asistencia/';
+        if (!is_dir($rutaBase)) {
+            mkdir($rutaBase, 0775, true); // Crear el directorio si no existe
+        }
+
+        $nombreArchivo = "asistencia_minuta_{$idMinuta}_{$fechaParaNombreArchivo}.pdf";
+        $rutaCompleta = $rutaBase . $nombreArchivo;
+
+        // El path a guardar en la BD (relativo a la raíz del proyecto)
+        $relativePath = 'public/docs/asistencia/' . $nombreArchivo;
+
+        // Guardar el PDF
+        file_put_contents($rutaCompleta, $dompdf->output());
+
+        return $relativePath;
+    }
+
+
     public function guardarMinutaCompleta($idMinuta, $asistenciaIDs, $temasData, $enlaceAdjunto)
     {
-        // --- INICIO DEBUG: Registrar entrada a la función ---
-        error_log("DEBUG: Iniciando guardarMinutaCompleta para idMinuta {$idMinuta}");
-        // --- FIN DEBUG ---
+        // ... (código de depuración omitido por brevedad) ...
 
-        $adjuntosGuardados = []; // Para devolver info al frontend
+        $adjuntosGuardados = [];
         try {
             $this->db->beginTransaction();
 
-            // --- 1. ACTUALIZAR MINUTA (t_minuta) ---
-            // (Ya no es necesario aquí, se asume que la minuta ya existe)
-
             // --- 2. ACTUALIZAR ASISTENCIA (t_asistencia) ---
             // Borramos la asistencia ANTERIOR de esta minuta
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Antes de DELETE FROM t_asistencia");
-            // --- FIN DEBUG ---
+            // ... (DELETE FROM t_asistencia)
             $sqlDeleteAsistencia = "DELETE FROM t_asistencia WHERE t_minuta_idMinuta = :idMinuta";
             $stmtDeleteAsistencia = $this->db->prepare($sqlDeleteAsistencia);
             $stmtDeleteAsistencia->execute([':idMinuta' => $idMinuta]);
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Después de DELETE FROM t_asistencia");
-            // --- FIN DEBUG ---
-
 
             // Insertamos la asistencia ACTUAL (los IDs que llegaron del form)
             $idTipoReunion = 1; // Asumido
             if (!empty($asistenciaIDs)) {
                 $sqlAsistencia = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
-                                    VALUES (:idMinuta, :idUsuario, :idTipoReunion, NOW())";
+                                 VALUES (:idMinuta, :idUsuario, :idTipoReunion, NOW())";
                 $stmtAsistencia = $this->db->prepare($sqlAsistencia);
                 foreach ($asistenciaIDs as $idUsuario) {
                     if (is_numeric($idUsuario)) { // Validar
-                        // --- DEBUG ---
-                        error_log("DEBUG idMinuta {$idMinuta}: Antes de INSERT INTO t_asistencia para usuario {$idUsuario}");
-                        // --- FIN DEBUG ---
                         $stmtAsistencia->execute([
                             ':idMinuta' => $idMinuta,
                             ':idUsuario' => $idUsuario,
                             ':idTipoReunion' => $idTipoReunion
                         ]);
-                        // --- DEBUG ---
-                        error_log("DEBUG idMinuta {$idMinuta}: Después de INSERT INTO t_asistencia para usuario {$idUsuario}");
-                        // --- FIN DEBUG ---
                     } else {
                         error_log("Warning idMinuta {$idMinuta}: ID de asistencia no válido ignorado: " . print_r($idUsuario, true));
                     }
                 }
             }
+
+            // 🚨 NUEVA FUNCIONALIDAD: GENERACIÓN DE PDF DE ASISTENCIA 🚨
+            if (!empty($asistenciaIDs)) {
+                // 1. Obtener los nombres de los asistentes y el nombre de la reunión
+                $dataAsistencia = $this->getNombresAsistentes($asistenciaIDs, $idMinuta);
+
+                // 2. Generar el PDF
+                $rutaPdfAsistencia = $this->generarPdfAsistencia($idMinuta, $dataAsistencia);
+
+                // 3. Guardar el PDF de asistencia como un adjunto de tipo 'asistencia_pdf' (o 'file' si es más simple)
+                // Usaremos tipo 'file' y nos basamos en el nombre para saber qué es
+                $sqlInsertAdjunto = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto) VALUES (:idMinuta, :path, :tipo)";
+                $stmtInsertAdjunto = $this->db->prepare($sqlInsertAdjunto);
+
+                $stmtInsertAdjunto->execute([
+                    ':idMinuta' => $idMinuta,
+                    ':path' => $rutaPdfAsistencia,
+                    ':tipo' => 'asistencia_pdf' // Nuevo tipo para identificar fácilmente el archivo de asistencia
+                ]);
+                $lastAdjId = $this->db->lastInsertId();
+                $adjuntosGuardados[] = ['idAdjunto' => $lastAdjId, 'pathAdjunto' => $rutaPdfAsistencia, 'tipoAdjunto' => 'asistencia_pdf'];
+                error_log("DEBUG idMinuta {$idMinuta}: PDF de asistencia generado y guardado en la BD: {$rutaPdfAsistencia}");
+            }
+            // -----------------------------------------------------------
 
             // --- 3. ACTUALIZAR TEMAS Y ACUERDOS (t_tema y t_acuerdo) ---
             $idsTemasActuales = [];
@@ -108,45 +257,26 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                     $idsTemasActuales[] = $tema['idTema'];
                 }
             }
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Antes de buscar temas existentes en DB");
-            // --- FIN DEBUG ---
             $sqlTemasEnDB = "SELECT idTema FROM t_tema WHERE t_minuta_idMinuta = :idMinuta";
             $stmtTemasEnDB = $this->db->prepare($sqlTemasEnDB);
             $stmtTemasEnDB->execute([':idMinuta' => $idMinuta]);
             $idsTemasEnDB = $stmtTemasEnDB->fetchAll(PDO::FETCH_COLUMN, 0);
             $idsTemasABorrar = array_diff($idsTemasEnDB, $idsTemasActuales);
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: IDs de temas a borrar: " . implode(', ', $idsTemasABorrar));
-            // --- FIN DEBUG ---
 
             if (!empty($idsTemasABorrar)) {
                 $placeholdersBorrar = implode(',', array_fill(0, count($idsTemasABorrar), '?'));
-                // --- DEBUG ---
-                error_log("DEBUG idMinuta {$idMinuta}: Antes de DELETE FROM t_acuerdo para temas a borrar.");
-                // --- FIN DEBUG ---
                 $sqlDeleteAcuerdos = "DELETE FROM t_acuerdo WHERE t_tema_idTema IN ($placeholdersBorrar)";
                 $stmtDeleteAcuerdos = $this->db->prepare($sqlDeleteAcuerdos);
                 $stmtDeleteAcuerdos->execute($idsTemasABorrar);
-                // --- DEBUG ---
-                error_log("DEBUG idMinuta {$idMinuta}: Antes de DELETE FROM t_tema para temas a borrar.");
-                // --- FIN DEBUG ---
-                $sqlDeleteTemas = "DELETE FROM t_tema WHERE idTema IN ($placeholdersBorrar) AND t_minuta_idMinuta = ?"; // Doble check con idMinuta
+                $sqlDeleteTemas = "DELETE FROM t_tema WHERE idTema IN ($placeholdersBorrar) AND t_minuta_idMinuta = ?";
                 $paramsBorrarTemas = array_merge($idsTemasABorrar, [$idMinuta]);
                 $stmtDeleteTemas = $this->db->prepare($sqlDeleteTemas);
                 $stmtDeleteTemas->execute($paramsBorrarTemas);
-                // --- DEBUG ---
-                error_log("DEBUG idMinuta {$idMinuta}: Después de DELETE de temas/acuerdos.");
-                // --- FIN DEBUG ---
             }
             $sqlInsertTema = "INSERT INTO t_tema (t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion) VALUES (:idMinuta, :nombre, :objetivo, :compromiso, :observacion)";
             $sqlUpdateTema = "UPDATE t_tema SET nombreTema = :nombre, objetivo = :objetivo, compromiso = :compromiso, observacion = :observacion WHERE idTema = :idTema AND t_minuta_idMinuta = :idMinuta";
-            $sqlUpsertAcuerdo = "INSERT INTO t_acuerdo (descAcuerdo, t_tema_idTema)
-                                  VALUES (:descAcuerdo, :idTema)
-                                  ON DUPLICATE KEY UPDATE descAcuerdo = VALUES(descAcuerdo)";
             $stmtInsertTema = $this->db->prepare($sqlInsertTema);
             $stmtUpdateTema = $this->db->prepare($sqlUpdateTema);
-            $stmtUpsertAcuerdo = $this->db->prepare($sqlUpsertAcuerdo);
 
             foreach ($temasData as $index => $tema) {
                 $idTema = $tema['idTema'] ?? null;
@@ -163,45 +293,26 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                 }
 
                 if ($idTema && in_array($idTema, $idsTemasActuales)) { // ACTUALIZAR
-                    // --- DEBUG ---
-                    error_log("DEBUG idMinuta {$idMinuta}: Antes de UPDATE t_tema para idTema {$idTema}");
-                    // --- FIN DEBUG ---
                     $paramsTema[':idTema'] = $idTema;
                     $stmtUpdateTema->execute($paramsTema);
                 } else { // INSERTAR
-                    // --- DEBUG ---
-                    error_log("DEBUG idMinuta {$idMinuta}: Antes de INSERT INTO t_tema para tema nuevo (índice {$index})");
-                    // --- FIN DEBUG ---
                     $stmtInsertTema->execute($paramsTema);
                     $idTema = $this->db->lastInsertId(); // Obtenemos el nuevo ID
-                    // --- DEBUG ---
-                    error_log("DEBUG idMinuta {$idMinuta}: Después de INSERT INTO t_tema. Nuevo idTema: {$idTema}");
-                    // --- FIN DEBUG ---
                 }
-                // ... (código que inserta o actualiza el TEMA) ...
 
                 $descAcuerdo = trim($tema['descAcuerdo'] ?? '');
 
-                // --- INICIO DE LA CORRECCIÓN DE ACUERDOS ---
-
                 // 1. Borrar SIEMPRE todos los acuerdos previos asociados a ESTE tema.
-                //    Esto evita que se acumulen duplicados.
-                error_log("DEBUG idMinuta {$idMinuta}: Limpiando acuerdos para idTema {$idTema}");
                 $sqlDeleteAcuerdo = "DELETE FROM t_acuerdo WHERE t_tema_idTema = :idTema";
                 $stmtDelAc = $this->db->prepare($sqlDeleteAcuerdo);
                 $stmtDelAc->execute([':idTema' => $idTema]);
 
                 // 2. Si el acuerdo que viene del formulario NO está vacío, insertarlo como nuevo.
                 if ($idTema && !empty($descAcuerdo)) {
-                    error_log("DEBUG idMinuta {$idMinuta}: Insertando nuevo acuerdo para idTema {$idTema}");
-
-                    // TU SQL 'sqlUpsertAcuerdo' original no funcionaba y le faltaba t_tipoReunion_idTipoReunion
                     $sqlInsertAcuerdo = "INSERT INTO t_acuerdo (descAcuerdo, t_tema_idTema, t_tipoReunion_idTipoReunion) 
-                         VALUES (:descAcuerdo, :idTema, :idTipoReunion)";
+                             VALUES (:descAcuerdo, :idTema, :idTipoReunion)";
 
                     $stmtInsAc = $this->db->prepare($sqlInsertAcuerdo);
-
-                    // Usamos el ID 1, igual que en la sección de asistencia.
                     $idTipoReunion = 1;
 
                     $stmtInsAc->execute([
@@ -210,46 +321,28 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                         ':idTipoReunion' => $idTipoReunion
                     ]);
                 }
-                // --- FIN DE LA CORRECCIÓN DE ACUERDOS ---
             }
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Fin del bucle de temas/acuerdos.");
-            // --- FIN DEBUG ---
 
 
-            // --- 4. PROCESAR ADJUNTOS ---
-            // --- DEBUG: Verificar idMinuta antes de adjuntos ---
-            if (empty($idMinuta) || !is_numeric($idMinuta) || $idMinuta <= 0) {
-                $this->db->rollBack(); // Cancelar transacción
-                error_log("ERROR CRITICO idMinuta {$idMinuta}: idMinuta inválido justo antes de insertar adjunto: " . print_r($idMinuta, true));
-                return ['status' => 'error', 'message' => 'Error interno: ID de Minuta inválido antes de guardar adjunto.', 'error' => 'ID_MINUTA_INVALIDO'];
-            }
-            error_log("DEBUG idMinuta {$idMinuta}: Valor de idMinuta ANTES de insertar adjunto: " . $idMinuta);
-            // --- FIN DEBUG ---
-
+            // --- 4. PROCESAR ADJUNTOS (Archivos subidos y Enlaces) ---
             $sqlInsertAdjunto = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto) VALUES (:idMinuta, :path, :tipo)";
             $stmtInsertAdjunto = $this->db->prepare($sqlInsertAdjunto);
-
-            // 4a. Procesar Archivos Subidos
             $baseUploadPath = __DIR__ . '/../public/DocumentosAdjuntos/';
             $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'xlsx', 'mp4', 'ppt', 'pptx', 'doc', 'docx'];
 
             if (isset($_FILES['adjuntos']) && !empty($_FILES['adjuntos']['name'][0])) {
                 $files = $_FILES['adjuntos'];
                 $numFiles = count($files['name']);
-                error_log("DEBUG idMinuta {$idMinuta}: Procesando {$numFiles} archivos subidos.");
 
                 for ($i = 0; $i < $numFiles; $i++) {
                     $fileName = $files['name'][$i];
                     $tmpName = $files['tmp_name'][$i];
-                    $fileSize = $files['size'][$i];
                     $fileError = $files['error'][$i];
 
                     if ($fileError === UPLOAD_ERR_OK) {
                         $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
                         if (in_array($fileExtension, $allowedExtensions)) {
-                            // ... (lógica para crear directorio y mover archivo) ...
                             $targetDir = $baseUploadPath . strtoupper($fileExtension) . '/';
                             if (!is_dir($targetDir)) {
                                 if (!mkdir($targetDir, 0775, true)) {
@@ -262,9 +355,6 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                             $relativePath = 'DocumentosAdjuntos/' . strtoupper($fileExtension) . '/' . $newFileName;
 
                             if (move_uploaded_file($tmpName, $targetPath)) {
-                                // --- DEBUG ---
-                                error_log("DEBUG idMinuta {$idMinuta}: Antes de INSERT INTO t_adjunto (file): {$relativePath}");
-                                // --- FIN DEBUG ---
                                 $stmtInsertAdjunto->execute([
                                     ':idMinuta' => $idMinuta,
                                     ':path' => $relativePath,
@@ -272,9 +362,6 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                                 ]);
                                 $lastAdjId = $this->db->lastInsertId();
                                 $adjuntosGuardados[] = ['idAdjunto' => $lastAdjId, 'pathAdjunto' => $relativePath, 'tipoAdjunto' => 'file'];
-                                // --- DEBUG ---
-                                error_log("DEBUG idMinuta {$idMinuta}: Después de INSERT INTO t_adjunto (file). Nuevo idAdjunto: {$lastAdjId}");
-                                // --- FIN DEBUG ---
                             } else {
                                 throw new Exception("Error al mover el archivo subido: " . $fileName);
                             }
@@ -285,17 +372,12 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                         error_log("Error idMinuta {$idMinuta}: Error al subir archivo adjunto $fileName: Código $fileError");
                     }
                 }
-            } else {
-                error_log("DEBUG idMinuta {$idMinuta}: No se recibieron archivos adjuntos en \$_FILES['adjuntos'].");
             }
 
             // 4b. Procesar Enlace Externo
             if (!empty($enlaceAdjunto)) {
                 $enlaceSanitized = filter_var(trim($enlaceAdjunto), FILTER_SANITIZE_URL);
                 if (filter_var($enlaceSanitized, FILTER_VALIDATE_URL)) {
-                    // --- DEBUG ---
-                    error_log("DEBUG idMinuta {$idMinuta}: Antes de INSERT INTO t_adjunto (link): {$enlaceSanitized}");
-                    // --- FIN DEBUG ---
                     $stmtInsertAdjunto->execute([
                         ':idMinuta' => $idMinuta,
                         ':path' => $enlaceSanitized,
@@ -303,24 +385,12 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
                     ]);
                     $lastAdjId = $this->db->lastInsertId();
                     $adjuntosGuardados[] = ['idAdjunto' => $lastAdjId, 'pathAdjunto' => $enlaceSanitized, 'tipoAdjunto' => 'link'];
-                    // --- DEBUG ---
-                    error_log("DEBUG idMinuta {$idMinuta}: Después de INSERT INTO t_adjunto (link). Nuevo idAdjunto: {$lastAdjId}");
-                    // --- FIN DEBUG ---
                 } else {
                     error_log("Warning idMinuta {$idMinuta}: URL no válida proporcionada para adjunto: " . $enlaceAdjunto);
                 }
-            } else {
-                error_log("DEBUG idMinuta {$idMinuta}: No se recibió enlace adjunto en \$_POST['enlaceAdjunto'].");
             }
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Fin del procesamiento de adjuntos.");
-            // --- FIN DEBUG ---
-
 
             // --- 5. ACTUALIZAR HORA DE TÉRMINO DE LA REUNIÓN ---
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Antes de buscar idReunion en t_reunion.");
-            // --- FIN DEBUG ---
             $sql_find_reunion = "SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1";
             $stmt_find = $this->db->prepare($sql_find_reunion);
             $stmt_find->execute([':idMinuta' => $idMinuta]);
@@ -329,9 +399,6 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
 
             if ($reunion) {
                 $idReunion = $reunion['idReunion'];
-                // --- DEBUG ---
-                error_log("DEBUG idMinuta {$idMinuta}: Antes de UPDATE t_reunion SET fechaTerminoReunion para idReunion {$idReunion}.");
-                // --- FIN DEBUG ---
                 $sql_update_termino = "UPDATE t_reunion SET fechaTerminoReunion = NOW() WHERE idReunion = :idReunion";
                 $stmt_update = $this->db->prepare($sql_update_termino);
                 $stmt_update->execute([':idReunion' => $idReunion]);
@@ -341,38 +408,25 @@ class MinutaManager extends BaseConexion // Asegúrate que BaseConexion está de
             }
 
             // --- 6. COMMIT ---
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Antes de db->commit().");
-            // --- FIN DEBUG ---
             $this->db->commit();
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Después de db->commit().");
-            // --- FIN DEBUG ---
 
 
             // --- Opcional: Obtener lista completa de adjuntos para devolver ---
-            // --- DEBUG ---
-            error_log("DEBUG idMinuta {$idMinuta}: Antes de SELECT todos los adjuntos para la respuesta.");
-            // --- FIN DEBUG ---
             $sqlTodosAdjuntos = "SELECT idAdjunto, pathAdjunto, tipoAdjunto FROM t_adjunto WHERE t_minuta_idMinuta = :idMinuta ORDER BY idAdjunto";
             $stmtTodosAdjuntos = $this->db->prepare($sqlTodosAdjuntos);
             $stmtTodosAdjuntos->execute([':idMinuta' => $idMinuta]);
             $listaCompletaAdjuntos = $stmtTodosAdjuntos->fetchAll(PDO::FETCH_ASSOC);
 
 
-            return ['status' => 'success', 'message' => $mensajeExito, 'idMinuta' => $idMinuta, 'adjuntosActualizados' => $listaCompletaAdjuntos]; // Devolvemos la lista
+            return ['status' => 'success', 'message' => $mensajeExito, 'idMinuta' => $idMinuta, 'adjuntosActualizados' => $listaCompletaAdjuntos];
         } catch (Exception $e) {
-            // --- DEBUG: Registrar error antes de rollback ---
             error_log("ERROR CATCH idMinuta {$idMinuta}: Excepción capturada - " . $e->getMessage());
-            // --- FIN DEBUG ---
             if ($this->db->inTransaction()) {
                 error_log("ERROR CATCH idMinuta {$idMinuta}: Realizando db->rollBack().");
                 $this->db->rollBack();
             }
-            // El error ya se registra aquí por el log anterior
             return ['status' => 'error', 'message' => 'Ocurrió un error al guardar los datos.', 'error' => $e->getMessage()];
         }
-        // No necesitamos 'finally' aquí si no hay nada más que hacer siempre
     }
 }
 // --- FIN DE LA CLASE MinutaManager ---
@@ -390,23 +444,17 @@ try {
     $manager = new MinutaManager();
 
     // 2. Llamar al método principal con los datos ya validados
-    // (Estos $idMinuta, $asistenciaIDs, $temasData, $enlaceAdjunto 
-    // fueron definidos al INICIO del script)
     $resultado = $manager->guardarMinutaCompleta(
         $idMinuta,
         $asistenciaIDs,
         $temasData,
         $enlaceAdjunto
-        // $_FILES se maneja internamente en el método, no es necesario pasarlo
     );
 
     // 3. Establecer el código de respuesta HTTP basado en el resultado
     if (isset($resultado['status']) && $resultado['status'] === 'error') {
-        // Si el método detectó un error (ej. 400 por validación interna o 500 por BD)
-        // Por simplicidad, si el método devuelve 'error', respondemos con 500.
         http_response_code(500);
     } else {
-        // Si todo salió bien
         http_response_code(200);
     }
 } catch (Exception $e) {
@@ -421,9 +469,7 @@ try {
 }
 
 // 4. Enviar la respuesta JSON al frontend
-// Esto es lo que el JavaScript (res.json()) espera recibir.
 echo json_encode($resultado);
 
 // 5. Finalizar la ejecución
 exit;
-// --- FIN DEL CÓDIGO DE EJECUCIÓN ---
