@@ -226,12 +226,12 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
 <body>
 
-  <div class="container-fluid app-container p-4"> 
+  <div class="container-fluid app-container p-4">
     <h5 class="fw-bold mb-3">GESTIÓN DE LA MINUTA</h5>
 
     <div class="row g-3">
 
-      
+
       <div class="col-12 mb-3">
         <div class="card shadow-sm">
           <div class="card-header bg-primary text-white fw-bold">
@@ -239,8 +239,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           </div>
           <div class="card-body bg-light">
             <div class="row">
-        
-              <div class="col-md-6 border-end pe-4"> 
+
+              <div class="col-md-6 border-end pe-4">
                 <dl class="row mb-0">
                   <dt class="col-sm-5 col-lg-4">N° Sesión:</dt>
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($idMinutaActual); ?></dd>
@@ -255,8 +255,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($secretarioNombre); ?></dd>
                 </dl>
               </div>
-       
-              <div class="col-md-6 ps-4"> 
+
+              <div class="col-md-6 ps-4">
                 <dl class="row mb-0">
                   <?php if (!$nombreComisionMixta1 && !$nombreComisionMixta2): // Caso: Comisión Única 
                   ?>
@@ -297,7 +297,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           <button class="btn btn-secondary dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#asistenciaForm" aria-expanded="false" aria-controls="asistenciaForm">
             Asistencia (Marcar estado)
           </button>
-          <div class="collapse" id="asistenciaForm"> 
+          <div class="collapse" id="asistenciaForm">
             <div class="p-4 border rounded-bottom bg-white">
               <div id="contenedorTablaAsistenciaEstado" style="max-height: 400px; overflow-y: auto;">
                 <p class="text-muted">Cargando lista de consejeros...</p>
@@ -321,7 +321,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         </div>
       </div>
 
-    
+
       <div class="col-12 mt-2">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0">DESARROLLO DE LA MINUTA</h5>
@@ -329,7 +329,28 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         <div id="contenedorTemas">
 
         </div>
-        <button type="button" class="btn btn-outline-dark btn-sm mt-2" onclick="agregarTema()">Agregar Tema <span class="ms-1">➕</span></button> 
+        <button type="button" class="btn btn-outline-dark btn-sm mt-2" onclick="agregarTema()">Agregar Tema <span class="ms-1">➕</span></button>
+
+        <div class="adjuntos-section mt-4 pt-3 border-top">
+          <h5 class="fw-bold mb-3">DOCUMENTOS ADJUNTOS</h5>
+          <div class="mb-3">
+            <label for="adjuntosArchivos" class="form-label">Seleccionar Archivos (PDF, JPG, PNG, XLSX, MP4, PPT, DOCX)</label>
+            <input class="form-control" type="file" id="adjuntosArchivos" name="adjuntosArchivos[]" multiple
+              accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx">
+            <small class="form-text text-muted">Puedes seleccionar varios archivos a la vez.</small>
+          </div>
+          <div class="mb-3">
+            <label for="enlaceAdjunto" class="form-label">Enlace Externo (Ej: Noticia)</label>
+            <input type="url" class="form-control" id="enlaceAdjunto" name="enlaceAdjunto" placeholder="https://ejemplo.com/noticia">
+          </div>
+          <div id="adjuntosExistentesContainer" class="mt-3">
+            <h6>Adjuntos Actuales:</h6>
+            <ul id="listaAdjuntosExistentes" class="list-group list-group-flush">
+              <li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>
+            </ul>
+          </div>
+        </div>
+
 
         <div class="d-flex justify-content-center gap-3 mt-4">
           <div class="text-end mt-3">
@@ -659,42 +680,25 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     }
 
     function guardarMinutaCompleta() {
-      /* ... sin cambios ... */
-      // Ya no necesitamos leer comision1, presidente1, etc. desde el form aquí
-      // La información del encabezado es estática.
-      // Solo necesitamos recolectar asistencia y temas.
-
-      // Validar que exista un ID de minuta
-      if (!idMinutaGlobal) {
-        alert("Error: No se puede guardar sin un ID de Minuta válido.");
-        return;
+      // --- DEBUG JAVASCRIPT: Verificar idMinutaGlobal al INICIO ---
+      console.log('[DEBUG] Inicio guardarMinutaCompleta. idMinutaGlobal:', idMinutaGlobal);
+      if (!idMinutaGlobal || isNaN(parseInt(idMinutaGlobal)) || parseInt(idMinutaGlobal) <= 0) {
+        alert("¡Error Crítico JS! El ID de la minuta (idMinutaGlobal) no es válido ANTES de recolectar datos.");
+        console.error('[DEBUG] idMinutaGlobal inválido al inicio:', idMinutaGlobal);
+        return; // Detener ejecución
       }
+      // --- FIN DEBUG JAVASCRIPT ---
 
       const {
         asistenciaIDs
       } = recolectarAsistencia();
-      const bloques = document.querySelectorAll("#contenedorTemas .tema-block"); // Asegurar selector
+      const bloques = document.querySelectorAll("#contenedorTemas .tema-block");
       const temasData = [];
-      if (bloques.length === 0) {
-        // Permitir guardar sin temas? O requerir al menos uno? Por ahora permitimos.
-        // alert("Agrega al menos un tema."); 
-        // return; 
-      }
-      let errorTema = false;
+
       bloques.forEach(b => {
         const c = b.querySelectorAll(".editable-area");
         const n = c[0]?.innerHTML.trim() || "";
         const o = c[1]?.innerHTML.trim() || "";
-        // Considerar tema válido si tiene nombre O objetivo
-        if (!n && !o && bloques.length > 1) {
-          // Si hay más de un bloque y este está totalmente vacío, lo marcamos para posible eliminación o ignorarlo
-          // Por ahora lo incluimos vacío, el backend podría filtrarlo
-        } else if (!n && !o && bloques.length === 1) {
-          // Si es el único tema y está vacío, no lo enviamos o mostramos error?
-          // Por ahora lo enviamos vacío. El backend decide.
-        }
-        // Ya no marcamos error si falta nombre u objetivo, el backend lo manejará
-        // if (!n || !o) errorTema = true; 
         temasData.push({
           nombreTema: n,
           objetivo: o,
@@ -704,46 +708,87 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           idTema: b.dataset.idTema || null
         });
       });
-      // Ya no detenemos por errorTema
-      // if (errorTema) { alert("Todos los temas deben tener Nombre y Objetivo."); return; }
 
-      // El objeto datosMinuta ya no se necesita aquí, solo enviamos ID, asistencia y temas
-      const datosCompletos = {
-        minuta: {
-          idMinuta: idMinutaGlobal
-        }, // Solo necesitamos el ID para el backend
-        asistencia: asistenciaIDs,
-        temas: temasData
-      };
+      const archivoInput = document.getElementById('adjuntosArchivos');
+      const enlaceInput = document.getElementById('enlaceAdjunto');
+      const archivosParaSubir = archivoInput ? archivoInput.files : [];
+      const enlaceValor = enlaceInput ? enlaceInput.value.trim() : '';
+
+      const formData = new FormData();
+
+      // --- DEBUG JAVASCRIPT: Verificar idMinutaGlobal JUSTO ANTES de añadirlo a FormData ---
+      console.log('[DEBUG] Valor de idMinutaGlobal ANTES de append:', idMinutaGlobal);
+      if (!idMinutaGlobal || isNaN(parseInt(idMinutaGlobal)) || parseInt(idMinutaGlobal) <= 0) {
+        alert('¡Error Crítico JS! El ID de la minuta no es válido justo antes de añadirlo a FormData.');
+        console.error('[DEBUG] idMinutaGlobal inválido antes de append:', idMinutaGlobal);
+        return; // Detener antes de enviar
+      }
+      console.log('[DEBUG] Añadiendo idMinuta a FormData:', idMinutaGlobal);
+      // --- FIN DEBUG JAVASCRIPT ---
+
+      formData.append('idMinuta', idMinutaGlobal);
+      formData.append('asistencia', JSON.stringify(asistenciaIDs));
+      formData.append('temas', JSON.stringify(temasData));
+
+      if (enlaceValor) {
+        formData.append('enlaceAdjunto', enlaceValor);
+      }
+
+      if (archivosParaSubir.length > 0) {
+        for (let i = 0; i < archivosParaSubir.length; i++) {
+          formData.append('adjuntos[]', archivosParaSubir[i]);
+        }
+      }
+
       const btnGuardar = document.querySelector('button[onclick="guardarMinutaCompleta()"]');
-      if (!btnGuardar) return; // Salir si el botón no existe
+      if (!btnGuardar) return;
       btnGuardar.disabled = true;
       btnGuardar.innerHTML = 'Guardando...';
 
+      // --- DEBUG JAVASCRIPT: Mostrar lo que se va a enviar (excepto archivos) ---
+      console.log('[DEBUG] Enviando datos (FormData):');
+      console.log('  idMinuta:', formData.get('idMinuta'));
+      console.log('  asistencia:', formData.get('asistencia'));
+      console.log('  temas:', formData.get('temas'));
+      console.log('  enlaceAdjunto:', formData.get('enlaceAdjunto'));
+      console.log('  Archivos adjuntos:', archivosParaSubir.length);
+      // --- FIN DEBUG JAVASCRIPT ---
+
       fetch("/corevota/controllers/guardar_minuta_completa.php", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(datosCompletos)
+          body: formData
         })
-        .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
+        .then(res => {
+          if (!res.ok) {
+            // Si hay error HTTP (4xx, 5xx), intentar leer como texto
+            return res.text().then(text => { // <--- Falta una llave aquí
+              console.error('[DEBUG] Respuesta no OK del servidor:', res.status, res.statusText, text);
+              throw new Error(`Error del servidor (${res.status}): ${text || res.statusText}`);
+            }); // <--- Y aquí
+          } // <--- Esta llave cerraba el if (!res.ok)
+          // Si la respuesta es OK (2xx), intentar leer como JSON
+          return res.json();
+        }) // <--- El error probablemente estaba cerca de aquí
         .then(resp => {
+          // --- DEBUG JAVASCRIPT: Mostrar respuesta JSON ---
+          console.log('[DEBUG] Respuesta JSON recibida:', resp);
+          // --- FIN DEBUG JAVASCRIPT ---
+
           btnGuardar.disabled = false;
           btnGuardar.innerHTML = '💾 Guardar Borrador';
           if (resp.status === "success") {
             alert("✅ Minuta guardada correctamente.");
-            // No redirigimos, dejamos que el usuario siga editando si quiere
-            // window.location.href = `menu.php?pagina=editar_minuta&id=${idMinutaGlobal}`; 
 
-            // Actualizar IDs de temas si se crearon nuevos (opcional, más complejo)
-            // Por ahora, recargar la página podría ser lo más simple si se necesita actualizar IDs
-            // O simplemente confiar en que el backend maneja bien los inserts/updates
+            if (archivoInput) archivoInput.value = '';
+            if (enlaceInput) enlaceInput.value = '';
 
-            // Re-evaluar botón aprobar por si el estado cambió (aunque no debería con solo guardar)
+            if (resp.adjuntosActualizados) {
+              mostrarAdjuntosExistentes(resp.adjuntosActualizados);
+            } else {
+              cargarYMostrarAdjuntosExistentes();
+            }
+
             gestionarVisibilidadBotonAprobar();
-
-            // Actualizar estado botón excel si la asistencia cambió
             if (btnExportarExcelGlobal) {
               if (asistenciaIDs.length > 0) {
                 btnExportarExcelGlobal.classList.remove('disabled');
@@ -753,19 +798,93 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
                 btnExportarExcelGlobal.href = '#';
               }
             }
-
           } else {
+            // Mostrar mensaje de error del JSON si existe
             alert(`⚠️ Error al guardar: ${resp.message}\nDetalles: ${resp.error || 'No disponibles'}`);
-            console.error("Error guardado completo:", resp.error);
+            console.error("Error guardado completo (respuesta JSON):", resp.error || resp.message);
           }
         })
         .catch(err => {
+          // --- DEBUG JAVASCRIPT: Mostrar error del fetch o del .json() ---
+          console.error('[DEBUG] Error en fetch o .json():', err);
+          // --- FIN DEBUG JAVASCRIPT ---
+
           btnGuardar.disabled = false;
           btnGuardar.innerHTML = '💾 Guardar Borrador';
-          alert("Error de conexión al guardar: " + err.message);
-          console.error("Error fetch-guardar:", err);
+
+          // Mostrar un mensaje más detallado, incluyendo el error capturado
+          alert("Error de conexión o respuesta inválida al guardar:\n" + err.message);
+          // El console.error ya estaba, lo dejamos
+          console.error("Error fetch-guardar o json():", err);
+        });
+    } // <- Asegúrate que esta llave de cierre final esté presente
+    function cargarYMostrarAdjuntosExistentes() {
+      if (!idMinutaGlobal) return; // No hacer nada si no hay ID de minuta
+
+      fetch(`/corevota/controllers/fetch_data.php?action=adjuntos_por_minuta&idMinuta=${idMinutaGlobal}`)
+        .then(response => response.ok ? response.json() : Promise.reject('Error al obtener adjuntos'))
+        .then(data => {
+          if (data.status === 'success' && data.data) {
+            mostrarAdjuntosExistentes(data.data);
+          } else {
+            mostrarAdjuntosExistentes([]); // Mostrar lista vacía o mensaje
+            console.warn('No se encontraron adjuntos o hubo un error:', data.message);
+          }
+        })
+        .catch(error => {
+          console.error('Error al cargar adjuntos:', error);
+          const listaUl = document.getElementById('listaAdjuntosExistentes');
+          if (listaUl) listaUl.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos actuales.</li>';
         });
     }
+
+    function mostrarAdjuntosExistentes(adjuntos) {
+      const listaUl = document.getElementById('listaAdjuntosExistentes');
+      if (!listaUl) return;
+
+      listaUl.innerHTML = ''; // Limpiar lista actual
+
+      if (!adjuntos || adjuntos.length === 0) {
+        listaUl.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>';
+        return;
+      }
+
+      adjuntos.forEach(adj => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+        const link = document.createElement('a');
+        link.href = (adj.tipoAdjunto === 'file') ? `/corevota/public/${adj.pathAdjunto}` : adj.pathAdjunto; // Asume que la ruta guardada es relativa a 'public/'
+        link.target = '_blank';
+        link.textContent = (adj.tipoAdjunto === 'file') ?
+          `📄 ${adj.pathAdjunto.split('/').pop()}` // Mostrar solo nombre de archivo
+          :
+          `🔗 Enlace Externo`;
+        link.title = adj.pathAdjunto; // Mostrar ruta completa en tooltip
+
+        li.appendChild(link);
+
+        // Botón opcional para eliminar (requiere backend)
+        /*
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
+        deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li); // Necesitarás implementar eliminarAdjunto
+        li.appendChild(deleteBtn);
+        */
+
+        listaUl.appendChild(li);
+      });
+    }
+
+    // --- Llamar a la función al cargar la página ---
+    document.addEventListener("DOMContentLoaded", () => {
+      // ... (código existente en DOMContentLoaded) ...
+
+      // Cargar adjuntos existentes
+      cargarYMostrarAdjuntosExistentes();
+
+    });
 
     function aprobarMinuta(idMinuta) {
       /* ... sin cambios ... */
