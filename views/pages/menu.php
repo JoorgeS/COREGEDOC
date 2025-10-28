@@ -501,12 +501,12 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
 
         // ❗️❗️ NUEVO CASE PARA EDITAR MINUTA ❗️❗️
         case 'editar_minuta':
-          // Pasamos el ID a $_GET para que crearMinuta.php lo pueda leer
-          if ($id_param) {
-            $_GET['id'] = $id_param; // Aseguramos que $_GET['id'] esté disponible
-            include __DIR__ . '/crearMinuta.php'; // Incluimos el mismo formulario
+          // La lógica de edición está en crearMinuta.php, que verifica si $_GET['id'] existe
+          $vista_a_incluir = __DIR__ . '/crearMinuta.php';
+          if (file_exists($vista_a_incluir)) {
+            include $vista_a_incluir;
           } else {
-            echo "<div class='alert alert-danger'>Error: Falta el ID de la minuta para editar.</div>";
+            echo '<div class="alert alert-danger">Error: No se encontró el archivo de edición de minuta.</div>';
           }
           break;
         // ❗️❗️ FIN NUEVO CASE ❗️❗️
@@ -526,7 +526,7 @@ if (isset($_SESSION['tipoUsuario_id']) && $_SESSION['tipoUsuario_id'] == 1):  en
         case 'votacion_listado':
           include __DIR__ . '/votacion_listado.php';
           break;
-        
+
         case 'voto_autogestion':
           include __DIR__ . '/voto_autogestion.php';
           break;
