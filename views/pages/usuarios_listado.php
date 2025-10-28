@@ -67,7 +67,7 @@ $msg    = $_GET['msg'] ?? '';
                         class="form-control form-control-sm"
                         id="nombre"
                         name="nombre"
-                        placeholder="Ej: Juan, Pérez, jperez@correo.cl"
+                        placeholder="Ej: Juan, Pérez, jperez@gobiernovalparaiso.cl"
                         value="<?php echo htmlspecialchars($nombreFiltro); ?>"
                     >
                 </div>

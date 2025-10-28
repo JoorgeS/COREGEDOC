@@ -1,93 +1,180 @@
 <?php
-require_once __DIR__ . '/../../class/class.conectorDB.php';
-$db = new conectorDB();
-$pdo = $db->getDatabase();
-
-// ✅ Buscar votación activa
-$sqlVotacion = "SELECT idVotacion, nombreVotacion 
-                FROM t_votacion 
-                WHERE habilitada = 1 
-                ORDER BY idVotacion DESC 
-                LIMIT 1";
-$stmtV = $pdo->query($sqlVotacion);
-$votacionActiva = $stmtV->fetch(PDO::FETCH_ASSOC);
-$idVotacionActiva = $votacionActiva['idVotacion'] ?? null;
-$nombreVotacion = $votacionActiva['nombreVotacion'] ?? 'Sin votación activa';
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (!isset($_SESSION['idUsuario'])) {
+  header("Location: /corevota/views/pages/login.php");
+  exit;
+}
 ?>
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Votación en Curso</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+body {
+  background-color: #f8f9fa;
+  color: #212529;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.container {
+  max-width: 1000px; /* 🔹 ancho máximo más reducido */
+}
+
+.header-votacion {
+  background-color: #198754;
+  color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 25px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.header-votacion h3 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.contadores {
+  margin-top: 10px;
+  font-size: 1.1rem;
+}
+
+.contadores span {
+  margin: 0 10px;
+  font-weight: 600;
+}
+
+.si-count { color: #070707ff; }
+.no-count { color: #161515ff; }
+.abs-count { color: #121313ff; }
+
+.tabla-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.table {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  overflow: hidden;
+  width: 45%;
+}
+
+.table thead {
+  background-color: #e9ecef;
+  text-align: center;
+  font-weight: 600;
+  color: #000;
+}
+
+.table tbody td {
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.voto-si { color: #198754; font-weight: 700; }
+.voto-no { color: #dc3545; font-weight: 700; }
+.voto-abs { color: #0dcaf0; font-weight: 700; }
+.voto-sin { color: #6c757d; }
+</style>
+</head>
+
+<body>
 <div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="fw-bold text-success mb-0">
-      <i class="fa-solid fa-square-poll-vertical me-2"></i>Votación en Curso
-    </h3>
-    <span class="badge bg-success fs-6 px-3 py-2 shadow-sm">
-      <?= htmlspecialchars($nombreVotacion) ?>
-    </span>
+  <div class="header-votacion">
+    <h3 id="tituloVotacion">Votación en curso</h3>
+    <div class="contadores">
+      SI: <span class="si-count" id="countSi">0</span> |
+      NO: <span class="no-count" id="countNo">0</span> |
+      ABS: <span class="abs-count" id="countAbs">0</span>
+    </div>
   </div>
 
-  <!-- 🔹 Resumen dinámico -->
-  <div id="resumenVotos" class="d-flex gap-3 mb-3">
-    <span class="badge bg-success fs-6">Sí: 0</span>
-    <span class="badge bg-danger fs-6">No: 0</span>
-    <span class="badge bg-secondary fs-6">Abstención: 0</span>
-    <span class="badge bg-dark fs-6">Sin votar: 0</span>
-  </div>
+  <div class="tabla-container">
+    <table class="table table-hover align-middle" id="tablaIzquierda">
+      <thead>
+        <tr><th>CONSEJERO</th><th>VOTO</th></tr>
+      </thead>
+      <tbody id="columnaIzquierda">
+        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
+      </tbody>
+    </table>
 
-  <table class="table table-hover table-bordered align-middle text-center shadow-sm" id="tablaVotos">
-    <thead class="table-success">
-      <tr>
-        <th style="width:5%;">#</th>
-        <th style="width:65%;">Consejero Regional</th>
-        <th style="width:30%;">Voto Emitido</th>
-      </tr>
-    </thead>
-    <tbody id="tbodyVotos">
-      <tr><td colspan="3" class="text-muted">Cargando votos...</td></tr>
-    </tbody>
-  </table>
+    <table class="table table-hover align-middle" id="tablaDerecha">
+      <thead>
+        <tr><th>CONSEJERO</th><th>VOTO</th></tr>
+      </thead>
+      <tbody id="columnaDerecha">
+        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-// 🔁 Recargar datos cada 1 segundo SIN usar caché
-const idVotacion = <?= $idVotacionActiva ? (int)$idVotacionActiva : 'null' ?>;
-
-function actualizarVotos() {
-  if (!idVotacion) return;
-
-  fetch(`/corevota/controllers/fetch_votos.php?idVotacion=${idVotacion}&t=${Date.now()}`, { cache: "no-store" })
+function cargarTabla() {
+  fetch('/corevota/controllers/fetch_votos.php')
     .then(res => res.json())
     .then(data => {
-      const tbody = document.getElementById('tbodyVotos');
-      const resumen = { SI: 0, NO: 0, ABSTENCION: 0, SINVOTO: 0 };
+      const left = document.getElementById('columnaIzquierda');
+      const right = document.getElementById('columnaDerecha');
+      const titulo = document.getElementById('tituloVotacion');
+      left.innerHTML = '';
+      right.innerHTML = '';
 
-      tbody.innerHTML = '';
+      let si = 0, no = 0, abs = 0;
 
-      data.forEach((v, i) => {
-        let color = 'secondary', texto = 'Sin votar';
-        if (v.opcionVoto === 'SI') { color = 'success'; texto = 'Sí'; resumen.SI++; }
-        else if (v.opcionVoto === 'NO') { color = 'danger'; texto = 'No'; resumen.NO++; }
-        else if (v.opcionVoto === 'ABSTENCION') { color = 'secondary'; texto = 'Abstención'; resumen.ABSTENCION++; }
-        else { resumen.SINVOTO++; }
+      // 🔹 Mostrar nombre de la votación
+      if (data.nombreVotacion) titulo.textContent = data.nombreVotacion;
 
-        tbody.innerHTML += `
-          <tr>
-            <td>${i + 1}</td>
-            <td>${v.nombre}</td>
-            <td><span class="badge bg-${color} fs-6 px-3 py-2">${texto}</span></td>
-          </tr>`;
-      });
+      if (data.status !== 'success' || !data.data.length) {
+        left.innerHTML = `<tr><td colspan="2" class="text-center text-muted">No hay registros</td></tr>`;
+        right.innerHTML = '';
+        return;
+      }
 
-      // 🔹 Actualizar resumen superior
-      document.getElementById('resumenVotos').innerHTML = `
-        <span class="badge bg-success fs-6">Sí: ${resumen.SI}</span>
-        <span class="badge bg-danger fs-6">No: ${resumen.NO}</span>
-        <span class="badge bg-secondary fs-6">Abstención: ${resumen.ABSTENCION}</span>
-        <span class="badge bg-dark fs-6">Sin votar: ${resumen.SINVOTO}</span>
-      `;
+      const mitad = Math.ceil(data.data.length / 2);
+      const izquierda = data.data.slice(0, mitad);
+      const derecha = data.data.slice(mitad);
+
+      const crearFila = (fila) => {
+        let clase = 'voto-sin';
+        let votoTexto = fila.opcionVoto || 'Sin votar';
+        if (votoTexto === 'SI') { clase = 'voto-si'; si++; }
+        else if (votoTexto === 'NO') { clase = 'voto-no'; no++; }
+        else if (votoTexto === 'ABSTENCION') { clase = 'voto-abs'; abs++; }
+        return `<tr><td>${fila.nombre}</td><td class="${clase} text-center">${votoTexto}</td></tr>`;
+      };
+
+      izquierda.forEach(fila => left.innerHTML += crearFila(fila));
+      derecha.forEach(fila => right.innerHTML += crearFila(fila));
+
+      document.getElementById('countSi').textContent = si;
+      document.getElementById('countNo').textContent = no;
+      document.getElementById('countAbs').textContent = abs;
     })
-    .catch(err => console.error('Error al actualizar votos:', err));
+    .catch(err => {
+      document.getElementById('columnaIzquierda').innerHTML = 
+        `<tr><td colspan="2" class="text-danger text-center">Error: ${err}</td></tr>`;
+    });
 }
 
-setInterval(actualizarVotos, 1000);
-actualizarVotos();
+// Primera carga
+cargarTabla();
+
+// Actualizar cada 5 segundos
+setInterval(cargarTabla, 5000);
 </script>
+</body>
+</html>

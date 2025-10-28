@@ -262,6 +262,5 @@ if (class_exists('ReunionManager')) {
         calendar.render();
     });
 </script>
-<script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

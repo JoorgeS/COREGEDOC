@@ -341,7 +341,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           </div>
           <div class="mb-3">
             <label for="enlaceAdjunto" class="form-label">Enlace Externo (Ej: Noticia)</label>
-            <input type="url" class="form-control" id="enlaceAdjunto" name="enlaceAdjunto" placeholder="https://ejemplo.com/noticia">
+            <input type="url" class="form-control" id="enlaceAdjunto" name="enlaceAdjunto" placeholder="https://www.gore.cl/">
           </div>
           <div id="adjuntosExistentesContainer" class="mt-3">
             <h6>Adjuntos Actuales:</h6>

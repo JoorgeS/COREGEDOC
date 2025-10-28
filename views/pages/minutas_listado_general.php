@@ -6,13 +6,13 @@
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 
 // Determinar el título y la página del formulario
-$estadoActual = $estadoActual ?? 'PENDIENTE'; // Valor por defecto
+$estadoActual = $estadoActual ?? 'PENDIENTE';
 $pageTitle = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
 $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
 
 // Usar fechas de la URL si existen, si no, usar mes actual
-$currentStartDate = $_GET['startDate'] ?? date('Y-m-01'); // Primer día del mes actual
-$currentEndDate = $_GET['endDate'] ?? date('Y-m-d');     // Día actual
+$currentStartDate = $_GET['startDate'] ?? date('Y-m-01');
+$currentEndDate = $_GET['endDate'] ?? date('Y-m-d');
 
 // Mantener filtro de tema si existe
 $currentThemeName = $_GET['themeName'] ?? '';
@@ -51,7 +51,7 @@ $currentThemeName = $_GET['themeName'] ?? '';
                     <th scope="col">Nombre(s) del Tema</th>
                     <th scope="col">Objetivo(s)</th>
                     <th scope="col">Fecha Creación</th>
-                    <th scope="col" class="text-center">Adjuntos</th>
+                    <th scope="col" class="text-center">Adjuntos</th> 
                     <th scope="col">Acciones</th>
                 </tr>
             </thead>
@@ -70,10 +70,13 @@ $currentThemeName = $_GET['themeName'] ?? '';
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = $minuta['totalAdjuntos'] ?? 0;
                             ?>
+
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
-                            <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
+                            
+                            <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td> 
                             <td><?php echo $minuta['objetivos'] ?? 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
+
                             <td class="text-center">
                                 <?php if ($totalAdjuntos > 0): ?>
                                     <button type="button" class="btn btn-info btn-sm"
@@ -85,6 +88,7 @@ $currentThemeName = $_GET['themeName'] ?? '';
                                     <span class="text-muted">N/A</span>
                                 <?php endif; ?>
                             </td>
+
                             <td style="white-space: nowrap;">
                                 <?php if ($estado === 'PENDIENTE'): ?>
                                     <a href="menu.php?pagina=editar_minuta&id=<?php echo $minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>

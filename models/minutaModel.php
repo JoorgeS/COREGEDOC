@@ -35,7 +35,7 @@ class MinutaModel
                 -- LEFT JOIN a t_adjunto para contarlos
                 LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta 
                 
-                WHERE m.estadoMinuta = :estado"; 
+                WHERE m.estadoMinuta = :estado";
         // --- FIN: AJUSTE CONSULTA SQL ---
 
         $valores = ['estado' => $estado];
@@ -54,8 +54,8 @@ class MinutaModel
         // PERO es más eficiente filtrar ANTES de agrupar si es posible.
         // Lo dejamos en WHERE por ahora, podría necesitar ajuste si causa problemas con minutas sin temas.
         if (!empty($themeName)) {
-             $sql .= " AND t.nombreTema LIKE :themeName"; // Filtra ANTES de agrupar
-             $valores['themeName'] = '%' . $themeName . '%';
+            $sql .= " AND t.nombreTema LIKE :themeName"; // Filtra ANTES de agrupar
+            $valores['themeName'] = '%' . $themeName . '%';
         }
 
         $sql .= " GROUP BY m.idMinuta
@@ -66,7 +66,7 @@ class MinutaModel
 
         if ($result === false) {
             error_log("Error SQL (getMinutasByEstado): " . $sql . " | Valores: " . print_r($valores, true));
-            return []; 
+            return [];
         }
 
         // Asegurarse de que siempre sea un array
@@ -83,7 +83,6 @@ class MinutaModel
         // --- FIN: VERIFICACIÓN ADICIONAL ---
 
         return $minutas;
-
     } // Fin de getMinutasByEstado
 
 

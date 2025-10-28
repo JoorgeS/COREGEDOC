@@ -1,6 +1,4 @@
-        
-
-    /*LOGIN*/
+        /*LOGIN*/
 
         body {
             margin: 0;
@@ -48,7 +46,7 @@
             background: #fff;
             border: 1px solid #ccc;
             min-width: 160px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             z-index: 100;
         }
 
@@ -116,6 +114,7 @@
             flex: 1;
             padding: 20px;
         }
+
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -162,7 +161,7 @@
             background: #fff;
             border: 1px solid #ccc;
             min-width: 160px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             z-index: 100;
         }
 
@@ -230,73 +229,98 @@
             flex: 1;
             padding: 20px;
         }
+
         /* ===== NAVBAR CORE VALPARAÍSO ===== */
         .navbar-core {
-        background-color: #ffffff;
-        border-bottom: 2px solid #d1d1d1;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        padding: 0.7rem 2rem;
+            background-color: #ffffff;
+            border-bottom: 2px solid #d1d1d1;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            padding: 0.7rem 2rem;
         }
 
         .navbar-core .titulo {
-        font-weight: 700;
-        font-size: 1.1rem;
-        color: #000;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #000;
         }
 
         .navbar-core .perfil {
-        font-weight: 500;
-        color: #333;
+            font-weight: 500;
+            color: #333;
         }
 
         .navbar-core .usuario {
-        font-weight: 700;
-        color: #000;
-        cursor: pointer;
+            font-weight: 700;
+            color: #000;
+            cursor: pointer;
         }
 
         .navbar-core .usuario:hover {
-        color: #007bff;
+            color: #007bff;
         }
 
         .navbar-core .dropdown-menu {
-        min-width: 160px;
-        right: 0;
-        left: auto;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-        border: 1px solid #ddd;
+            min-width: 160px;
+            right: 0;
+            left: auto;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
         }
 
         .titulo-sistema {
-        margin-left: 40px; /* mueve el texto más a la derecha */
-        font-weight: 600;
-        color: #000;
+            margin-left: 40px;
+            /* mueve el texto más a la derecha */
+            font-weight: 600;
+            color: #000;
         }
 
         .bb-editor-toolbar {
-        display: flex;
-        gap: 6px;
-        background: #f8f9fa;
-        border: 1px solid #ccc;
-        padding: 6px;
-        border-radius: 4px;
+            display: flex;
+            gap: 6px;
+            background: #f8f9fa;
+            border: 1px solid #ccc;
+            padding: 6px;
+            border-radius: 4px;
         }
 
         .bb-editor-toolbar button {
-        font-weight: bold;
-        min-width: 32px;
-        height: 32px;
+            font-weight: bold;
+            min-width: 32px;
+            height: 32px;
         }
 
         .editable-area {
-        min-height: 120px;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        outline: none;
+            min-height: 120px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            outline: none;
         }
 
         .editable-area:focus {
-        border-color: #007bff;
-        box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+        }
+
+        /* Transparencia de las imágenes */
+        .carousel-image-transparent {
+            opacity: 0.5;
+            /* Ajusta este valor (0.4 = más transparente, 0.7 = menos transparente) */
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* Opcional: Imagen normal al pasar el mouse */
+        .carousel-image-transparent:hover {
+            opacity: 1;
+        }
+
+        /* Velocidad de la animación de deslizamiento */
+        #carouselZonasRegion .carousel-item {
+            transition: transform 5s ease-in-out;
+            /* 1.5s = duración del deslizamiento. Puedes poner 1s, 2s, etc. */
+        }
+
+        .carousel-fade .carousel-item {
+            transition: opacity 5s ease-in-out;
+            /* Ajusta 1.5s a la duración deseada (ej. 2s, 2.5s) */
         }
