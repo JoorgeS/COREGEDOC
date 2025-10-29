@@ -417,7 +417,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     </div>
   </template>
 
-  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  
 
   <script>
     // --- Variables Globales (Reducidas) ---
