@@ -7,7 +7,8 @@
  */
 
 abstract class BaseConexion
-{ // 👈 Clase Renombrada para evitar colisión con otras posibles clases.
+{
+	// ... (Tu código actual de la clase BaseConexion permanece sin cambios) ...
 
 	protected $datahost;
 
@@ -50,3 +51,20 @@ abstract class BaseConexion
 		}
 	}
 }
+
+
+// ==============================================================================
+// 🚀 INICIO DE CONFIGURACIÓN DE CORREO ELECTRÓNICO (SMTP)
+// ==============================================================================
+
+// **IMPORTANTE:** Reemplaza estos valores con tus credenciales reales de correo.
+// Si usas Gmail, recuerda generar una "Contraseña de aplicación" y usar el puerto 465 o 587.
+
+define('SMTP_HOST', 'smtp.gmail.com');                  // Servidor SMTP (ej. 'smtp.gmail.com')
+define('SMTP_USER', 'tu_correo_de_envio@gmail.com');    // Tu correo electrónico completo
+define('SMTP_PASS', 'tu_clave_de_aplicacion');          // La contraseña o Clave de Aplicación (NO la contraseña de tu cuenta)
+define('SMTP_PORT', 465);                               // Puerto SMTPS (465) o STARTTLS (587)
+
+// ==============================================================================
+// 🛑 FIN DE CONFIGURACIÓN DE CORREO ELECTRÓNICO (SMTP)
+// ==============================================================================
