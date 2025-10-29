@@ -1,180 +1,137 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-if (!isset($_SESSION['idUsuario'])) {
-  header("Location: /corevota/views/pages/login.php");
+require_once __DIR__ . '/../../class/class.conectorDB.php';
+
+$db = new conectorDB();
+$pdo = $db->getDatabase();
+
+$idVotacion = $_GET['idVotacion'] ?? null;
+
+if (!$idVotacion) {
+  echo "<div class='alert alert-warning text-center m-4'>No se seleccionó ninguna votación.</div>";
   exit;
 }
+
+// 🔹 Info votación
+$sqlInfo = "SELECT v.nombreVotacion, c.nombreComision
+            FROM t_votacion v
+            LEFT JOIN t_comision c ON v.idComision = c.idComision
+            WHERE v.idVotacion = :id";
+$stmtInfo = $pdo->prepare($sqlInfo);
+$stmtInfo->execute([':id' => $idVotacion]);
+$votacion = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+
+// 🔹 Consejeros
+$sqlConsejeros = "SELECT idUsuario, pNombre, aPaterno
+                  FROM t_usuario
+                  WHERE tipoUsuario_id = 1
+                  ORDER BY aPaterno ASC, pNombre ASC";
+$stmtCons = $pdo->query($sqlConsejeros);
+$consejeros = $stmtCons->fetchAll(PDO::FETCH_ASSOC);
+
+// 🔹 Votos emitidos
+$sqlVotos = "SELECT idUsuario, opcionVoto
+             FROM t_voto
+             WHERE idVotacion = :id";
+$stmtVotos = $pdo->prepare($sqlVotos);
+$stmtVotos->execute([':id' => $idVotacion]);
+$votos = $stmtVotos->fetchAll(PDO::FETCH_KEY_PAIR);
+
+// 🔹 Contadores
+$totalSI = $totalNO = $totalABS = 0;
+foreach ($votos as $v) {
+  if ($v === 'SI') $totalSI++;
+  elseif ($v === 'NO') $totalNO++;
+  elseif ($v === 'ABSTENCION') $totalABS++;
+}
+$totalConsejeros = count($consejeros);
+$totalSinVotar = $totalConsejeros - count($votos);
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Votación en Curso</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<style>
-body {
-  background-color: #f8f9fa;
-  color: #212529;
-  font-family: "Segoe UI", Arial, sans-serif;
-}
-
-.container {
-  max-width: 1000px; /* 🔹 ancho máximo más reducido */
-}
-
-.header-votacion {
-  background-color: #198754;
-  color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 25px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-}
-
-.header-votacion h3 {
-  margin: 0;
-  font-weight: 700;
-  font-size: 1.5rem;
-}
-
-.contadores {
-  margin-top: 10px;
-  font-size: 1.1rem;
-}
-
-.contadores span {
-  margin: 0 10px;
-  font-weight: 600;
-}
-
-.si-count { color: #070707ff; }
-.no-count { color: #161515ff; }
-.abs-count { color: #121313ff; }
-
-.tabla-container {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.table {
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  overflow: hidden;
-  width: 45%;
-}
-
-.table thead {
-  background-color: #e9ecef;
-  text-align: center;
-  font-weight: 600;
-  color: #000;
-}
-
-.table tbody td {
-  font-size: 0.95rem;
-  padding: 8px 10px;
-  vertical-align: middle;
-}
-
-.voto-si { color: #198754; font-weight: 700; }
-.voto-no { color: #dc3545; font-weight: 700; }
-.voto-abs { color: #0dcaf0; font-weight: 700; }
-.voto-sin { color: #6c757d; }
-</style>
-</head>
-
-<body>
 <div class="container mt-4">
-  <div class="header-votacion">
-    <h3 id="tituloVotacion">Votación en curso</h3>
-    <div class="contadores">
-      SI: <span class="si-count" id="countSi">0</span> |
-      NO: <span class="no-count" id="countNo">0</span> |
-      ABS: <span class="abs-count" id="countAbs">0</span>
-    </div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold text-success">
+      <i class="fa-solid fa-chart-simple me-2"></i>
+      <?= htmlspecialchars($votacion['nombreVotacion'] ?? 'Votación desconocida') ?>
+    </h3>
+    <a href="menu.php?pagina=voto_autogestion" class="btn btn-outline-secondary">
+      <i class="fa-solid fa-arrow-left me-2"></i>Volver
+    </a>
   </div>
 
-  <div class="tabla-container">
-    <table class="table table-hover align-middle" id="tablaIzquierda">
-      <thead>
-        <tr><th>CONSEJERO</th><th>VOTO</th></tr>
-      </thead>
-      <tbody id="columnaIzquierda">
-        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
-      </tbody>
-    </table>
+  <p class="text-muted mb-4">
+    <i class="fa-solid fa-landmark me-2 text-success"></i>
+    Comisión: <strong><?= htmlspecialchars($votacion['nombreComision'] ?? 'No definida') ?></strong>
+  </p>
 
-    <table class="table table-hover align-middle" id="tablaDerecha">
-      <thead>
-        <tr><th>CONSEJERO</th><th>VOTO</th></tr>
-      </thead>
-      <tbody id="columnaDerecha">
-        <tr><td colspan="2" class="text-center text-muted">Cargando...</td></tr>
-      </tbody>
-    </table>
+  <!-- 🔹 Resumen -->
+  <div class="d-flex justify-content-center gap-4 mb-4 text-center fw-bold fs-5">
+    <div class="text-success">SÍ: <?= $totalSI ?></div>
+    <div class="text-danger">NO: <?= $totalNO ?></div>
+    <div class="text-secondary">ABSTENCIÓN: <?= $totalABS ?></div>
+    <div class="text-dark">SIN VOTAR: <?= $totalSinVotar ?></div>
+  </div>
+
+  <!-- 🔹 Tabla dividida en dos columnas -->
+  <div class="row">
+    <?php
+      $mitad = ceil($totalConsejeros / 2);
+      $col1 = array_slice($consejeros, 0, $mitad);
+      $col2 = array_slice($consejeros, $mitad);
+      $columnas = [$col1, $col2];
+    ?>
+
+    <?php foreach ($columnas as $colIndex => $grupo): ?>
+      <div class="col-md-6">
+        <table class="table table-bordered text-center mb-4">
+          <thead class="table-success">
+            <tr>
+              <th>#</th>
+              <th>Consejero Regional</th>
+              <th>Voto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($grupo as $i => $c): 
+              $voto = $votos[$c['idUsuario']] ?? null;
+              $color = match ($voto) {
+                'SI' => 'text-success fw-bold',
+                'NO' => 'text-danger fw-bold',
+                'ABSTENCION' => 'text-secondary fw-bold',
+                default => 'text-muted'
+              };
+              $texto = $voto ?: 'Sin votar';
+            ?>
+              <tr>
+                <td><?= $i + 1 + ($colIndex * $mitad) ?></td>
+                <td class="text-start ps-4"><?= htmlspecialchars($c['pNombre'] . ' ' . $c['aPaterno']) ?></td>
+                <td class="<?= $color ?>"><?= htmlspecialchars($texto) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endforeach; ?>
   </div>
 </div>
 
+<style>
+.table th, .table td { vertical-align: middle; font-size: 0.95rem; }
+.text-muted { color: #999 !important; }
+</style>
+
 <script>
-function cargarTabla() {
-  fetch('/corevota/controllers/fetch_votos.php')
-    .then(res => res.json())
-    .then(data => {
-      const left = document.getElementById('columnaIzquierda');
-      const right = document.getElementById('columnaDerecha');
-      const titulo = document.getElementById('tituloVotacion');
-      left.innerHTML = '';
-      right.innerHTML = '';
-
-      let si = 0, no = 0, abs = 0;
-
-      // 🔹 Mostrar nombre de la votación
-      if (data.nombreVotacion) titulo.textContent = data.nombreVotacion;
-
-      if (data.status !== 'success' || !data.data.length) {
-        left.innerHTML = `<tr><td colspan="2" class="text-center text-muted">No hay registros</td></tr>`;
-        right.innerHTML = '';
-        return;
+// 🔁 Actualización automática
+setInterval(() => {
+  fetch(window.location.href)
+    .then(res => res.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, 'text/html');
+      const newContainer = newDoc.querySelector('.container');
+      if (newContainer) {
+        document.querySelector('.container').innerHTML = newContainer.innerHTML;
       }
-
-      const mitad = Math.ceil(data.data.length / 2);
-      const izquierda = data.data.slice(0, mitad);
-      const derecha = data.data.slice(mitad);
-
-      const crearFila = (fila) => {
-        let clase = 'voto-sin';
-        let votoTexto = fila.opcionVoto || 'Sin votar';
-        if (votoTexto === 'SI') { clase = 'voto-si'; si++; }
-        else if (votoTexto === 'NO') { clase = 'voto-no'; no++; }
-        else if (votoTexto === 'ABSTENCION') { clase = 'voto-abs'; abs++; }
-        return `<tr><td>${fila.nombre}</td><td class="${clase} text-center">${votoTexto}</td></tr>`;
-      };
-
-      izquierda.forEach(fila => left.innerHTML += crearFila(fila));
-      derecha.forEach(fila => right.innerHTML += crearFila(fila));
-
-      document.getElementById('countSi').textContent = si;
-      document.getElementById('countNo').textContent = no;
-      document.getElementById('countAbs').textContent = abs;
     })
-    .catch(err => {
-      document.getElementById('columnaIzquierda').innerHTML = 
-        `<tr><td colspan="2" class="text-danger text-center">Error: ${err}</td></tr>`;
-    });
-}
-
-// Primera carga
-cargarTabla();
-
-// Actualizar cada 5 segundos
-setInterval(cargarTabla, 5000);
+    .catch(err => console.error('Error al actualizar tabla:', err));
+}, 1500);
 </script>
-</body>
-</html>
