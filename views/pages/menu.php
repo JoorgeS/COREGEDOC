@@ -245,6 +245,11 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                                 <li><a href="menu.php?pagina=reunion_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Listado</a></li>
                                 <li><a href="menu.php?pagina=reunion_calendario" class="link-dark d-block rounded py-1"><i class="fas fa-calendar-alt fa-fw me-2"></i>Vista Calendario</a></li>
                                 <li><a href="menu.php?pagina=reunion_autogestion_asistencia" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-hand-pointer fa-fw me-2"></i>Registrar Mi Asistencia</a></li>
+
+                                <!-- AGREGADO: Historial de asistencia -->
+                                <li><a href="menu.php?pagina=historial_asistencia" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Asistencia</a></li>
+                                <!-- FIN AGREGADO -->
+
                             </ul>
                         </div>
                     </li>
@@ -301,7 +306,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             // --- Mostrar Saludo, Fecha y Temperatura SÓLO en la página 'home' ---
             if ($pagina === 'home') :
             ?>
-                <div class="container-fluid mb-4"> <div class="row align-items-center">
+                <div class="container-fluid mb-4">
+                    <div class="row align-items-center">
                         <div class="col-md-8">
                             <h2 class="display-6"><?php echo $saludo . ', ' . $nombreUsuario; ?>! 👋</h2>
                             <p class="lead text-muted">Hoy es <?php echo ucfirst($fechaActual); ?></p>
@@ -311,7 +317,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         </div>
                     </div>
                     <hr>
-                    </div>
+                </div>
             <?php
             endif;
             // --- Fin sección Saludo ---
@@ -334,6 +340,11 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                 'reunion_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'list']],
                 'reunion_calendario' => ['type' => 'view', 'file' => $base_path . '/reunion_calendario.php'],
                 'reunion_autogestion_asistencia' => ['type' => 'view', 'file' => $base_path . '/asistencia_autogestion.php'],
+
+                // AGREGADO: ruta para el historial de asistencia
+                'historial_asistencia' => ['type' => 'view', 'file' => $base_path . '/historial_asistencia.php'],
+                // FIN AGREGADO
+
                 'crearVotacion' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_crear' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_listado' => ['type' => 'view', 'file' => $base_path . '/votacion_listado.php'],
@@ -370,7 +381,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                     echo "<div class='alert alert-danger m-3'>Error: El archivo para la página '<strong>" . htmlspecialchars($pagina) . "</strong>' no fue encontrado.</div>";
                 } elseif (!isset($route['file']) || !file_exists($route['file'])) {
                     // Si es 'home' pero el archivo no existe, podrías querer mostrar un mensaje o simplemente nada más después del saludo.
-                     echo "<p>Contenido principal del home no encontrado.</p>"; // Opcional
+                    echo "<p>Contenido principal del home no encontrado.</p>"; // Opcional
                 }
             }
             // --- Fin Router ---
@@ -414,19 +425,15 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
               const temperatura = Math.round(data.main.temp);
               const descripcion = data.weather[0].description;
               const iconCode = data.weather[0].icon;
-              // Icono de OpenWeatherMap (opcional) o FontAwesome
-              // const iconoUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
-              // tempElement.innerHTML = `<img src="${iconoUrl}" alt="${descripcion}" style="vertical-align: middle; height: 30px;"> ${temperatura}°C`;
 
-              // Usando Font Awesome (requiere tenerlo incluido) - adapta el icono si prefieres
-               let iconoFa = 'fas fa-cloud-sun'; // Icono por defecto
-               if (iconCode.includes('01')) iconoFa = 'fas fa-sun'; // Sol
-               else if (iconCode.includes('02')) iconoFa = 'fas fa-cloud-sun'; // Pocas nubes
-               else if (iconCode.includes('03') || iconCode.includes('04')) iconoFa = 'fas fa-cloud'; // Nubes
-               else if (iconCode.includes('09') || iconCode.includes('10')) iconoFa = 'fas fa-cloud-showers-heavy'; // Lluvia
-               else if (iconCode.includes('11')) iconoFa = 'fas fa-bolt'; // Tormenta
-               else if (iconCode.includes('13')) iconoFa = 'fas fa-snowflake'; // Nieve
-               else if (iconCode.includes('50')) iconoFa = 'fas fa-smog'; // Niebla
+               let iconoFa = 'fas fa-cloud-sun';
+               if (iconCode.includes('01')) iconoFa = 'fas fa-sun';
+               else if (iconCode.includes('02')) iconoFa = 'fas fa-cloud-sun';
+               else if (iconCode.includes('03') || iconCode.includes('04')) iconoFa = 'fas fa-cloud';
+               else if (iconCode.includes('09') || iconCode.includes('10')) iconoFa = 'fas fa-cloud-showers-heavy';
+               else if (iconCode.includes('11')) iconoFa = 'fas fa-bolt';
+               else if (iconCode.includes('13')) iconoFa = 'fas fa-snowflake';
+               else if (iconCode.includes('50')) iconoFa = 'fas fa-smog';
 
                tempElement.innerHTML = `<i class="${iconoFa} me-2"></i> ${temperatura}°C, ${descripcion}`;
 

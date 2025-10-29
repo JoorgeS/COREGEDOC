@@ -1,31 +1,31 @@
 <?php
 // views/pages/comisiones_listado.php
-// Asegúrate de que $comisiones esté definida por el controlador.
+// Espera que $comisiones venga desde el controlador con los campos:
+// nombreComision, vigencia, presidenteNombre
 
-// =====================
-// BLOQUE NUEVO: filtros
-// =====================
-$filtroNombre = $_GET['nombre'] ?? '';
+$filtroNombre   = $_GET['nombre']   ?? '';
 $filtroVigencia = $_GET['vigencia'] ?? '';
 
 $comisionesFiltradas = $comisiones;
 
+// FILTROS
 if (!empty($filtroNombre) || $filtroVigencia !== '') {
     $comisionesFiltradas = array_filter($comisionesFiltradas, function ($comision) use ($filtroNombre, $filtroVigencia) {
+        $nombreCoincide = true;
+        if (!empty($filtroNombre)) {
+            $needle = mb_strtolower($filtroNombre);
+            $campoComision   = mb_strtolower($comision['nombreComision'] ?? '');
+            $campoPresidente = mb_strtolower($comision['presidenteNombre'] ?? '');
+            $nombreCoincide = (strpos($campoComision, $needle) !== false) ||
+                              (strpos($campoPresidente, $needle) !== false);
+        }
+        $vigenciaCoincide = ($filtroVigencia === '') ||
+                            ((string)$comision['vigencia'] === (string)$filtroVigencia);
 
-        // Coincidencia parcial de nombre (case-insensitive)
-        $coincideNombre = empty($filtroNombre) ||
-            stripos($comision['nombreComision'], $filtroNombre) !== false;
-
-        // Coincidencia por vigencia exacta si viene seleccionada
-        $coincideVigencia = ($filtroVigencia === '') ||
-            ($comision['vigencia'] == $filtroVigencia);
-
-        return $coincideNombre && $coincideVigencia;
+        return $nombreCoincide && $vigenciaCoincide;
     });
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 
@@ -48,28 +48,21 @@ if (!empty($filtroNombre) || $filtroVigencia !== '') {
             white-space: nowrap;
         }
 
-        .table tbody tr td:nth-child(2) {
+        .table tbody tr td:nth-child(1) {
             width: 100%;
         }
-
-        /* Fuerza el ancho del nombre */
     </style>
 </head>
 
 <body>
-
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3 class="mb-0">Listado de Comisiones</h3>
             <a href="menu.php?pagina=comision_crear" class="btn btn-success">Registrar Nueva Comisión</a>
         </div>
 
-        <!-- ========================= -->
-        <!-- FORMULARIO DE FILTRO      -->
-        <!-- ========================= -->
+        <!-- FORMULARIO DE FILTRO -->
         <form method="GET" class="row g-3 mb-4" action="menu.php">
-            <!-- IMPORTANTE:
-                 Esto define qué vista debe renderizar tu router -->
             <input type="hidden" name="pagina" value="comision_listado">
 
             <div class="col-md-5">
@@ -77,7 +70,7 @@ if (!empty($filtroNombre) || $filtroVigencia !== '') {
                     type="text"
                     name="nombre"
                     class="form-control"
-                    placeholder="Buscar por nombre de comisión..."
+                    placeholder="Buscar por comisión o presidente..."
                     value="<?php echo htmlspecialchars($filtroNombre); ?>">
             </div>
 
@@ -94,43 +87,42 @@ if (!empty($filtroNombre) || $filtroVigencia !== '') {
             </div>
 
             <div class="col-md-2">
-                <!-- "Limpiar" vuelve al router con la misma vista sin filtros -->
                 <a href="menu.php?pagina=comision_listado" class="btn btn-secondary w-100">Limpiar</a>
             </div>
         </form>
-        <!-- ========================= -->
-        <!-- FIN FORMULARIO DE FILTRO  -->
-        <!-- ========================= -->
 
+        <!-- TABLA DE RESULTADOS -->
         <div class="table-responsive shadow-sm">
             <table class="table table-striped table-bordered align-middle">
                 <thead class="table-dark sticky-top">
                     <tr>
-                        <th>Nombre de la Comisión</th>
+                        <th>Nombre Comisión</th>
+                        <th>Presidente</th>
                         <th>Vigencia</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($comisionesFiltradas) || !is_array($comisionesFiltradas)): ?>
+                    <?php if (empty($comisionesFiltradas)): ?>
                         <tr>
                             <td colspan="4" class="text-center py-4">No hay comisiones registradas.</td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($comisionesFiltradas as $comision): ?>
+                        <?php foreach ($comisionesFiltradas as $c): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($comision['nombreComision']); ?></td>
+                                <td><?php echo htmlspecialchars($c['nombreComision']); ?></td>
+                                <td><?php echo htmlspecialchars($c['presidenteNombre'] ?? 'No asignado'); ?></td>
                                 <td>
-                                    <span class="badge <?php echo $comision['vigencia'] == 1 ? 'bg-success' : 'bg-danger'; ?>">
-                                        <?php echo $comision['vigencia'] == 1 ? 'Activa' : 'Inactiva'; ?>
+                                    <span class="badge <?php echo ($c['vigencia'] == 1 ? 'bg-success' : 'bg-danger'); ?>">
+                                        <?php echo ($c['vigencia'] == 1 ? 'Activa' : 'Inactiva'); ?>
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="menu.php?pagina=comision_editar&id=<?php echo $comision['idComision']; ?>" class="btn btn-sm btn-primary me-2">Editar</a>
-                                    <a href="/corevota/controllers/ComisionController.php?action=delete&id=<?php echo $comision['idComision']; ?>"
-                                        class="btn btn-sm btn-danger"
-                                        onclick="return confirm('¿Está seguro de deshabilitar esta comisión?');">
-                                        Deshabilitar
+                                    <a href="menu.php?pagina=comision_editar&id=<?php echo $c['idComision']; ?>" class="btn btn-sm btn-primary me-2">Editar</a>
+                                    <a href="/corevota/controllers/ComisionController.php?action=delete&id=<?php echo $c['idComision']; ?>"
+                                       class="btn btn-sm btn-danger"
+                                       onclick="return confirm('¿Está seguro de deshabilitar esta comisión?');">
+                                       Deshabilitar
                                     </a>
                                 </td>
                             </tr>
@@ -141,5 +133,4 @@ if (!empty($filtroNombre) || $filtroVigencia !== '') {
         </div>
     </div>
 </body>
-
 </html>
