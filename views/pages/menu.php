@@ -207,7 +207,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         </button>
                         <div class="collapse show" id="minutas-collapse">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                
+
                                 <li><a href="menu.php?pagina=minutas_pendientes" class="link-warning d-block rounded py-1"><i class="fas fa-clock fa-fw me-2"></i>Minutas Pendientes</a></li>
                                 <li><a href="menu.php?pagina=minutas_aprobadas" class="link-success d-block rounded py-1"><i class="fas fa-check-circle fa-fw me-2"></i>Minutas Aprobadas</a></li>
                             </ul>
@@ -247,7 +247,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                                 <li><a href="menu.php?pagina=reunion_autogestion_asistencia" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-hand-pointer fa-fw me-2"></i>Registrar Mi Asistencia</a></li>
 
                                 <li><a href="menu.php?pagina=historial_asistencia" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Asistencia</a></li>
-                                </ul>
+                            </ul>
                         </div>
                     </li>
                     <li>
@@ -386,7 +386,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
         </main>
 
     </div>
-    
+
     <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
     <script>
@@ -409,90 +409,335 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
 
             // 3. Usar fetch para llamar a tu nuevo archivo PHP
             fetch('/corevota/controllers/obtener_adjuntos.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: minutaId
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        idMinuta: minutaId
+                    })
                 })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Error en la respuesta del servidor.');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // 4. Procesar la respuesta y construir la lista
-                if (data.status === 'success' && data.adjuntos.length > 0) {
-                    listaUl.innerHTML = ''; // Limpiar el "Cargando..."
-                    
-                    data.adjuntos.forEach(adjunto => {
-                        const li = document.createElement('li');
-                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 4. Procesar la respuesta y construir la lista
+                    if (data.status === 'success' && data.adjuntos.length > 0) {
+                        listaUl.innerHTML = ''; // Limpiar el "Cargando..."
 
-                        // Crear el enlace
-                        const a = document.createElement('a');
-                        a.href = adjunto.pathArchivo; // Asume que la ruta es web-accessible
-                        a.textContent = adjunto.nombreArchivo;
-                        a.target = '_blank'; // Abrir en pestaña nueva
-                        
-                        // Añadir un ícono de descarga
-                        const icon = document.createElement('i');
-                        icon.className = 'fas fa-download text-primary';
+                        data.adjuntos.forEach(adjunto => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
 
-                        li.appendChild(a);
-                        li.appendChild(icon);
-                        listaUl.appendChild(li);
-                    });
+                            // Crear el enlace
+                            const a = document.createElement('a');
+                            a.href = adjunto.pathArchivo; // Asume que la ruta es web-accessible
+                            a.textContent = adjunto.nombreArchivo;
+                            a.target = '_blank'; // Abrir en pestaña nueva
 
-                } else if (data.adjuntos.length === 0) {
-                    listaUl.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos para esta minuta.</li>';
-                } else {
-                    // Si el servidor devolvió un error
-                    throw new Error(data.message || 'No se pudieron cargar los adjuntos.');
-                }
-            })
-            .catch(error => {
-                // 5. Manejar cualquier error de red o del fetch
-                console.error('Error en verAdjuntos:', error);
-                listaUl.innerHTML = `<li class="list-group-item text-danger"><b>Error:</b> ${error.message}</li>`;
-            });
+                            // Añadir un ícono de descarga
+                            const icon = document.createElement('i');
+                            icon.className = 'fas fa-download text-primary';
+
+                            li.appendChild(a);
+                            li.appendChild(icon);
+                            listaUl.appendChild(li);
+                        });
+
+                    } else if (data.adjuntos.length === 0) {
+                        listaUl.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos para esta minuta.</li>';
+                    } else {
+                        // Si el servidor devolvió un error
+                        throw new Error(data.message || 'No se pudieron cargar los adjuntos.');
+                    }
+                })
+                .catch(error => {
+                    // 5. Manejar cualquier error de red o del fetch
+                    console.error('Error en verAdjuntos:', error);
+                    listaUl.innerHTML = `<li class="list-group-item text-danger"><b>Error:</b> ${error.message}</li>`;
+                });
         }
+
+        /*
+============================================================
+/   NUEVAS FUNCIONES PARA GESTIÓN DE ADJUNTOS
+============================================================
+*/
+
+        /**
+         * Carga la lista inicial de adjuntos al abrir la página de edición.
+         * DEBE SER LLAMADO cuando se carga la página `crearMinuta.php`.
+         */
+        function cargarAdjuntosExistentes(idMinuta) {
+            const listaUI = document.getElementById('listaAdjuntosExistentes');
+            if (!listaUI) return; // No estamos en la página de edición
+
+            listaUI.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
+
+            fetch('/corevota/controllers/obtener_adjuntos.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        idMinuta: idMinuta
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    listaUI.innerHTML = ''; // Limpiar "Cargando..."
+                    if (data.status === 'success' && data.adjuntos.length > 0) {
+                        data.adjuntos.forEach(adjunto => {
+                            const li = crearItemAdjuntoUI(adjunto);
+                            listaUI.appendChild(li);
+                        });
+                    } else {
+                        listaUI.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos para esta minuta.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error cargando adjuntos:', error);
+                    listaUI.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
+                });
+        }
+
+        /**
+         * Función helper para crear un <li> de la lista
+         */
+        function crearItemAdjuntoUI(adjunto) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            li.dataset.id = adjunto.idAdjunto; // Guardamos el ID en el item
+
+            const divInfo = document.createElement('div');
+
+            // Definir ícono y texto del enlace
+            let icono = 'fa-file-alt'; // Icono por defecto
+            let textoEnlace = adjunto.nombreArchivo;
+
+            if (adjunto.tipoAdjunto === 'link') {
+                icono = 'fa-link text-info';
+                textoEnlace = adjunto.nombreArchivo.length > 70 ? adjunto.nombreArchivo.substring(0, 70) + '...' : adjunto.nombreArchivo;
+            } else if (/\.(jpg|jpeg|png|gif)$/i.test(adjunto.nombreArchivo)) {
+                icono = 'fa-file-image text-success';
+            } else if (/\.pdf$/i.test(adjunto.nombreArchivo)) {
+                icono = 'fa-file-pdf text-danger';
+            } else if (/\.(doc|docx)$/i.test(adjunto.nombreArchivo)) {
+                icono = 'fa-file-word text-primary';
+            } else if (/\.(xls|xlsx)$/i.test(adjunto.nombreArchivo)) {
+                icono = 'fa-file-excel text-success';
+            }
+
+            divInfo.innerHTML = `<i class="fas ${icono} fa-fw me-2"></i>`;
+
+            const a = document.createElement('a');
+            a.href = adjunto.pathArchivo;
+            a.textContent = textoEnlace;
+            a.target = '_blank';
+            divInfo.appendChild(a);
+
+            // Botón de eliminar
+            const btnEliminar = document.createElement('button');
+            btnEliminar.type = 'button';
+            btnEliminar.className = 'btn btn-outline-danger btn-sm';
+            btnEliminar.title = 'Eliminar adjunto';
+            btnEliminar.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            btnEliminar.onclick = () => manejarEliminarAdjunto(adjunto.idAdjunto); // Llama al handler
+
+            li.appendChild(divInfo);
+            li.appendChild(btnEliminar);
+            return li;
+        }
+
+        /**
+         * Maneja el clic en el botón de eliminar.
+         */
+        function manejarEliminarAdjunto(idAdjunto) {
+            if (!confirm('¿Está seguro de que desea eliminar este adjunto? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            fetch('/corevota/controllers/eliminar_adjunto.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        idAdjunto: idAdjunto
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Eliminar el item de la lista en la UI
+                        const itemUI = document.querySelector(`li[data-id='${idAdjunto}']`);
+                        if (itemUI) {
+                            itemUI.remove();
+                        }
+                        alert('Adjunto eliminado con éxito.');
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al eliminar:', error);
+                    alert('Error de conexión al eliminar.');
+                });
+        }
+
+
+        /**
+         * Event Listeners para los formularios de AÑADIR.
+         * Esto debe ejecutarse DESPUÉS de que el DOM esté cargado.
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Detectar si estamos en la página de edición
+            const formSubir = document.getElementById('formSubirArchivo');
+            const formLink = document.getElementById('formAgregarLink');
+            const idMinutaInput = document.getElementById('idMinutaActual');
+
+            // Si no encontramos los formularios, salimos.
+            if (!formSubir || !formLink || !idMinutaInput) {
+                return;
+            }
+
+            const idMinuta = idMinutaInput.value;
+
+            // --- Cargar la lista inicial al entrar ---
+            if (idMinuta && idMinuta !== '0') {
+                cargarAdjuntosExistentes(idMinuta);
+            } else {
+                // Es una minuta nueva, no hay nada que cargar
+                document.getElementById('listaAdjuntosExistentes').innerHTML = '<li class="list-group-item text-muted">Guarda la minuta primero para poder añadir adjuntos.</li>';
+                // Deshabilitamos los formularios
+                formSubir.style.opacity = '0.5';
+                formSubir.style.pointerEvents = 'none';
+                formLink.style.opacity = '0.5';
+                formLink.style.pointerEvents = 'none';
+                return;
+            }
+
+
+            // --- Manejador para SUBIR ARCHIVO ---
+            formSubir.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const formData = new FormData();
+                formData.append('idMinuta', idMinuta);
+                formData.append('tipoAdjunto', 'file');
+                formData.append('archivo', document.getElementById('inputArchivo').files[0]);
+
+                const btnSubir = document.getElementById('btnSubirArchivo');
+                btnSubir.disabled = true;
+                btnSubir.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Subiendo...';
+
+                fetch('/corevota/controllers/agregar_adjunto.php', {
+                        method: 'POST',
+                        body: formData // No se usa headers 'Content-Type' con FormData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const listaUI = document.getElementById('listaAdjuntosExistentes');
+                            // Quitar "No hay adjuntos" si es el primero
+                            if (listaUI.querySelector('.text-muted')) {
+                                listaUI.innerHTML = '';
+                            }
+                            const li = crearItemAdjuntoUI(data.nuevoAdjunto);
+                            listaUI.appendChild(li);
+                            formSubir.reset(); // Limpiar el formulario
+                        } else {
+                            alert('Error al subir: ' + data.message);
+                        }
+                    })
+                    .catch(error => alert('Error de red: ' + error.message))
+                    .finally(() => {
+                        btnSubir.disabled = false;
+                        btnSubir.innerHTML = '<i class="fas fa-upload me-2"></i>Subir';
+                    });
+            });
+
+            // --- Manejador para AÑADIR LINK ---
+            formLink.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const formData = new FormData();
+                formData.append('idMinuta', idMinuta);
+                formData.append('tipoAdjunto', 'link');
+                formData.append('urlLink', document.getElementById('inputUrlLink').value);
+
+                const btnLink = document.getElementById('btnAgregarLink');
+                btnLink.disabled = true;
+                btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
+
+                fetch('/corevota/controllers/agregar_adjunto.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const listaUI = document.getElementById('listaAdjuntosExistentes');
+                            // Quitar "No hay adjuntos" si es el primero
+                            if (listaUI.querySelector('.text-muted')) {
+                                listaUI.innerHTML = '';
+                            }
+                            const li = crearItemAdjuntoUI(data.nuevoAdjunto);
+                            listaUI.appendChild(li);
+                            formLink.reset(); // Limpiar el formulario
+                        } else {
+                            alert('Error al añadir link: ' + data.message);
+                        }
+                    })
+                    .catch(error => alert('Error de red: ' + error.message))
+                    .finally(() => {
+                        btnLink.disabled = false;
+                        btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
+                    });
+            });
+        });
+
 
         // (Aquí va tu otra función, aprobarMinuta)
         // Asegúrate de tener también la función aprobarMinuta aquí si la necesitas en la misma página
         function aprobarMinuta(idMinuta) {
             // ... tu código para aprobar ...
-            
+
             // Este es solo un ejemplo de lo que podrías tener. 
             // ¡Reemplázalo con tu código real de aprobarMinuta!
             if (confirm('¿Está seguro de que desea firmar y aprobar esta minuta? Esta acción es irreversible.')) {
-                
+
                 // Muestra algún indicador de carga
                 console.log("Aprobando minuta: " + idMinuta);
 
                 fetch('/corevota/controllers/aprobar_minuta.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idMinuta: idMinuta })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        alert('Minuta aprobada con éxito. La página se recargará.');
-                        // Recargar la página para que la minuta pase a la otra lista
-                        window.location.reload(); 
-                    } else {
-                        // Si falla, muestra el error
-                        alert('Error al aprobar: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error en fetch al aprobar:', error);
-                    alert('Error de conexión al intentar aprobar la minuta.');
-                });
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            idMinuta: idMinuta
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert('Minuta aprobada con éxito. La página se recargará.');
+                            // Recargar la página para que la minuta pase a la otra lista
+                            window.location.reload();
+                        } else {
+                            // Si falla, muestra el error
+                            alert('Error al aprobar: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error en fetch al aprobar:', error);
+                        alert('Error de conexión al intentar aprobar la minuta.');
+                    });
             }
         }
     </script>
@@ -542,4 +787,5 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
         });
     </script>
 </body>
+
 </html>

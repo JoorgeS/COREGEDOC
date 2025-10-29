@@ -1,6 +1,7 @@
 <?php
 // /corevota/controllers/obtener_adjuntos.php
-// --- VERSIÓN CORREGIDA BASADA EN TU TABLA t_adjunto ---
+// --- VERSIÓN ACTUALIZADA (v2) ---
+// Ahora devuelve idAdjunto y tipoAdjunto para la página de EDICIÓN.
 
 header('Content-Type: application/json');
 error_reporting(0); // Desactivar errores en producción
@@ -28,58 +29,54 @@ try {
     $db = new conectorDB();
     $pdo = $db->getDatabase();
 
-    // 3. --- CONSULTA SQL CORREGIDA ---
-    // Basado en tu tabla t_adjunto:
-    // - Seleccionamos de t_adjunto
-    // - Filtramos por t_minuta_idMinuta (el ID que nos llega)
-    // - Filtramos por tipoAdjunto = 'file' (para ignorar los de 'asistencia')
-    
+    // 3. --- CONSULTA SQL ACTUALIZADA ---
+    // Ahora seleccionamos MÁS campos: idAdjunto y tipoAdjunto
     $sql = "SELECT 
                 idAdjunto, 
-                pathAdjunto
+                pathAdjunto,
+                tipoAdjunto 
             FROM t_adjunto
-            WHERE t_minuta_idMinuta = :idMinuta
-            AND tipoAdjunto = 'file'"; // <-- ¡Este filtro es clave!
+            WHERE t_minuta_idMinuta = :idMinuta";
+    // Quitamos el filtro de 'file' para que también traiga los 'link'
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':idMinuta' => $idMinuta]);
     $adjuntos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 4. Procesar resultados para el JSON
-    // Tu tabla t_adjunto tiene rutas inconsistentes.
-    // Fila 1: DocumentosAdjuntos/PNG/adj_...
-    // Fila 9: public/docs/asistencia/minuta_...
-    // Este código corrige eso para que JavaScript reciba una URL web válida.
-
     $adjuntosProcesados = [];
     foreach ($adjuntos as $adjunto) {
-        
+
         $pathOriginal = $adjunto['pathAdjunto'];
-        $pathCorregido = $pathOriginal;
+        $tipo = $adjunto['tipoAdjunto'];
+        $pathWebFinal = '';
 
-        // Si el path NO empieza con 'public/docs/' (como la Fila 1)
-        if (strpos($pathCorregido, 'public/') !== 0) {
-            // ...entonces asumimos que es un 'file' y le prefijamos la ruta de documentos
-            $pathCorregido = 'public/' . $pathCorregido;
+        if ($tipo === 'link') {
+            // Si es un link, el path es la URL completa
+            $pathWebFinal = $pathOriginal;
+            $nombreArchivo = $pathOriginal; // Para links, el nombre es la URL
+        } else {
+            // Si es un archivo (file, asistencia, etc.), construimos la ruta
+            $pathCorregido = $pathOriginal;
+            if (strpos($pathCorregido, 'public/') !== 0) {
+                // Asumimos que es un 'file' y le prefijamos la ruta
+                $pathCorregido = 'public/docs/' . $pathCorregido;
+            }
+            $pathWebFinal = '/corevota/' . $pathCorregido;
+            $nombreArchivo = basename($pathOriginal); // Extrae solo el nombre
         }
-        
-        // Ahora, todos los paths son 'public/docs/...'
-        // Finalmente, prefijamos la raíz del proyecto '/corevota/'
-        $pathWebFinal = '/corevota/' . $pathCorregido;
-
 
         $adjuntosProcesados[] = [
-            // Extrae solo el nombre del archivo para mostrarlo
-            'nombreArchivo' => basename($pathOriginal), 
-            // Envía la ruta web completa y corregida
-            'pathArchivo'   => $pathWebFinal 
+            'idAdjunto'     => (int)$adjunto['idAdjunto'], // <-- ¡NUEVO!
+            'tipoAdjunto'   => $tipo,                       // <-- ¡NUEVO!
+            'nombreArchivo' => $nombreArchivo,
+            'pathArchivo'   => $pathWebFinal
         ];
     }
 
 
     // 5. Devolver la respuesta en JSON
     echo json_encode(['status' => 'success', 'adjuntos' => $adjuntosProcesados]);
-
 } catch (Exception $e) {
     error_log("Error en obtener_adjuntos.php (Minuta ID: $idMinuta): " . $e->getMessage());
     echo json_encode(['status' => 'error', 'message' => 'Error al consultar la base de datos.', 'adjuntos' => []]);
