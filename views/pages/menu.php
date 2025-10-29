@@ -246,11 +246,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                                 <li><a href="menu.php?pagina=reunion_calendario" class="link-dark d-block rounded py-1"><i class="fas fa-calendar-alt fa-fw me-2"></i>Vista Calendario</a></li>
                                 <li><a href="menu.php?pagina=reunion_autogestion_asistencia" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-hand-pointer fa-fw me-2"></i>Registrar Mi Asistencia</a></li>
 
-                                <!-- AGREGADO: Historial de asistencia -->
                                 <li><a href="menu.php?pagina=historial_asistencia" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Asistencia</a></li>
-                                <!-- FIN AGREGADO -->
-
-                            </ul>
+                                </ul>
                         </div>
                     </li>
                     <li>
@@ -389,64 +386,160 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
         </main>
 
     </div>
+    
     <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // ... (tu código JS existente para aprobarMinuta, verAdjuntos, etc.) ...
-        // Pegar aquí las funciones aprobarMinuta y verAdjuntos si estaban antes
-        // Ejemplo:
-        function aprobarMinuta(idMinuta) {
-            // ... tu código ...
+        /**
+         * Función para mostrar los adjuntos de una minuta en un modal.
+         */
+        function verAdjuntos(minutaId) {
+            // 1. Obtener referencias a los elementos del DOM
+            const modalElement = document.getElementById('modalAdjuntos');
+            if (!modalElement) {
+                console.error('El modal #modalAdjuntos no existe en el DOM.');
+                return;
+            }
+            const modal = new bootstrap.Modal(modalElement);
+            const listaUl = document.getElementById('listaDeAdjuntos');
+
+            // 2. Poner el modal en estado de "Cargando..." y mostrarlo
+            listaUl.innerHTML = '<li class="list-group-item text-muted">Cargando...</li>';
+            modal.show();
+
+            // 3. Usar fetch para llamar a tu nuevo archivo PHP
+            fetch('/corevota/controllers/obtener_adjuntos.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: minutaId
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 4. Procesar la respuesta y construir la lista
+                if (data.status === 'success' && data.adjuntos.length > 0) {
+                    listaUl.innerHTML = ''; // Limpiar el "Cargando..."
+                    
+                    data.adjuntos.forEach(adjunto => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+                        // Crear el enlace
+                        const a = document.createElement('a');
+                        a.href = adjunto.pathArchivo; // Asume que la ruta es web-accessible
+                        a.textContent = adjunto.nombreArchivo;
+                        a.target = '_blank'; // Abrir en pestaña nueva
+                        
+                        // Añadir un ícono de descarga
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-download text-primary';
+
+                        li.appendChild(a);
+                        li.appendChild(icon);
+                        listaUl.appendChild(li);
+                    });
+
+                } else if (data.adjuntos.length === 0) {
+                    listaUl.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos para esta minuta.</li>';
+                } else {
+                    // Si el servidor devolvió un error
+                    throw new Error(data.message || 'No se pudieron cargar los adjuntos.');
+                }
+            })
+            .catch(error => {
+                // 5. Manejar cualquier error de red o del fetch
+                console.error('Error en verAdjuntos:', error);
+                listaUl.innerHTML = `<li class="list-group-item text-danger"><b>Error:</b> ${error.message}</li>`;
+            });
         }
-        async function verAdjuntos(idMinuta) {
-            // ... tu código ...
+
+        // (Aquí va tu otra función, aprobarMinuta)
+        // Asegúrate de tener también la función aprobarMinuta aquí si la necesitas en la misma página
+        function aprobarMinuta(idMinuta) {
+            // ... tu código para aprobar ...
+            
+            // Este es solo un ejemplo de lo que podrías tener. 
+            // ¡Reemplázalo con tu código real de aprobarMinuta!
+            if (confirm('¿Está seguro de que desea firmar y aprobar esta minuta? Esta acción es irreversible.')) {
+                
+                // Muestra algún indicador de carga
+                console.log("Aprobando minuta: " + idMinuta);
+
+                fetch('/corevota/controllers/aprobar_minuta.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idMinuta: idMinuta })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Minuta aprobada con éxito. La página se recargará.');
+                        // Recargar la página para que la minuta pase a la otra lista
+                        window.location.reload(); 
+                    } else {
+                        // Si falla, muestra el error
+                        alert('Error al aprobar: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error en fetch al aprobar:', error);
+                    alert('Error de conexión al intentar aprobar la minuta.');
+                });
+            }
         }
     </script>
-
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Solo ejecuta el fetch si el elemento existe (es decir, si estamos en 'home')
-      const tempElement = document.getElementById('temperatura-actual');
-      if (tempElement) {
-        const apiKey = '71852032dae024a5eb1702b278bd88fa'; // <-- ¡IMPORTANTE: Reemplaza con tu clave API de OpenWeatherMap!
-        const ciudad = 'La Calera'; // La ciudad de tu región
-        const pais = 'CL'; // Código de país (Chile)
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${ciudad},${pais}&appid=${apiKey}&units=metric&lang=es`;
+        document.addEventListener('DOMContentLoaded', function() {
+            // Solo ejecuta el fetch si el elemento existe (es decir, si estamos en 'home')
+            const tempElement = document.getElementById('temperatura-actual');
+            if (tempElement) {
+                const apiKey = '71852032dae024a5eb1702b278bd88fa'; // <-- ¡IMPORTANTE: Reemplaza con tu clave API de OpenWeatherMap!
+                const ciudad = 'La Calera'; // La ciudad de tu región
+                const pais = 'CL'; // Código de país (Chile)
+                const url = `https://api.openweathermap.org/data/2.5/weather?q=${ciudad},${pais}&appid=${apiKey}&units=metric&lang=es`;
 
-        fetch(url)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.main && data.main.temp && data.weather && data.weather[0]) {
+                            const temperatura = Math.round(data.main.temp);
+                            const descripcion = data.weather[0].description;
+                            const iconCode = data.weather[0].icon;
+
+                            let iconoFa = 'fas fa-cloud-sun';
+                            if (iconCode.includes('01')) iconoFa = 'fas fa-sun';
+                            else if (iconCode.includes('02')) iconoFa = 'fas fa-cloud-sun';
+                            else if (iconCode.includes('03') || iconCode.includes('04')) iconoFa = 'fas fa-cloud';
+                            else if (iconCode.includes('09') || iconCode.includes('10')) iconoFa = 'fas fa-cloud-showers-heavy';
+                            else if (iconCode.includes('11')) iconoFa = 'fas fa-bolt';
+                            else if (iconCode.includes('13')) iconoFa = 'fas fa-snowflake';
+                            else if (iconCode.includes('50')) iconoFa = 'fas fa-smog';
+
+                            tempElement.innerHTML = `<i class="${iconoFa} me-2"></i> ${temperatura}°C, ${descripcion}`;
+
+                        } else {
+                            tempElement.textContent = 'Clima no disponible';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al obtener datos del clima:', error);
+                        tempElement.textContent = 'Error al cargar clima';
+                    });
             }
-            return response.json();
-          })
-          .then(data => {
-            if (data.main && data.main.temp && data.weather && data.weather[0]) {
-              const temperatura = Math.round(data.main.temp);
-              const descripcion = data.weather[0].description;
-              const iconCode = data.weather[0].icon;
-
-               let iconoFa = 'fas fa-cloud-sun';
-               if (iconCode.includes('01')) iconoFa = 'fas fa-sun';
-               else if (iconCode.includes('02')) iconoFa = 'fas fa-cloud-sun';
-               else if (iconCode.includes('03') || iconCode.includes('04')) iconoFa = 'fas fa-cloud';
-               else if (iconCode.includes('09') || iconCode.includes('10')) iconoFa = 'fas fa-cloud-showers-heavy';
-               else if (iconCode.includes('11')) iconoFa = 'fas fa-bolt';
-               else if (iconCode.includes('13')) iconoFa = 'fas fa-snowflake';
-               else if (iconCode.includes('50')) iconoFa = 'fas fa-smog';
-
-               tempElement.innerHTML = `<i class="${iconoFa} me-2"></i> ${temperatura}°C, ${descripcion}`;
-
-            } else {
-              tempElement.textContent = 'Clima no disponible';
-            }
-          })
-          .catch(error => {
-            console.error('Error al obtener datos del clima:', error);
-            tempElement.textContent = 'Error al cargar clima';
-          });
-      }
-    });
+        });
     </script>
 </body>
 </html>
