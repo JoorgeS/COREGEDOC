@@ -372,6 +372,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                 'comision_crear' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'create']],
                 'comision_editar' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'edit']],
                 'reunion_crear' => ['type' => 'view', 'file' => $base_path . '/reunion_form.php'],
+                'reunion_editar' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'edit']],
                 'reunion_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'list']],
                 'reunion_calendario' => ['type' => 'view', 'file' => $base_path . '/reunion_calendario.php'],
                 'reunion_autogestion_asistencia' => ['type' => 'view', 'file' => $base_path . '/asistencia_autogestion.php'],

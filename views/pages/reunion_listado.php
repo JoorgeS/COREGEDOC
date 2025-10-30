@@ -5,14 +5,10 @@ if (!isset($reuniones)) {
     $reuniones = []; // Asegura que la variable exista si se accede directamente
 }
 
-// Mensajes de éxito o error (opcional pero útil)
+// Los mensajes de sesión ahora se manejan en menu.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
-$success_msg = $_SESSION['success'] ?? null;
-$error_msg = $_SESSION['error'] ?? null;
-unset($_SESSION['success'], $_SESSION['error']);
 ?>
 
 <!DOCTYPE html>
@@ -43,12 +39,7 @@ unset($_SESSION['success'], $_SESSION['error']);
             <i class="fas fa-plus me-1"></i> Crear Nueva Reunión
         </a>
 
-        <?php if ($success_msg): ?>
-            <div class="alert alert-success"><?php echo htmlspecialchars($success_msg); ?></div>
-        <?php endif; ?>
-        <?php if ($error_msg): ?>
-            <div class="alert alert-danger"><?php echo htmlspecialchars($error_msg); ?></div>
-        <?php endif; ?>
+        <?php // Los mensajes de éxito/error se muestran en menu.php ?>
 
         <div class="card shadow-sm">
             <div class="card-body">
@@ -71,13 +62,24 @@ unset($_SESSION['success'], $_SESSION['error']);
                             <tbody>
                                 <?php foreach ($reuniones as $reunion): ?>
                                     <?php
-                                    // Determinamos el estado basado en la minuta vinculada
-                                    $estado = $reunion['estadoMinuta'] ?? 'Error';
-                                    $idMinuta = $reunion['t_minuta_idMinuta'];
+                                    // Variables para esta fila
+                                    $idReunion = $reunion['idReunion']; // ID de la reunión
+                                    $idMinuta = $reunion['t_minuta_idMinuta']; // ID de la minuta (puede ser NULL)
+                                    $estadoMinuta = $reunion['estadoMinuta']; // Estado (NULL, 'PENDIENTE', 'APROBADA')
 
+                                    // Determinar el texto y color del badge de estado
+                                    $estadoTexto = 'No Iniciada';
                                     $badge_class = 'bg-secondary';
-                                    if ($estado === 'PENDIENTE') $badge_class = 'bg-warning text-dark';
-                                    if ($estado === 'APROBADA') $badge_class = 'bg-success';
+                                    if ($estadoMinuta === 'PENDIENTE') {
+                                        $estadoTexto = 'Pendiente';
+                                        $badge_class = 'bg-warning text-dark';
+                                    } elseif ($estadoMinuta === 'APROBADA') {
+                                        $estadoTexto = 'Aprobada';
+                                        $badge_class = 'bg-success';
+                                    } elseif ($idMinuta === null) {
+                                        $estadoTexto = 'Programada'; // Estado si aún no tiene minuta
+                                        $badge_class = 'bg-info text-dark';
+                                    }
                                     ?>
                                     <tr>
                                         <td><strong><?php echo htmlspecialchars($idMinuta); ?></strong></td>
@@ -86,16 +88,13 @@ unset($_SESSION['success'], $_SESSION['error']);
                                         <td><?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($reunion['fechaInicioReunion']))); ?></td>
                                         <td><?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($reunion['fechaTerminoReunion']))); ?></td>
                                         <td>
-                                            <span class="badge <?php echo $badge_class; ?>"><?php echo htmlspecialchars($estado); ?></span>
+                                            <span class="badge <?php echo $badge_class; ?>"><?php echo htmlspecialchars($estadoTexto); ?></span>
                                         </td>
 
                                         <td style="white-space: nowrap;">
                                             <?php
-                                            $idReunion = $reunion['idReunion']; // ID de la reunión
-                                            $idMinuta = $reunion['t_minuta_idMinuta']; // ID de la minuta (puede ser NULL)
-                                            $estadoMinuta = $reunion['estadoMinuta']; // Estado de la minuta (puede ser NULL)
+                                            // $now viene del controlador (ReunionController.php)
                                             $meetingStartTime = strtotime($reunion['fechaInicioReunion']);
-                                            // $now viene del controlador
 
                                             // --- Lógica Principal de Acciones ---
 
@@ -120,7 +119,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                                                 }
                                             } elseif ($estadoMinuta === 'PENDIENTE') {
                                                 // *** CASO 2: Minuta iniciada pero pendiente *** -> Botón Amarillo "Continuar Edición"
-                                                ?>
+                                            ?>
                                                 <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning" title="Continuar editando la minuta">
                                                     <i class="fas fa-edit me-1"></i> Continuar Edición
                                                 </a>
@@ -133,7 +132,7 @@ unset($_SESSION['success'], $_SESSION['error']);
                                                 </span>
                                             <?php
                                             } else {
-                                                // Estado desconocido (esto no debería ocurrir si los datos son consistentes)
+                                                // Estado desconocido
                                             ?>
                                                 <span class="text-danger" title="Estado de minuta desconocido: <?php echo htmlspecialchars($estadoMinuta); ?>">
                                                     <i class="fas fa-exclamation-circle me-1"></i> Estado Inválido
@@ -141,21 +140,23 @@ unset($_SESSION['success'], $_SESSION['error']);
                                             <?php
                                             }
 
-                                            // --- Botones Adicionales (Editar y Eliminar Reunión) ---
-                                            // Mostrar si la reunión aún no está finalizada (minuta no aprobada)
-                                            if ($estadoMinuta !== 'APROBADA') {
+                                            // --- INICIO DE LA CORRECCIÓN ---
+                                            // Botones Adicionales (Editar y Eliminar Reunión)
+                                            // Mostrar solo si la minuta AÚN NO se ha creado (reunión no iniciada)
+                                            if ($idMinuta === null) {
                                             ?>
-                                                <a href="menu.php?pagina=reunion_form&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
+                                                <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
                                                 <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>"
-                                                    class="btn btn-sm btn-danger ms-1"
-                                                    title="Deshabilitar Reunión"
-                                                    onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión? Esta acción la quitará del listado activo.');">
+                                                   class="btn btn-sm btn-danger ms-1"
+                                                   title="Deshabilitar Reunión"
+                                                   onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión? Esta acción la quitará del listado activo.');">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             <?php
                                             }
+                                            // --- FIN DE LA CORRECCIÓN ---
                                             ?>
                                         </td>
                                     </tr>
