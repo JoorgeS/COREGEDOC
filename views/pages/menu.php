@@ -220,7 +220,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         <div class="collapse show" id="usuarios-collapse">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
                                 <li><a href="menu.php?pagina=usuarios_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
-                                <li><a href="menu.php?pagina=usuario_crear" class="link-dark d-block rounded py-1"><i class="fas fa-user-plus fa-fw me-2"></i>Registrar nuevo</a></li>
+                                <?php // <li><a href="menu.php?pagina=usuario_crear" class="link-dark d-block rounded py-1"><i class="fas fa-user-plus fa-fw me-2"></i>Registrar nuevo</a></li> 
+                                ?>
                             </ul>
                         </div>
                     </li>
@@ -230,7 +231,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         </button>
                         <div class="collapse show" id="comisiones-collapse">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <li><a href="menu.php?pagina=comision_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Registrar nueva</a></li>
+                                <?php // <li><a href="menu.php?pagina=comision_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Registrar nueva</a></li> 
+                                ?>
                                 <li><a href="menu.php?pagina=comision_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
                             </ul>
                         </div>
@@ -241,7 +243,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         </button>
                         <div class="collapse show" id="reuniones-collapse">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <li><a href="menu.php?pagina=reunion_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Crear Reunión</a></li>
+                                <?php // <li><a href="menu.php?pagina=reunion_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Crear Reunión</a></li> 
+                                ?>
                                 <li><a href="menu.php?pagina=reunion_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Listado</a></li>
                                 <li><a href="menu.php?pagina=reunion_calendario" class="link-dark d-block rounded py-1"><i class="fas fa-calendar-alt fa-fw me-2"></i>Vista Calendario</a></li>
                                 <li><a href="menu.php?pagina=reunion_autogestion_asistencia" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-hand-pointer fa-fw me-2"></i>Registrar Mi Asistencia</a></li>
@@ -280,7 +283,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         <?php
                         // Nombre y Apellido del Usuario (sin cambios)
                         if (isset($_SESSION['pNombre']) && isset($_SESSION['aPaterno'])) {
-                            echo htmlspecialchars($_SESSION['pNombre'] . " " . $_SESSION['aPaterno']);
+                            echo htmlspecialchars($_SESSION['pNombre'] . " " . htmlspecialchars($_SESSION['aPaterno']));
                         } else {
                             echo "Usuario invitado";
                         }
@@ -326,7 +329,7 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                     });
                 </script>
             <?php endif; ?>
-            
+
             <?php // Mantener la alerta de error en la página (los modales son malos para errores)
             if ($error_msg): ?>
                 <div class="alert alert-danger alert-dismissible fade show mx-3" role="alert">
@@ -837,13 +840,13 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="confirmacionModalMessage">
-                    </div>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
                 </div>
             </div>
         </div>
     </div>
-    </body>
+</body>
 
 </html>
