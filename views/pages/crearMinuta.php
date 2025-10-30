@@ -1,5 +1,5 @@
 <?php
-// views/pages/crearMinuta.php - VERSIÓN CORREGIDA Y LIMPIA
+// views/pages/crearMinuta.php - VERSIÓN CON ENCABEZADO UNIFICADO
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -53,7 +53,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     $stmt_reunion = $pdo->prepare($sql_reunion);
     $stmt_reunion->execute([':idMinutaActual' => $idMinutaActual]);
     $reunionData = $stmt_reunion->fetch(PDO::FETCH_ASSOC);
-    // $reunionData puede ser 'false' si no hay reunión asociada
+    // $reunionData puede ser 'false' si no hay reunión asociada, aunque no debería pasar
 
     // 3. Cargar TODAS las comisiones vigentes y TODOS los posibles presidentes (Consejeros)
     // Comisiones (Indexadas por ID)
@@ -76,7 +76,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
     // --- 4. ASIGNAR NOMBRES PARA MOSTRAR EN EL ENCABEZADO ---
     $idComisionPrincipal = $minutaData['t_comision_idComision'];
-    // Usamos el presidente guardado en la minuta
+    // Usamos el presidente guardado en la minuta (que debería ser el de la com. principal al momento de crear)
     $idPresidentePrincipal = $minutaData['t_usuario_idPresidente'];
 
     // Buscar nombres usando los arrays cargados
@@ -88,6 +88,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
       $idComisionMixta1 = $reunionData['t_comision_idComision_mixta'];
       if (isset($all_commissions[$idComisionMixta1])) {
         $nombreComisionMixta1 = $all_commissions[$idComisionMixta1]['nombreComision'];
+        // Buscar el presidente oficial de ESTA comisión mixta
         $idPresidenteMixta1 = $all_commissions[$idComisionMixta1]['t_usuario_idPresidente'] ?? null;
         $nombrePresidenteMixta1 = $idPresidenteMixta1 ? ($all_presidents[$idPresidenteMixta1] ?? 'Presidente No Asignado') : 'N/A';
       } else {
@@ -99,6 +100,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
       $idComisionMixta2 = $reunionData['t_comision_idComision_mixta2'];
       if (isset($all_commissions[$idComisionMixta2])) {
         $nombreComisionMixta2 = $all_commissions[$idComisionMixta2]['nombreComision'];
+        // Buscar el presidente oficial de ESTA comisión mixta
         $idPresidenteMixta2 = $all_commissions[$idComisionMixta2]['t_usuario_idPresidente'] ?? null;
         $nombrePresidenteMixta2 = $idPresidenteMixta2 ? ($all_presidents[$idPresidenteMixta2] ?? 'Presidente No Asignado') : 'N/A';
       } else {
@@ -145,28 +147,47 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
   <meta charset="UTF-8">
   <title>Gestión de Minuta #<?php echo htmlspecialchars($idMinutaActual); ?></title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/corevota/public/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
-    /* Estilos específicos para esta página */
+    /* Estilos específicos */
+    /* Encabezado azul */
     .card-header.bg-primary {
       background-color: #0d6efd !important;
     }
 
+    /* Cuerpo gris claro */
     .card-body.bg-light {
       background-color: #f8f9fa !important;
     }
 
+    /* Etiquetas en negrita */
     dl.row dt {
       font-weight: 600;
       text-align: right;
       padding-right: 0.5em;
     }
 
+    /* Aumentar espacio entre filas del encabezado */
     dl.row>div {
       margin-bottom: 0.3rem;
     }
 
+    /* Evitar desbordamiento en valores largos */
     dl.row dd {
       word-break: break-word;
+    }
+
+    /* Otros estilos heredados */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
     }
 
     .asistencia-checkbox.absent-check.default-absent:checked {
@@ -209,6 +230,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
     <div class="row g-3">
 
+
       <div class="col-12 mb-3">
         <div class="card shadow-sm">
           <div class="card-header bg-primary text-white fw-bold">
@@ -216,18 +238,23 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           </div>
           <div class="card-body bg-light">
             <div class="row">
+
               <div class="col-md-6 border-end pe-4">
                 <dl class="row mb-0">
                   <dt class="col-sm-5 col-lg-4">N° Sesión:</dt>
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($idMinutaActual); ?></dd>
+
                   <dt class="col-sm-5 col-lg-4">Fecha:</dt>
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars(date('d-m-Y', strtotime($minutaData['fechaMinuta'] ?? 'now'))); ?></dd>
+
                   <dt class="col-sm-5 col-lg-4">Hora:</dt>
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars(date('H:i', strtotime($minutaData['horaMinuta'] ?? 'now'))); ?> hrs.</dd>
+
                   <dt class="col-sm-5 col-lg-4">Secretario Técnico:</dt>
                   <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($secretarioNombre); ?></dd>
                 </dl>
               </div>
+
               <div class="col-md-6 ps-4">
                 <dl class="row mb-0">
                   <?php if (!$nombreComisionMixta1 && !$nombreComisionMixta2): // Caso: Comisión Única 
@@ -242,12 +269,14 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombreComisionPrincipal); ?></dd>
                     <dt class="col-sm-5 col-lg-4">1° Presidente:</dt>
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombrePresidentePrincipal); ?></dd>
+
                     <?php if ($nombreComisionMixta1): ?>
                       <dt class="col-sm-5 col-lg-4 mt-1">2° Comisión:</dt>
                       <dd class="col-sm-7 col-lg-8 mt-1"><?php echo htmlspecialchars($nombreComisionMixta1); ?></dd>
                       <dt class="col-sm-5 col-lg-4">2° Presidente:</dt>
                       <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombrePresidenteMixta1); ?></dd>
                     <?php endif; ?>
+
                     <?php if ($nombreComisionMixta2): ?>
                       <dt class="col-sm-5 col-lg-4 mt-1">3° Comisión:</dt>
                       <dd class="col-sm-7 col-lg-8 mt-1"><?php echo htmlspecialchars($nombreComisionMixta2); ?></dd>
@@ -291,11 +320,13 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         </div>
       </div>
 
+
       <div class="col-12 mt-2">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0">DESARROLLO DE LA MINUTA</h5>
         </div>
         <div id="contenedorTemas">
+
         </div>
         <button type="button" class="btn btn-outline-dark btn-sm mt-2" onclick="agregarTema()">Agregar Tema <span class="ms-1">➕</span></button>
 
@@ -332,6 +363,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             </ul>
           </div>
         </div>
+
+
         <div class="d-flex justify-content-center gap-3 mt-4">
           <div class="text-end mt-3">
             <button type="button" class="btn btn-success fw-bold" onclick="guardarMinutaCompleta()">💾 Guardar Borrador</button>
@@ -389,10 +422,35 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             <div class="editable-area form-control" contenteditable="true" placeholder="Añade observaciones..."></div>
           </div>
         </div>
+        <div class="form-check mt-2">
+          <input class="form-check-input toggle-votacion" type="checkbox" id="checkVotacion_{{index}}">
+          <label class="form-check-label fw-semibold text-success" for="checkVotacion_{{index}}">
+            Asociar votación existente
+          </label>
+        </div>
+
+        <div class="mt-2 select-votacion" id="selectVotacion_{{index}}" style="display:none;">
+          <label class="form-label">Seleccionar votación habilitada</label>
+          <select class="form-select votacion-select" name="idVotacion[]" required>
+            <option value="">Seleccione una votación...</option>
+            <?php
+              require_once __DIR__ . '/../../controllers/VotacionController.php';
+              $vCtrl = new VotacionController();
+              $votaciones = $vCtrl->listar()['data'] ?? [];
+              foreach ($votaciones as $v) {
+                if ($v['habilitada'] == 1) {
+                  echo '<option value="' . $v['idVotacion'] . '">' . htmlspecialchars($v['nombreVotacion']) . '</option>';
+                }
+              }
+            ?>
+          </select>
+        </div>
+
       </div>
       <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
     </div>
   </template>
+
 
   <script>
     // --- Variables Globales (Reducidas) ---
@@ -435,7 +493,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
     // --- Funciones de Carga de Datos (FETCH - SOLO ASISTENCIA) ---
     function cargarTablaAsistencia() {
-      // (Función sin cambios)
+      // (Copiar la función cargarTablaAsistencia completa de la respuesta anterior aquí)
       fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
         .then(res => res.ok ? res.json() : Promise.reject(res))
         .then(response => {
@@ -453,17 +511,17 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             tabla += `</tbody></table>`;
             cont.innerHTML = tabla;
           } else {
-            cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar o error en la respuesta.</p>';
+            cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar o error en la respuesta.</p>'; // Mensaje mejorado
           }
         })
         .catch(err => {
           console.error("Error carga asistencia:", err);
           const cont = document.getElementById("contenedorTablaAsistenciaEstado");
-          if (cont) cont.innerHTML = '<p class="text-danger">Error al conectar para cargar asistencia.</p>';
+          if (cont) cont.innerHTML = '<p class="text-danger">Error al conectar para cargar asistencia.</p>'; // Mensaje mejorado
         });
     }
 
-    // --- Lógica Asistencia (SIN CAMBIOS) ---
+    // --- Lógica Asistencia (SIN CAMBIOS desde la versión anterior) ---
     function handleAsistenciaChange(userId, changedType) {
       // (Función sin cambios)
       const present = document.getElementById(`present_${userId}`);
@@ -497,6 +555,9 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         asistencia: asistenciaIDs
       };
 
+      // Si es minuta nueva, necesita encabezado para crearla primero - ESTA LÓGICA YA NO APLICA AQUÍ
+      // if (!idMinutaGlobal) { ... } // <- Se puede borrar este if
+
       btn.disabled = true;
       status.textContent = 'Guardando...';
       status.className = 'me-auto small text-muted';
@@ -519,6 +580,10 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             status.textContent = "✅ Guardado";
             status.className = 'me-auto small text-success fw-bold';
             ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String);
+
+            // Lógica de 'newMinutaId' ya no aplica aquí
+            // if (resp.newMinutaId) { ... } // <- Se puede borrar este if
+
             if (idMinutaGlobal && btnExportarExcelGlobal) {
               btnExportarExcelGlobal.classList.remove('disabled');
               btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
@@ -552,7 +617,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         });
     }
 
-    // --- Lógica TEMAS (SIN CAMBIOS) ---
+
+    // --- Lógica TEMAS (SIN CAMBIOS desde la versión anterior) ---
     function format(command) {
       /* ... sin cambios ... */
       try {
@@ -567,7 +633,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       if (DATOS_TEMAS_CARGADOS && DATOS_TEMAS_CARGADOS.length > 0) {
         DATOS_TEMAS_CARGADOS.forEach(t => crearBloqueTema(t));
       } else {
-        crearBloqueTema();
+        crearBloqueTema(); // Crear uno vacío si no hay datos
       }
     }
 
@@ -580,12 +646,14 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       /* ... sin cambios ... */
       contadorTemas++;
       const plantilla = document.getElementById("plantilla-tema");
-      if (!plantilla || !plantilla.content) return;
+      if (!plantilla || !plantilla.content) return; // Verificar que la plantilla exista
       const nuevo = plantilla.content.cloneNode(true);
       const div = nuevo.querySelector('.tema-block');
-      if (!div) return;
+      if (!div) return; // Verificar elemento principal
+
       const h6 = nuevo.querySelector('h6');
       if (h6) h6.innerText = `Tema ${contadorTemas}`;
+
       nuevo.querySelectorAll('[data-bs-target]').forEach(el => {
         let target = el.getAttribute('data-bs-target').replace('_ID_', `_${contadorTemas}_`);
         el.setAttribute('data-bs-target', target);
@@ -607,7 +675,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       if (btnEliminar && contadorTemas > 1) {
         btnEliminar.style.display = 'inline-block';
       } else if (btnEliminar) {
-        btnEliminar.style.display = 'none';
+        btnEliminar.style.display = 'none'; // Asegurar que el primero no tenga botón eliminar
       }
       contenedorTemasGlobal.appendChild(nuevo);
     }
@@ -624,7 +692,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     function actualizarNumerosDeTema() {
       /* ... sin cambios ... */
       const bloques = contenedorTemasGlobal.querySelectorAll('.tema-block');
-      contadorTemas = 0;
+      contadorTemas = 0; // Reiniciar contador
       bloques.forEach(b => {
         contadorTemas++;
         const h6 = b.querySelector('h6');
@@ -634,10 +702,11 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       });
     }
 
-    // --- Lógica ACCIONES FINALES (GUARDAR BORRADOR Y APROBAR) ---
+    // --- Lógica ACCIONES FINALES (SIN CAMBIOS desde la versión anterior) ---
     function gestionarVisibilidadBotonAprobar() {
       // (Función sin cambios)
       const btn = document.getElementById('btnAprobarMinuta');
+      // Asegurarse que ID_PRESIDENTE_ASIGNADO no sea null antes de comparar
       if (btn && idMinutaGlobal && ID_USUARIO_LOGUEADO && ID_PRESIDENTE_ASIGNADO !== null && ID_USUARIO_LOGUEADO == ID_PRESIDENTE_ASIGNADO && ESTADO_MINUTA_ACTUAL === 'PENDIENTE') {
         btn.style.display = 'inline-block';
       } else if (btn) {
@@ -646,13 +715,14 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     }
 
     function guardarMinutaCompleta() {
-      // (Función MODIFICADA para NO enviar adjuntos)
+      // --- DEBUG JAVASCRIPT: Verificar idMinutaGlobal al INICIO ---
       console.log('[DEBUG] Inicio guardarMinutaCompleta. idMinutaGlobal:', idMinutaGlobal);
       if (!idMinutaGlobal || isNaN(parseInt(idMinutaGlobal)) || parseInt(idMinutaGlobal) <= 0) {
         alert("¡Error Crítico JS! El ID de la minuta (idMinutaGlobal) no es válido ANTES de recolectar datos.");
         console.error('[DEBUG] idMinutaGlobal inválido al inicio:', idMinutaGlobal);
-        return;
+        return; // Detener ejecución
       }
+      // --- FIN DEBUG JAVASCRIPT ---
 
       const {
         asistenciaIDs
@@ -662,9 +732,11 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
       bloques.forEach(b => {
         const c = b.querySelectorAll(".editable-area");
+        const n = c[0]?.innerHTML.trim() || "";
+        const o = c[1]?.innerHTML.trim() || "";
         temasData.push({
-          nombreTema: c[0]?.innerHTML.trim() || "",
-          objetivo: c[1]?.innerHTML.trim() || "",
+          nombreTema: n,
+          objetivo: o,
           descAcuerdo: c[2]?.innerHTML.trim() || "",
           compromiso: c[3]?.innerHTML.trim() || "",
           observacion: c[4]?.innerHTML.trim() || "",
@@ -672,27 +744,43 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         });
       });
 
-      // Los adjuntos y enlaces AHORA SE GUARDAN INTERACTIVAMENTE.
-      // Ya no necesitamos recolectarlos aquí.
+      const archivoInput = document.getElementById('adjuntosArchivos');
+      const enlaceInput = document.getElementById('enlaceAdjunto');
+      const archivosParaSubir = archivoInput ? archivoInput.files : [];
+      const enlaceValor = enlaceInput ? enlaceInput.value.trim() : '';
+
       const formData = new FormData();
 
+      // --- DEBUG JAVASCRIPT: Verificar idMinutaGlobal JUSTO ANTES de añadirlo a FormData ---
       console.log('[DEBUG] Valor de idMinutaGlobal ANTES de append:', idMinutaGlobal);
       if (!idMinutaGlobal || isNaN(parseInt(idMinutaGlobal)) || parseInt(idMinutaGlobal) <= 0) {
         alert('¡Error Crítico JS! El ID de la minuta no es válido justo antes de añadirlo a FormData.');
         console.error('[DEBUG] idMinutaGlobal inválido antes de append:', idMinutaGlobal);
-        return;
+        return; // Detener antes de enviar
       }
       console.log('[DEBUG] Añadiendo idMinuta a FormData:', idMinutaGlobal);
+      // --- FIN DEBUG JAVASCRIPT ---
 
       formData.append('idMinuta', idMinutaGlobal);
       formData.append('asistencia', JSON.stringify(asistenciaIDs));
       formData.append('temas', JSON.stringify(temasData));
+
+      if (enlaceValor) {
+        formData.append('enlaceAdjunto', enlaceValor);
+      }
+
+      if (archivosParaSubir.length > 0) {
+        for (let i = 0; i < archivosParaSubir.length; i++) {
+          formData.append('adjuntos[]', archivosParaSubir[i]);
+        }
+      }
 
       const btnGuardar = document.querySelector('button[onclick="guardarMinutaCompleta()"]');
       if (!btnGuardar) return;
       btnGuardar.disabled = true;
       btnGuardar.innerHTML = 'Guardando...';
 
+      // --- DEBUG JAVASCRIPT: Mostrar lo que se va a enviar (excepto archivos) ---
       console.log('[DEBUG] Enviando datos (FormData):');
       console.log('  idMinuta:', formData.get('idMinuta'));
       console.log('  asistencia:', formData.get('asistencia'));
@@ -705,7 +793,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         })
         .then(res => {
           if (!res.ok) {
-            return res.text().then(text => {
+            // Si hay error HTTP (4xx, 5xx), intentar leer como texto
+            return res.text().then(text => { // <--- Falta una llave aquí
               console.error('[DEBUG] Respuesta no OK del servidor:', res.status, res.statusText, text);
               throw new Error(`Error del servidor (${res.status}): ${text || res.statusText}`);
             });
@@ -713,15 +802,23 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           return res.json();
         })
         .then(resp => {
+          // --- DEBUG JAVASCRIPT: Mostrar respuesta JSON ---
           console.log('[DEBUG] Respuesta JSON recibida:', resp);
+          // --- FIN DEBUG JAVASCRIPT ---
 
           btnGuardar.disabled = false;
           btnGuardar.innerHTML = '💾 Guardar Borrador';
           if (resp.status === "success") {
             alert("✅ Minuta guardada correctamente.");
 
-            // Refresca la lista de adjuntos por si acaso (la función está en menu.php)
-            cargarAdjuntosExistentes(idMinutaGlobal);
+            if (archivoInput) archivoInput.value = '';
+            if (enlaceInput) enlaceInput.value = '';
+
+            if (resp.adjuntosActualizados) {
+              mostrarAdjuntosExistentes(resp.adjuntosActualizados);
+            } else {
+              cargarYMostrarAdjuntosExistentes();
+            }
 
             gestionarVisibilidadBotonAprobar();
             if (btnExportarExcelGlobal) {
@@ -734,21 +831,92 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
               }
             }
           } else {
+            // Mostrar mensaje de error del JSON si existe
             alert(`⚠️ Error al guardar: ${resp.message}\nDetalles: ${resp.error || 'No disponibles'}`);
             console.error("Error guardado completo (respuesta JSON):", resp.error || resp.message);
           }
         })
         .catch(err => {
+          // --- DEBUG JAVASCRIPT: Mostrar error del fetch o del .json() ---
           console.error('[DEBUG] Error en fetch o .json():', err);
+          // --- FIN DEBUG JAVASCRIPT ---
+
           btnGuardar.disabled = false;
           btnGuardar.innerHTML = '💾 Guardar Borrador';
+
+          // Mostrar un mensaje más detallado, incluyendo el error capturado
           alert("Error de conexión o respuesta inválida al guardar:\n" + err.message);
+          // El console.error ya estaba, lo dejamos
           console.error("Error fetch-guardar o json():", err);
+        });
+    } // <- Asegúrate que esta llave de cierre final esté presente
+    function cargarYMostrarAdjuntosExistentes() {
+      if (!idMinutaGlobal) return; // No hacer nada si no hay ID de minuta
+
+      fetch(`/corevota/controllers/fetch_data.php?action=adjuntos_por_minuta&idMinuta=${idMinutaGlobal}`)
+        .then(response => response.ok ? response.json() : Promise.reject('Error al obtener adjuntos'))
+        .then(data => {
+          if (data.status === 'success' && data.data) {
+            mostrarAdjuntosExistentes(data.data);
+          } else {
+            mostrarAdjuntosExistentes([]); // Mostrar lista vacía o mensaje
+            console.warn('No se encontraron adjuntos o hubo un error:', data.message);
+          }
+        })
+        .catch(error => {
+          console.error('Error al cargar adjuntos:', error);
+          const listaUl = document.getElementById('listaAdjuntosExistentes');
+          if (listaUl) listaUl.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos actuales.</li>';
         });
     }
 
-    // ¡IMPORTANTE! Las funciones cargarYMostrarAdjuntosExistentes() y mostrarAdjuntosExistentes()
-    // FUERON ELIMINADAS de aquí porque ya existen en menu.php
+    function mostrarAdjuntosExistentes(adjuntos) {
+      const listaUl = document.getElementById('listaAdjuntosExistentes');
+      if (!listaUl) return;
+
+      listaUl.innerHTML = ''; // Limpiar lista actual
+
+      if (!adjuntos || adjuntos.length === 0) {
+        listaUl.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>';
+        return;
+      }
+
+      adjuntos.forEach(adj => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+        const link = document.createElement('a');
+        link.href = (adj.tipoAdjunto === 'file') ? `/corevota/public/${adj.pathAdjunto}` : adj.pathAdjunto; // Asume que la ruta guardada es relativa a 'public/'
+        link.target = '_blank';
+        link.textContent = (adj.tipoAdjunto === 'file') ?
+          `📄 ${adj.pathAdjunto.split('/').pop()}` // Mostrar solo nombre de archivo
+          :
+          `🔗 Enlace Externo`;
+        link.title = adj.pathAdjunto; // Mostrar ruta completa en tooltip
+
+        li.appendChild(link);
+
+        // Botón opcional para eliminar (requiere backend)
+        /*
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
+        deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li); // Necesitarás implementar eliminarAdjunto
+        li.appendChild(deleteBtn);
+        */
+
+        listaUl.appendChild(li);
+      });
+    }
+
+    // --- Llamar a la función al cargar la página ---
+    document.addEventListener("DOMContentLoaded", () => {
+      // ... (código existente en DOMContentLoaded) ...
+
+      // Cargar adjuntos existentes
+      cargarYMostrarAdjuntosExistentes();
+
+    });
 
     function aprobarMinuta(idMinuta) {
       // (Función sin cambios)
@@ -778,7 +946,24 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         })
         .catch(err => alert("Error de red al intentar aprobar la minuta:\n" + err.message));
     }
+      // --- Lógica Mostrar/Ocultar Select Votación ---
+      document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('toggle-votacion')) {
+          const index = e.target.id.split('_')[1];
+          const selectDiv = document.getElementById('selectVotacion_' + index);
+          if (e.target.checked) {
+            selectDiv.style.display = 'block';
+          } else {
+            selectDiv.style.display = 'none';
+            const select = selectDiv.querySelector('select');
+            if (select) select.value = '';
+          }
+        }
+      });
+
+
   </script>
+
 </body>
 
 </html>

@@ -90,23 +90,73 @@ unset($_SESSION['success'], $_SESSION['error']);
                                         </td>
 
                                         <td style="white-space: nowrap;">
-                                            <?php if ($estado === 'APROBADA'): ?>
-                                                <a href="menu.php?pagina=minutas_aprobadas" class="btn btn-sm btn-success">
-                                                    <i class="fas fa-check-circle me-1"></i> Minuta guardada
-                                                </a>
+                                            <?php
+                                            $idReunion = $reunion['idReunion']; // ID de la reunión
+                                            $idMinuta = $reunion['t_minuta_idMinuta']; // ID de la minuta (puede ser NULL)
+                                            $estadoMinuta = $reunion['estadoMinuta']; // Estado de la minuta (puede ser NULL)
+                                            $meetingStartTime = strtotime($reunion['fechaInicioReunion']);
+                                            // $now viene del controlador
 
-                                            <?php elseif ($estado === 'PENDIENTE'): ?>
-                                                <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning">
-                                                    <i class="fas fa-edit me-1"></i> Continuar editando la minuta
+                                            // --- Lógica Principal de Acciones ---
+
+                                            if ($idMinuta === null) {
+                                                // *** CASO 1: Aún no se ha iniciado la minuta ***
+                                                if ($now < $meetingStartTime) {
+                                                    // 1a: Reunión futura -> Mensaje informativo
+                                                    $horaInicioFormato = htmlspecialchars(date('H:i', $meetingStartTime));
+                                                    $fechaInicioFormato = htmlspecialchars(date('d-m-Y', $meetingStartTime));
+                                            ?>
+                                                    <span class="text-muted" title="Programada para el <?php echo $fechaInicioFormato; ?> a las <?php echo $horaInicioFormato; ?>">
+                                                        <i class="fas fa-clock me-1"></i> Iniciar se habilita a las <?php echo $horaInicioFormato; ?>
+                                                    </span>
+                                                <?php
+                                                } else {
+                                                    // 1b: Hora de inicio ya pasó -> Botón Azul "Iniciar Reunión"
+                                                ?>
+                                                    <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary" title="Crear e iniciar la edición de la minuta">
+                                                        <i class="fas fa-play me-1"></i> Iniciar Reunión
+                                                    </a>
+                                                <?php
+                                                }
+                                            } elseif ($estadoMinuta === 'PENDIENTE') {
+                                                // *** CASO 2: Minuta iniciada pero pendiente *** -> Botón Amarillo "Continuar Edición"
+                                                ?>
+                                                <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning" title="Continuar editando la minuta">
+                                                    <i class="fas fa-edit me-1"></i> Continuar Edición
                                                 </a>
-                                                <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $reunion['idReunion']; ?>"
-                                                    class="btn btn-sm btn-danger"
-                                                    onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión?');">
+                                            <?php
+                                            } elseif ($estadoMinuta === 'APROBADA') {
+                                                // *** CASO 3: Minuta aprobada *** -> Mensaje "Reunión Finalizada"
+                                            ?>
+                                                <span class="text-success">
+                                                    <i class="fas fa-check-circle me-1"></i> Reunión Finalizada
+                                                </span>
+                                            <?php
+                                            } else {
+                                                // Estado desconocido (esto no debería ocurrir si los datos son consistentes)
+                                            ?>
+                                                <span class="text-danger" title="Estado de minuta desconocido: <?php echo htmlspecialchars($estadoMinuta); ?>">
+                                                    <i class="fas fa-exclamation-circle me-1"></i> Estado Inválido
+                                                </span>
+                                            <?php
+                                            }
+
+                                            // --- Botones Adicionales (Editar y Eliminar Reunión) ---
+                                            // Mostrar si la reunión aún no está finalizada (minuta no aprobada)
+                                            if ($estadoMinuta !== 'APROBADA') {
+                                            ?>
+                                                <a href="menu.php?pagina=reunion_form&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </a>
+                                                <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>"
+                                                    class="btn btn-sm btn-danger ms-1"
+                                                    title="Deshabilitar Reunión"
+                                                    onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión? Esta acción la quitará del listado activo.');">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
-                                            <?php else: ?>
-                                                <span class="text-danger">Inválido</span>
-                                            <?php endif; ?>
+                                            <?php
+                                            }
+                                            ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

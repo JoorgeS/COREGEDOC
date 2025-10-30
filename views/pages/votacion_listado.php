@@ -17,7 +17,7 @@ $votaciones = $response['data'] ?? [];
           <thead class="table-light">
             <tr>
               <th>ID</th>
-              <th>Nombre de la Votación</th>
+              <th>Nombre de la Adenda</th>
               <th>Comisión</th>
               <th>Fecha de Creación</th>
               <th>Estado</th>

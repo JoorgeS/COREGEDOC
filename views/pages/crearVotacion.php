@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Nombre de la votación -->
         <div class="mb-3">
-          <label for="nombreVotacion" class="form-label fw-semibold">Nombre de la Votación *</label>
+          <label for="nombreVotacion" class="form-label fw-semibold">Nombre de la Adenda *</label>
           <input type="text" class="form-control" id="nombreVotacion" name="nombreVotacion"
                  placeholder="Ej: Aprobación de proyecto regional" required>
         </div>

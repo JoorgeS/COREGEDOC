@@ -300,6 +300,44 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
 
         <main>
             <?php
+            // --- INICIO: Bloque para mostrar mensajes de sesión ---
+
+            // Obtener mensajes de sesión y luego limpiarlos
+            // session_start() ya está hecho al principio de menu.php
+            $success_msg = $_SESSION['success'] ?? null;
+            $error_msg = $_SESSION['error'] ?? null;
+            unset($_SESSION['success'], $_SESSION['error']); // Limpiar ambos mensajes
+
+            // --- MODIFICADO: Script para activar modal en caso de éxito ---
+            if ($success_msg): ?>
+                <script>
+                    // Esperar a que el DOM esté completamente cargado
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Seleccionar el modal por su ID
+                        var modalElement = document.getElementById('confirmacionModal');
+                        if (modalElement) {
+                            // Crear una instancia del modal de Bootstrap
+                            var successModal = new bootstrap.Modal(modalElement);
+                            // Establecer el mensaje de éxito en el cuerpo del modal
+                            document.getElementById('confirmacionModalMessage').textContent = <?php echo json_encode($success_msg); ?>;
+                            // Mostrar el modal
+                            successModal.show();
+                        }
+                    });
+                </script>
+            <?php endif; ?>
+            
+            <?php // Mantener la alerta de error en la página (los modales son malos para errores)
+            if ($error_msg): ?>
+                <div class="alert alert-danger alert-dismissible fade show mx-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i> <?php echo htmlspecialchars($error_msg); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
+            <?php // --- FIN: Bloque para mostrar mensajes de sesión --- 
+            ?>
+
+            <?php
             // --- Mostrar Saludo, Fecha y Temperatura SÓLO en la página 'home' ---
             if ($pagina === 'home') :
             ?>
@@ -384,6 +422,9 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             // --- Fin Router ---
             ?>
         </main>
+
+
+
 
     </div>
 
@@ -786,6 +827,22 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             }
         });
     </script>
-</body>
+
+    <div class="modal fade" id="confirmacionModal" tabindex="-1" aria-labelledby="confirmacionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="confirmacionModalLabel"><i class="fas fa-check-circle me-2"></i>Operación Exitosa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmacionModalMessage">
+                    </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </body>
 
 </html>
