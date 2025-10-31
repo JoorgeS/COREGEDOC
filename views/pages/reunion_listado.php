@@ -59,10 +59,8 @@ function renderPagination($current, $pages) {
 <body>
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="mb-0">Listado de Reuniones</h3>
-            <a href="menu.php?pagina=reunion_crear" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Crear Nueva Reunión
-            </a>
+            <h3 class="mb-0">Reuniones Registradas</h3>
+
         </div>
 
         <?php // Los mensajes de éxito/error se muestran en menu.php ?>

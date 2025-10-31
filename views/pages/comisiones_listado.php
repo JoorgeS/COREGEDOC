@@ -58,7 +58,7 @@ if (!empty($filtroNombre) || $filtroVigencia !== '') {
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3 class="mb-0">Listado de Comisiones</h3>
-            <a href="menu.php?pagina=comision_crear" class="btn btn-success">Registrar Nueva Comisión</a>
+           
         </div>
 
         <!-- FORMULARIO DE FILTRO -->

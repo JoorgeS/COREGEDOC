@@ -1,59 +1,32 @@
 <?php
 // views/pages/minutas_dashboard.php
-
-// Define la pestaña activa (por defecto 'pendientes')
-$tabActiva = $_GET['tab'] ?? 'pendientes';
+// Este archivo ahora actúa como un panel de navegación para el módulo de Minutas.
 ?>
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Gestión de Minutas</h2>
-        <a href="menu.php?pagina=crear_minuta" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Crear Nueva Minuta
-        </a>
-    </div>
-
-    <ul class="nav nav-tabs" id="minutasTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <a class="nav-link <?php echo ($tabActiva === 'pendientes') ? 'active' : ''; ?>" href="menu.php?pagina=minutas_dashboard&tab=pendientes" role="tab">
-                <i class="fas fa-clock me-2"></i>Minutas Pendientes
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a class="nav-link <?php echo ($tabActiva === 'aprobadas') ? 'active' : ''; ?>" href="menu.php?pagina=minutas_dashboard&tab=aprobadas" role="tab">
-                <i class="fas fa-check-circle me-2"></i>Minutas Aprobadas
-            </a>
-        </li>
-    </ul>
-
-    <div class="tab-content" id="minutasTabsContent">
-        
-        <div class="tab-pane fade <?php echo ($tabActiva === 'pendientes') ? 'show active' : ''; ?>" id="pendientes-content" role="tabpanel">
-            <div class="card card-body border-top-0 rounded-bottom">
-                <?php
-                // --- AJUSTE IMPORTANTE ---
-                // Solo cargar este bloque si la pestaña está activa
-                if ($tabActiva === 'pendientes') {
-                    $_GET['action'] = 'list';
-                    $_GET['estado'] = 'PENDIENTE';
-                    include __DIR__ . '/../../controllers/MinutaController.php';
-                }
-                ?>
-            </div>
+        <h2 class="mb-0">Módulo de Minutas</h2>
         </div>
 
-        <div class="tab-pane fade <?php echo ($tabActiva === 'aprobadas') ? 'show active' : ''; ?>" id="aprobadas-content" role="tabpanel">
-            <div class="card card-body border-top-0 rounded-bottom">
-                 <?php
-                // --- AJUSTE IMPORTANTE ---
-                // Solo cargar este bloque si la pestaña está activa
-                if ($tabActiva === 'aprobadas') {
-                    $_GET['action'] = 'list';
-                    $_GET['estado'] = 'APROBADA';
-                    include __DIR__ . '/../../controllers/MinutaController.php';
-                }
-                ?>
-            </div>
+    <p class="lead text-muted mb-4">Selecciona una categoría para revisar las minutas.</p>
+
+    <div class="row g-4">
+
+        <div class="col-md-6">
+            <a href="menu.php?pagina=minutas_pendientes" class="dashboard-card h-100">
+                <i class="fas fa-clock text-warning"></i>
+                <h5 class="mt-3">Minutas Pendientes</h5>
+                <p class="mb-0 text-muted">Revisar, firmar y gestionar las minutas que requieren aprobación.</p>
+            </a>
         </div>
+
+        <div class="col-md-6">
+            <a href="menu.php?pagina=minutas_aprobadas" class="dashboard-card h-100">
+                <i class="fas fa-check-circle text-success"></i>
+                <h5 class="mt-3">Minutas Aprobadas</h5>
+                <p class="mb-0 text-muted">Consultar el archivo histórico de todas las minutas firmadas y finalizadas.</p>
+            </a>
+        </div>
+
     </div>
 </div>

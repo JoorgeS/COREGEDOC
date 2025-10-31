@@ -48,6 +48,7 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
             opacity: 1;
         }
 
+        /* Clase modificada para un bloque más visual */
         .pretty-block {
             background: linear-gradient(to bottom right, #ffffff 0%, #fafbff 100%);
             border: 1px solid #e1e5ef;
@@ -64,12 +65,13 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
         }
 
         .section-title {
-            font-size: .9rem;
-            font-weight: 600;
+            font-size: 1rem; /* Aumentado ligeramente para más peso */
+            font-weight: 700; /* Más audaz */
             color: #1f2d3d;
             display: flex;
             align-items: center;
             gap: .5rem;
+            margin-bottom: .5rem;
         }
 
         .section-title i {
@@ -112,7 +114,7 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
             line-height: 1.3;
         }
 
-        .invalid-horario {
+        .invalid-horario, .invalid-feedback-custom {
             color: #dc3545;
             font-size: .8rem;
             font-weight: 500;
@@ -140,64 +142,77 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                         <input type="hidden" name="idReunion" value="<?php echo $idReunion_val; ?>">
                     <?php endif; ?>
 
-                    <div class="mb-3">
-                        <label for="comisionSelect1" class="form-label">
-                            Comisión Principal <span class="text-danger">*</span>
-                        </label>
-                        <select class="form-select form-select-md rounded-3" id="comisionSelect1" name="t_comision_idComision" required>
-                            <option value="">Cargando comisiones...</option>
-                        </select>
-                        <div class="hint text-muted small mt-1">
-                            Esta será la comisión responsable de la sesión.
+                    <div class="pretty-block mb-4">
+                        <div class="section-title mb-3">
+                            <i class="fa-solid fa-people-group"></i>
+                            <span>1. Comisiones Responsables</span>
                         </div>
-                    </div>
 
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="comisionMixtaCheck" name="comisionMixta" value="1"
-                            onchange="toggleComisionMixta()" <?php if ($esMixta_val) echo 'checked'; ?>>
-                        <label class="form-check-label fw-semibold" for="comisionMixtaCheck">
-                            ¿Es Comisión Mixta/Conjunta?
-                        </label>
-                    </div>
-
-                    <div id="bloqueMixta" class="hidden-block border rounded p-3 mb-3 bg-light">
-                        <p class="fw-bold mb-2">Comisiones Adicionales:</p>
                         <div class="mb-3">
-                            <label for="comisionSelect2" class="form-label">
-                                Segunda Comisión <span class="text-danger">*</span>
+                            <label for="comisionSelect1" class="form-label">
+                                Comisión Principal <span class="asterisk">*</span>
                             </label>
-                            <select class="form-select" id="comisionSelect2" name="t_comision_idComision_mixta" onchange="toggleTerceraComision()">
-                                <option value="">Seleccione...</option>
+                            <select class="form-select form-select-md rounded-3" id="comisionSelect1" name="t_comision_idComision" required onchange="toggleComisionMixtaBlock()">
+                                <option value="">Cargando comisiones...</option>
                             </select>
-                            <small class="text-muted">Seleccione la segunda comisión participante.</small>
+                            <div class="hint mt-1">
+                                Seleccione la comisión responsable de la sesión.
+                            </div>
+                            <div id="errorComision1" class="invalid-feedback-custom"></div>
                         </div>
-                        <div id="bloqueTercera" class="hidden-block mb-2">
-                            <label for="comisionSelect3" class="form-label">Tercera Comisión (Opcional)</label>
-                            <select class="form-select" id="comisionSelect3" name="t_comision_idComision_mixta2">
-                                <option value="">Seleccione si aplica...</option>
-                            </select>
-                            <small class="text-muted">Seleccione si hay una tercera comisión.</small>
+
+                        <div id="opcionMixtaBlock" class="hidden-block pt-2">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="comisionMixtaCheck" name="comisionMixta" value="1"
+                                    onchange="toggleComisionMixta()" <?php if ($esMixta_val) echo 'checked'; ?>>
+                                <label class="form-check-label fw-semibold" for="comisionMixtaCheck">
+                                    ¿Es una reunión de Comisión Mixta/Conjunta?
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="bloqueMixta" class="hidden-block border rounded p-3 mt-3 bg-white">
+                            <p class="fw-bold mb-3">Comisiones Adicionales</p>
+                            
+                            <div class="mb-3">
+                                <label for="comisionSelect2" class="form-label">
+                                    Segunda Comisión <span class="asterisk">*</span>
+                                </label>
+                                <select class="form-select" id="comisionSelect2" name="t_comision_idComision_mixta" onchange="toggleTerceraComision(); validateComisiones();">
+                                    <option value="">Seleccione...</option>
+                                </select>
+                                <div class="hint">La segunda comisión participante. Debe ser distinta a la Principal.</div>
+                                <div id="errorComision2" class="invalid-feedback-custom"></div>
+                            </div>
+
+                            <div id="bloqueTercera" class="hidden-block mb-1">
+                                <label for="comisionSelect3" class="form-label">Tercera Comisión (Opcional)</label>
+                                <select class="form-select" id="comisionSelect3" name="t_comision_idComision_mixta2" onchange="validateComisiones()">
+                                    <option value="">Seleccione si aplica...</option>
+                                </select>
+                                <div class="hint">Seleccione si hay una tercera comisión participante.</div>
+                                <div id="errorComision3" class="invalid-feedback-custom"></div>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label for="nombreReunion" class="form-label">
-                            Nombre de la Reunión <span class="text-danger">*</span>
+                            2. Nombre de la Reunión <span class="asterisk">*</span>
                         </label>
                         <input type="text" class="form-control" id="nombreReunion" name="nombreReunion" required
                             value="<?php echo $nombre_val; ?>">
+                        <div class="hint">Título descriptivo para identificar rápidamente la sesión.</div>
                     </div>
-
                     <div class="pretty-block">
                         <div class="section-header-inline">
                             <div>
                                 <div class="section-title">
                                     <i class="fa-solid fa-clock"></i>
-                                    <span>Duración de la Reunión</span>
+                                    <span>3. Duración y Horario</span>
                                 </div>
                                 <div class="section-desc">
                                     <?php if (!$isEditMode): ?>
-                                        Se propone la hora actual como inicio y +1 hora como término. Puedes ajustar.
+                                        Se propone la hora actual como inicio y **+1 hora** como término. Puedes ajustar.
                                     <?php else: ?>
                                         Ajuste la fecha y hora de la reunión.
                                     <?php endif; ?>
@@ -222,18 +237,18 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                                 <div class="input-group">
                                     <input type="datetime-local" class="form-control" id="fechaTerminoReunion" name="fechaTerminoReunion" required
                                         value="<?php echo $termino_val; ?>">
-                                    <button class="btn btn-outline-secondary btn-plus" type="button" id="btnCopiarMasHora">
+                                    <button class="btn btn-outline-primary btn-plus" type="button" id="btnCopiarMasHora">
                                         +1 hr
                                     </button>
                                 </div>
-                                <div class="hint">Hora estimada de término. Usa <b>+1 hr</b> para autocompletar.</div>
+                                <div class="hint">Hora estimada de término. Usa **+1 hr** para autocompletar.</div>
                                 <div id="errorHorario" class="invalid-horario">
                                     La hora de término debe ser posterior al inicio.
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="d-flex justify-content-start gap-2 mt-3">
+                    <div class="d-flex justify-content-start gap-2 mt-4">
                         <button type="submit" class="btn btn-primary">
                             <?php echo $button_text; ?>
                         </button>
@@ -243,12 +258,27 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
             </div>
         </div>
     </div>
-
+    
     <script>
         let comisionesData = [];
-        // Pasamos las variables de PHP a JavaScript de forma segura
         const isEditMode = <?php echo json_encode($isEditMode); ?>;
         const editData = <?php echo json_encode($isEditMode ? $reunion_data : new stdClass()); ?>;
+
+        // Referencias a los selects
+        const com1 = document.getElementById('comisionSelect1');
+        const com2 = document.getElementById('comisionSelect2');
+        const com3 = document.getElementById('comisionSelect3');
+
+        // Referencias a los bloques
+        const opcionMixtaBlock = document.getElementById('opcionMixtaBlock');
+        const comisionMixtaCheck = document.getElementById('comisionMixtaCheck');
+        const bloqueMixta = document.getElementById('bloqueMixta');
+        const bloqueTercera = document.getElementById('bloqueTercera');
+        
+        // Referencias a errores
+        const errorComision1 = document.getElementById('errorComision1');
+        const errorComision2 = document.getElementById('errorComision2');
+        const errorComision3 = document.getElementById('errorComision3');
 
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -258,13 +288,15 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                 setDefaultsFromNow();
             }
             setupDateTimeLogic();
+            // Llama a la lógica inicial para edición o creación
+            toggleComisionMixtaBlock(); 
+            if (isEditMode) {
+                toggleComisionMixta();
+                toggleTerceraComision();
+            }
         });
 
         function fetchComisiones() {
-            const com1 = document.getElementById('comisionSelect1');
-            const com2 = document.getElementById('comisionSelect2');
-            const com3 = document.getElementById('comisionSelect3');
-
             fetch("/corevota/controllers/fetch_data.php?action=comisiones")
                 .then(res => res.ok ? res.json() : Promise.reject(res))
                 .then(response => {
@@ -274,19 +306,13 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                         populateSelect(com2, comisionesData, "Seleccione la segunda comisión...");
                         populateSelect(com3, comisionesData, "Seleccione si aplica...");
 
-                        // --- INICIO: Lógica de Edición ---
-                        // Si estamos en modo edición, seleccionamos los valores guardados
+                        // --- Lógica de Edición ---
                         if (isEditMode) {
                             com1.value = editData.t_comision_idComision || "";
                             com2.value = editData.t_comision_idComision_mixta || "";
                             com3.value = editData.t_comision_idComision_mixta2 || "";
-
-                            // Forzamos la actualización de la UI para mostrar/ocultar bloques
-                            toggleComisionMixta();
-                            toggleTerceraComision();
+                            validateComisiones(); // Valida al cargar en edición
                         }
-                        // --- FIN: Lógica de Edición ---
-
                     } else handleFetchError([com1, com2, com3]);
                 })
                 .catch(err => handleFetchError([com1, com2, com3]));
@@ -307,19 +333,31 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
             </option>`;
             });
         }
+        
+        // Función UX: Muestra el Checkbox de Mixta solo después de elegir Comisión 1
+        function toggleComisionMixtaBlock() {
+            if (com1.value) {
+                opcionMixtaBlock.style.display = 'block';
+                setTimeout(() => opcionMixtaBlock.classList.add('show'), 10);
+            } else {
+                opcionMixtaBlock.classList.remove('show');
+                bloqueMixta.classList.remove('show');
+                bloqueTercera.classList.remove('show');
+                comisionMixtaCheck.checked = false; // Desmarcar si no hay C1
+                setTimeout(() => {
+                    opcionMixtaBlock.style.display = 'none';
+                    bloqueMixta.style.display = 'none';
+                    bloqueTercera.style.display = 'none';
+                }, 300);
+            }
+            validateComisiones(); // Re-validar al cambiar C1
+        }
 
         function toggleComisionMixta() {
-            const check = document.getElementById('comisionMixtaCheck');
-            const bloqueMixta = document.getElementById('bloqueMixta');
-            const select2 = document.getElementById('comisionSelect2');
-            const bloqueTercera = document.getElementById('bloqueTercera');
-            const select3 = document.getElementById('comisionSelect3');
-
-            if (check.checked) {
+            if (comisionMixtaCheck.checked) {
                 bloqueMixta.style.display = 'block';
                 setTimeout(() => bloqueMixta.classList.add('show'), 10);
-                select2.required = true;
-                // No ocultamos la tercera comisión aquí, toggleTerceraComision() lo hará si es necesario
+                com2.required = true;
             } else {
                 bloqueMixta.classList.remove('show');
                 bloqueTercera.classList.remove('show'); // Ocultar tercera también
@@ -327,48 +365,89 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                     bloqueMixta.style.display = 'none';
                     bloqueTercera.style.display = 'none';
                 }, 300);
-                select2.required = false;
-                select3.required = false;
+                com2.required = false;
+                com3.required = false;
 
-                // Si no estamos editando, limpiamos los valores. Si estamos editando, los dejamos para JS.
-                if (!isEditMode) {
-                    select2.value = "";
-                    select3.value = "";
+                // Limpiar valores solo si no estamos editando (o si se desmarca)
+                if (!isEditMode || !comisionMixtaCheck.checked) {
+                    com2.value = "";
+                    com3.value = "";
                 }
             }
+            validateComisiones(); // Re-validar al activar/desactivar mixta
         }
 
         function toggleTerceraComision() {
-            const select2 = document.getElementById('comisionSelect2');
-            const bloqueTercera = document.getElementById('bloqueTercera');
-            const select3 = document.getElementById('comisionSelect3');
-
-            if (select2.value) {
+            if (com2.value) {
                 bloqueTercera.style.display = 'block';
                 setTimeout(() => bloqueTercera.classList.add('show'), 10);
             } else {
                 bloqueTercera.classList.remove('show');
                 setTimeout(() => bloqueTercera.style.display = 'none', 300);
-                if (!isEditMode) {
-                    select3.value = "";
+                com3.required = false;
+                
+                if (!isEditMode || !com2.value) {
+                    com3.value = "";
                 }
             }
         }
+        
+        // Función de VALIDACIÓN MEJORADA para Comisiones
+        function validateComisiones() {
+            let isValid = true;
+            const val1 = com1.value;
+            const val2 = com2.value;
+            const val3 = com3.value;
+            
+            // Limpiar errores previos
+            [com1, com2, com3].forEach(c => c.classList.remove('is-invalid'));
+            [errorComision1, errorComision2, errorComision3].forEach(e => {
+                e.style.display = 'none'; 
+                e.textContent = '';
+            });
 
-        // ====== LÓGICA FECHA/HORA ======
+            if (val2 && val2 === val1) {
+                showComisionError(com2, errorComision2, 'La Segunda Comisión no puede ser la misma que la Comisión Principal.');
+                isValid = false;
+            }
+
+            if (val3) {
+                if (val3 === val1) {
+                    showComisionError(com3, errorComision3, 'La Tercera Comisión no puede ser la misma que la Comisión Principal.');
+                    isValid = false;
+                }
+                if (val3 === val2) {
+                    showComisionError(com3, errorComision3, 'La Tercera Comisión debe ser distinta a la Segunda Comisión.');
+                    isValid = false;
+                }
+            }
+            
+            return isValid;
+        }
+        
+        function showComisionError(input, errorElement, message) {
+            input.classList.add('is-invalid');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+
+        // ====== LÓGICA FECHA/HORA (Mantenida y mejorada la validación) ======
         function formatLocalForInput(dateObj) {
             const pad = (n) => n.toString().padStart(2, '0');
             return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
         }
 
         function setDefaultsFromNow() {
-            // Esta función solo se llama si isEditMode es false
             const inicio = document.getElementById('fechaInicioReunion');
             const fin = document.getElementById('fechaTerminoReunion');
             const now = new Date();
+            // Redondea al minuto más cercano para evitar segundos
+            now.setSeconds(0);
+            now.setMilliseconds(0);
+            
             const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
 
-            // Solo establece si están vacíos (no debería ser necesario si isEditMode es false, pero es seguro)
             if (!inicio.value) inicio.value = formatLocalForInput(now);
             if (!fin.value) fin.value = formatLocalForInput(plus1h);
         }
@@ -390,28 +469,38 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
                 fin.classList.remove('is-invalid');
             }
 
-            function validar() {
+            function validarHorario() {
                 if (!inicio.value || !fin.value) return hideErr();
                 const ini = new Date(inicio.value);
                 const end = new Date(fin.value);
                 if (end <= ini) showErr();
                 else hideErr();
+                
+                return end > ini;
             }
 
             btn.addEventListener('click', () => {
-                if (!inicio.value) return;
+                if (!inicio.value) {
+                    alert('Por favor, defina primero la Fecha y Hora de Inicio.');
+                    return;
+                }
                 const ini = new Date(inicio.value);
                 fin.value = formatLocalForInput(new Date(ini.getTime() + 60 * 60 * 1000));
-                validar();
+                validarHorario();
             });
 
-            [inicio, fin].forEach(e => e.addEventListener('input', validar));
+            [inicio, fin].forEach(e => e.addEventListener('input', validarHorario));
 
             form.addEventListener('submit', e => {
-                validar(); // Ejecuta la validación una última vez
-                if (error.style.display === 'block') {
-                    e.preventDefault(); // Detiene el envío si hay error
-                    alert('La hora de término debe ser posterior a la hora de inicio.');
+                const isHorarioValid = validarHorario();
+                const isComisionesValid = validateComisiones();
+                
+                if (!isHorarioValid || !isComisionesValid) {
+                    e.preventDefault();
+                    // Opcional: Desplazarse al primer error
+                    if (!isComisionesValid) com1.focus();
+                    else if (!isHorarioValid) inicio.focus();
+                    alert('Por favor, corrija los errores en el formulario antes de guardar.');
                 }
             });
         }

@@ -91,10 +91,8 @@ $msg    = $_GET['msg'] ?? '';
 <body>
 <div class="card p-4 shadow-sm">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="mb-0">Listado de Usuarios</h2>
-        <a href="usuario_formulario.php?action=create" class="btn btn-success btn-sm">
-            Registrar Nuevo Usuario
-        </a>
+        <h2 class="mb-0">Usuarios Registrados</h2>
+
     </div>
 
     <!-- Buscador (sin botón Buscar) -->
