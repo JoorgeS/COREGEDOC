@@ -29,10 +29,13 @@ $comisionesDeLaReunion = []; // Para el <select> de votación
 // --- Variables para almacenar los nombres a mostrar en el encabezado ---
 $nombreComisionPrincipal = 'N/A';
 $nombrePresidentePrincipal = 'N/A';
+$idPresidentePrincipal = null; // ⭐ NUEVO: Guardar ID
 $nombreComisionMixta1 = null;
 $nombrePresidenteMixta1 = null;
+$idPresidenteMixta1 = null; // ⭐ NUEVO: Guardar ID
 $nombreComisionMixta2 = null;
 $nombrePresidenteMixta2 = null;
+$idPresidenteMixta2 = null; // ⭐ NUEVO: Guardar ID
 $all_commissions = []; // Array [idComision => ['nombreComision' => ..., 't_usuario_idPresidente' => ...]]
 $all_presidents = []; // Array [idUsuario => 'Nombre Apellido']
 
@@ -84,8 +87,9 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
     // --- 4. ASIGNAR NOMBRES PARA MOSTRAR EN EL ENCABEZADO ---
     $idComisionPrincipal = $minutaData['t_comision_idComision'];
-    // Usamos el presidente guardado en la minuta (que debería ser el de la com. principal al momento de crear)
-    $idPresidentePrincipal = $minutaData['t_usuario_idPresidente'];
+
+    // ⭐ CORRECCIÓN: Usamos el ID de presidente "en vivo" de la comisión, no el "congelado"
+    $idPresidentePrincipal = $all_commissions[$idComisionPrincipal]['t_usuario_idPresidente'] ?? null; // ⭐ CORRECCIÓN: Guardamos el ID
 
     // Buscar nombres usando los arrays cargados
     $nombreComisionPrincipal = $all_commissions[$idComisionPrincipal]['nombreComision'] ?? 'Comisión No Encontrada/Inválida';
@@ -104,7 +108,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
       if (isset($all_commissions[$idComisionMixta1])) {
         $nombreComisionMixta1 = $all_commissions[$idComisionMixta1]['nombreComision'];
         // Buscar el presidente oficial de ESTA comisión mixta
-        $idPresidenteMixta1 = $all_commissions[$idComisionMixta1]['t_usuario_idPresidente'] ?? null;
+        $idPresidenteMixta1 = $all_commissions[$idComisionMixta1]['t_usuario_idPresidente'] ?? null; // ⭐ CORRECCIÓN: Guardamos el ID
         $nombrePresidenteMixta1 = $idPresidenteMixta1 ? ($all_presidents[$idPresidenteMixta1] ?? 'Presidente No Asignado') : 'N/A';
 
         // --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
@@ -121,7 +125,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
       if (isset($all_commissions[$idComisionMixta2])) {
         $nombreComisionMixta2 = $all_commissions[$idComisionMixta2]['nombreComision'];
         // Buscar el presidente oficial de ESTA comisión mixta
-        $idPresidenteMixta2 = $all_commissions[$idComisionMixta2]['t_usuario_idPresidente'] ?? null;
+        $idPresidenteMixta2 = $all_commissions[$idComisionMixta2]['t_usuario_idPresidente'] ?? null; // ⭐ CORRECCIÓN: Guardamos el ID
         $nombrePresidenteMixta2 = $idPresidenteMixta2 ? ($all_presidents[$idPresidenteMixta2] ?? 'Presidente No Asignado') : 'N/A';
 
         // --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
@@ -160,9 +164,22 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
   die("❌ Error: No se especificó un ID de minuta válido para editar. <a href='menu.php?pagina=minutas_pendientes'>Volver al listado</a>");
 }
 
-// Variables PHP para pasar a JS
-$estadoMinuta = $minutaData['estadoMinuta'] ?? 'PENDIENTE'; // Si falla la carga, asumimos pendiente
-$jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? null);
+// ⭐ ================== INICIO BLOQUE MODIFICADO ==================
+// --- 4b. ⭐ NUEVO: Crear un array con TODOS los IDs de presidentes requeridos ---
+// (Usamos los IDs que ya encontramos más arriba: $idPresidentePrincipal, $idPresidenteMixta1, $idPresidenteMixta2)
+$listaPresidentesRequeridos = array_unique(array_filter([
+  $idPresidentePrincipal,
+  $idPresidenteMixta1,
+  $idPresidenteMixta2
+]));
+
+// --- Variables PHP para pasar a JS ---
+$estadoMinuta = $minutaData['estadoMinuta'] ?? 'PENDIENTE';
+
+// ⭐ CORREGIDO: Pasamos el array de IDs a JS
+// Usamos array_map('intval', ...) para asegurar que sean números [10, 15, 20] y no strings
+$jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidentesRequeridos));
+// ⭐ =================== FIN BLOQUE MODIFICADO ===================
 
 ?>
 <!DOCTYPE html>
@@ -283,27 +300,27 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
               <div class="col-md-6 ps-4">
                 <dl class="row mb-0">
-                  <?php if (!$nombreComisionMixta1 && !$nombreComisionMixta2): // Caso: Comisión Única 
+                  <?php if (!$nombreComisionMixta1 && !$nombreComisionMixta2) : // Caso: Comisión Única 
                   ?>
                     <dt class="col-sm-5 col-lg-4">Comisión:</dt>
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombreComisionPrincipal); ?></dd>
                     <dt class="col-sm-5 col-lg-4">Presidente:</dt>
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombrePresidentePrincipal); ?></dd>
-                  <?php else: // Caso: Comisión Mixta/Conjunta 
+                  <?php else : // Caso: Comisión Mixta/Conjunta 
                   ?>
                     <dt class="col-sm-5 col-lg-4">1° Comisión:</dt>
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombreComisionPrincipal); ?></dd>
                     <dt class="col-sm-5 col-lg-4">1° Presidente:</dt>
                     <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombrePresidentePrincipal); ?></dd>
 
-                    <?php if ($nombreComisionMixta1): ?>
+                    <?php if ($nombreComisionMixta1) : ?>
                       <dt class="col-sm-5 col-lg-4 mt-1">2° Comisión:</dt>
                       <dd class="col-sm-7 col-lg-8 mt-1"><?php echo htmlspecialchars($nombreComisionMixta1); ?></dd>
                       <dt class="col-sm-5 col-lg-4">2° Presidente:</dt>
                       <dd class="col-sm-7 col-lg-8"><?php echo htmlspecialchars($nombrePresidenteMixta1); ?></dd>
                     <?php endif; ?>
 
-                    <?php if ($nombreComisionMixta2): ?>
+                    <?php if ($nombreComisionMixta2) : ?>
                       <dt class="col-sm-5 col-lg-4 mt-1">3° Comisión:</dt>
                       <dd class="col-sm-7 col-lg-8 mt-1"><?php echo htmlspecialchars($nombreComisionMixta2); ?></dd>
                       <dt class="col-sm-5 col-lg-4">3° Presidente:</dt>
@@ -358,19 +375,19 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
                     <div class="mb-3">
                       <label for="votacionComisionId" class="form-label">Comisión *</label>
                       <select class="form-select" id="votacionComisionId" required>
-                        <?php if (count($comisionesDeLaReunion) === 0): ?>
+                        <?php if (count($comisionesDeLaReunion) === 0) : ?>
                           <option value="">-- No hay comisiones válidas --</option>
-                        <?php elseif (count($comisionesDeLaReunion) === 1):
+                        <?php elseif (count($comisionesDeLaReunion) === 1) :
                           // Si solo hay una, seleccionarla por defecto
                           $idCom = key($comisionesDeLaReunion);
                           $nombreCom = $comisionesDeLaReunion[$idCom];
                         ?>
                           <option value="<?php echo $idCom; ?>" selected><?php echo htmlspecialchars($nombreCom); ?></option>
-                        <?php else:
+                        <?php else :
                           // Si hay varias (mixta), dar a elegir
                         ?>
                           <option value="">-- Seleccione comisión (Mixta) --</option>
-                          <?php foreach ($comisionesDeLaReunion as $id => $nombre): ?>
+                          <?php foreach ($comisionesDeLaReunion as $id => $nombre) : ?>
                             <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($nombre); ?></option>
                           <?php endforeach; ?>
                         <?php endif; ?>
@@ -450,7 +467,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         <div class="d-flex justify-content-center gap-3 mt-4">
           <div class="text-end mt-3">
             <button type="button" class="btn btn-success fw-bold" onclick="guardarMinutaCompleta()">💾 Guardar Borrador</button>
-            <button type="button" class="btn btn-primary fw-bold ms-3" id="btnAprobarMinuta" onclick="aprobarMinuta(idMinutaGlobal)" style="display:none;">🔒 Firmar y Aprobar</button>
+            <button type="button" class="btn btn-primary fw-bold ms-3" id="btnAprobarMinuta" onclick="aprobarMinuta(idMinutaGlobal)" style="display:none;">Registrar mi firma
+            </button>
           </div>
         </div>
       </div>
@@ -540,10 +558,16 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     let contadorTemas = 0;
     const contenedorTemasGlobal = document.getElementById("contenedorTemas");
     let idMinutaGlobal = <?php echo json_encode($idMinutaActual); ?>;
-    const ID_USUARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? null); ?>;
-    // El presidente asignado a la minuta (para mostrar/ocultar botón aprobar)
-    const ID_PRESIDENTE_ASIGNADO = <?php echo $jsIdPresidenteAsignado; ?>;
+
+    // ⭐ ================== INICIO BLOQUE MODIFICADO ==================
+    // ⭐ CORREGIDO: Usamos el array de presidentes
+    const IDS_PRESIDENTES_REQUERIDOS = <?php echo $jsArrayPresidentesRequeridos; ?>; // Esto será un array [10, 15, 20]
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
+
+    // Forzamos el ID de usuario a ser un número para una comparación segura
+    const ID_USUARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ? intval($_SESSION['idUsuario']) : null); ?>;
+    // ⭐ =================== FIN BLOQUE MODIFICADO ===================
+
     // Asegurar que sean arrays, incluso si PHP devuelve null
     const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
     let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // 🟨 Sigue siendo array de strings
@@ -555,7 +579,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
       // --- Cargas iniciales ---
       cargarTablaAsistencia();
-      gestionarVisibilidadBotonAprobar();
+      gestionarVisibilidadBotonAprobar(); // ⭐ Llamamos a la función (que ahora está corregida)
       cargarOPrepararTemas();
       // ¡IMPORTANTE! El código para cargar/manejar adjuntos YA ESTÁ EN menu.php
       // Se ejecutará automáticamente porque los IDs del HTML ahora coinciden.
@@ -806,16 +830,29 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     }
 
     // --- Lógica ACCIONES FINALES (SIN CAMBIOS) ---
+
+    // ⭐ ================== INICIO BLOQUE MODIFICADO ==================
+    // (Línea ~1230)
     function gestionarVisibilidadBotonAprobar() {
-      // (Función sin cambios)
       const btn = document.getElementById('btnAprobarMinuta');
-      // Asegurarse que ID_PRESIDENTE_ASIGNADO no sea null antes de comparar
-      if (btn && idMinutaGlobal && ID_USUARIO_LOGUEADO && ID_PRESIDENTE_ASIGNADO !== null && ID_USUARIO_LOGUEADO == ID_PRESIDENTE_ASIGNADO && ESTADO_MINUTA_ACTUAL === 'PENDIENTE') {
+      if (!btn) return; // Salir si el botón no existe
+
+      // ⭐ LÓGICA CORREGIDA
+      // Comprobamos si el ID del usuario logueado está INCLUIDO en el array de presidentes requeridos
+      const esPresidenteRequerido = ID_USUARIO_LOGUEADO && IDS_PRESIDENTES_REQUERIDOS.includes(ID_USUARIO_LOGUEADO);
+
+      // El botón solo se muestra si:
+      // 1. La minuta está PENDIENTE o PARCIAL
+      // 2. Y el usuario logueado ES uno de los presidentes requeridos
+      if (idMinutaGlobal && (ESTADO_MINUTA_ACTUAL === 'PENDIENTE' || ESTADO_MINUTA_ACTUAL === 'PARCIAL') && esPresidenteRequerido) {
         btn.style.display = 'inline-block';
-      } else if (btn) {
+        // Como sugieres, cambiamos el texto para que sea más claro
+        btn.innerHTML = '🔒 Registrar Mi Firma';
+      } else {
         btn.style.display = 'none';
       }
     }
+    // ⭐ =================== FIN BLOQUE MODIFICADO ===================
 
     function guardarMinutaCompleta() {
       /* ... 🟨 CORREGIDO 🟨 ... */
@@ -1014,27 +1051,74 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         alert("Error: ID de minuta no válido.");
         return;
       }
-      if (!confirm("¿FIRMAR y APROBAR esta minuta? Esta acción es irreversible.")) return;
 
-      fetch("/corevota/controllers/aprobar_minuta.php", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            idMinuta: idMinuta
-          })
-        })
-        .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
-        .then(response => {
-          if (response.status === 'success') {
-            alert("✅ Minuta aprobada correctamente. Será redirigido al listado.");
-            window.location.href = 'menu.php?pagina=minutas_aprobadas'; // Redirigir a aprobadas
-          } else {
-            alert(`⚠️ Error al aprobar la minuta: ${response.message}`);
-          }
-        })
-        .catch(err => alert("Error de red al intentar aprobar la minuta:\n" + err.message));
+      // ⭐ MEJORA: Mostrar un Swal de confirmación más elegante
+      Swal.fire({
+        title: '¿Confirmar Firma?',
+        text: "Está a punto de firmar y aprobar esta minuta. Esta acción es irreversible.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, Firmar y Aprobar',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // Si confirma, procede con el fetch
+          Swal.fire({
+            title: 'Procesando Firma...',
+            text: 'Por favor espere.',
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+
+          fetch("/corevota/controllers/aprobar_minuta.php", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                idMinuta: idMinuta
+              })
+            })
+            .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
+            .then(response => {
+              // ⭐ MEJORA: Respuestas con Swal
+              if (response.status === 'success_final') {
+                Swal.fire(
+                  '¡Aprobada!',
+                  'Minuta aprobada y PDF generado con todas las firmas. Será redirigido.',
+                  'success'
+                ).then(() => {
+                  window.location.href = 'menu.php?pagina=minutas_aprobadas';
+                });
+              } else if (response.status === 'success_partial') {
+                Swal.fire(
+                  '¡Firma Registrada!',
+                  `${response.message} Será redirigido.`,
+                  'info'
+                ).then(() => {
+                  window.location.href = 'menu.php?pagina=minutas_pendientes'; // Redirigir a pendientes
+                });
+              } else {
+                Swal.fire(
+                  'Error',
+                  `Error al aprobar: ${response.message}`,
+                  'error'
+                );
+              }
+            })
+            .catch(err => {
+              Swal.fire(
+                'Error de Red',
+                `No se pudo conectar para aprobar: ${err.message}`,
+                'error'
+              );
+            });
+        }
+      });
     }
     // --- Lógica Mostrar/Ocultar Select Votación ---
     document.addEventListener('change', function(e) {
@@ -1085,21 +1169,21 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           let html = '<ul class="list-group">';
           data.data.forEach(v => {
             html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <span class="fw-bold">${v.nombreVotacion}</span>
-                                <small class="d-block text-muted">
-                                    Comisión: ${v.nombreComision} | Estado: 
-                                    ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
-                                </small>
-                            </div>
-                            <div>
-                                <button class="btn btn-warning btn-sm" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
-                                    <i class="fas fa-person-booth"></i> Registrar Voto
-                                </button>
-                            </div>
-                        </li>
-                    `;
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="fw-bold">${v.nombreVotacion}</span>
+                                            <small class="d-block text-muted">
+                                                Comisión: ${v.nombreComision} | Estado: 
+                                                ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
+                                            </small>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-warning btn-sm" title="Registrar votos manually" onclick="abrirModalVoto(${v.idVotacion})">
+                                                <i class="fas fa-person-booth"></i> Registrar Voto
+                                            </button>
+                                        </div>
+                                    </li>
+                                `;
           });
           html += '</ul>';
           cont.innerHTML = html;
@@ -1229,10 +1313,10 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             // No ha votado
             modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
             modalHtml += `<td class="text-center" style="white-space: nowrap;">
-            <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
-            <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
-            <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
-          </td>`;
+                            <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
+                            <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
+                            <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
+                        </td>`;
           }
           modalHtml += '</tr>';
         });

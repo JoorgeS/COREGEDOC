@@ -171,7 +171,7 @@ function renderPaginationListado($current, $pages) {
                                 <?php if ($estado === 'PENDIENTE'): ?>
                                     <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
                                     <?php if ($idUsuarioLogueado && (int)$idUsuarioLogueado === (int)$presidenteAsignado): ?>
-                                        <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">🔒 Firmar y Aprobar</button>
+                                        <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">Registrar mi Firma</button>
                                     <?php endif; ?>
                                 <?php elseif ($estado === 'APROBADA'): ?>
                                     <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Visualizar PDF</a>

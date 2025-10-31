@@ -1,7 +1,7 @@
 <?php
 // /corevota/controllers/aprobar_minuta.php
 header('Content-Type: application/json');
-error_reporting(E_ALL); // Mantener errores visibles por ahora
+error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -20,7 +20,8 @@ use Dompdf\Options;
 // 2. OBTENER DATOS DE ENTRADA Y SESIÓN
 $input_data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $input_data['idMinuta'] ?? null;
-$idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
+// ⭐ CORRECCIÓN: Forzar el ID de usuario a entero
+$idUsuarioLogueado = isset($_SESSION['idUsuario']) ? intval($_SESSION['idUsuario']) : null;
 $nombreUsuarioLogueado = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? 'N/A'));
 
 if (!$idMinuta || !$idUsuarioLogueado || !is_numeric($idMinuta)) {
@@ -29,7 +30,7 @@ if (!$idMinuta || !$idUsuarioLogueado || !is_numeric($idMinuta)) {
 }
 
 // -----------------------------------------------------------------------------
-// FUNCIÓN ImageToDataUrl (Se mantiene sin cambios, es robusta)
+// FUNCIÓN ImageToDataUrl (Se mantiene sin cambios)
 // -----------------------------------------------------------------------------
 function ImageToDataUrl(String $filename): String
 {
@@ -52,17 +53,17 @@ function ImageToDataUrl(String $filename): String
 
 
 // -----------------------------------------------------------------------------
-// FUNCIÓN PARA GENERAR HTML (AJUSTADA PARA EL LOGO GORE Y RECIBIR firmaImg)
+// FUNCIÓN PARA GENERAR HTML (AJUSTADA PARA MÚLTIPLES FIRMAS)
 // -----------------------------------------------------------------------------
-function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // <--- Añadido $firmaImgUri
+function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri)
 {
     // --- Preparar datos del encabezado ---
+    // (Esta sección se mantiene igual que tu original)
     $idMinuta = htmlspecialchars($data['minuta_info']['idMinuta'] ?? 'N/A');
     $fecha = htmlspecialchars(date('d-m-Y', strtotime($data['minuta_info']['fechaMinuta'] ?? 'now')));
     $hora = htmlspecialchars(date('H:i', strtotime($data['minuta_info']['horaMinuta'] ?? 'now')));
     $secretario = htmlspecialchars($data['secretario_info']['nombreCompleto'] ?? 'N/A');
 
-    // Comisiones y presidentes
     $com1 = $data['comisiones_info']['com1'] ?? null;
     $com2 = $data['comisiones_info']['com2'] ?? null;
     $com3 = $data['comisiones_info']['com3'] ?? null;
@@ -76,25 +77,15 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // 
 
     $esMixta = ($comision2_nombre || $comision3_nombre);
 
-    // Título de comisiones en header
     $tituloComisionesHeader = $comision1_nombre;
     if ($comision2_nombre) $tituloComisionesHeader .= " / " . $comision2_nombre;
     if ($comision3_nombre) $tituloComisionesHeader .= " / " . $comision3_nombre;
 
-    // Datos de firma (enviados desde PHP)
-    $firmaNombre  = htmlspecialchars($data['firma']['nombre'] ?? 'N/A');
-    $firmaFecha  = htmlspecialchars($data['firma']['fechaHora'] ?? '');
-    $firmaCorreo  = htmlspecialchars($data['firma']['correo'] ?? '');
-    $firmaCargo  = htmlspecialchars($data['firma']['cargo'] ?? '');
-    $firmaUnidad  = htmlspecialchars($data['firma']['unidad'] ?? '');
 
     // --- HTML ---
+    // (El CSS se mantiene igual que tu original, lo omito por brevedad)
     $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Minuta Aprobada ' . $idMinuta . '</title><style>' .
         'body{font-family:Helvetica,sans-serif;font-size:10pt;line-height:1.4;}' .
-        '.header{margin-bottom:20px;overflow:hidden;border-bottom:1px solid #ccc;padding-bottom:10px;}' .
-        '.logo-left{float:left; height: 80px; width: auto; margin-top:0px;}' . // <--- AJUSTADO ANCHO DEL LOGO GORE
-        '.logo-right{float:right;width:100px;height:auto;}' .
-        /* --- CSS PARA HEADER CON TABLA --- */
         '.header-table{width:100%; border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:20px; border-collapse: collapse;}' .
         '.header-table .logo-left-cell{width:110px; text-align:left; vertical-align:top;}' .
         '.header-table .logo-left-cell img{height: 80px; width: auto;}' .
@@ -103,7 +94,6 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // 
         '.header-table .header-center-cell .consejo{font-size:10pt;}' .
         '.header-table .logo-right-cell{width:110px; text-align:right; vertical-align:top;}' .
         '.header-table .logo-right-cell img{width:100px; height:auto;}' .
-        /* --- FIN CSS HEADER --- */
         '.titulo-minuta{text-align:center;font-weight:bold;font-size:12pt;margin:20px 0 15px 0;text-decoration:underline;}' .
         '.info-tabla{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:9pt;}' .
         '.info-tabla td{padding:4px 8px;border:1px solid #ccc;vertical-align:top;}' .
@@ -115,24 +105,22 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // 
         '.desarrollo-tema h4{font-size:10pt;font-weight:bold;margin:10px 0 3px 0;background-color:#f2f2f2;padding:3px 5px;border:1px solid #ddd;}' .
         '.desarrollo-tema div{margin:0 0 8px 5px;padding-left:5px;border-left:2px solid #eee;}' .
         '.desarrollo-tema strong{display:block;margin-bottom:2px;font-size:9pt;color:#555;}' .
-        '.signature-box{margin-top:40px;text-align:center;page-break-inside:avoid;}' .
-        '.signature-line{border-top:1px solid #000;width:50%;margin:20px auto 5px auto;}' .
-        // --- ESTILO DE .firma-chip (el contenedor) ---
-        '.firma-chip{font-size:9pt;color:#222; text-align:center; width:70%;margin:10px auto;border:1px dashed #aaa;padding:8px;border-radius:6px;' .
-        'position: relative; min-height: 100px; overflow: hidden;}' . // <--- Estilo base
+        '.signature-box-container{margin-top:40px;text-align:center;page-break-inside:avoid; clear:both;}' . // <-- Contenedor
+        '.firma-chip{font-size:9pt;color:#222; text-align:center; width:45%; margin: 10px 2.5%; border:1px dashed #aaa;padding:8px;border-radius:6px;' .
+        'position: relative; min-height: 100px; overflow: hidden; display: inline-block; float:left; page-break-inside:avoid;} ' . // <-- Ajustado
         '.votacion-block{page-break-inside:avoid; margin-bottom:15px; font-size:9pt;}' .
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
         '.votacion-detalle{columns:2;-webkit-columns:2;column-gap:20px;padding-left:20px;margin-top:5px;}' .
-        '</style></head><body>' .
+        '</style></head><body>';
 
-
-        // -----------------------------------------------------------------
-        // 🔽 CÓDIGO HTML DEL CONTENIDO DE LA MINUTA 🔽
-        // -----------------------------------------------------------------
-
-        '<table class="header-table"><tr>' .
+    // -----------------------------------------------------------------
+    // 🔽 CÓDIGO HTML DEL CONTENIDO (Omitido por brevedad, es igual) 🔽
+    // -----------------------------------------------------------------
+    // (Tu código de header-table, info-tabla, asistentes, tabla de sesión, desarrollo, votaciones va aquí... sin cambios)
+    // ... (código HTML idéntico al tuyo desde línea 133 hasta 291) ...
+    $html .= '<table class="header-table"><tr>' .
         '<td class="logo-left-cell">' . ($logoGoreUri ? '<img src="' . htmlspecialchars($logoGoreUri) . '" alt="Logo GORE">' : '') . '</td>' .
         '<td class="header-center-cell">' .
         '<p>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>' .
@@ -257,48 +245,53 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // 
 
 
     // -----------------------------------------------------------------------------
-    // BLOQUE DE FIRMA (Recibe firmaImgUri directamente)
+    // ⭐ NUEVO BLOQUE DE FIRMAS MÚLTIPLES ⭐
     // -----------------------------------------------------------------------------
-    $html .= '<div class="signature-box">';
+    $html .= '<div class="signature-box-container">';
 
-    // Contenedor .firma-chip con Flexbox para centrar el bloque de texto
-    $html .= '<div class="firma-chip">';
+    // --- Función interna para no repetir el "chip" de firma ---
+    $generarChipFirma = function ($nombre, $comision, $fechaHora, $firmaImgUri) {
+        $chipHtml = '<div class="firma-chip">';
 
-    // Imagen (sello) absoluta y centrada
-    if (!empty($firmaImgUri)) { // <--- Usa $firmaImgUri que ya es un data:uri
-        $html .= '<img src="' . $firmaImgUri . '" alt="Firma" ' .
-            'style="position: absolute; ' .
-            'top: 10px; left: 50%; margin-left: -50px; ' .
-            'width: 100px; height: auto; ' .
-            'opacity: 0.2; ' .
-            'z-index: 1;">'; // Detrás
-    } else {
-        // Mensaje de error visible en el PDF si la imagen falla
-        $html .= '<span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; color: #a00; font-size: 8pt; opacity: 0.3;">[SELLO NO ENCONTRADO]</span>';
+        // Sello de agua
+        if (!empty($firmaImgUri)) {
+            $chipHtml .= '<img src="' . $firmaImgUri . '" alt="Firma" ' .
+                'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
+        } else {
+            $chipHtml .= '<span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; color: #a00; font-size: 8pt; opacity: 0.3;">[SELLO NO ENCONTRADO]</span>';
+        }
+
+        // Texto de la firma
+        $chipHtml .= '<div style="position: relative; z-index: 2; font-size: 9pt; line-height: 1.3; display: inline-block; text-align: left;">' .
+            '<strong style="font-size: 10pt;">' . htmlspecialchars($nombre) . '</strong><br/>' .
+            'Presidente de Comisión<br/>' .
+            htmlspecialchars($comision) . '<br/>' .
+            'Consejo Regional<br/>' .
+            htmlspecialchars($fechaHora) . // Usamos la fecha de aprobación real
+            '</div>'; // Cierre div de texto
+
+        $chipHtml .= '</div>'; // Cierre firma-chip
+        return $chipHtml;
+    };
+    // --- Fin función interna ---
+
+    // Iteramos sobre las firmas reales obtenidas de la BD
+    if (!empty($data['firmas_aprobadas']) && is_array($data['firmas_aprobadas'])) {
+        foreach ($data['firmas_aprobadas'] as $firma) {
+            $html .= $generarChipFirma(
+                $firma['nombrePresidente'],
+                $firma['nombreComision'],
+                date('d-m-Y H:i:s', strtotime($firma['fechaAprobacion'])),
+                $firmaImgUri // Usamos el mismo sello para todos
+            );
+        }
     }
 
-    // Div del texto (centrado por flex) con texto alineado a la izquierda
-    $html .= '<div style="position: relative; z-index: 2; font-size: 9pt; line-height: 1.3; display: inline-block; text-align: left;">' .
+    $html .= '</div>'; // cierre signature-box-container
+    // -----------------------------------------------------------------------------
+    // ⭐ FIN NUEVO BLOQUE DE FIRMAS ⭐
+    // -----------------------------------------------------------------------------
 
-        // 1. Nombre
-        '<strong style="font-size: 10pt;">' . htmlspecialchars($presidente1_nombre) . '</strong><br/>' .
-
-        // 2. Cargo
-        htmlspecialchars($firmaCargo) . '<br/>' .
-
-        // 3. Comisión
-        htmlspecialchars($comision1_nombre) . '<br/>' .
-
-        // 4. Unidad
-        htmlspecialchars($firmaUnidad) . '<br/>' .
-
-        // 5. Fecha y hora
-        htmlspecialchars($firmaFecha) .
-
-        '</div>'; // Cierre del div de texto (z-index: 2)
-
-    $html .= '</div>'; // cierre firma-chip
-    $html .= '</div>'; // cierre signature-box
 
     $html .= '</body></html>';
     return $html;
@@ -306,7 +299,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri) // 
 
 
 /* =============================================================================
-    🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT 🔽
+    🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT (MODIFICADO) 🔽
 =============================================================================
 */
 
@@ -327,26 +320,17 @@ try {
         throw new Exception('No se encontró la minuta.');
     }
 
-    // --- 2. CARGAR INFO SECRETARIO Y FIRMA ---
+    // --- 2. CARGAR INFO SECRETARIO ---
+    // (Esto se mantiene, es solo para el encabezado del PDF)
     $idSecretario = $data_pdf['minuta_info']['t_usuario_idSecretario'] ?? $idUsuarioLogueado;
-
-    // 2a. Datos del Secretario que escribió la minuta
     $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto FROM t_usuario WHERE idUsuario = :idSec");
     $sqlSec->execute([':idSec' => $idSecretario]);
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
 
-    // 2b. Datos de FIRMA (El presidente que está logueado y aprobando)
-    // Se añade 'tipoUsuario_id as idTipoUsuario' para que la función HTML sepa qué sello cargar
-    $sqlFirma = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto, 'Presidente de Comisión' as cargo, 'Consejo Regional' as unidad, tipoUsuario_id as idTipoUsuario FROM t_usuario WHERE idUsuario = :idUser");
-    $sqlFirma->execute([':idUser' => $idUsuarioLogueado]);
-    $data_pdf['firma'] = $sqlFirma->fetch(PDO::FETCH_ASSOC);
-    $data_pdf['firma']['fechaHora'] = date('d-m-Y H:i:s'); // Firma ahora mismo
 
-    // --- 3. CARGAR COMISIONES Y PRESIDENTES (CORREGIDO PARA MIXTAS) ---
-    $idCom1 = $data_pdf['minuta_info']['t_comision_idComision'];
-    $idPres1 = $data_pdf['minuta_info']['t_usuario_idPresidente'];
+    // --- 3. CARGAR COMISIONES Y PRESIDENTES (CORREGIDO PARA OBTENER IDs) ---
 
-    // Función auxiliar para no repetir código
+    // ⭐ CAMBIO AQUÍ: La función ahora debe devolver también el ID del presidente
     $getDatosComision = function ($idComision) use ($pdo) {
         if (empty($idComision)) return null;
 
@@ -354,9 +338,9 @@ try {
         $sqlCom->execute([':id' => $idComision]);
         $comData = $sqlCom->fetch(PDO::FETCH_ASSOC);
 
-        if (!$comData) return ['nombre' => 'Comisión no encontrada', 'presidente' => 'N/A'];
+        if (!$comData) return ['nombre' => 'Comisión no encontrada', 'presidente' => 'N/A', 'idPresidente' => null];
 
-        $idPresidente = $comData['t_usuario_idPresidente'];
+        $idPresidente = $comData['t_usuario_idPresidente']; // <-- Obtenemos el ID oficial
         $nombrePresidente = 'Presidente no asignado';
 
         if (!empty($idPresidente)) {
@@ -367,38 +351,100 @@ try {
 
         return [
             'nombre' => $comData['nombreComision'],
-            'presidente' => $nombrePresidente
+            'presidente' => $nombrePresidente,
+            'idPresidente' => $idPresidente // <-- ⭐ Devolvemos el ID
         ];
     };
 
-    // 3a. Cargar Comisión Principal (Presidente de la minuta)
+    // 3a. Cargar Comisión Principal
+    $idCom1 = $data_pdf['minuta_info']['t_comision_idComision'];
+    $idPres1_minuta = $data_pdf['minuta_info']['t_usuario_idPresidente']; // Presidente guardado en la minuta
+
     $com1_data = $getDatosComision($idCom1);
-    // Sobreescribimos el presidente por el que quedó guardado en la minuta (por si cambió)
-    if (!empty($idPres1)) {
-        $sqlPres1 = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto FROM t_usuario WHERE idUsuario = :id");
-        $sqlPres1->execute([':id' => $idPres1]);
-        $com1_data['presidente'] = $sqlPres1->fetchColumn() ?: $com1_data['presidente'];
-    }
+
+
     $data_pdf['comisiones_info']['com1'] = $com1_data;
 
 
-    // 3b. Cargar Comisiones Mixtas (Presidentes oficiales de cada comisión)
+    // 3b. Cargar Comisiones Mixtas
     $sqlMixta = $pdo->prepare("SELECT t_comision_idComision_mixta, t_comision_idComision_mixta2 FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta");
     $sqlMixta->execute([':idMinuta' => $idMinuta]);
     $comisionesMixtas = $sqlMixta->fetch(PDO::FETCH_ASSOC);
 
+    $idPres2 = null;
+    $idPres3 = null;
+
     if ($comisionesMixtas) {
-        // Cargar Comisión 2 (Mixta)
         if (!empty($comisionesMixtas['t_comision_idComision_mixta'])) {
-            $data_pdf['comisiones_info']['com2'] = $getDatosComision($comisionesMixtas['t_comision_idComision_mixta']);
+            $com2_data = $getDatosComision($comisionesMixtas['t_comision_idComision_mixta']);
+            $data_pdf['comisiones_info']['com2'] = $com2_data;
+            $idPres2 = $com2_data['idPresidente']; // <-- ⭐ Guardamos ID Pres 2
         }
-        // Cargar Comisión 3 (Mixta)
         if (!empty($comisionesMixtas['t_comision_idComision_mixta2'])) {
-            $data_pdf['comisiones_info']['com3'] = $getDatosComision($comisionesMixtas['t_comision_idComision_mixta2']);
+            $com3_data = $getDatosComision($comisionesMixtas['t_comision_idComision_mixta2']);
+            $data_pdf['comisiones_info']['com3'] = $com3_data;
+            $idPres3 = $com3_data['idPresidente']; // <-- ⭐ Guardamos ID Pres 3
         }
     }
 
-    // --- 4. CARGAR ASISTENTES ---
+    // --- 4. LISTA DE PRESIDENTES REQUERIDOS ---
+    // --- 4. LISTA DE PRESIDENTES REQUERIDOS ---
+    $idPres1 = $com1_data['idPresidente'];
+
+    // ⭐ CORRECCIÓN: Forzar todos los IDs a enteros para una comparación segura
+    $presidentesRequeridos = array_map('intval', array_unique(array_filter([$idPres1, $idPres2, $idPres3])));
+
+    $totalRequeridos = count($presidentesRequeridos);
+
+    // (Opcional) Actualizar la minuta con el conteo correcto
+    $pdo->prepare("UPDATE t_minuta SET presidentesRequeridos = ? WHERE idMinuta = ?")->execute([$totalRequeridos, $idMinuta]);
+
+
+    // --- 5. VERIFICAR SI EL USUARIO LOGUEADO ES UN PRESIDENTE REQUERIDO ---
+    // Usamos una comparación estricta (true) ahora que ambos son enteros
+    if (!in_array($idUsuarioLogueado, $presidentesRequeridos, true)) {
+        throw new Exception('No tiene permisos para aprobar esta minuta. Solo los presidentes de las comisiones asociadas pueden hacerlo.');
+    }
+
+    // --- 6. REGISTRAR LA APROBACIÓN ACTUAL ---
+    // Usamos INSERT IGNORE para evitar errores si ya firmó
+    $sqlInsertFirma = "INSERT IGNORE INTO t_aprobacion_minuta (t_minuta_idMinuta, t_usuario_idPresidente, fechaAprobacion)
+                       VALUES (:idMinuta, :idUsuario, NOW())";
+    $stmtInsert = $pdo->prepare($sqlInsertFirma);
+    $stmtInsert->execute([
+        ':idMinuta' => $idMinuta,
+        ':idUsuario' => $idUsuarioLogueado
+    ]);
+
+    // --- 7. VERIFICAR SI YA SE COMPLETARON LAS APROBACIONES ---
+    $sqlCount = $pdo->prepare("SELECT COUNT(DISTINCT t_usuario_idPresidente) FROM t_aprobacion_minuta WHERE t_minuta_idMinuta = :idMinuta");
+    $sqlCount->execute([':idMinuta' => $idMinuta]);
+    $totalAprobaciones = (int)$sqlCount->fetchColumn();
+
+    if ($totalAprobaciones < $totalRequeridos) {
+        // --- AÚN FALTAN FIRMAS ---
+        // Actualizamos estado a PARCIAL y salimos
+        $sqlUpdParcial = "UPDATE t_minuta SET estadoMinuta = 'PARCIAL' WHERE idMinuta = :id";
+        $pdo->prepare($sqlUpdParcial)->execute([':id' => $idMinuta]);
+
+        $pdo->commit();
+        echo json_encode([
+            'status' => 'success_partial',
+            'message' => "Firma registrada. Faltan " . ($totalRequeridos - $totalAprobaciones) . " aprobación(es) más.",
+            'aprobadas' => $totalAprobaciones,
+            'requeridas' => $totalRequeridos
+        ]);
+        exit;
+    }
+
+    // =========================================================================
+    // SI LLEGAMOS AQUÍ, ES LA ÚLTIMA FIRMA. PROCEDEMOS A GENERAR EL PDF FINAL.
+    // =========================================================================
+
+    // --- 8. CARGAR DATOS PARA EL PDF (Asistentes, Temas, Votos) ---
+    // (Este bloque se mantiene igual que tu original)
+
+    // 8a. ASISTENTES
     $sqlAsis = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
                 FROM t_asistencia a
                 JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
@@ -408,7 +454,7 @@ try {
     $stmtAsis->execute([':id' => $idMinuta]);
     $data_pdf['asistentes'] = $stmtAsis->fetchAll(PDO::FETCH_ASSOC);
 
-    // --- 5. CARGAR TEMAS Y ACUERDOS ---
+    // 8b. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
                  FROM t_tema t 
                  LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
@@ -418,8 +464,8 @@ try {
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
-    // --- 6. CARGAR VOTACIONES ---
-    $data_pdf['votaciones'] = []; // Inicializar
+    // 8c. VOTACIONES
+    $data_pdf['votaciones'] = [];
     try {
         $sqlVotaciones = "SELECT idVotacion, nombreVotacion FROM t_votacion WHERE t_minuta_idMinuta = :idMinuta";
         $stmtVotaciones = $pdo->prepare($sqlVotaciones);
@@ -462,30 +508,44 @@ try {
         error_log("Error al cargar votaciones para PDF: " . $e->getMessage());
         $data_pdf['votaciones'] = [];
     }
-    // --- (FIN BLOQUE VOTACIONES) ---
 
-    // --- 7. DEFINIR LOGOS Y SELLO DE FIRMA COMO DATA URIS ---
+    // --- 9. ⭐ NUEVO: CARGAR FIRMAS PARA EL PDF ---
+    $sqlFirmasPDF = "SELECT 
+                        CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente, 
+                        c.nombreComision, 
+                        a.fechaAprobacion 
+                     FROM t_aprobacion_minuta a
+                     JOIN t_usuario u ON a.t_usuario_idPresidente = u.idUsuario
+                     -- Unir con t_comision para saber qué comisión preside
+                     LEFT JOIN t_comision c ON c.t_usuario_idPresidente = u.idUsuario
+                     WHERE a.t_minuta_idMinuta = :idMinuta
+                     GROUP BY u.idUsuario -- Agrupar por si un presidente preside varias comisiones de la minuta
+                     ORDER BY a.fechaAprobacion ASC";
+    $stmtFirmas = $pdo->prepare($sqlFirmasPDF);
+    $stmtFirmas->execute([':idMinuta' => $idMinuta]);
+    $data_pdf['firmas_aprobadas'] = $stmtFirmas->fetchAll(PDO::FETCH_ASSOC);
+
+
+    // --- 10. DEFINIR LOGOS Y SELLO DE FIRMA ---
     $logoGoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logo2.png');
     $logoCoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logoCore1.png');
 
-    $firmaFilename = ($data_pdf['firma']['idTipoUsuario'] ?? 1) == 1
-        ? 'firmadigital.png'
-        : 'aprobacion.png';
-    $firmaImgUri = ImageToDataUrl(ROOT_PATH . 'public/img/' . $firmaFilename); // <--- Generado aquí, con ROOT_PATH
+    // Usamos el sello 'aprobacion.png' genérico, ya que 'firmadigital.png' parece ser para Secretarios.
+    $firmaImgUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png');
 
-    // --- 8. GENERAR HTML (Ahora con el $firmaImgUri) ---
-    $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri, $firmaImgUri); // <--- Pasando el $firmaImgUri
+    // --- 11. GENERAR HTML (Ahora con el bloque de firmas múltiples) ---
+    $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri, $firmaImgUri);
 
-    // --- 9. INICIALIZAR DOMPDF Y RENDERIZAR ---
+    // --- 12. INICIALIZAR DOMPDF Y RENDERIZAR ---
     $options = new Options();
     $options->set('isHtml5ParserEnabled', true);
-    $options->set('isRemoteEnabled', true); // Para las imágenes
+    $options->set('isRemoteEnabled', true);
     $dompdf = new Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('letter', 'portrait');
     $dompdf->render();
 
-    // --- 10. GUARDAR PDF EN SERVIDOR ---
+    // --- 13. GUARDAR PDF EN SERVIDOR ---
     $pathDirectorio = ROOT_PATH . 'public/docs/minutas_aprobadas/';
     if (!file_exists($pathDirectorio)) {
         mkdir($pathDirectorio, 0775, true);
@@ -493,11 +553,11 @@ try {
     $nombreArchivo = "Minuta_Aprobada_N" . $idMinuta . "_" . date('Ymd_His') . ".pdf";
     $pathCompleto = $pathDirectorio . $nombreArchivo;
 
-    $pathParaBD = '/corevota/public/docs/minutas_aprobadas/' . $nombreArchivo; // Ruta relativa para la BD
+    $pathParaBD = '/corevota/public/docs/minutas_aprobadas/' . $nombreArchivo;
 
     file_put_contents($pathCompleto, $dompdf->output());
 
-    // --- 11. ACTUALIZAR MINUTA EN BD (CORREGIDO) ---
+    // --- 14. ACTUALIZAR MINUTA EN BD (Estado final) ---
     $sqlUpd = "UPDATE t_minuta SET 
                     estadoMinuta = 'APROBADA', 
                     pathArchivo = :pathArchivo, 
@@ -509,38 +569,15 @@ try {
         ':id' => $idMinuta
     ]);
 
-
-    // -----------------------------------------------------------------------------
-    // 11b. REGISTRAR FIRMA ELECTRÓNICA DIRECTAMENTE EN t_firma
-    // -----------------------------------------------------------------------------
-    $idTipoUsuario = $_SESSION['tipoUsuario_id'] ?? 1;
-
-    // Obtener comisión asociada
-    $stmtCom = $pdo->prepare("SELECT t_comision_idComision FROM t_minuta WHERE idMinuta = ?");
-    $stmtCom->execute([$idMinuta]);
-    $idComision = $stmtCom->fetchColumn();
-
-    if ($idComision) {
-        $sql_firma = "INSERT INTO t_firma (descFirma, idTipoUsuario, fechaGuardado, idUsuario, idComision)
-                       VALUES (:desc, :tipo, CURTIME(), :usuario, :comision)";
-        $stmt_firma = $pdo->prepare($sql_firma);
-        $stmt_firma->execute([
-            ':desc'     => 'Firma electrónica registrada al aprobar minuta ' . $idMinuta,
-            ':tipo'     => $idTipoUsuario,
-            ':usuario'  => $idUsuarioLogueado,
-            ':comision' => $idComision
-        ]);
-    }
-
-    // --- 12. COMMIT Y RESPUESTA EXITOSA ---
+    // --- 15. COMMIT Y RESPUESTA EXITOSA FINAL ---
     $pdo->commit();
-    echo json_encode(['status' => 'success', 'message' => 'Minuta aprobada y PDF generado.', 'pdf_path' => $pathParaBD]);
+    echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y PDF generado con todas las firmas.', 'pdf_path' => $pathParaBD]);
 } catch (Exception $e) {
-    // --- 13. ROLLBACK Y RESPUESTA DE ERROR ---
+    // --- 16. ROLLBACK Y RESPUESTA DE ERROR ---
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
     error_log("Error fatal al aprobar minuta: " . $e->getMessage() . " \nEn archivo: " . $e->getFile() . " \nEn línea: " . $e->getLine());
-    http_response_code(500); // Enviar un código de error real
+    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Error al procesar la aprobación: ' . $e->getMessage()]);
 }
