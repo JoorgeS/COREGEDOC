@@ -13,7 +13,7 @@ if (!isset($_SESSION['idUsuario'])) {
 }
 
 // Capturar la página a cargar
-$pagina = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
+$paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
 $id_param = $_GET['id'] ?? null; // Capturamos el ID también
 
 // --- Lógica para Saludo y Fecha ---
@@ -34,10 +34,63 @@ if ($horaActual < 12) {
 }
 
 // Obtiene la fecha actual en español
-// Asegúrate de que la localización 'es_ES' esté instalada en tu servidor
 setlocale(LC_TIME, 'es_ES.UTF-8', 'Spanish_Spain.1252');
-$fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre de 2025
+$fechaActual = strftime('%A, %d de %B de %Y');
 // --- Fin Lógica Saludo y Fecha ---
+
+
+/*
+============================================================
+/   MODIFICADO: LÓGICA PARA EL SIDEBAR ACTIVO
+============================================================
+*/
+// Define los grupos de páginas para el estado 'activo'
+$gruposPaginas = [
+    // La página principal 'home'
+    'home' => ['home'],
+    
+    // Todas las páginas que activarán el enlace 'Minutas'
+    'minutas' => [
+        'minutas_dashboard', 'minutas_pendientes', 'minutas_aprobadas', 
+        'crear_minuta', 'editar_minuta'
+    ],
+    
+    // Todas las páginas que activarán el enlace 'Usuarios'
+    'usuarios' => [
+        'usuarios_dashboard', 'usuarios_listado', 'usuario_crear'
+    ],
+    
+    // Todas las páginas que activarán el enlace 'Comisiones'
+    'comisiones' => [
+        'comisiones_dashboard', 'comision_listado', 'comision_crear', 
+        'comision_editar'
+    ],
+    
+    // Todas las páginas que activarán el enlace 'Reuniones'
+    'reuniones' => [
+        'reuniones_dashboard', 'reunion_listado', 'reunion_calendario', 
+        'reunion_autogestion_asistencia', 'historial_asistencia', 
+        'reunion_crear', 'reunion_editar'
+    ],
+    
+    // Todas las páginas que activarán el enlace 'Votaciones'
+    'votaciones' => [
+        'votaciones_dashboard', 'votacion_listado', 'historial_votacion', 
+        'voto_autogestion', 'crearVotacion', 'votacion_crear', 'tabla_votacion'
+    ]
+];
+
+/**
+ * Función helper para verificar si un enlace del menú debe estar activo.
+ * Compara la página actual con los grupos definidos.
+ */
+function esActivo($grupo, $paginaActual, $gruposPaginas) {
+    if (isset($gruposPaginas[$grupo])) {
+        return in_array($paginaActual, $gruposPaginas[$grupo]);
+    }
+    return false;
+}
+// --- FIN LÓGICA SIDEBAR ---
 
 ?>
 <!DOCTYPE html>
@@ -52,10 +105,11 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     <style>
-        /* ESTILOS (sin cambios respecto a tu versión anterior) */
         :root {
             --sidebar-width: 230px;
             --header-height: 65px;
+            /* MODIFICADO: Define el color azul del CORE */
+            --core-blue: #004a99; /* Este es un azul oscuro profesional, ajústalo al HEX exacto si lo tienes */
         }
 
         html,
@@ -97,69 +151,39 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             margin-bottom: 10px;
         }
 
-        /* Ajuste: Quitar cursor pointer si el botón ya no hace nada */
-        .nav-pills .btn-toggle {
-            color: #333;
-            font-weight: bold;
-            padding: 10px 15px;
+
+        /* ============================================================
+        /   MODIFICADO: NUEVOS ESTILOS PARA EL SIDEBAR SIMPLIFICADO
+        ============================================================
+        */
+        .sidebar .nav-link {
+            color: #333; /* Color de texto normal */
+            font-weight: 500; /* Un poco más grueso que el normal */
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 4px; /* Espacio entre ítems */
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            /* cursor: default; */
-            background: none;
-            border: none;
-            width: 100%;
-            text-align: left;
-            border-radius: 0;
-        }
-
-        .nav-pills .btn-toggle:hover,
-        .nav-pills .btn-toggle:focus {
-            background-color: transparent;
-            /* Quitar hover si ya no es clickeable */
-            outline: none;
-            box-shadow: none;
-        }
-
-        /* .toggle-icon { display: none; } */
-        /* Ocultar icono si se quita del HTML */
-        .btn-toggle-nav {
-            padding-left: 1.25rem;
-        }
-
-        .btn-toggle-nav a {
-            padding: 8px 15px;
-            color: #495057;
-            font-size: 0.9rem;
             text-decoration: none;
-            display: block;
-            border-radius: 4px;
-            margin-bottom: 2px;
         }
-
-        .btn-toggle-nav a:hover,
-        .btn-toggle-nav a.active {
-            color: #0d6efd;
-            background-color: #e7f1ff;
-        }
-
-        .btn-toggle-nav a i {
-            width: 20px;
+        .sidebar .nav-link i {
+            width: 25px; /* Ancho fijo para alinear iconos */
             text-align: center;
-            margin-right: 8px;
+            margin-right: 10px;
+            font-size: 0.9rem;
         }
 
-        .link-warning {
-            color: #ffc107 !important;
+        .sidebar .nav-link:hover {
+            background-color: #e7f1ff; /* Hover sutil (azul claro) */
+            color: var(--core-blue);
         }
 
-        .link-success {
-            color: #198754 !important;
+        .sidebar .nav-link.active {
+            background-color: var(--core-blue); /* Fondo azul oscuro cuando está activo */
+            color: #ffffff; /* Texto blanco cuando está activo */
         }
+        /* --- FIN NUEVOS ESTILOS SIDEBAR --- */
 
-        .link-danger {
-            color: #dc3545 !important;
-        }
 
         .sidebar-footer {
             padding: 15px;
@@ -167,6 +191,11 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             margin-top: auto;
         }
 
+
+        /* ============================================================
+        /   MODIFICADO: ESTILOS PARA EL HEADER (NAVBAR) AZUL
+        ============================================================
+        */
         .core-header {
             height: var(--header-height);
             width: calc(100% - var(--sidebar-width));
@@ -175,9 +204,60 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             top: 0;
             right: 0;
             z-index: 1020;
-            background-color: #ffffff;
+            background-color: var(--core-blue); /* Color azul de fondo */
+            color: #ffffff; /* Color de texto principal blanco */
             border-bottom: 1px solid #dee2e6;
             box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+        }
+
+        /* Ajustar colores del texto dentro del header */
+        .core-header .titulo-sistema {
+            color: #ffffff !important; /* Sobreescribir .text-muted */
+            font-weight: 500;
+        }
+        .core-header .perfil {
+            color: #e0e0e0; /* Un gris claro para el texto "Perfil:" */
+        }
+         .core-header .perfil strong {
+            color: #ffffff; /* Blanco para el nombre del perfil */
+         }
+        .core-header .usuario {
+            color: #ffffff; /* Blanco para el nombre de usuario */
+        }
+        .core-header .dropdown-toggle::after {
+            color: #ffffff; /* Flecha del dropdown blanca */
+        }
+        /* --- FIN ESTILOS HEADER --- */
+        
+        /* ============================================================
+        /   NUEVO: ESTILOS PARA DASHBOARD CARDS
+        ============================================================
+        */
+        .dashboard-card {
+            display: block;
+            padding: 2rem 1.5rem;
+            text-decoration: none;
+            color: #333;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, .075);
+            transition: all 0.2s ease-in-out;
+            text-align: center;
+            height: 100%;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, .15);
+            color: var(--core-blue);
+        }
+        .dashboard-card i {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--core-blue);
+        }
+        .dashboard-card h5 {
+            font-weight: 600;
         }
 
         main {
@@ -200,70 +280,49 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                 <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo">
             </div>
             <div class="flex-grow-1 overflow-auto">
-                <ul class="nav nav-pills flex-column mb-auto px-2">
-                    <li>
-                        <button class="btn btn-toggle align-items-center rounded w-100" data-bs-toggle="collapse" data-bs-target="#minutas-collapse" aria-expanded="true">
-                            <span class="d-flex align-items-center"><i class="fas fa-file-alt fa-fw me-2"></i>Minutas</span>
-                        </button>
-                        <div class="collapse show" id="minutas-collapse">
-                            <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
 
-                                <li><a href="menu.php?pagina=minutas_pendientes" class="link-warning d-block rounded py-1"><i class="fas fa-clock fa-fw me-2"></i>Minutas Pendientes</a></li>
-                                <li><a href="menu.php?pagina=minutas_aprobadas" class="link-success d-block rounded py-1"><i class="fas fa-check-circle fa-fw me-2"></i>Minutas Aprobadas</a></li>
-                            </ul>
-                        </div>
+            <ul class="nav nav-pills flex-column mb-auto px-2">
+                    
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=home" class="nav-link <?php echo esActivo('home', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-home fa-fw"></i>
+                            Inicio
+                        </a>
                     </li>
-                    <li>
-                        <button class="btn btn-toggle align-items-center rounded w-100" data-bs-toggle="collapse" data-bs-target="#usuarios-collapse" aria-expanded="true">
-                            <span class="d-flex align-items-center"><i class="fas fa-users fa-fw me-2"></i>Usuarios</span>
-                        </button>
-                        <div class="collapse show" id="usuarios-collapse">
-                            <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <li><a href="menu.php?pagina=usuarios_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
-                                <?php // <li><a href="menu.php?pagina=usuario_crear" class="link-dark d-block rounded py-1"><i class="fas fa-user-plus fa-fw me-2"></i>Registrar nuevo</a></li> 
-                                ?>
-                            </ul>
-                        </div>
-                    </li>
-                    <li>
-                        <button class="btn btn-toggle align-items-center rounded w-100" data-bs-toggle="collapse" data-bs-target="#comisiones-collapse" aria-expanded="true">
-                            <span class="d-flex align-items-center"><i class="fas fa-landmark fa-fw me-2"></i>Comisiones</span>
-                        </button>
-                        <div class="collapse show" id="comisiones-collapse">
-                            <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <?php // <li><a href="menu.php?pagina=comision_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Registrar nueva</a></li> 
-                                ?>
-                                <li><a href="menu.php?pagina=comision_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
-                            </ul>
-                        </div>
-                    </li>
-                    <li>
-                        <button class="btn btn-toggle align-items-center rounded w-100" data-bs-toggle="collapse" data-bs-target="#reuniones-collapse" aria-expanded="true">
-                            <span class="d-flex align-items-center"><i class="fas fa-calendar-check fa-fw me-2"></i>Reuniones</span>
-                        </button>
-                        <div class="collapse show" id="reuniones-collapse">
-                            <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <?php // <li><a href="menu.php?pagina=reunion_crear" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Crear Reunión</a></li> 
-                                ?>
-                                <li><a href="menu.php?pagina=reunion_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Listado</a></li>
-                                <li><a href="menu.php?pagina=reunion_calendario" class="link-dark d-block rounded py-1"><i class="fas fa-calendar-alt fa-fw me-2"></i>Vista Calendario</a></li>
-                                <li><a href="menu.php?pagina=reunion_autogestion_asistencia" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-hand-pointer fa-fw me-2"></i>Registrar Mi Asistencia</a></li>
 
-                                <li><a href="menu.php?pagina=historial_asistencia" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Asistencia</a></li>
-                            </ul>
-                        </div>
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-file-alt fa-fw"></i>
+                            Minutas
+                        </a>
                     </li>
-                    <li>
-                        <button class="btn btn-toggle align-items-center rounded w-100" data-bs-toggle="collapse" data-bs-target="#votaciones-collapse" aria-expanded="true">
-                            <span class="d-flex align-items-center"><i class="fas fa-list-check fa-fw me-2"></i>Votaciones</span>
-                        </button>
-                        <div class="collapse show" id="votaciones-collapse">
-                            <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <li><a href="menu.php?pagina=votacion_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
-                                <li><a href="menu.php?pagina=historial_votacion" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Votación</a></li>
-                                <li><a href="menu.php?pagina=voto_autogestion" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-check-to-slot fa-fw me-2"></i>Registrar Votación</a></li>
-                            </ul>
-                        </div>
+
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=usuarios_dashboard" class="nav-link <?php echo esActivo('usuarios', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-users fa-fw"></i>
+                            Usuarios
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=comisiones_dashboard" class="nav-link <?php echo esActivo('comisiones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-landmark fa-fw"></i>
+                            Comisiones
+                        </a>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=reuniones_dashboard" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-calendar-check fa-fw"></i>
+                            Reuniones
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a href="menu.php?pagina=votaciones_dashboard" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                            <i class="fas fa-list-check fa-fw"></i>
+                            Votaciones
+                        </a>
                     </li>
                 </ul>
             </div>
@@ -303,46 +362,34 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
 
         <main>
             <?php
-            // --- INICIO: Bloque para mostrar mensajes de sesión ---
-
-            // Obtener mensajes de sesión y luego limpiarlos
-            // session_start() ya está hecho al principio de menu.php
+            // --- Bloque para mostrar mensajes de sesión (SIN CAMBIOS) ---
             $success_msg = $_SESSION['success'] ?? null;
             $error_msg = $_SESSION['error'] ?? null;
-            unset($_SESSION['success'], $_SESSION['error']); // Limpiar ambos mensajes
-
-            // --- MODIFICADO: Script para activar modal en caso de éxito ---
+            unset($_SESSION['success'], $_SESSION['error']); 
             if ($success_msg): ?>
                 <script>
-                    // Esperar a que el DOM esté completamente cargado
                     document.addEventListener('DOMContentLoaded', function() {
-                        // Seleccionar el modal por su ID
                         var modalElement = document.getElementById('confirmacionModal');
                         if (modalElement) {
-                            // Crear una instancia del modal de Bootstrap
                             var successModal = new bootstrap.Modal(modalElement);
-                            // Establecer el mensaje de éxito en el cuerpo del modal
                             document.getElementById('confirmacionModalMessage').textContent = <?php echo json_encode($success_msg); ?>;
-                            // Mostrar el modal
                             successModal.show();
                         }
                     });
                 </script>
             <?php endif; ?>
-
-            <?php // Mantener la alerta de error en la página (los modales son malos para errores)
-            if ($error_msg): ?>
+            <?php if ($error_msg): ?>
                 <div class="alert alert-danger alert-dismissible fade show mx-3" role="alert">
                     <i class="fas fa-exclamation-triangle me-2"></i> <?php echo htmlspecialchars($error_msg); ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             <?php endif; ?>
-            <?php // --- FIN: Bloque para mostrar mensajes de sesión --- 
+            <?php // --- FIN Bloque mensajes --- 
             ?>
 
             <?php
-            // --- Mostrar Saludo, Fecha y Temperatura SÓLO en la página 'home' ---
-            if ($pagina === 'home') :
+            // --- Mostrar Saludo, Fecha y Temperatura SÓLO en la página 'home' (SIN CAMBIOS) ---
+            if ($paginaActual === 'home') :
             ?>
                 <div class="container-fluid mb-4">
                     <div class="row align-items-center">
@@ -359,16 +406,32 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             <?php
             endif;
             // --- Fin sección Saludo ---
+            ?>
 
+            <?php
             // --- Router para cargar el contenido de la página solicitada ---
             $base_path = __DIR__;
             $controllers_path = __DIR__ . '/../../controllers';
 
+            /* ============================================================
+            /   MODIFICADO: RUTAS DEL ROUTER (VERSIÓN FINAL)
+            ============================================================
+            */
+            // ¡ESTE BLOQUE HA SIDO ACTUALIZADO!
             $routes = [
+                // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
+                'home' => ['type' => 'view', 'file' => $base_path . '/home.php'],
+                'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'], // ¡NUEVA VISTA!
+                'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php'], // ¡NUEVA VISTA!
+                'comisiones_dashboard' => ['type' => 'view', 'file' => $base_path . '/comisiones_dashboard.php'], // ¡NUEVA VISTA!
+                'reuniones_dashboard' => ['type' => 'view', 'file' => $base_path . '/reuniones_dashboard.php'], // ¡NUEVA VISTA!
+                'votaciones_dashboard' => ['type' => 'view', 'file' => $base_path . '/votaciones_dashboard.php'], // ¡NUEVA VISTA!
+                
+                // --- VISTAS SECUNDARIAS (las que estaban antes, sin cambios) ---
                 'crear_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
                 'minutas_pendientes' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'PENDIENTE']],
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],
-                'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'], // Usa la misma vista
+                'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'], 
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php'],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create']],
                 'comision_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'list']],
@@ -379,24 +442,23 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                 'reunion_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'list']],
                 'reunion_calendario' => ['type' => 'view', 'file' => $base_path . '/reunion_calendario.php'],
                 'reunion_autogestion_asistencia' => ['type' => 'view', 'file' => $base_path . '/asistencia_autogestion.php'],
-
-                // AGREGADO: ruta para el historial de asistencia
                 'historial_asistencia' => ['type' => 'view', 'file' => $base_path . '/historial_asistencia.php'],
-                // FIN AGREGADO
-
                 'crearVotacion' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_crear' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_listado' => ['type' => 'view', 'file' => $base_path . '/votacion_listado.php'],
-
                 'historial_votacion' => ['type' => 'view', 'file' => $base_path . '/historial_votacion.php'],
                 'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php'],
                 'tabla_votacion' => ['type' => 'view', 'file' => $base_path . '/tablaVotacion.php'],
-                'perfil_usuario' => ['type' => 'view', 'file' => $base_path . '/perfil_usuario.php'],
-                'configuracion_vista' => ['type' => 'view', 'file' => $base_path . '/configuracion_vista.php'],
-                'home' => ['type' => 'view', 'file' => $base_path . '/home.php'] // Asegúrate que home.php existe
-            ];
 
-            $route = $routes[$pagina] ?? $routes['home'];
+                // --- VISTAS DE PERFIL Y CIERRE ---
+                'perfil_usuario' => ['type' => 'view', 'file' => $base_path . '/perfil_usuario.php'],
+                'configuracion_vista' => ['type' => 'view', 'file' => $base_path . '/configuracion_vista.php']
+            ];
+            // --- FIN BLOQUE ROUTER ACTUALIZADO ---
+
+
+            // --- Lógica del Router (SIN CAMBIOS) ---
+            $route = $routes[$paginaActual] ?? $routes['home'];
 
             if (!empty($route['params'])) {
                 foreach ($route['params'] as $key => $value) {
@@ -408,7 +470,6 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                     }
                 }
             }
-            // Asegurar que el ID llegue a las páginas que lo necesitan
             if ($id_param !== null) {
                 $_GET['id'] = $id_param;
             }
@@ -416,22 +477,15 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
             if (isset($route['file']) && file_exists($route['file'])) {
                 include $route['file'];
             } else {
-                // Si la página es 'home' y no existe el archivo home.php, no mostramos error, ya mostramos el saludo.
-                // Si es otra página, sí mostramos el error.
-                if ($pagina !== 'home') {
-                    echo "<div class='alert alert-danger m-3'>Error: El archivo para la página '<strong>" . htmlspecialchars($pagina) . "</strong>' no fue encontrado.</div>";
+                if ($paginaActual !== 'home') {
+                    echo "<div class='alert alert-danger m-3'>Error: El archivo para la página '<strong>" . htmlspecialchars($paginaActual) . "</strong>' no fue encontrado.</div>";
                 } elseif (!isset($route['file']) || !file_exists($route['file'])) {
-                    // Si es 'home' pero el archivo no existe, podrías querer mostrar un mensaje o simplemente nada más después del saludo.
-                    echo "<p>Contenido principal del home no encontrado.</p>"; // Opcional
+                    echo "<p>Contenido principal del home no encontrado.</p>"; 
                 }
             }
             // --- Fin Router ---
             ?>
         </main>
-
-
-
-
     </div>
 
     <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -509,10 +563,10 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
         }
 
         /*
-============================================================
-/   NUEVAS FUNCIONES PARA GESTIÓN DE ADJUNTOS
-============================================================
-*/
+        ============================================================
+        /   NUEVAS FUNCIONES PARA GESTIÓN DE ADJUNTOS
+        ============================================================
+        */
 
         /**
          * Carga la lista inicial de adjuntos al abrir la página de edición.
