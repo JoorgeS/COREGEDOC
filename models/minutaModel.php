@@ -14,53 +14,82 @@ class MinutaModel
 
     /**
      * READ: Obtiene minutas por estado con filtros opcionales y cuenta de adjuntos.
+     * - Estado calculado por pathArchivo (sin depender de columna estadoMinuta en BD).
+     * - Filtro "themeName" busca en t_tema.nombreTema O t_tema.objetivo.
+     * - Mantiene alias usados por las vistas.
      */
     public function getMinutasByEstado($estado, $startDate = null, $endDate = null, $themeName = null)
     {
-        // --- INICIO: AJUSTE CONSULTA SQL ---
-        $sql = "SELECT
-                    m.idMinuta AS idMinuta,
-                    m.t_usuario_idPresidente,
-                    m.estadoMinuta,
-                    m.pathArchivo,
-                    m.fechaMinuta,
-                    -- Usaremos IFNULL para devolver 'N/A' si no hay temas
-                    IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema SEPARATOR '<br>'), 'N/A') AS nombreTemas, 
-                    IFNULL(GROUP_CONCAT(DISTINCT t.objetivo SEPARATOR '<br>'), 'N/A') AS objetivos,
-                    COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos 
-                    
-                FROM t_minuta m
-                -- LEFT JOIN a t_tema para obtener nombres y objetivos
-                LEFT JOIN t_tema t ON t.t_minuta_idMinuta = m.idMinuta
-                -- LEFT JOIN a t_adjunto para contarlos
-                LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta 
-                
-                WHERE m.estadoMinuta = :estado";
-        // --- FIN: AJUSTE CONSULTA SQL ---
+        // Normalizamos estado
+        $estado = strtoupper(trim((string)$estado)) === 'APROBADA' ? 'APROBADA' : 'PENDIENTE';
 
-        $valores = ['estado' => $estado];
+        // SELECT con alias esperados por las vistas
+        $sql = "
+            SELECT
+                m.idMinuta AS idMinuta,
+                m.t_usuario_idPresidente,  -- se mantiene tal cual para no romper vistas
+                /* estadoMinuta calculado por pathArchivo para no depender de una columna inexistente */
+                CASE 
+                    WHEN COALESCE(m.pathArchivo,'') <> '' THEN 'APROBADA'
+                    ELSE 'PENDIENTE'
+                END AS estadoMinuta,
+                m.pathArchivo,
+                m.fechaMinuta,
 
-        if ($startDate) {
-            $sql .= " AND m.fechaMinuta >= :startDate";
+                /* Temas y objetivos agregados; si no hay, devolvemos 'N/A' */
+                IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
+                IFNULL(GROUP_CONCAT(DISTINCT t.objetivo   ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS objetivos,
+
+                /* Conteo de adjuntos reales */
+                COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos
+
+            FROM t_minuta m
+            /* LEFT JOIN para no perder minutas sin temas ni adjuntos */
+            LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
+            LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+            WHERE 1=1
+        ";
+
+        $valores = [];
+
+        // Filtro por estado usando pathArchivo
+        if ($estado === 'APROBADA') {
+            $sql .= " AND COALESCE(m.pathArchivo,'') <> '' ";
+        } else { // PENDIENTE
+            $sql .= " AND COALESCE(m.pathArchivo,'') = '' ";
+        }
+
+        // Filtros de fecha (incluye fin de día)
+        if (!empty($startDate)) {
+            $sql .= " AND m.fechaMinuta >= :startDate ";
             $valores['startDate'] = $startDate;
         }
-
-        if ($endDate) {
-            $sql .= " AND m.fechaMinuta <= :endDateWithTime";
-            $valores['endDateWithTime'] = $endDate . ' 23:59:59';
+        if (!empty($endDate)) {
+            $sql .= " AND m.fechaMinuta <= :endDate ";
+            $valores['endDate'] = $endDate . ' 23:59:59';
         }
 
-        // CORRECCIÓN FILTRO TEMA: Debe estar en HAVING porque filtra sobre GROUP_CONCAT
-        // PERO es más eficiente filtrar ANTES de agrupar si es posible.
-        // Lo dejamos en WHERE por ahora, podría necesitar ajuste si causa problemas con minutas sin temas.
+        // Filtro por palabra clave: busca en NOMBRE DEL TEMA O OBJETIVO
         if (!empty($themeName)) {
-            $sql .= " AND t.nombreTema LIKE :themeName"; // Filtra ANTES de agrupar
-            $valores['themeName'] = '%' . $themeName . '%';
+            $sql .= "
+                AND EXISTS (
+                    SELECT 1
+                    FROM t_tema tt
+                    WHERE tt.t_minuta_idMinuta = m.idMinuta
+                      AND (
+                           tt.nombreTema LIKE :kw
+                        OR tt.objetivo   LIKE :kw
+                      )
+                )
+            ";
+            $valores['kw'] = '%' . $themeName . '%';
         }
 
-        $sql .= " GROUP BY m.idMinuta
-                  ORDER BY m.fechaMinuta DESC, m.idMinuta DESC";
-
+        // Agrupación y orden
+        $sql .= "
+            GROUP BY m.idMinuta, m.t_usuario_idPresidente, m.pathArchivo, m.fechaMinuta
+            ORDER BY m.fechaMinuta DESC, m.idMinuta DESC
+        ";
 
         $result = $this->db_connector->consultarBD($sql, $valores);
 
@@ -69,24 +98,22 @@ class MinutaModel
             return [];
         }
 
-        // Asegurarse de que siempre sea un array
+        // Asegurarnos de devolver siempre un array
         $minutas = is_array($result) ? $result : [];
 
-        // --- INICIO: VERIFICACIÓN ADICIONAL ---
-        // Vamos a asegurarnos de que las claves esperadas existan en cada minuta
-        foreach ($minutas as &$minuta) { // Usamos '&' para modificar el array original
-            $minuta['nombreTemas'] = $minuta['nombreTemas'] ?? 'N/A';
-            $minuta['objetivos'] = $minuta['objetivos'] ?? 'N/A';
+        // Claves seguras para la vista
+        foreach ($minutas as &$minuta) {
+            $minuta['nombreTemas']   = $minuta['nombreTemas']   ?? 'N/A';
+            $minuta['objetivos']     = $minuta['objetivos']     ?? 'N/A';
             $minuta['totalAdjuntos'] = $minuta['totalAdjuntos'] ?? 0;
         }
-        unset($minuta); // Romper la referencia
-        // --- FIN: VERIFICACIÓN ADICIONAL ---
+        unset($minuta);
 
         return $minutas;
     } // Fin de getMinutasByEstado
 
 
-    // --- El resto de tus funciones (sin cambios) ---
+    // --- El resto de tus funciones (SIN CAMBIOS) ---
     public function getAllMinutas()
     {
         $sql = "SELECT idTema, t_minuta_idMinuta, nombreTema, objetivo, compromiso, observacion
@@ -113,12 +140,12 @@ class MinutaModel
                 compromiso = :compromiso, observacion = :observacion
                 WHERE idTema = :idTema";
         $valores = [
-            'nombreTema' => $data['nombreTema'],
-            'objetivo' => $data['objetivo'],
-            'compromiso' => $data['compromiso'],
+            'nombreTema'  => $data['nombreTema'],
+            'objetivo'    => $data['objetivo'],
+            'compromiso'  => $data['compromiso'],
             'observacion' => $data['observacion'],
-            'idTema' => (int)$id
+            'idTema'      => (int)$id
         ];
         return $this->db_connector->consultarBD($sql, $valores);
     }
-} // Fin de la clase MinutaModel
+}

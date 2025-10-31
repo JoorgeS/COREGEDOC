@@ -20,6 +20,11 @@ $asistencia_guardada_ids = [];
 $existeAsistenciaGuardada = false;
 $secretarioNombre = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? 'N/A')); // Nombre del usuario logueado
 
+// --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
+$idReunionActual = null;
+$comisionesDeLaReunion = []; // Para el <select> de votación
+// --- 🔼 FIN AÑADIDO 🔼 ---
+
 // --- Variables para almacenar los nombres a mostrar en el encabezado ---
 $nombreComisionPrincipal = 'N/A';
 $nombrePresidentePrincipal = 'N/A';
@@ -28,15 +33,15 @@ $nombrePresidenteMixta1 = null;
 $nombreComisionMixta2 = null;
 $nombrePresidenteMixta2 = null;
 $all_commissions = []; // Array [idComision => ['nombreComision' => ..., 't_usuario_idPresidente' => ...]]
-$all_presidents = [];  // Array [idUsuario => 'Nombre Apellido']
+$all_presidents = []; // Array [idUsuario => 'Nombre Apellido']
 
 // --- Solo intentar cargar si el ID es válido ---
 if ($idMinutaActual && is_numeric($idMinutaActual)) {
   try {
     // 1. Cargar datos de t_minuta (Comisión principal y su presidente asociado a la minuta)
     $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta 
-                       FROM t_minuta 
-                       WHERE idMinuta = :idMinutaActual";
+           FROM t_minuta 
+           WHERE idMinuta = :idMinutaActual";
     $stmt_minuta = $pdo->prepare($sql_minuta);
     $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
     $minutaData = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
@@ -47,12 +52,14 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     }
 
     // 2. Cargar datos de t_reunion (para obtener IDs de comisiones mixtas)
-    $sql_reunion = "SELECT t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2 
-                        FROM t_reunion 
-                        WHERE t_minuta_idMinuta = :idMinutaActual";
+    // 🟨 MODIFICADO 🟨
+    $sql_reunion = "SELECT idReunion, t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2 
+            FROM t_reunion 
+            WHERE t_minuta_idMinuta = :idMinutaActual";
     $stmt_reunion = $pdo->prepare($sql_reunion);
     $stmt_reunion->execute([':idMinutaActual' => $idMinutaActual]);
     $reunionData = $stmt_reunion->fetch(PDO::FETCH_ASSOC);
+    $idReunionActual = $reunionData['idReunion'] ?? null; // <-- Guardamos el ID de la reunión
     // $reunionData puede ser 'false' si no hay reunión asociada, aunque no debería pasar
 
     // 3. Cargar TODAS las comisiones vigentes y TODOS los posibles presidentes (Consejeros)
@@ -83,6 +90,13 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     $nombreComisionPrincipal = $all_commissions[$idComisionPrincipal]['nombreComision'] ?? 'Comisión No Encontrada/Inválida';
     $nombrePresidentePrincipal = $all_presidents[$idPresidentePrincipal] ?? 'Presidente No Encontrado/Inválido';
 
+    // --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
+    // Llenar el array de comisiones para el <select> de votación
+    if (isset($all_commissions[$idComisionPrincipal])) {
+      $comisionesDeLaReunion[$idComisionPrincipal] = $nombreComisionPrincipal;
+    }
+    // --- 🔼 FIN AÑADIDO 🔼 ---
+
     // Buscar nombres para comisiones mixtas (si existen en $reunionData)
     if ($reunionData && !empty($reunionData['t_comision_idComision_mixta'])) {
       $idComisionMixta1 = $reunionData['t_comision_idComision_mixta'];
@@ -91,6 +105,11 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         // Buscar el presidente oficial de ESTA comisión mixta
         $idPresidenteMixta1 = $all_commissions[$idComisionMixta1]['t_usuario_idPresidente'] ?? null;
         $nombrePresidenteMixta1 = $idPresidenteMixta1 ? ($all_presidents[$idPresidenteMixta1] ?? 'Presidente No Asignado') : 'N/A';
+
+        // --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
+        $comisionesDeLaReunion[$idComisionMixta1] = $nombreComisionMixta1;
+        // --- 🔼 FIN AÑADIDO 🔼 ---
+
       } else {
         $nombreComisionMixta1 = 'Comisión Mixta 1 No Encontrada/Inválida';
         $nombrePresidenteMixta1 = 'N/A';
@@ -103,6 +122,11 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         // Buscar el presidente oficial de ESTA comisión mixta
         $idPresidenteMixta2 = $all_commissions[$idComisionMixta2]['t_usuario_idPresidente'] ?? null;
         $nombrePresidenteMixta2 = $idPresidenteMixta2 ? ($all_presidents[$idPresidenteMixta2] ?? 'Presidente No Asignado') : 'N/A';
+
+        // --- 🔽 AÑADIDO PARA VOTACIONES 🔽 ---
+        $comisionesDeLaReunion[$idComisionMixta2] = $nombreComisionMixta2;
+        // --- 🔼 FIN AÑADIDO 🔼 ---
+
       } else {
         $nombreComisionMixta2 = 'Comisión Mixta 2 No Encontrada/Inválida';
         $nombrePresidenteMixta2 = 'N/A';
@@ -111,8 +135,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
     // 5. Cargar temas (sin cambios)
     $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+           FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+           WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
     $stmt_temas = $pdo->prepare($sql_temas);
     $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
     $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -121,7 +145,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     $sql_asistencia = "SELECT t_usuario_idUsuario FROM t_asistencia WHERE t_minuta_idMinuta = :idMinutaActual";
     $stmt_asistencia = $pdo->prepare($sql_asistencia);
     $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
-    $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
+    $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0); // Sigue siendo array de strings
     $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
   } catch (Exception $e) {
     error_log("Error cargando datos para edición (Minuta ID: {$idMinutaActual}): " . $e->getMessage());
@@ -150,6 +174,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
   <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="/corevota/public/css/style.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     /* Estilos específicos */
     /* Encabezado azul */
@@ -320,7 +345,69 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         </div>
       </div>
 
+      <div class="col-md-12 mt-2">
+        <div class="dropdown-form-block mb-3">
+          <button class="btn btn-info dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#votacionForm" aria-expanded="false" aria-controls="votacionForm">
+            <i class="fa-solid fa-check-to-slot me-2"></i> Gestión de Votaciones
+          </button>
+          <div class="collapse" id="votacionForm">
+            <div class="p-4 border rounded-bottom bg-white">
 
+              <div class="card shadow-sm mb-4">
+                <div class="card-header fw-bold">
+                  Crear Nueva Votación para esta Minuta
+                </div>
+                <div class="card-body">
+                  <form id="formCrearVotacionMinuta">
+                    <div class="mb-3">
+                      <label for="votacionComisionId" class="form-label">Comisión *</label>
+                      <select class="form-select" id="votacionComisionId" required>
+                        <?php if (count($comisionesDeLaReunion) === 0): ?>
+                          <option value="">-- No hay comisiones válidas --</option>
+                        <?php elseif (count($comisionesDeLaReunion) === 1):
+                          // Si solo hay una, seleccionarla por defecto
+                          $idCom = key($comisionesDeLaReunion);
+                          $nombreCom = $comisionesDeLaReunion[$idCom];
+                        ?>
+                          <option value="<?php echo $idCom; ?>" selected><?php echo htmlspecialchars($nombreCom); ?></option>
+                        <?php else:
+                          // Si hay varias (mixta), dar a elegir
+                        ?>
+                          <option value="">-- Seleccione comisión (Mixta) --</option>
+                          <?php foreach ($comisionesDeLaReunion as $id => $nombre): ?>
+                            <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($nombre); ?></option>
+                          <?php endforeach; ?>
+                        <?php endif; ?>
+                      </select>
+                    </div>
+                    <div class="mb-3">
+                      <label for="votacionNombre" class="form-label">Texto de la Votación (Adenda) *</label>
+                      <textarea class="form-control" id="votacionNombre" rows="2" placeholder="Ej: ¿Aprueba el presupuesto para TI?" required></textarea>
+                    </div>
+                    <div class="text-end">
+                      <button type="button" class="btn btn-primary" onclick="guardarNuevaVotacion()">
+                        <i class="fas fa-plus me-1"></i> Crear y Habilitar Votación
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="card shadow-sm">
+                <div class="card-header fw-bold">
+                  Votaciones de esta Reunión
+                </div>
+                <div class="card-body">
+                  <p class="text-muted small" id="votacionesStatus">Cargando votaciones...</p>
+                  <div id="listaVotacionesMinuta">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="col-12 mt-2">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold mb-0">DESARROLLO DE LA MINUTA</h5>
@@ -434,14 +521,15 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           <select class="form-select votacion-select" name="idVotacion[]" required>
             <option value="">Seleccione una votación...</option>
             <?php
-              require_once __DIR__ . '/../../controllers/VotacionController.php';
-              $vCtrl = new VotacionController();
-              $votaciones = $vCtrl->listar()['data'] ?? [];
-              foreach ($votaciones as $v) {
-                if ($v['habilitada'] == 1) {
-                  echo '<option value="' . $v['idVotacion'] . '">' . htmlspecialchars($v['nombreVotacion']) . '</option>';
-                }
+            // 🟨 MODIFICADO: Se movió el 'require_once' al inicio del archivo
+            // require_once __DIR__ . '/../../controllers/VotacionController.php'; 
+            $vCtrl = new VotacionController();
+            $votaciones = $vCtrl->listar()['data'] ?? [];
+            foreach ($votaciones as $v) {
+              if ($v['habilitada'] == 1) {
+                echo '<option value="' . $v['idVotacion'] . '">' . htmlspecialchars($v['nombreVotacion']) . '</option>';
               }
+            }
             ?>
           </select>
         </div>
@@ -463,7 +551,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
     // Asegurar que sean arrays, incluso si PHP devuelve null
     const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
-    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>;
+    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // 🟨 Sigue siendo array de strings
     let btnExportarExcelGlobal = null;
 
     // --- Evento Principal de Carga (Simplificado) ---
@@ -544,7 +632,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     }
 
     function guardarAsistencia() {
-      // (Función sin cambios)
+      // 🟨 MODIFICADO 🟨
       const {
         asistenciaIDs
       } = recolectarAsistencia();
@@ -579,7 +667,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           if (resp.status === "success") {
             status.textContent = "✅ Guardado";
             status.className = 'me-auto small text-success fw-bold';
-            ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String);
+            ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String); // <-- 🟨 IMPORTANTE: Actualiza la var global
 
             // Lógica de 'newMinutaId' ya no aplica aquí
             // if (resp.newMinutaId) { ... } // <- Se puede borrar este if
@@ -662,6 +750,16 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       nuevo.querySelectorAll('.collapse').forEach(el => {
         el.id = el.id.replace('_ID_', `_${contadorTemas}_`);
       });
+      nuevo.querySelectorAll('[for*="checkVotacion_"]').forEach(el => { // 🟨 CORREGIDO 🟨
+        el.htmlFor = `checkVotacion_${contadorTemas}`;
+      });
+      nuevo.querySelectorAll('[id*="checkVotacion_"]').forEach(el => { // 🟨 CORREGIDO 🟨
+        el.id = `checkVotacion_${contadorTemas}`;
+      });
+      nuevo.querySelectorAll('[id*="selectVotacion_"]').forEach(el => { // 🟨 CORREGIDO 🟨
+        el.id = `selectVotacion_${contadorTemas}`;
+      });
+
       const areas = nuevo.querySelectorAll('.editable-area');
       if (tema) {
         if (areas[0]) areas[0].innerHTML = tema.nombreTema || '';
@@ -697,6 +795,16 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         contadorTemas++;
         const h6 = b.querySelector('h6');
         if (h6) h6.innerText = `Tema ${contadorTemas}`;
+        // 🟨 CORRECCIÓN: IDs de votación también deben actualizarse
+        b.querySelectorAll('[for*="checkVotacion_"]').forEach(el => {
+          el.htmlFor = `checkVotacion_${contadorTemas}`;
+        });
+        b.querySelectorAll('[id*="checkVotacion_"]').forEach(el => {
+          el.id = `checkVotacion_${contadorTemas}`;
+        });
+        b.querySelectorAll('[id*="selectVotacion_"]').forEach(el => {
+          el.id = `selectVotacion_${contadorTemas}`;
+        });
         const btnEliminar = b.querySelector('.eliminar-tema');
         if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
       });
@@ -782,9 +890,9 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
 
       // --- DEBUG JAVASCRIPT: Mostrar lo que se va a enviar (excepto archivos) ---
       console.log('[DEBUG] Enviando datos (FormData):');
-      console.log('  idMinuta:', formData.get('idMinuta'));
-      console.log('  asistencia:', formData.get('asistencia'));
-      console.log('  temas:', formData.get('temas'));
+      console.log(' idMinuta:', formData.get('idMinuta'));
+      console.log(' asistencia:', formData.get('asistencia'));
+      console.log(' temas:', formData.get('temas'));
       // Ya no enviamos archivos ni enlace aquí
 
       fetch("/corevota/controllers/guardar_minuta_completa.php", {
@@ -794,7 +902,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         .then(res => {
           if (!res.ok) {
             // Si hay error HTTP (4xx, 5xx), intentar leer como texto
-            return res.text().then(text => { // <--- Falta una llave aquí
+            return res.text().then(text => { // <--- 🟨 CORRECCIÓN: Llave faltante
               console.error('[DEBUG] Respuesta no OK del servidor:', res.status, res.statusText, text);
               throw new Error(`Error del servidor (${res.status}): ${text || res.statusText}`);
             });
@@ -849,7 +957,8 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
           // El console.error ya estaba, lo dejamos
           console.error("Error fetch-guardar o json():", err);
         });
-    } // <- Asegúrate que esta llave de cierre final esté presente
+    } // <- 🟨 CORRECCIÓN: Llave de cierre que faltaba
+
     function cargarYMostrarAdjuntosExistentes() {
       if (!idMinutaGlobal) return; // No hacer nada si no hay ID de minuta
 
@@ -946,22 +1055,261 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         })
         .catch(err => alert("Error de red al intentar aprobar la minuta:\n" + err.message));
     }
-      // --- Lógica Mostrar/Ocultar Select Votación ---
-      document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('toggle-votacion')) {
-          const index = e.target.id.split('_')[1];
-          const selectDiv = document.getElementById('selectVotacion_' + index);
-          if (e.target.checked) {
-            selectDiv.style.display = 'block';
-          } else {
-            selectDiv.style.display = 'none';
-            const select = selectDiv.querySelector('select');
-            if (select) select.value = '';
-          }
+    // --- Lógica Mostrar/Ocultar Select Votación ---
+    document.addEventListener('change', function(e) {
+      if (e.target.classList.contains('toggle-votacion')) {
+        const index = e.target.id.split('_')[1];
+        const selectDiv = document.getElementById('selectVotacion_' + index);
+        if (e.target.checked) {
+          selectDiv.style.display = 'block';
+        } else {
+          selectDiv.style.display = 'none';
+          const select = selectDiv.querySelector('select');
+          if (select) select.value = '';
+        }
+      }
+    });
+
+
+    // --- 🔽🔽 INICIO CÓDIGO VOTACIONES (CORREGIDO) 🔽🔽 ---
+
+    // --- Variables Globales para Votación ---
+    const ID_REUNION_GLOBAL = <?php echo json_encode($idReunionActual); ?>;
+    const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? null); ?>;
+    // NO se declara 'LISTA_ASISTENTES_MINUTA' porque ya existe la variable global 'ASISTENCIA_GUARDADA_IDS'
+
+    // --- Carga Inicial ---
+    document.addEventListener("DOMContentLoaded", () => {
+      cargarVotacionesDeLaMinuta();
+    });
+
+    /**
+     * Carga la lista de votaciones ya creadas para esta minuta.
+     */
+    async function cargarVotacionesDeLaMinuta() {
+      const cont = document.getElementById('listaVotacionesMinuta');
+      const status = document.getElementById('votacionesStatus');
+      if (!cont || !status) return;
+
+      cont.innerHTML = '';
+      status.textContent = 'Cargando...';
+
+      try {
+        const resp = await fetch(`/corevota/controllers/gestionar_votacion_minuta.php?action=list&idMinuta=${idMinutaGlobal}`);
+        const data = await resp.json();
+
+        if (data.status === 'success' && data.data.length > 0) {
+          status.textContent = `Mostrando ${data.data.length} votacion(es).`;
+          let html = '<ul class="list-group">';
+          data.data.forEach(v => {
+            html += `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <span class="fw-bold">${v.nombreVotacion}</span>
+                <small class="d-block text-muted">
+                  Comisión: ${v.nombreComision} | Estado: 
+                  ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
+                </small>
+              </div>
+              <div>
+                <button class="btn btn-warning btn-sm" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
+                  <i class="fas fa-person-booth"></i> Registrar Voto
+                </button>
+              </div>
+            </li>
+          `;
+          });
+          html += '</ul>';
+          cont.innerHTML = html;
+        } else {
+          status.textContent = 'No hay votaciones creadas para esta minuta.';
+        }
+      } catch (err) {
+        console.error("Error cargando votaciones:", err);
+        status.textContent = 'Error al cargar votaciones.';
+        status.className = 'text-danger small';
+      }
+    }
+
+    /**
+     * Llama al controlador para guardar la nueva votación.
+     */
+    async function guardarNuevaVotacion() {
+      const idComision = document.getElementById('votacionComisionId').value;
+      const nombreVotacion = document.getElementById('votacionNombre').value.trim();
+      const btn = document.querySelector('#formCrearVotacionMinuta button');
+
+      if (!idComision || !nombreVotacion) {
+        Swal.fire('Campos incompletos', 'Debe seleccionar una comisión y escribir el texto de la votación.', 'warning');
+        return;
+      }
+      if (!idMinutaGlobal || !ID_REUNION_GLOBAL) {
+        Swal.fire('Error de Sistema', 'No se pudo encontrar el ID de la Minuta o Reunión. Recargue la página.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+      const formData = new FormData();
+      formData.append('action', 'create');
+      formData.append('idMinuta', idMinutaGlobal);
+      formData.append('idReunion', ID_REUNION_GLOBAL);
+      formData.append('idComision', idComision);
+      formData.append('nombreVotacion', nombreVotacion);
+
+      try {
+        const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await resp.json();
+
+        if (data.status === 'success') {
+          Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
+          document.getElementById('votacionNombre').value = ''; // Limpiar
+          cargarVotacionesDeLaMinuta(); // Recargar la lista
+        } else {
+          Swal.fire('Error', 'No se pudo crear la votación: ' + data.message, 'error');
+        }
+
+      } catch (err) {
+        console.error("Error fetch guardar votacion:", err);
+        Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
+    }
+
+
+    /**
+     * Abre el modal para que el secretario registre votos manualmente.
+     */
+    async function abrirModalVoto(idVotacion) {
+      // 🟨 CORRECCIÓN: Usar la variable global 'ASISTENCIA_GUARDADA_IDS'
+      if (ASISTENCIA_GUARDADA_IDS.length === 0) {
+        Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
+        return;
+      }
+
+      // 1. Mostrar modal de carga
+      Swal.fire({
+        title: 'Cargando Estado de Votación...',
+        text: 'Buscando asistentes y votos...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
         }
       });
 
+      // 2. Buscar datos (Asistentes y Votos)
+      try {
+        const formData = new FormData();
+        formData.append('action', 'get_status');
+        formData.append('idVotacion', idVotacion);
+        // 🟨 CORRECCIÓN: Enviar los IDs de los asistentes presentes
+        formData.append('asistentes_ids', JSON.stringify(ASISTENCIA_GUARDADA_IDS));
 
+        const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await resp.json();
+
+        if (data.status !== 'success') {
+          throw new Error(data.message);
+        }
+
+        // 3. Construir el HTML del Modal
+        let modalHtml = '<div class="container-fluid" style="text-align: left;">';
+        modalHtml += '<p class="text-muted">Seleccione el voto para cada asistente que no haya votado.</p>';
+        modalHtml += '<table class="table table-sm table-hover">';
+        modalHtml += '<thead><tr><th>Asistente</th><th class="text-center">Voto Registrado</th><th class="text-center">Registrar Voto</th></tr></thead><tbody>';
+
+        data.data.asistentes.forEach(asistente => {
+          const voto = data.data.votos[asistente.idUsuario] || null;
+          modalHtml += `<tr><td>${asistente.nombreCompleto}</td>`;
+
+          if (voto) {
+            // Ya votó
+            let badge = 'secondary';
+            if (voto.opcionVoto === 'SI') badge = 'success';
+            if (voto.opcionVoto === 'NO') badge = 'danger';
+            modalHtml += `<td class="text-center"><span class="badge bg-${badge}">${voto.opcionVoto}</span></td>`;
+            modalHtml += `<td></td>`; // Sin acciones
+          } else {
+            // No ha votado
+            modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
+            modalHtml += `<td class="text-center" style="white-space: nowrap;">
+            <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
+            <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
+            <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
+          </td>`;
+          }
+          modalHtml += '</tr>';
+        });
+        modalHtml += '</tbody></table></div>';
+
+        Swal.fire({
+          title: 'Cargando Estado de Votación...',
+          text: 'Buscando asistentes y votos...',
+          allowOutsideClick: false,
+          didOpen: () => {
+            Swal.showLoading();
+          }
+        });
+
+      } catch (err) {
+        Swal.fire('Error', 'No se pudo cargar el estado de la votación: ' + err.message, 'error');
+      }
+    }
+
+    /**
+     * Es llamado por los botones [SÍ] [NO] [ABS] en el modal del secretario.
+     */
+    async function registrarVotoSecretario(idVotacion, idUsuarioVotante, opcionVoto, btn) {
+
+      const fila = btn.closest('tr');
+      const celdaAccion = btn.parentElement;
+      celdaAccion.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+      const formData = new FormData();
+      formData.append('action', 'register_vote');
+      formData.append('idVotacion', idVotacion);
+      formData.append('idUsuario', idUsuarioVotante); // El usuario por el que se vota
+      formData.append('opcionVoto', opcionVoto);
+      formData.append('idUsuarioRegistra', ID_SECRETARIO_LOGUEADO); // El secretario
+
+      try {
+        const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await resp.json();
+
+        if (data.status === 'success') {
+          // Actualizar la fila en el modal
+          let badge = 'secondary';
+          if (opcionVoto === 'SI') badge = 'success';
+          Click
+          if (opcionVoto === 'NO') badge = 'danger';
+
+          const celdaVoto = fila.querySelector('td:nth-child(2)');
+          celdaVoto.innerHTML = `<span class="badge bg-${badge}">${opcionVoto}</span>`;
+          celdaAccion.innerHTML = '<span class="text-success fw-bold">Guardado</span>';
+        } else {
+          Swal.fire('Error', 'No se pudo registrar el voto: ' + data.message, 'error');
+          celdaAccion.innerHTML = '<span class="text-danger fw-bold">Error</span>';
+          // Re-habilitar botones si falla (opcional)
+        }
+      } catch (err) {
+        Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
+        celdaAccion.innerHTML = '<span class="text-danger fw-bold">Error</span>';
+      }
+    }
+
+    // --- 🔼🔼 FIN CÓDIGO VOTACIONES 🔼🔼 ---
   </script>
 
 </body>

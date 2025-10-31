@@ -12,18 +12,85 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
 
 // Usar fechas de la URL si existen, si no, usar mes actual
 $currentStartDate = $_GET['startDate'] ?? date('Y-m-01');
-$currentEndDate = $_GET['endDate'] ?? date('Y-m-d');
+$currentEndDate   = $_GET['endDate']   ?? date('Y-m-d');
 
-// Mantener filtro de tema si existe
+// Palabra clave (para buscar en Tema y Objetivo)
 $currentThemeName = $_GET['themeName'] ?? '';
+
+// ---------- PREFILTRO: buscar en Tema y Objetivo (vista) ----------
+$minutasFiltradas = $minutas;
+
+// Normalizador robusto (quita <br>, tags, decodifica entidades y pasa a minúsculas)
+$__normalize = function ($s) {
+    $s = (string)$s;
+    $s = preg_replace('/<br\s*\/?>/i', ' ', $s);
+    $s = strip_tags($s);
+    $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $s = mb_strtolower($s, 'UTF-8');
+    $s = trim($s);
+    if (in_array($s, ['n/a', 'na', '-'], true)) $s = '';
+    return $s;
+};
+
+if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
+    $needle = mb_strtolower(trim($currentThemeName), 'UTF-8');
+
+    // claves posibles para tema y objetivo (por si cambian los alias en otra parte)
+    $temaKeys = ['nombreTemas', 'nombreTema', 'temas', 'tema'];
+    $objKeys  = ['objetivos', 'objetivo', 'objetivosTexto'];
+
+    $minutasFiltradas = array_values(array_filter($minutasFiltradas, function ($m) use ($needle, $__normalize, $temaKeys, $objKeys) {
+        $temas = '';
+        foreach ($temaKeys as $k) {
+            if (isset($m[$k]) && $m[$k] !== null && $m[$k] !== '') {
+                $temas .= ' ' . $m[$k];
+            }
+        }
+        $objs = '';
+        foreach ($objKeys as $k) {
+            if (isset($m[$k]) && $m[$k] !== null && $m[$k] !== '') {
+                $objs .= ' ' . $m[$k];
+            }
+        }
+
+        $temasNorm = $__normalize($temas);
+        $objsNorm  = $__normalize($objs);
+
+        // Coincide si aparece en Tema o en Objetivo
+        return (mb_stripos($temasNorm, $needle, 0, 'UTF-8') !== false) ||
+               (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
+    }));
+}
+
+// ---------- Paginación en la vista ----------
+$perPage  = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
+$page     = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$offset   = ($page - 1) * $perPage;
+$total    = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
+$pages    = max(1, (int)ceil(($total ?: 1) / $perPage));
+$minutasPage = array_slice($minutasFiltradas ?? [], $offset, $perPage);
+
+// Helper paginación
+function renderPaginationListado($current, $pages) {
+    if ($pages <= 1) return;
+    echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm">';
+    for ($i = 1; $i <= $pages; $i++) {
+        $active = ($i === $current) ? ' active' : '';
+        $qsArr  = $_GET;
+        $qsArr['p'] = $i;
+        $qs = http_build_query($qsArr);
+        echo '<li class="page-item'.$active.'"><a class="page-link" href="?'.$qs.'">'.$i.'</a></li>';
+    }
+    echo '</ul></nav>';
+}
 ?>
 
 <div class="container-fluid mt-4">
-    <h3 class="mb-3"><?php echo $pageTitle; ?></h3>
+    <h3 class="mb-3"><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
 
     <form method="GET" class="mb-4 p-3 border rounded bg-light">
-        <input type="hidden" name="pagina" value="<?php echo $paginaForm; ?>">
-        <input type="hidden" name="estado" value="<?php echo $estadoActual; ?>">
+        <input type="hidden" name="pagina" value="<?php echo htmlspecialchars($paginaForm, ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="estado" value="<?php echo htmlspecialchars($estadoActual, ENT_QUOTES, 'UTF-8'); ?>">
         <div class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label for="startDate" class="form-label">Fecha Creación Desde:</label>
@@ -33,10 +100,23 @@ $currentThemeName = $_GET['themeName'] ?? '';
                 <label for="endDate" class="form-label">Fecha Creación Hasta:</label>
                 <input type="date" class="form-control form-control-sm" id="endDate" name="endDate" value="<?php echo htmlspecialchars($currentEndDate ?? ''); ?>">
             </div>
+
             <div class="col-md-4">
-                <label for="themeName" class="form-label">Nombre del Tema:</label>
-                <input type="text" class="form-control form-control-sm" id="themeName" name="themeName" placeholder="Buscar por tema..." value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
+                <?php if ($estadoActual === 'APROBADA'): ?>
+                    <label for="themeName" class="form-label">Buscar por palabra clave</label>
+                    <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        id="themeName"
+                        name="themeName"
+                        placeholder="Busca en “Nombre(s) del Tema” u “Objetivo(s)”…"
+                        value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
+                <?php else: ?>
+                    <!-- En PENDIENTES: oculto para no cambiar flujo -->
+                    <input type="hidden" id="themeName" name="themeName" value="">
+                <?php endif; ?>
             </div>
+
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
             </div>
@@ -51,29 +131,27 @@ $currentThemeName = $_GET['themeName'] ?? '';
                     <th scope="col">Nombre(s) del Tema</th>
                     <th scope="col">Objetivo(s)</th>
                     <th scope="col">Fecha Creación</th>
-                    <th scope="col" class="text-center">Adjuntos</th> 
+                    <th scope="col" class="text-center">Adjuntos</th>
                     <th scope="col">Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (empty($minutas) || !is_array($minutas)): ?>
+                <?php if (empty($minutasPage) || !is_array($minutasPage)): ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados en este estado.</td>
+                        <td colspan="6" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($minutas as $minuta): ?>
+                    <?php foreach ($minutasPage as $minuta): ?>
                         <tr>
                             <?php
                             $minutaId = $minuta['idMinuta'];
                             $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
                             $presidenteAsignado = $minuta['t_usuario_idPresidente'] ?? null;
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
-                            $totalAdjuntos = $minuta['totalAdjuntos'] ?? 0;
+                            $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
                             ?>
-
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
-                            
-                            <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td> 
+                            <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
                             <td><?php echo $minuta['objetivos'] ?? 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
 
@@ -81,19 +159,19 @@ $currentThemeName = $_GET['themeName'] ?? '';
                                 <?php if ($totalAdjuntos > 0): ?>
                                     <button type="button" class="btn btn-info btn-sm"
                                             title="Ver adjuntos"
-                                            onclick="verAdjuntos(<?php echo $minutaId; ?>)">
+                                            onclick="verAdjuntos(<?php echo (int)$minutaId; ?>)">
                                         <i class="fas fa-paperclip"></i> (<?php echo $totalAdjuntos; ?>)
                                     </button>
                                 <?php else: ?>
-                                    <span class="text-muted">N/A</span>
+                                    <span class="text-muted">No posee archivo adjunto</span>
                                 <?php endif; ?>
                             </td>
 
                             <td style="white-space: nowrap;">
                                 <?php if ($estado === 'PENDIENTE'): ?>
-                                    <a href="menu.php?pagina=editar_minuta&id=<?php echo $minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
+                                    <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
                                     <?php if ($idUsuarioLogueado && (int)$idUsuarioLogueado === (int)$presidenteAsignado): ?>
-                                        <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo $minutaId; ?>)">🔒 Firmar y Aprobar</button>
+                                        <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">🔒 Firmar y Aprobar</button>
                                     <?php endif; ?>
                                 <?php elseif ($estado === 'APROBADA'): ?>
                                     <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Visualizar PDF</a>
@@ -107,6 +185,8 @@ $currentThemeName = $_GET['themeName'] ?? '';
             </tbody>
         </table>
     </div>
+
+    <?php renderPaginationListado($page, $pages); ?>
 </div>
 
 <div class="modal fade" id="modalAdjuntos" tabindex="-1" aria-labelledby="modalAdjuntosLabel" aria-hidden="true">

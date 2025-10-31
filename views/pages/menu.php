@@ -259,8 +259,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                         </button>
                         <div class="collapse show" id="votaciones-collapse">
                             <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                                <li><a href="menu.php?pagina=crearVotacion" class="link-dark d-block rounded py-1"><i class="fas fa-plus fa-fw me-2"></i>Registrar nueva</a></li>
                                 <li><a href="menu.php?pagina=votacion_listado" class="link-dark d-block rounded py-1"><i class="fas fa-list fa-fw me-2"></i>Revisar listado</a></li>
+                                <li><a href="menu.php?pagina=historial_votacion" class="link-dark d-block rounded py-1"><i class="fas fa-clipboard-list fa-fw me-2"></i>Historial de Votación</a></li>
                                 <li><a href="menu.php?pagina=voto_autogestion" class="link-success d-block rounded py-1 fw-bold"><i class="fas fa-check-to-slot fa-fw me-2"></i>Registrar Votación</a></li>
                             </ul>
                         </div>
@@ -387,6 +387,8 @@ $fechaActual = strftime('%A, %d de %B de %Y'); // Ejemplo: martes, 28 de octubre
                 'crearVotacion' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_crear' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_listado' => ['type' => 'view', 'file' => $base_path . '/votacion_listado.php'],
+
+                'historial_votacion' => ['type' => 'view', 'file' => $base_path . '/historial_votacion.php'],
                 'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php'],
                 'tabla_votacion' => ['type' => 'view', 'file' => $base_path . '/tablaVotacion.php'],
                 'perfil_usuario' => ['type' => 'view', 'file' => $base_path . '/perfil_usuario.php'],
