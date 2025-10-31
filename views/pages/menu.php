@@ -222,9 +222,10 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 
         .sidebar-footer {
-            padding: 15px;
+            padding: 0;
+            /* SIN padding horizontal ni vertical */
             border-top: 1px solid #dee2e6;
-            margin-top: auto;
+            background-color: #ffffff;
         }
 
 
@@ -324,6 +325,30 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             padding: 1.5rem;
             background-color: #f8f9fa;
         }
+
+        /* --- ESTILOS PARA BOTÓN CERRAR SESIÓN --- */
+        .sidebar-footer {
+            padding: 1rem 0.5rem;
+            /* Padding similar al px-2 de la lista */
+            border-top: 1px solid #dee2e6;
+            background-color: #ffffff;
+            /* Asegura fondo blanco por si acaso */
+        }
+
+        .nav-link-logout {
+            background-color: #dc3545 !important;
+            /* Rojo 'danger' */
+            color: #ffffff !important;
+            /* Texto blanco */
+            font-weight: bold;
+        }
+
+        .nav-link-logout:hover {
+            background-color: #bb2d3b !important;
+            /* Rojo más oscuro en hover */
+        }
+
+        /* --- FIN ESTILOS BOTÓN --- */
     </style>
 </head>
 
@@ -379,8 +404,16 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                             Votaciones
                         </a>
                     </li>
+
+                    <li class="nav-item mt-auto"> <a href="/corevota/logout.php" class="nav-link nav-link-logout">
+                            <i class="fas fa-sign-out-alt fa-fw"></i>
+                            Cerrar Sesión
+                        </a>
+                    </li>
+
                 </ul>
             </div>
+
         </nav>
 
         <header class="core-header d-flex justify-content-between align-items-center p-3">
@@ -446,7 +479,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 <div class="container-fluid mb-4">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h2 class="display-6"><?php echo $saludo . ', ' . $nombreUsuario; ?>! 👋</h2>
+                            <h2 class="display-6"><?php echo $saludo . ' ' . $nombreUsuario; ?></h2>
                             <p class="lead text-muted">Hoy es <?php echo ucfirst($fechaActual); ?></p>
                         </div>
                         <div class="col-md-4 text-md-end">
