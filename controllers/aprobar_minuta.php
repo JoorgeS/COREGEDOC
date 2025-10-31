@@ -11,6 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // 1. INCLUIR DEPENDENCIAS Y CONFIGURACIÓN
 define('ROOT_PATH', dirname(__DIR__) . '/');
 require_once ROOT_PATH . 'class/class.conectorDB.php';
+require_once ROOT_PATH . 'models/FirmaModel.php';
 require_once ROOT_PATH . 'vendor/autoload.php'; // Dompdf
 
 use Dompdf\Dompdf;
@@ -244,21 +245,56 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri)
     // --- 🔼 FIN BLOQUE AÑADIDO 🔼 ---
 
 
-    // Firma en texto (sin imágenes)
-    $html .= '<div class="signature-box">
-        <div class="signature-line"></div>
-        <p>' . $presidente1_nombre . '</p>
-        <p>Presidente</p>
-        <p>Comisión ' . $comision1_nombre . '</p>
-        <div class="firma-chip">
-          <strong>Firmado electrónicamente por:</strong> ' . $firmaNombre . '<br/>' .
-        ($firmaCargo ? ('<strong>Cargo:</strong> ' . $firmaCargo . '<br/>') : '') .
-        ($firmaUnidad ? ('<strong>Unidad:</strong> ' . $firmaUnidad . '<br/>') : '') .
-        //($firmaRut   ? ('<strong>RUT:</strong> '   . $firmaRut   . '<br/>') : '') .
-        ($firmaCorreo ? ('<strong>Correo:</strong> ' . $firmaCorreo . '<br/>') : '') .
-        '<strong>Fecha y hora de firma:</strong> ' . $firmaFecha . '
-        </div>
-       </div>';
+    // -----------------------------------------------------------------------------
+    // BLOQUE DE FIRMA (versión estable con verificación + estilo alineado)
+    // -----------------------------------------------------------------------------
+    $firmaImg = '';
+    try {
+        $filename = ($data['firma']['idTipoUsuario'] ?? 1) == 1
+            ? 'firmadigital.png'
+            : 'aprobacion.png';
+
+        $imgPath = realpath(__DIR__ . '/../../corevota/public/img/' . $filename);
+        error_log("🧭 RUTA CALCULADA: " . $imgPath);
+        error_log("👤 Tipo de usuario en firma: " . ($data['firma']['idTipoUsuario'] ?? 'NO DEFINIDO'));
+
+        if ($imgPath && is_file($imgPath)) {
+            $mime = mime_content_type($imgPath);
+            $firmaImg = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($imgPath));
+            error_log("✅ Firma encontrada y cargada correctamente");
+        } else {
+            error_log("⚠️ No se encontró imagen de firma en: " . $imgPath);
+        }
+    } catch (Throwable $e) {
+        error_log("❌ Error al generar firmaImg: " . $e->getMessage());
+    }
+
+
+    $html .= '<div class="signature-box">';
+    $html .= '<div class="signature-line"></div>' .
+            '<p>' . htmlspecialchars($presidente1_nombre) . '</p>' .
+            '<p>Presidente</p>' .
+            '<p>Comisión ' . htmlspecialchars($comision1_nombre) . '</p>';
+
+    // Bloque con flexbox: imagen + texto alineados
+    $html .= '<div class="firma-chip" style="display:flex;align-items:center;gap:12px;">';
+
+    if (!empty($firmaImg)) {
+        $html .= '<img src="' . $firmaImg . '" alt="Firma" style="width:80px;height:auto;opacity:0.95;">';
+    } else {
+        $html .= '<span style="color:#a00;font-size:8pt;">[Firma digital no encontrada]</span>';
+    }
+
+    $html .= '<div style="font-size:9pt;line-height:1.4;">' .
+                '<strong>Firmado electrónicamente por:</strong> ' . htmlspecialchars($presidente1_nombre) . '<br/>' .
+                ($firmaCargo  ? '<strong>Cargo:</strong> '  . htmlspecialchars($firmaCargo)  . '<br/>' : '') .
+                ($firmaUnidad ? '<strong>Unidad:</strong> ' . htmlspecialchars($firmaUnidad) . '<br/>' : '') .
+                ($firmaCorreo ? '<strong>Correo:</strong> ' . htmlspecialchars($firmaCorreo) . '<br/>' : '') .
+                '<strong>Fecha y hora de firma:</strong> ' . htmlspecialchars($firmaFecha) .
+            '</div>';
+
+    $html .= '</div>'; // cierre firma-chip
+    $html .= '</div>'; // cierre signature-box
 
     $html .= '</body></html>';
     return $html;
@@ -468,6 +504,29 @@ try {
         ':pathArchivo' => $pathParaBD,
         ':id' => $idMinuta
     ]);
+
+
+    // -----------------------------------------------------------------------------
+    // 11b. REGISTRAR FIRMA ELECTRÓNICA DIRECTAMENTE EN t_firma
+    // -----------------------------------------------------------------------------
+    $idTipoUsuario = $_SESSION['tipoUsuario_id'] ?? 1;
+
+    // Obtener comisión asociada
+    $stmtCom = $pdo->prepare("SELECT t_comision_idComision FROM t_minuta WHERE idMinuta = ?");
+    $stmtCom->execute([$idMinuta]);
+    $idComision = $stmtCom->fetchColumn();
+
+    if ($idComision) {
+        $sql_firma = "INSERT INTO t_firma (descFirma, idTipoUsuario, fechaGuardado, idUsuario, idComision)
+                    VALUES (:desc, :tipo, CURTIME(), :usuario, :comision)";
+        $stmt_firma = $pdo->prepare($sql_firma);
+        $stmt_firma->execute([
+            ':desc'     => 'Firma electrónica registrada al aprobar minuta ' . $idMinuta,
+            ':tipo'     => $idTipoUsuario,
+            ':usuario'  => $idUsuarioLogueado,
+            ':comision' => $idComision
+        ]);
+    }
 
     // --- 12. COMMIT Y RESPUESTA EXITOSA ---
     $pdo->commit();
