@@ -1,5 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (session_status() === PHP_SESSION_NONE) {
+  session_start();
+}
 if (!isset($_SESSION['idUsuario'])) {
   header("Location: /corevota/views/pages/login.php");
   exit;
@@ -23,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
   $opcionVoto = $_POST['opcionVoto'];
 
   // 1️⃣ Verificar si ya votó
-  $sqlCheck = "SELECT COUNT(*) FROM t_voto WHERE idUsuario = :idUsuario AND idVotacion = :idVotacion";
+  $sqlCheck = "SELECT COUNT(*) FROM t_voto 
+             WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
   $stmt = $pdo->prepare($sqlCheck);
   $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
   if ($stmt->fetchColumn() > 0) {
@@ -58,9 +61,10 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
     <div class="row g-4">
       <?php foreach ($habilitadas as $v):
         // verificar si el usuario ya votó esta votación
-        $sqlCheck = "SELECT opcionVoto FROM t_voto WHERE idUsuario = :idUsuario AND idVotacion = :idVotacion";
-        $stmt = $pdo->prepare($sqlCheck);
-        $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $v['idVotacion']]);
+$sqlCheck = "SELECT opcionVoto FROM t_voto 
+                     WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+    $stmt = $pdo->prepare($sqlCheck);
+    $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $v['idVotacion']]);
         $votoPrevio = $stmt->fetchColumn();
         $yaVoto = !empty($votoPrevio);
       ?>
@@ -90,7 +94,7 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                 </form>
               <?php endif; ?>
               <div class="mt-3">
-                <a href="menu.php?pagina=tabla_votacion&idVotacion=<?= $v['idVotacion'] ?>" 
+                <a href="menu.php?pagina=tabla_votacion&idVotacion=<?= $v['idVotacion'] ?>"
                   class="btn btn-outline-success btn-sm fw-semibold">
                   <i class="fa-solid fa-chart-simple me-1"></i> Ver resultados
                 </a>
@@ -104,105 +108,109 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
 </div>
 
 <script>
-// Enviar voto con validación visual
-document.querySelectorAll('.voto-btn').forEach(btn => {
-  btn.addEventListener('click', function () {
-    const form = this.closest('.form-voto');
-    const nombre = form.dataset.nombre;
-    const opcion = this.dataset.value;
+  // Enviar voto con validación visual
+  document.querySelectorAll('.voto-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const form = this.closest('.form-voto');
+      const nombre = form.dataset.nombre;
+      const opcion = this.dataset.value;
 
-    Swal.fire({
-      title: `¿Confirmas tu voto "${opcion}"?`,
-      text: `Votación: ${nombre}`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#198754',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Sí, votar',
-      cancelButtonText: 'Cancelar'
-    }).then(result => {
-      if (result.isConfirmed) {
-        const formData = new FormData();
-        formData.append('idVotacion', form.querySelector('input[name="idVotacion"]').value);
-        formData.append('opcionVoto', opcion);
+      Swal.fire({
+        title: `¿Confirmas tu voto "${opcion}"?`,
+        text: `Votación: ${nombre}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, votar',
+        cancelButtonText: 'Cancelar'
+      }).then(result => {
+        if (result.isConfirmed) {
+          const formData = new FormData();
+          formData.append('idVotacion', form.querySelector('input[name="idVotacion"]').value);
+          formData.append('opcionVoto', opcion);
 
-        fetch('voto_autogestion.php', {
-          method: 'POST',
-          body: formData
-        })
-        .then(response => response.json())
-        .then(resp => {
-          if (resp.status === 'duplicate') {
-            Swal.fire({
-              icon: 'warning',
-              title: '⚠️ Ya registraste tu voto',
-              text: 'No puedes votar nuevamente en esta votación.',
-              confirmButtonColor: '#198754'
+          fetch('voto_autogestion.php', {
+              method: 'POST',
+              body: formData
+            })
+            .then(response => response.json())
+            .then(resp => {
+              if (resp.status === 'duplicate') {
+                Swal.fire({
+                  icon: 'warning',
+                  title: '⚠️ Ya registraste tu voto',
+                  text: 'No puedes votar nuevamente en esta votación.',
+                  confirmButtonColor: '#198754'
+                });
+              } else if (resp.status === 'success') {
+                Swal.fire({
+                  icon: 'success',
+                  title: '✅ Voto registrado correctamente',
+                  showConfirmButton: false,
+                  timer: 1500
+                });
+                setTimeout(() => {
+                  window.location.href = 'menu.php?pagina=tabla_votacion';
+                }, 1500);
+              } else {
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Error al registrar voto',
+                  text: resp.message || 'Inténtalo nuevamente.',
+                  confirmButtonColor: '#198754'
+                });
+              }
+            })
+            .catch(err => {
+              Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'No se pudo comunicar con el servidor.',
+                confirmButtonColor: '#198754'
+              });
             });
-          } else if (resp.status === 'success') {
-            Swal.fire({
-              icon: 'success',
-              title: '✅ Voto registrado correctamente',
-              showConfirmButton: false,
-              timer: 1500
-            });
-            setTimeout(() => {
-              window.location.href = 'menu.php?pagina=tabla_votacion';
-            }, 1500);
-          } else {
-            Swal.fire({
-              icon: 'error',
-              title: 'Error al registrar voto',
-              text: resp.message || 'Inténtalo nuevamente.',
-              confirmButtonColor: '#198754'
-            });
-          }
-        })
-        .catch(err => {
-          Swal.fire({
-            icon: 'error',
-            title: 'Error de conexión',
-            text: 'No se pudo comunicar con el servidor.',
-            confirmButtonColor: '#198754'
-          });
-        });
-      }
+        }
+      });
     });
   });
-});
 </script>
 
 <style>
-.voto-btn {
-  width: 100px;
-  border-radius: 10px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.voto-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-}
-.card {
-  background-color: #fff;
-  transition: transform 0.2s ease;
-}
-.card:hover {
-  transform: translateY(-4px);
-}
-.alert-success {
-  background-color: #e6f7ec;
-  border: 1px solid #198754;
-  color: #155d2d;
-}
+  .voto-btn {
+    width: 100px;
+    border-radius: 10px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
 
-.btn-outline-success {
-  border-width: 2px;
-  border-color: #198754;
-  color: #198754;
-}
-.btn-outline-success:hover {
-  background-color: #198754;
-  color: #fff;
-}
+  .voto-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  }
 
+  .card {
+    background-color: #fff;
+    transition: transform 0.2s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+  }
+
+  .alert-success {
+    background-color: #e6f7ec;
+    border: 1px solid #198754;
+    color: #155d2d;
+  }
+
+  .btn-outline-success {
+    border-width: 2px;
+    border-color: #198754;
+    color: #198754;
+  }
+
+  .btn-outline-success:hover {
+    background-color: #198754;
+    color: #fff;
+  }
 </style>

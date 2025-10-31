@@ -320,6 +320,50 @@ class ReunionManager extends BaseConexion
             return ['status' => 'error', 'message' => 'Error al obtener los datos de la reunión.'];
         }
     }
+
+    /**
+     * NUEVO: Datos para el calendario (reuniones programadas y vigentes).
+     * No altera ningún flujo existente.
+     */
+    public function getReunionesCalendarData(): array
+    {
+        try {
+            $sql = "
+                SELECT
+                    r.idReunion,
+                    r.nombreReunion,
+                    r.fechaInicioReunion,
+                    r.fechaTerminoReunion,
+                    r.t_comision_idComision,
+                    c.nombreComision
+                FROM t_reunion r
+                LEFT JOIN t_comision c
+                       ON c.idComision = r.t_comision_idComision
+                WHERE COALESCE(r.vigente, 1) = 1
+                ORDER BY r.fechaInicioReunion ASC, r.idReunion ASC
+            ";
+
+            $stmt = $this->db->query($sql);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Normalizar a ISO 8601 (YYYY-MM-DDTHH:mm:ss)
+            foreach ($rows as &$r) {
+                if (!empty($r['fechaInicioReunion'])) {
+                    $r['fechaInicioReunion']  = date('Y-m-d\TH:i:s', strtotime($r['fechaInicioReunion']));
+                }
+                if (!empty($r['fechaTerminoReunion'])) {
+                    $r['fechaTerminoReunion'] = date('Y-m-d\TH:i:s', strtotime($r['fechaTerminoReunion']));
+                }
+            }
+            unset($r);
+
+            return ['status' => 'success', 'data' => $rows];
+
+        } catch (Throwable $e) {
+            error_log('[getReunionesCalendarData] ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No fue posible cargar el calendario', 'data' => []];
+        }
+    }
 }
 
 // --- Enrutamiento ---

@@ -103,15 +103,9 @@ if (class_exists('ReunionManager')) {
             font-size: .8rem;
         }
 
-        .fc-daygrid-day-number {
-            font-size: .8rem;
-            font-weight: 500;
-            color: #495057;
-        }
+        .fc-daygrid-day-number { font-size: .8rem; font-weight: 500; color: #495057; }
 
-        .fc .fc-col-header-cell-cushion {
-            text-transform: capitalize;
-        }
+        .fc .fc-col-header-cell-cushion { text-transform: capitalize; }
 
         .fc-event, .fc-daygrid-event {
             border-radius: .5rem;
@@ -136,23 +130,60 @@ if (class_exists('ReunionManager')) {
 document.addEventListener('DOMContentLoaded', function() {
     const reunionesPHP = <?php echo json_encode($reuniones ?? []); ?>;
 
-    const calendarEvents = reunionesPHP.map(reunion => {
+    // Helpers robustos para fechas
+    function isEmpty(val) { return val === null || val === undefined || String(val).trim() === ''; }
+
+    function normalizeDateString(str) {
+        // Acepta "YYYY-MM-DD" o "YYYY-MM-DD HH:mm(:ss)"
+        if (isEmpty(str)) return null;
+        const s = String(str).trim();
+        // Si viene solo fecha, agrégale T00:00:00 para que FullCalendar la entienda igual
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00:00';
+        // Reemplaza espacio por T si viene "YYYY-MM-DD HH:mm:ss"
+        if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(s)) return s.replace(' ', 'T');
+        return s; // Dejar tal cual para otros formatos válidos
+    }
+
+    function looksAllDay(str) {
+        if (isEmpty(str)) return true;
+        const s = String(str);
+        // Consideramos allDay si no hay hora o si es 00:00:00
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) || /\b00:00(:00)?\b/.test(s);
+    }
+
+    const calendarEvents = (reunionesPHP || []).map(reunion => {
         const colorMap = {
             1: '#54a3ff', 2: '#7dd321', 3: '#ffc107', 4: '#dc3545',
             5: '#6f42c1', 6: '#20c997', 7: '#fd7e14', 8: '#6c757d'
         };
         const commissionId = reunion.t_comision_idComision ? parseInt(reunion.t_comision_idComision) : 1;
-        return {
+
+        const startRaw = reunion.fechaInicioReunion;
+        const endRaw   = reunion.fechaTerminoReunion;
+
+        const startStr = normalizeDateString(startRaw);
+        const endStr   = normalizeDateString(endRaw);
+
+        // Determinar si debe mostrarse como allDay
+        const allDay = looksAllDay(startRaw) && (isEmpty(endRaw) || looksAllDay(endRaw));
+
+        const event = {
             id: reunion.idReunion,
-            title: reunion.nombreComision + ': ' + reunion.nombreReunion,
-            start: reunion.fechaInicioReunion,
-            end: reunion.fechaTerminoReunion,
-            allDay: false,
+            title: (reunion.nombreComision || '') + (reunion.nombreReunion ? ': ' + reunion.nombreReunion : ''),
+            start: startStr,                         // siempre definimos start
+            allDay: allDay,                          // marcar día completo si corresponde
             backgroundColor: colorMap[commissionId] || '#17a2b8',
             borderColor: colorMap[commissionId] || '#17a2b8',
             url: `/corevota/views/pages/crearReunion.php?action=edit&id=${reunion.idReunion}`
         };
-    });
+
+        // Solo seteamos end si viene válido (para que eventos "programados" con solo fecha igual aparezcan)
+        if (!isEmpty(endStr)) {
+            event.end = endStr;
+        }
+
+        return event;
+    }).filter(e => !isEmpty(e.start)); // descarta cualquiera sin fecha de inicio
 
     function capitalizeFirst(s) {
         if (!s) return s;
@@ -166,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
         firstDay: 1,
         dayHeaderFormat: { weekday: 'long' },
 
-        // 🔹 Mostrar "Octubre 2025" (sin el "de")
+        // Título "Octubre 2025" (sin "de")
         titleFormat: function(info) {
             const d = info.date ? info.date.marker : info.view.currentStart;
             const month = capitalizeFirst(d.toLocaleDateString('es-CL', { month: 'long' }));
@@ -179,17 +210,13 @@ document.addEventListener('DOMContentLoaded', function() {
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay'
         },
-        buttonText: {
-            today: 'Hoy',
-            day:   'Día',
-            week:  'Semana',
-            month: 'Mes'
-        },
+        buttonText: { today: 'Hoy', day: 'Día', week: 'Semana', month: 'Mes' },
 
         height: 'auto',
         contentHeight: 'auto',
         aspectRatio: 2,
         editable: false,
+
         events: calendarEvents,
 
         eventClick: function(info) {
