@@ -342,26 +342,36 @@ class MinutaManager extends BaseConexion
       // -----------------------------------------------------------------
       // Si la minuta está 'PARCIAL' (parcialmente firmada) y el secretario
       // la está editando, debemos invalidar las firmas anteriores.
+      // -----------------------------------------------------------------
+      // ⭐ INICIO: LÓGICA DE "REQUIERE REVISIÓN" (NUEVO) ⭐
+      // -----------------------------------------------------------------
+      // Si la minuta está 'PARCIAL' (parcialmente firmada) y el secretario
+      // la está editando, debemos invalidar las firmas anteriores.
       if ($estadoMinutaActual === 'PARCIAL') {
 
-        // 1. Borrar todas las firmas de aprobación existentes para esta minuta
-        // 1. Marcar todas las firmas existentes como 'pendientes de revisión'
-        // 1. Marcar todas las firmas existentes como 'pendientes de revisión'
-        $sqlMarcarFirmas = "UPDATE t_aprobacion_minuta
-                                          SET estado_firma = 'PENDIENTE_REVISION'
-                                          WHERE t_minuta_idMinuta = :idMinuta";
+        // 1. Marcar todas las firmas que ya estaban 'EN_ESPERA' a 'REQUIERE_REVISION'
+        $sqlMarcarFirmas = "UPDATE t_aprobacion_minuta 
+                                  SET estado_firma = 'REQUIERE_REVISION' 
+                                  WHERE t_minuta_idMinuta = :idMinuta
+                                  AND estado_firma = 'EN_ESPERA'";
         $stmtMarcar = $this->db->prepare($sqlMarcarFirmas);
         $stmtMarcar->execute([':idMinuta' => $idMinuta]);
+        $firmasPausadas = $stmtMarcar->rowCount();
 
         // 2. Reiniciar el estado de la minuta principal a 'PENDIENTE'
-        // La columna 'presidentesRequeridos' NO se toca.
+        // Esto es crucial para que el conteo de firmas vuelva a empezar.
         $sqlResetMinuta = "UPDATE t_minuta SET estadoMinuta = 'PENDIENTE' WHERE idMinuta = :idMinuta";
         $stmtReset = $this->db->prepare($sqlResetMinuta);
         $stmtReset->execute([':idMinuta' => $idMinuta]);
 
         // 3. Dejar un registro en el log
-        error_log("INFO idMinuta {$idMinuta}: La minuta fue editada por un secretario mientras estaba en 'PARCIAL'. Se reiniciaron todas las firmas y el estado volvió a 'PENDIENTE'.");
+        if ($firmasPausadas > 0) {
+          error_log("INFO idMinuta {$idMinuta}: Minuta editada por secretario. {$firmasPausadas} firma(s) marcadas como 'REQUIERE_REVISION'. Estado de Minuta vuelve a 'PENDIENTE'.");
+        }
       }
+      // -----------------------------------------------------------------
+      // ⭐ FIN: LÓGICA DE "REQUIERE REVISIÓN" ⭐
+      // -----------------------------------------------------------------
       // -----------------------------------------------------------------
       // ⭐ FIN: LÓGICA DE REINICIO DE FIRMAS ⭐
       // -----------------------------------------------------------------

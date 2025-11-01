@@ -76,8 +76,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
       }
     }
 
-    // Presidentes (Indexados por ID, asumiendo tipoUsuario_id = 1)
-    $stmt_all_pres = $pdo->query("SELECT idUsuario, pNombre, aPaterno FROM t_usuario WHERE tipoUsuario_id = 1");
+ 
+    $stmt_all_pres = $pdo->query("SELECT idUsuario, pNombre, aPaterno FROM t_usuario WHERE tipoUsuario_id = 3");
     if ($stmt_all_pres) {
       $all_presidents_raw = $stmt_all_pres->fetchAll(PDO::FETCH_ASSOC);
       foreach ($all_presidents_raw as $pres) {
@@ -153,16 +153,18 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0); // Sigue siendo array de strings
     $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
 
-    $estadoFirmaUsuario = null;
-    if (isset($_SESSION['idUsuario'])) {
+    // ... (después de cargar $minutaData, $reunionData, etc.) ...
+
+    $estadoFirmaUsuario = null; // 'EN_ESPERA' o 'REQUIERE_REVISION' o null
+    if (isset($_SESSION['idUsuario']) && $idMinutaActual) {
       $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                  WHERE t_minuta_idMinuta = :idMinuta 
-                  AND t_usuario_idPresidente = :idUsuario");
+                                WHERE t_minuta_idMinuta = :idMinuta 
+                                AND t_usuario_idPresidente = :idUsuario");
       $sqlFirma->execute([':idMinuta' => $idMinutaActual, ':idUsuario' => $_SESSION['idUsuario']]);
-      // fetchColumn() devolverá 'CONFIRMADA', 'PENDIENTE_REVISION', o false si no hay fila
-      $estadoFirmaUsuario = $sqlFirma->fetchColumn();
+      $estadoFirmaUsuario = $sqlFirma->fetchColumn(); // Devuelve el estado o false
     }
   } catch (Exception $e) {
+    // ... (tu bloque catch existente)
     error_log("Error cargando datos para edición (Minuta ID: {$idMinutaActual}): " . $e->getMessage());
     // Mostrar un mensaje de error o redirigir
     die("❌ Error al cargar los datos de la minuta: " . htmlspecialchars($e->getMessage()) . "<br><a href='menu.php?pagina=minutas_pendientes'>Volver al listado</a>");
@@ -359,8 +361,8 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
                 <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()">
                   <i class="fas fa-save me-1"></i> Guardar Asistencia
                 </button>
-                <a href="#" class="btn btn-success btn-sm <?php echo !$existeAsistenciaGuardada ? 'disabled' : ''; ?>" id="btnExportarExcel" role="button" <?php echo $idMinutaActual ? 'data-idminuta="' . $idMinutaActual . '"' : ''; ?> <?php echo ($existeAsistenciaGuardada && $idMinutaActual) ? 'href="/corevota/controllers/exportar_asistencia_excel.php?idMinuta=' . $idMinutaActual . '"' : 'href="#"'; ?>>
-                  <i class="fas fa-file-excel me-1"></i> Exportar Asistencia (Excel)
+                
+
                 </a>
               </div>
             </div>
@@ -571,14 +573,12 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
 
     // ⭐ ================== INICIO BLOQUE MODIFICADO ==================
     // ⭐ CORREGIDO: Usamos el array de presidentes
-    const IDS_PRESIDENTES_REQUERIDOS = <?php echo $jsArrayPresidentesRequeridos; ?>; // Esto será un array [10, 15, 20]
+    const IDS_PRESIDENTES_REQUERIDOS = <?php echo $jsArrayPresidentesRequeridos; ?>;
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
     const ESTADO_FIRMA_USUARIO = <?php echo json_encode($estadoFirmaUsuario); ?>; // <-- AÑADE ESTA LÍNEA
-
-    // Forzamos el ID de usuario a ser un número para una comparación segura
-
-    // Forzamos el ID de usuario a ser un número para una comparación segura
     const ID_USUARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ? intval($_SESSION['idUsuario']) : null); ?>;
+
+
     // ⭐ =================== FIN BLOQUE MODIFICADO ===================
 
     // Asegurar que sean arrays, incluso si PHP devuelve null
@@ -848,40 +848,37 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
     // (Línea ~1230)
     function gestionarVisibilidadBotonAprobar() {
       const btn = document.getElementById('btnAprobarMinuta');
-      if (!btn) return; // Salir si el botón no existe
+      if (!btn) return;
 
-      // Comprobamos si el ID del usuario logueado está INCLUIDO en el array de presidentes requeridos
       const esPresidenteRequerido = ID_USUARIO_LOGUEADO && IDS_PRESIDENTES_REQUERIDOS.includes(ID_USUARIO_LOGUEADO);
 
-      // El botón solo se muestra si:
-      // 1. La minuta NO está 'APROBADA'
-      // 2. Y el usuario logueado ES uno de los presidentes requeridos
-      if (idMinutaGlobal && ESTADO_MINUTA_ACTUAL !== 'APROBADA' && esPresidenteRequerido) {
-        btn.style.display = 'inline-block';
-        btn.disabled = false; // Habilitado por defecto
-
-        // --- NUEVA LÓGICA DE TEXTO Y ESTADO ---
-        if (ESTADO_FIRMA_USUARIO === 'PENDIENTE_REVISION') {
-          // El secretario editó. El presidente debe re-confirmar.
-          btn.innerHTML = '⚠️ Confirmar Cambios y Re-Firmar';
-          btn.classList.remove('btn-primary', 'btn-success', 'btn-secondary');
-          btn.classList.add('btn-warning', 'fw-bold');
-        } else if (ESTADO_FIRMA_USUARIO === 'CONFIRMADA') {
-          // El presidente ya firmó y su firma es válida. Está esperando a otros.
-          btn.innerHTML = '✅ Firma Registrada (En espera de otros)';
-          btn.classList.remove('btn-primary', 'btn-warning', 'btn-secondary');
-          btn.classList.add('btn-success');
-          btn.disabled = true; // Deshabilitar, ya firmó.
-        } else {
-          // Es null o PENDIENTE, significa que no ha firmado
-          btn.innerHTML = '🔒 Registrar Mi Firma';
-          btn.classList.remove('btn-warning', 'btn-success', 'btn-secondary');
-          btn.classList.add('btn-primary', 'fw-bold');
-        }
-        // --- FIN NUEVA LÓGICA ---
-
-      } else {
+      // Ocultar si no es presidente requerido O si la minuta ya está APROBADA
+      if (!esPresidenteRequerido || ESTADO_MINUTA_ACTUAL === 'APROBADA') {
         btn.style.display = 'none';
+        return;
+      }
+
+      // Si llega aquí, es presidente y la minuta está PENDIENTE o PARCIAL
+      btn.style.display = 'inline-block';
+      btn.disabled = false;
+
+      // Ahora definimos el texto y color según tu flujo
+      if (ESTADO_FIRMA_USUARIO === 'REQUIERE_REVISION') {
+        // "Revisar actualización de la minuta"
+        btn.innerHTML = '⚠️ Confirmar Cambios y Re-Firmar';
+        btn.classList.remove('btn-primary', 'btn-success', 'btn-secondary');
+        btn.classList.add('btn-warning', 'fw-bold');
+      } else if (ESTADO_FIRMA_USUARIO === 'EN_ESPERA') {
+        // "a la espera de confirmacion"
+        btn.innerHTML = '✅ Firma Registrada (En Espera de otros)';
+        btn.classList.remove('btn-primary', 'btn-warning', 'btn-secondary');
+        btn.classList.add('btn-success');
+        btn.disabled = true; // Deshabilitar, ya firmó y está en espera.
+      } else {
+        // Estado 'Pendiente' (null/false)
+        btn.innerHTML = '🔒 Registrar Mi Firma';
+        btn.classList.remove('btn-warning', 'btn-success', 'btn-secondary');
+        btn.classList.add('btn-primary', 'fw-bold');
       }
     }
     // ⭐ =================== FIN BLOQUE MODIFICADO ===================
@@ -1119,6 +1116,9 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
             .then(response => {
               // ⭐ MEJORA: Respuestas con Swal
               if (response.status === 'success_final') {
+                // ---------------------------------------------
+                // CASO 1: ÉXITO TOTAL (Última firma registrada)
+                // ---------------------------------------------
                 Swal.fire(
                   '¡Aprobada!',
                   'Minuta aprobada y PDF generado con todas las firmas. Será redirigido.',
@@ -1126,7 +1126,11 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
                 ).then(() => {
                   window.location.href = 'menu.php?pagina=minutas_aprobadas';
                 });
+
               } else if (response.status === 'success_partial') {
+                // ---------------------------------------------
+                // CASO 2: ÉXITO PARCIAL (Faltan firmas)
+                // ---------------------------------------------
                 Swal.fire(
                   '¡Firma Registrada!',
                   `${response.message} Será redirigido.`,
@@ -1134,12 +1138,30 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
                 ).then(() => {
                   window.location.href = 'menu.php?pagina=minutas_pendientes'; // Redirigir a pendientes
                 });
+
               } else {
-                Swal.fire(
-                  'Error',
-                  `Error al aprobar: ${response.message}`,
-                  'error'
-                );
+                // ---------------------------------------------
+                // CASO 3: ERROR REAL O EL ERROR QUE VES
+                // ---------------------------------------------
+
+                // Si el mensaje es el que nos dijiste, es un ÉXITO PARCIAL
+                // que fue mal interpretado. Lo mostramos como 'info'.
+                if (response.message && response.message.includes('Firma registrada. Faltan')) {
+                  Swal.fire(
+                    '¡Firma Registrada!',
+                    `${response.message} Será redirigido.`,
+                    'info'
+                  ).then(() => {
+                    window.location.href = 'menu.php?pagina=minutas_pendientes';
+                  });
+                } else {
+                  // Si es cualquier otro mensaje, es un ERROR real.
+                  Swal.fire(
+                    'Error',
+                    `Error al aprobar: ${response.message || 'Error desconocido'}`,
+                    'error'
+                  );
+                }
               }
             })
             .catch(err => {

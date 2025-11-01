@@ -14,6 +14,9 @@ if (class_exists('ReunionManager')) {
         error_log("Error al cargar datos del calendario: " . $e->getMessage());
     }
 }
+
+// Fecha actual del servidor (YYYY-MM-DD)
+$serverToday = date('Y-m-d');
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -25,7 +28,6 @@ if (class_exists('ReunionManager')) {
 
     <style>
         body { background-color: #f8f9fa; }
-
         #fullCalendarContainer {
             position: relative;
             width: 95%;
@@ -37,7 +39,6 @@ if (class_exists('ReunionManager')) {
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             overflow: hidden;
         }
-
         #fullCalendarContainer::before {
             content: "";
             position: absolute;
@@ -52,7 +53,6 @@ if (class_exists('ReunionManager')) {
             z-index: 0;
             pointer-events: none;
         }
-
         .fc { position: relative; z-index: 1; }
 
         .calendar-title {
@@ -70,13 +70,7 @@ if (class_exists('ReunionManager')) {
             justify-content: space-between;
             margin-bottom: 1rem !important;
         }
-
-        .fc-toolbar-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #212529;
-        }
-
+        .fc-toolbar-title { font-size: 1.25rem; font-weight: 600; color: #212529; }
         .fc-toolbar-chunk { display: flex; align-items: center; gap: .5rem; }
 
         .fc-button {
@@ -90,9 +84,13 @@ if (class_exists('ReunionManager')) {
             box-shadow: 0 1px 2px rgba(0,0,0,.08);
             transition: all .15s ease-in-out;
         }
-
         .fc-button:hover { filter: brightness(0.95); }
-        .fc-button.fc-button-active { background-color: #212529 !important; color: #fff !important; box-shadow: 0 2px 4px rgba(0,0,0,.2); }
+        .fc-button.fc-button-active,
+        .fc-today-button.fc-button-active {
+            background-color: #212529 !important;
+            color: #fff !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,.2);
+        }
         .fc-button-group { display: flex; gap: .5rem; }
         .fc-prev-button, .fc-next-button, .fc-today-button { min-width: 2.5rem; text-align: center; }
 
@@ -102,10 +100,23 @@ if (class_exists('ReunionManager')) {
             font-weight: 500;
             font-size: .8rem;
         }
+        /* Días de semana en negrita y sin subrayado */
+        .fc .fc-col-header-cell-cushion {
+            text-transform: capitalize;
+            text-decoration: none !important;
+            font-weight: 700 !important;
+            color: #495057;
+        }
 
         .fc-daygrid-day-number { font-size: .8rem; font-weight: 500; color: #495057; }
 
-        .fc .fc-col-header-cell-cushion { text-transform: capitalize; }
+        /* Día actual resaltado (verde) */
+            .fc-day-today {
+            background-color: rgba(40, 167, 69, 0.2) !important; /* verde translúcido */
+            border: 2px solid #28a745 !important; /* verde Bootstrap */
+            border-radius: 8px !important;
+        }
+
 
         .fc-event, .fc-daygrid-event {
             border-radius: .5rem;
@@ -114,7 +125,6 @@ if (class_exists('ReunionManager')) {
             font-weight: 500;
             padding: .25rem .4rem;
         }
-
         .fc-event:hover { filter: brightness(0.9); }
     </style>
 </head>
@@ -128,26 +138,24 @@ if (class_exists('ReunionManager')) {
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Datos desde PHP
     const reunionesPHP = <?php echo json_encode($reuniones ?? []); ?>;
+    // Forzamos hora “neutral” para evitar desfaces por TZ
+    const serverToday = '<?php echo $serverToday; ?>T12:00:00';
 
-    // Helpers robustos para fechas
     function isEmpty(val) { return val === null || val === undefined || String(val).trim() === ''; }
 
     function normalizeDateString(str) {
-        // Acepta "YYYY-MM-DD" o "YYYY-MM-DD HH:mm(:ss)"
         if (isEmpty(str)) return null;
         const s = String(str).trim();
-        // Si viene solo fecha, agrégale T00:00:00 para que FullCalendar la entienda igual
         if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00:00';
-        // Reemplaza espacio por T si viene "YYYY-MM-DD HH:mm:ss"
         if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(s)) return s.replace(' ', 'T');
-        return s; // Dejar tal cual para otros formatos válidos
+        return s;
     }
 
     function looksAllDay(str) {
         if (isEmpty(str)) return true;
         const s = String(str);
-        // Consideramos allDay si no hay hora o si es 00:00:00
         return /^\d{4}-\d{2}-\d{2}$/.test(s) || /\b00:00(:00)?\b/.test(s);
     }
 
@@ -163,71 +171,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const startStr = normalizeDateString(startRaw);
         const endStr   = normalizeDateString(endRaw);
-
-        // Determinar si debe mostrarse como allDay
         const allDay = looksAllDay(startRaw) && (isEmpty(endRaw) || looksAllDay(endRaw));
 
         const event = {
             id: reunion.idReunion,
             title: (reunion.nombreComision || '') + (reunion.nombreReunion ? ': ' + reunion.nombreReunion : ''),
-            start: startStr,                         // siempre definimos start
-            allDay: allDay,                          // marcar día completo si corresponde
+            start: startStr,
+            allDay: allDay,
             backgroundColor: colorMap[commissionId] || '#17a2b8',
             borderColor: colorMap[commissionId] || '#17a2b8',
             url: `/corevota/views/pages/crearReunion.php?action=edit&id=${reunion.idReunion}`
         };
-
-        // Solo seteamos end si viene válido (para que eventos "programados" con solo fecha igual aparezcan)
-        if (!isEmpty(endStr)) {
-            event.end = endStr;
-        }
+        if (!isEmpty(endStr)) event.end = endStr;
 
         return event;
-    }).filter(e => !isEmpty(e.start)); // descarta cualquiera sin fecha de inicio
-
-    function capitalizeFirst(s) {
-        if (!s) return s;
-        return s.charAt(0).toUpperCase() + s.slice(1);
-    }
+    }).filter(e => !isEmpty(e.start));
 
     const calendarEl = document.getElementById('fullCalendarContainer');
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        locale: 'es',
-        firstDay: 1,
-        dayHeaderFormat: { weekday: 'long' },
 
-        // Título "Octubre 2025" (sin "de")
-        titleFormat: function(info) {
-            const d = info.date ? info.date.marker : info.view.currentStart;
-            const month = capitalizeFirst(d.toLocaleDateString('es-CL', { month: 'long' }));
-            const year  = d.getFullYear();
-            return `${month} ${year}`;
-        },
+    // Inicializar dentro de try/catch para que, ante cualquier error, no “desaparezca” la vista
+    try {
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialDate: new Date(serverToday),
+            now: new Date(serverToday),
+            initialView: 'dayGridMonth',
+            locale: 'es',
+            firstDay: 1,
+            dayHeaderFormat: { weekday: 'long' },
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            buttonText: { today: 'Hoy', day: 'Día', week: 'Semana', month: 'Mes' },
+            height: 'auto',
+            contentHeight: 'auto',
+            aspectRatio: 2,
+            editable: false,
+            events: calendarEvents,
 
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        },
-        buttonText: { today: 'Hoy', day: 'Día', week: 'Semana', month: 'Mes' },
+            eventClick: function(info) {
+                if (info.event.url) {
+                    window.location.href = info.event.url;
+                    return false;
+                }
+            },
 
-        height: 'auto',
-        contentHeight: 'auto',
-        aspectRatio: 2,
-        editable: false,
-
-        events: calendarEvents,
-
-        eventClick: function(info) {
-            if (info.event.url) {
-                window.location.href = info.event.url;
-                return false;
+            // Ajuste robusto del título al “punto medio” del rango visible
+            datesSet: function(info) {
+                const start = info.start;
+                const end = info.end;
+                const mid = new Date(start.getTime() + (end.getTime() - start.getTime()) / 2);
+                const mes = mid.toLocaleDateString('es-CL', { month: 'long' });
+                const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
+                const titulo = `${mesCap} ${mid.getFullYear()}`;
+                const titleEl = document.querySelector('.fc-toolbar-title');
+                if (titleEl) titleEl.textContent = titulo;
             }
-        }
-    });
+        });
 
-    calendar.render();
+        calendar.render();
+
+        // Forzar a “hoy” y marcar el botón
+        setTimeout(() => {
+            calendar.gotoDate(new Date(serverToday));
+            const todayBtn = document.querySelector('.fc-today-button');
+            if (todayBtn) todayBtn.classList.add('fc-button-active');
+        }, 300);
+
+    } catch (e) {
+        console.error('Error inicializando FullCalendar:', e);
+        calendarEl.innerHTML = '<div class="alert alert-danger">No se pudo cargar el calendario.</div>';
+    }
 });
 </script>
 </body>
