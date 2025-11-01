@@ -1,6 +1,5 @@
 <?php
 // views/pages/usuarios_listado.php
-// RUTA CRÍTICA: Desde views/pages/ subimos dos niveles (../../) a la raíz para encontrar Usuario.php
 require_once(__DIR__ . '/../../Usuario.php');
 
 $usuarioObj   = new Usuario();
@@ -71,7 +70,6 @@ if ($esAjax) {
     exit;
 }
 
-// --- Render de la página completa (para menu.php u otras plantillas) ---
 $status = $_GET['status'] ?? '';
 $msg    = $_GET['msg'] ?? '';
 ?>
@@ -92,10 +90,9 @@ $msg    = $_GET['msg'] ?? '';
 <div class="card p-4 shadow-sm">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Usuarios Registrados</h2>
-
     </div>
 
-    <!-- Buscador (sin botón Buscar) -->
+    <!-- Buscador (sin botón Buscar ni Limpiar) -->
     <div class="mb-3 p-3 border rounded bg-light" role="search">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
@@ -109,9 +106,6 @@ $msg    = $_GET['msg'] ?? '';
                     value="<?php echo htmlspecialchars($nombreFiltro); ?>"
                     autocomplete="off">
                 <div id="estado-busqueda" class="search-loading mt-1" aria-live="polite">Buscando...</div>
-            </div>
-            <div class="col-md-2">
-                <button id="btn-limpiar" class="btn btn-secondary btn-sm w-100">Limpiar</button>
             </div>
         </div>
     </div>
@@ -131,7 +125,6 @@ $msg    = $_GET['msg'] ?? '';
 <script>
 (function () {
     const input = document.getElementById('nombre');
-    const limpiarBtn = document.getElementById('btn-limpiar');
     const tabla = document.getElementById('tabla-usuarios');
     const estado = document.getElementById('estado-busqueda');
 
@@ -155,12 +148,6 @@ $msg    = $_GET['msg'] ?? '';
 
     input.addEventListener('input', actualizarTabla);
     input.addEventListener('change', actualizarTabla);
-
-    limpiarBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        input.value = '';
-        actualizarTabla();
-    });
 })();
 </script>
 </body>

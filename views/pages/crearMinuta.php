@@ -152,6 +152,16 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
     $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0); // Sigue siendo array de strings
     $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
+
+    $estadoFirmaUsuario = null;
+    if (isset($_SESSION['idUsuario'])) {
+      $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
+                  WHERE t_minuta_idMinuta = :idMinuta 
+                  AND t_usuario_idPresidente = :idUsuario");
+      $sqlFirma->execute([':idMinuta' => $idMinutaActual, ':idUsuario' => $_SESSION['idUsuario']]);
+      // fetchColumn() devolverá 'CONFIRMADA', 'PENDIENTE_REVISION', o false si no hay fila
+      $estadoFirmaUsuario = $sqlFirma->fetchColumn();
+    }
   } catch (Exception $e) {
     error_log("Error cargando datos para edición (Minuta ID: {$idMinutaActual}): " . $e->getMessage());
     // Mostrar un mensaje de error o redirigir
@@ -563,6 +573,9 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
     // ⭐ CORREGIDO: Usamos el array de presidentes
     const IDS_PRESIDENTES_REQUERIDOS = <?php echo $jsArrayPresidentesRequeridos; ?>; // Esto será un array [10, 15, 20]
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
+    const ESTADO_FIRMA_USUARIO = <?php echo json_encode($estadoFirmaUsuario); ?>; // <-- AÑADE ESTA LÍNEA
+
+    // Forzamos el ID de usuario a ser un número para una comparación segura
 
     // Forzamos el ID de usuario a ser un número para una comparación segura
     const ID_USUARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ? intval($_SESSION['idUsuario']) : null); ?>;
@@ -837,17 +850,36 @@ $jsArrayPresidentesRequeridos = json_encode(array_map('intval', $listaPresidente
       const btn = document.getElementById('btnAprobarMinuta');
       if (!btn) return; // Salir si el botón no existe
 
-      // ⭐ LÓGICA CORREGIDA
       // Comprobamos si el ID del usuario logueado está INCLUIDO en el array de presidentes requeridos
       const esPresidenteRequerido = ID_USUARIO_LOGUEADO && IDS_PRESIDENTES_REQUERIDOS.includes(ID_USUARIO_LOGUEADO);
 
       // El botón solo se muestra si:
-      // 1. La minuta está PENDIENTE o PARCIAL
+      // 1. La minuta NO está 'APROBADA'
       // 2. Y el usuario logueado ES uno de los presidentes requeridos
-      if (idMinutaGlobal && (ESTADO_MINUTA_ACTUAL === 'PENDIENTE' || ESTADO_MINUTA_ACTUAL === 'PARCIAL') && esPresidenteRequerido) {
+      if (idMinutaGlobal && ESTADO_MINUTA_ACTUAL !== 'APROBADA' && esPresidenteRequerido) {
         btn.style.display = 'inline-block';
-        // Como sugieres, cambiamos el texto para que sea más claro
-        btn.innerHTML = '🔒 Registrar Mi Firma';
+        btn.disabled = false; // Habilitado por defecto
+
+        // --- NUEVA LÓGICA DE TEXTO Y ESTADO ---
+        if (ESTADO_FIRMA_USUARIO === 'PENDIENTE_REVISION') {
+          // El secretario editó. El presidente debe re-confirmar.
+          btn.innerHTML = '⚠️ Confirmar Cambios y Re-Firmar';
+          btn.classList.remove('btn-primary', 'btn-success', 'btn-secondary');
+          btn.classList.add('btn-warning', 'fw-bold');
+        } else if (ESTADO_FIRMA_USUARIO === 'CONFIRMADA') {
+          // El presidente ya firmó y su firma es válida. Está esperando a otros.
+          btn.innerHTML = '✅ Firma Registrada (En espera de otros)';
+          btn.classList.remove('btn-primary', 'btn-warning', 'btn-secondary');
+          btn.classList.add('btn-success');
+          btn.disabled = true; // Deshabilitar, ya firmó.
+        } else {
+          // Es null o PENDIENTE, significa que no ha firmado
+          btn.innerHTML = '🔒 Registrar Mi Firma';
+          btn.classList.remove('btn-warning', 'btn-success', 'btn-secondary');
+          btn.classList.add('btn-primary', 'fw-bold');
+        }
+        // --- FIN NUEVA LÓGICA ---
+
       } else {
         btn.style.display = 'none';
       }

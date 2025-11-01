@@ -408,16 +408,26 @@ try {
 
     // --- 6. REGISTRAR LA APROBACIÓN ACTUAL ---
     // Usamos INSERT IGNORE para evitar errores si ya firmó
-    $sqlInsertFirma = "INSERT IGNORE INTO t_aprobacion_minuta (t_minuta_idMinuta, t_usuario_idPresidente, fechaAprobacion)
-                       VALUES (:idMinuta, :idUsuario, NOW())";
-    $stmtInsert = $pdo->prepare($sqlInsertFirma);
-    $stmtInsert->execute([
+    $sqlUpsertFirma = "INSERT INTO t_aprobacion_minuta
+                           (t_minuta_idMinuta, t_usuario_idPresidente, fechaAprobacion, estado_firma)
+                       VALUES
+                           (:idMinuta, :idUsuario, NOW(), 'CONFIRMADA')
+                       ON DUPLICATE KEY UPDATE
+                           fechaAprobacion = NOW(),
+                           estado_firma = 'CONFIRMADA'";
+
+    $stmtUpsert = $pdo->prepare($sqlUpsertFirma);
+    $stmtUpsert->execute([
         ':idMinuta' => $idMinuta,
         ':idUsuario' => $idUsuarioLogueado
     ]);
 
     // --- 7. VERIFICAR SI YA SE COMPLETARON LAS APROBACIONES ---
-    $sqlCount = $pdo->prepare("SELECT COUNT(DISTINCT t_usuario_idPresidente) FROM t_aprobacion_minuta WHERE t_minuta_idMinuta = :idMinuta");
+    // --- 7. VERIFICAR SI YA SE COMPLETARON LAS APROBACIONES ---
+    $sqlCount = $pdo->prepare("SELECT COUNT(DISTINCT t_usuario_idPresidente)
+                               FROM t_aprobacion_minuta
+                               WHERE t_minuta_idMinuta = :idMinuta
+                               AND estado_firma = 'CONFIRMADA'");
     $sqlCount->execute([':idMinuta' => $idMinuta]);
     $totalAprobaciones = (int)$sqlCount->fetchColumn();
 

@@ -16,23 +16,40 @@ if (!isset($now)) {
 }
 
 /* =========================
+   FILTROS EN VISTA (no rompe lógica)
+   ========================= */
+$q = isset($_GET['q']) ? trim((string)$_GET['q']) : ''; // búsqueda por comisión o nombre reunión
+
+/* =========================
    PAGINACIÓN (no rompe lógica)
    ========================= */
 $perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;  // 10 por defecto
-$total   = count($reuniones);
+
+// --- Aplicar filtro antes de paginar ---
+$reunionesFiltradas = $reuniones;
+if ($q !== '') {
+    $needle = mb_strtolower($q, 'UTF-8');
+    $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($needle) {
+        $comision = mb_strtolower((string)($r['nombreComision'] ?? ''), 'UTF-8');
+        $nombre   = mb_strtolower((string)($r['nombreReunion'] ?? ''), 'UTF-8');
+        return (strpos($comision, $needle) !== false) || (strpos($nombre, $needle) !== false);
+    });
+}
+
+$total   = count($reunionesFiltradas);
 $pages   = max(1, (int)ceil($total / $perPage));
 $page    = isset($_GET['p']) ? (int)$_GET['p'] : 1;
 $page    = max(1, min($page, $pages));
 $offset  = ($page - 1) * $perPage;
 
 // Subconjunto a mostrar
-$reunionesPage = array_slice($reuniones, $offset, $perPage);
+$reunionesPage = array_slice($reunionesFiltradas, $offset, $perPage);
 
 // Helper para paginación
 function renderPagination($current, $pages) {
     if ($pages <= 1) return;
     // Preservar querystring existente
-    echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mt-3">';
+    echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0">';
     for ($i = 1; $i <= $pages; $i++) {
         $qsArr = $_GET;
         $qsArr['p'] = $i;
@@ -54,16 +71,44 @@ function renderPagination($current, $pages) {
     <style>
         .table-responsive { margin-top: 20px; }
         .table th, .table td { vertical-align: middle; }
+        .filters-card{border:1px solid #e5e7eb;border-radius:.5rem;background:#f8fafc}
+        .sticky-th thead th{position:sticky;top:0;z-index:1}
     </style>
 </head>
 <body>
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h3 class="mb-0">Reuniones Registradas</h3>
-
+            <!-- Se eliminó el selector de la esquina superior derecha -->
         </div>
 
-        <?php // Los mensajes de éxito/error se muestran en menu.php ?>
+        <!-- Filtros (debajo del título) -->
+        <form id="filtrosForm" method="GET" class="mb-3 p-3 filters-card">
+            <input type="hidden" name="pagina" value="<?php echo htmlspecialchars($_GET['pagina'] ?? 'reunion_listado', ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="p" id="pHidden" value="<?php echo (int)$page; ?>">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="q" class="form-label">Buscar</label>
+                    <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        id="q"
+                        name="q"
+                        placeholder="Buscar por comisión o nombre de reunión..."
+                        value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="col-md-4">
+                    <label for="per_page" class="form-label">Resultados</label>
+                    <select name="per_page" id="per_page" class="form-select form-select-sm">
+                        <?php foreach ([10,25,50] as $opt): ?>
+                            <option value="<?php echo $opt; ?>" <?php echo ($perPage===$opt)?'selected':''; ?>>
+                                <?php echo $opt; ?>/pág
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+        </form>
 
         <div class="card shadow-sm">
             <div class="card-body">
@@ -71,7 +116,7 @@ function renderPagination($current, $pages) {
                     <?php if (empty($reunionesPage)): ?>
                         <div class="alert alert-info">No hay reuniones vigentes registradas.</div>
                     <?php else: ?>
-                        <table class="table table-striped table-hover">
+                        <table class="table table-striped table-hover sticky-th">
                             <thead class="table-dark">
                                 <tr>
                                     <th>N° Minuta</th>
@@ -120,9 +165,7 @@ function renderPagination($current, $pages) {
                                             <?php
                                             // --- Lógica Principal de Acciones (se mantiene) ---
                                             if ($idMinuta === null) {
-                                                // *** CASO 1: Aún no se ha iniciado la minuta ***
                                                 if ($now < $meetingStartTime) {
-                                                    // 1a: Reunión futura -> Mensaje informativo
                                                     $horaInicioFormato = htmlspecialchars(date('H:i', $meetingStartTime));
                                                     $fechaInicioFormato = htmlspecialchars(date('d-m-Y', $meetingStartTime));
                                                     ?>
@@ -131,7 +174,6 @@ function renderPagination($current, $pages) {
                                                     </span>
                                                     <?php
                                                 } else {
-                                                    // 1b: Hora de inicio ya pasó -> Botón Azul "Iniciar Reunión"
                                                     ?>
                                                     <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary" title="Crear e iniciar la edición de la minuta">
                                                         <i class="fas fa-play me-1"></i> Iniciar Reunión
@@ -139,21 +181,18 @@ function renderPagination($current, $pages) {
                                                     <?php
                                                 }
                                             } elseif ($estadoMinuta === 'PENDIENTE') {
-                                                // *** CASO 2: Minuta iniciada pero pendiente ***
                                                 ?>
                                                 <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning" title="Continuar editando la minuta">
                                                     <i class="fas fa-edit me-1"></i> Continuar Edición
                                                 </a>
                                                 <?php
                                             } elseif ($estadoMinuta === 'APROBADA') {
-                                                // *** CASO 3: Minuta aprobada ***
                                                 ?>
                                                 <span class="text-success">
                                                     <i class="fas fa-check-circle me-1"></i> Reunión Finalizada
                                                 </span>
                                                 <?php
                                             } else {
-                                                // Estado desconocido
                                                 ?>
                                                 <span class="text-danger" title="Estado de minuta desconocido: <?php echo htmlspecialchars($estadoMinuta); ?>">
                                                     <i class="fas fa-exclamation-circle me-1"></i> Estado Inválido
@@ -161,7 +200,6 @@ function renderPagination($current, $pages) {
                                                 <?php
                                             }
 
-                        /* Botones Editar / Eliminar visibles sólo si aún no hay minuta creada */
                                             if ($idMinuta === null) {
                                                 ?>
                                                 <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
@@ -182,8 +220,10 @@ function renderPagination($current, $pages) {
                             </tbody>
                         </table>
 
-                        <!-- Paginación -->
-                        <?php renderPagination($page, $pages); ?>
+                        <!-- Paginación inferior (se mantiene) -->
+                        <div class="d-flex justify-content-end">
+                            <?php renderPagination($page, $pages); ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -191,5 +231,40 @@ function renderPagination($current, $pages) {
     </div>
 
     <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (function(){
+      // Form de filtros principal
+      const form   = document.getElementById('filtrosForm');
+      const inputQ = document.getElementById('q');
+      const perSel = document.getElementById('per_page');
+      const pHid   = document.getElementById('pHidden');
+
+      // Ir siempre a la primera página al cambiar filtros
+      function toFirstPage(){ if (pHid) pHid.value = '1'; }
+
+      // Autosubmit por tamaño de página
+      if(perSel){
+        perSel.addEventListener('change', ()=>{
+          toFirstPage();
+          if (form) form.submit();
+        });
+      }
+
+      // Búsqueda automática (≥5 chars o vacío)
+      if(inputQ && form){
+        let t=null;
+        inputQ.addEventListener('input', ()=>{
+          clearTimeout(t);
+          t = setTimeout(()=>{
+            const val = (inputQ.value || '').trim();
+            if(val.length >= 5 || val.length === 0){
+              toFirstPage();
+              form.submit();
+            }
+          }, 400);
+        });
+      }
+    })();
+    </script>
 </body>
 </html>
