@@ -562,16 +562,35 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             endif;
             // --- Fin sección Saludo ---
             ?>
-
             <?php
             // --- Router para cargar el contenido de la página solicitada ---
             $base_path = __DIR__;
             $controllers_path = __DIR__ . '/../../controllers';
 
+            // --- INICIO: AJUSTE PARA RUTA DE MINUTAS PENDIENTES ---
+            // (Esto asume que $tipoUsuario y ROL_PRESIDENTE_COMISION están definidos más arriba en este archivo)
+
+            // 1. Por defecto, la ruta apunta a la vista del Secretario Técnico
+            $rutaMinutasPendientes = [
+                'type' => 'controller',
+                'file' => $controllers_path . '/MinutaController.php', //
+                'params' => ['action' => 'list', 'estado' => 'PENDIENTE']
+            ];
+
+            // 2. PERO, si el usuario es un Presidente, apuntamos a su vista de firma personal
+            if ($tipoUsuario == ROL_PRESIDENTE_COMISION) {
+                $rutaMinutasPendientes = [
+                    'type' => 'view',
+                    'file' => $base_path . '/minutaPendiente.php' //
+                ];
+            }
+            // --- FIN: AJUSTE PARA RUTA DE MINUTAS PENDIENTES ---
+
+
             /* ============================================================
-            /   MODIFICADO: RUTAS DEL ROUTER (VERSIÓN FINAL)
-            ============================================================
-            */
+        /   MODIFICADO: RUTAS DEL ROUTER (VERSIÓN FINAL)
+        ============================================================
+        */
             // ¡ESTE BLOQUE HA SIDO ACTUALIZADO!
             $routes = [
                 // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
@@ -584,7 +603,11 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
                 // --- VISTAS SECUNDARIAS (las que estaban antes) ---
                 'crear_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
-                'minutas_pendientes' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'PENDIENTE']],
+
+                // --- LÍNEA MODIFICADA ---
+                'minutas_pendientes' => $rutaMinutasPendientes, // Ahora usa la variable que definimos arriba
+                // --- FIN LÍNEA MODIFICADA ---
+
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],
                 'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php'],
