@@ -610,6 +610,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],
                 'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
+              
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php'],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create']],
                 'comision_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'list']],
