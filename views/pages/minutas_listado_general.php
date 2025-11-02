@@ -77,7 +77,7 @@ if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
 
         // Coincide si aparece en Tema o en Objetivo
         return (mb_stripos($temasNorm, $needle, 0, 'UTF-8') !== false) ||
-            (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
+           (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
     }));
 }
 
@@ -151,13 +151,14 @@ function renderPaginationListado($current, $pages)
                     <th scope="col">Objetivo(s)</th>
                     <th scope="col">Fecha Creación</th>
                     <th scope="col" class="text-center">Adjuntos</th>
+                    <th scope="col">Revisar</th>
                     <th scope="col">Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($minutasPage) || !is_array($minutasPage)): ?>
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
+                        <td colspan="7" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($minutasPage as $minuta): ?>
@@ -165,7 +166,6 @@ function renderPaginationListado($current, $pages)
                             <?php
                             $minutaId = $minuta['idMinuta'];
                             $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
-                            // $presidenteAsignado = $minuta['t_usuario_idPresidente'] ?? null; // Lógica antigua
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
 
@@ -173,21 +173,18 @@ function renderPaginationListado($current, $pages)
                             $estadoFirmaUsuario = null;
                             $esPresidenteRequerido = false;
 
-                            // Solo consultamos si el $pdo está activo, el usuario está logueado y la minuta no está aprobada
                             if ($pdo && $idUsuarioLogueado && $estado !== 'APROBADA') {
                                 try {
-                                    // Consultamos el estado de firma del usuario logueado para ESTA minuta
                                     $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                                                               WHERE t_minuta_idMinuta = :idMinuta 
-                                                               AND t_usuario_idPresidente = :idUsuario");
+                                                                WHERE t_minuta_idMinuta = :idMinuta 
+                                                                AND t_usuario_idPresidente = :idUsuario");
                                     $sqlFirma->execute([':idMinuta' => $minutaId, ':idUsuario' => $idUsuarioLogueado]);
-                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn(); // 'EN_ESPERA', 'REQUIERE_REVISION', o false
+                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn(); 
 
                                     if ($estadoFirmaUsuario !== false) { // false = no es firmante
                                         $esPresidenteRequerido = true;
                                     }
                                 } catch (Exception $e) {
-                                    // Error en la sub-consulta, no mostrará botones de firma
                                     error_log("Error query firma en lista (ID Minuta: $minutaId): " . $e->getMessage());
                                 }
                             }
@@ -212,58 +209,55 @@ function renderPaginationListado($current, $pages)
                             </td>
 
                             <td style="white-space: nowrap;">
-                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): // Asumo que PARCIAL también es un estado posible 
-                                ?>
-
-                                    <?php
-                                    if ($esPresidenteRequerido):
-                                        // El usuario es un presidente firmante de esta minuta
-
-                                        if ($estadoFirmaUsuario === 'REQUIERE_REVISION') {
-                                            // 1. "Revisar actualización de la minuta"
-                                            // Este botón DEBE llevar a la página de edición.
-                                    ?>
-                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-warning fw-bold">
-                                                ⚠️ Confirmar Cambios y Re-Firmar
-                                            </a>
-                                        <?php
-                                        } else if ($estadoFirmaUsuario === 'EN_ESPERA') {
-                                            // 2. "a la espera de confirmacion"
-                                            // El usuario ya firmó, botón deshabilitado.
-                                        ?>
-                                            <button type="button" class="btn btn-sm btn-success" disabled>
-                                                ✅ Firma Registrada (En Espera)
-                                            </button>
-                                        <?php
-                                        } else {
-                                            // 3. Estado 'Pendiente' (null)
-                                            // El usuario debe firmar. 
-                                            // Mostramos "Editar" (por si quiere revisar) y "Registrar Firma" (como atajo).
-                                        ?>
-                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2" title="Editar Minuta">Editar</a>
-
-                                            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">
-                                                🔒 Registrar Mi Firma
-                                            </button>
-                                        <?php
-                                        }
-
-                                    else:
-                                        // El usuario NO es un presidente firmante (probablemente es secretario/admin).
-                                        // Solo debe ver el botón "Editar".
-                                        ?>
-                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
-                                    <?php
-                                    endif; // Fin de $esPresidenteRequerido 
-                                    ?>
+                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): ?>
+                                    
+                                    <?php if ($esPresidenteRequerido && $estadoFirmaUsuario === 'REQUIERE_REVISION'): ?>
+                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-warning fw-bold">
+                                            ⚠️ Revisar Cambios
+                                        </a>
+                                    <?php else: ?>
+                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white" title="Revisar/Editar Minuta">
+                                            Revisar / Editar
+                                        </a>
+                                    <?php endif; ?>
 
                                 <?php elseif ($estado === 'APROBADA'): ?>
-                                    <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Visualizar PDF</a>
+                                    <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-secondary <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">
+                                        Ver PDF Final
+                                    </a>
                                 <?php else: ?>
                                     —
                                 <?php endif; ?>
                             </td>
-                        </tr>
+                            <td style="white-space: nowrap;">
+                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): ?>
+                                    
+                                    <?php if ($esPresidenteRequerido): ?>
+                                        <?php if ($estadoFirmaUsuario === 'REQUIERE_REVISION'): ?>
+                                            <span class="badge bg-warning text-dark">Requiere Re-Firma</span>
+                                        
+                                        <?php elseif ($estadoFirmaUsuario === 'EN_ESPERA'): ?>
+                                            <button type="button" class="btn btn-sm btn-success" disabled>
+                                                ✅ Firma Registrada (En Espera)
+                                            </button>
+                                        
+                                        <?php else: // $estadoFirmaUsuario es null (pendiente) ?>
+                                            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">
+                                                🔒 Registrar Mi Firma
+                                            </button>
+                                        <?php endif; ?>
+
+                                    <?php else: ?>
+                                        <span class="badge bg-light text-dark">Gestión ST</span>
+                                    <?php endif; ?>
+
+                                <?php elseif ($estado === 'APROBADA'): ?>
+                                    <span class="badge bg-success">Minuta Aprobada</span>
+                                <?php else: ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
