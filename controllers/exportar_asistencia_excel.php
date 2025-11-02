@@ -2,7 +2,7 @@
 // controllers/exportar_asistencia_excel.php
 
 // 0. Habilitar reporte de errores (solo para desarrollo)
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 // 1. Incluir dependencias

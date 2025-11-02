@@ -647,245 +647,47 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 });
         }
 
-        /*
-        ============================================================
-        /   NUEVAS FUNCIONES PARA GESTIÓN DE ADJUNTOS
-        ============================================================
-        */
 
-        /**
-         * Carga la lista inicial de adjuntos al abrir la página de edición.
-         * DEBE SER LLAMADO cuando se carga la página `crearMinuta.php`.
-         */
-        function cargarAdjuntosExistentes(idMinuta) {
-            const listaUI = document.getElementById('listaAdjuntosExistentes');
-            if (!listaUI) return; // No estamos en la página de edición
 
-            listaUI.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
+        // --- Manejador para AÑADIR LINK ---
+        formLink.addEventListener('submit', (e) => {
+        e.preventDefault();
 
-            fetch('/corevota/controllers/obtener_adjuntos.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        idMinuta: idMinuta
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    listaUI.innerHTML = ''; // Limpiar "Cargando..."
-                    if (data.status === 'success' && data.adjuntos.length > 0) {
-                        data.adjuntos.forEach(adjunto => {
-                            const li = crearItemAdjuntoUI(adjunto);
-                            listaUI.appendChild(li);
-                        });
-                    } else {
-                        listaUI.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos para esta minuta.</li>';
+        const formData = new FormData();
+        formData.append('idMinuta', idMinuta);
+        formData.append('tipoAdjunto', 'link');
+        formData.append('urlLink', document.getElementById('inputUrlLink').value);
+
+        const btnLink = document.getElementById('btnAgregarLink');
+        btnLink.disabled = true;
+        btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
+
+        fetch('/corevota/controllers/agregar_adjunto.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const listaUI = document.getElementById('listaAdjuntosExistentes');
+                    // Quitar "No hay adjuntos" si es el primero
+                    if (listaUI.querySelector('.text-muted')) {
+                        listaUI.innerHTML = '';
                     }
-                })
-                .catch(error => {
-                    console.error('Error cargando adjuntos:', error);
-                    listaUI.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
-                });
-        }
-
-        /**
-         * Función helper para crear un <li> de la lista
-         */
-        function crearItemAdjuntoUI(adjunto) {
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-            li.dataset.id = adjunto.idAdjunto; // Guardamos el ID en el item
-
-            const divInfo = document.createElement('div');
-
-            // Definir ícono y texto del enlace
-            let icono = 'fa-file-alt'; // Icono por defecto
-            let textoEnlace = adjunto.nombreArchivo;
-
-            if (adjunto.tipoAdjunto === 'link') {
-                icono = 'fa-link text-info';
-                textoEnlace = adjunto.nombreArchivo.length > 70 ? adjunto.nombreArchivo.substring(0, 70) + '...' : adjunto.nombreArchivo;
-            } else if (/\.(jpg|jpeg|png|gif)$/i.test(adjunto.nombreArchivo)) {
-                icono = 'fa-file-image text-success';
-            } else if (/\.pdf$/i.test(adjunto.nombreArchivo)) {
-                icono = 'fa-file-pdf text-danger';
-            } else if (/\.(doc|docx)$/i.test(adjunto.nombreArchivo)) {
-                icono = 'fa-file-word text-primary';
-            } else if (/\.(xls|xlsx)$/i.test(adjunto.nombreArchivo)) {
-                icono = 'fa-file-excel text-success';
-            }
-
-            divInfo.innerHTML = `<i class="fas ${icono} fa-fw me-2"></i>`;
-
-            const a = document.createElement('a');
-            a.href = adjunto.pathArchivo;
-            a.textContent = textoEnlace;
-            a.target = '_blank';
-            divInfo.appendChild(a);
-
-            // Botón de eliminar
-            const btnEliminar = document.createElement('button');
-            btnEliminar.type = 'button';
-            btnEliminar.className = 'btn btn-outline-danger btn-sm';
-            btnEliminar.title = 'Eliminar adjunto';
-            btnEliminar.innerHTML = '<i class="fas fa-trash-alt"></i>';
-            btnEliminar.onclick = () => manejarEliminarAdjunto(adjunto.idAdjunto); // Llama al handler
-
-            li.appendChild(divInfo);
-            li.appendChild(btnEliminar);
-            return li;
-        }
-
-        /**
-         * Maneja el clic en el botón de eliminar.
-         */
-        function manejarEliminarAdjunto(idAdjunto) {
-            if (!confirm('¿Está seguro de que desea eliminar este adjunto? Esta acción no se puede deshacer.')) {
-                return;
-            }
-
-            fetch('/corevota/controllers/eliminar_adjunto.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        idAdjunto: idAdjunto
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Eliminar el item de la lista en la UI
-                        const itemUI = document.querySelector(`li[data-id='${idAdjunto}']`);
-                        if (itemUI) {
-                            itemUI.remove();
-                        }
-                        alert('Adjunto eliminado con éxito.');
-                    } else {
-                        alert('Error: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al eliminar:', error);
-                    alert('Error de conexión al eliminar.');
-                });
-        }
-
-
-        /**
-         * Event Listeners para los formularios de AÑADIR.
-         * Esto debe ejecutarse DESPUÉS de que el DOM esté cargado.
-         */
-        document.addEventListener('DOMContentLoaded', () => {
-
-            // Detectar si estamos en la página de edición
-            const formSubir = document.getElementById('formSubirArchivo');
-            const formLink = document.getElementById('formAgregarLink');
-            const idMinutaInput = document.getElementById('idMinutaActual');
-
-            // Si no encontramos los formularios, salimos.
-            if (!formSubir || !formLink || !idMinutaInput) {
-                return;
-            }
-
-            const idMinuta = idMinutaInput.value;
-
-            // --- Cargar la lista inicial al entrar ---
-            if (idMinuta && idMinuta !== '0') {
-                cargarAdjuntosExistentes(idMinuta);
-            } else {
-                // Es una minuta nueva, no hay nada que cargar
-                document.getElementById('listaAdjuntosExistentes').innerHTML = '<li class="list-group-item text-muted">Guarda la minuta primero para poder añadir adjuntos.</li>';
-                // Deshabilitamos los formularios
-                formSubir.style.opacity = '0.5';
-                formSubir.style.pointerEvents = 'none';
-                formLink.style.opacity = '0.5';
-                formLink.style.pointerEvents = 'none';
-                return;
-            }
-
-
-            // --- Manejador para SUBIR ARCHIVO ---
-            formSubir.addEventListener('submit', (e) => {
-                e.preventDefault();
-
-                const formData = new FormData();
-                formData.append('idMinuta', idMinuta);
-                formData.append('tipoAdjunto', 'file');
-                formData.append('archivo', document.getElementById('inputArchivo').files[0]);
-
-                const btnSubir = document.getElementById('btnSubirArchivo');
-                btnSubir.disabled = true;
-                btnSubir.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Subiendo...';
-
-                fetch('/corevota/controllers/agregar_adjunto.php', {
-                        method: 'POST',
-                        body: formData // No se usa headers 'Content-Type' con FormData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            const listaUI = document.getElementById('listaAdjuntosExistentes');
-                            // Quitar "No hay adjuntos" si es el primero
-                            if (listaUI.querySelector('.text-muted')) {
-                                listaUI.innerHTML = '';
-                            }
-                            const li = crearItemAdjuntoUI(data.nuevoAdjunto);
-                            listaUI.appendChild(li);
-                            formSubir.reset(); // Limpiar el formulario
-                        } else {
-                            alert('Error al subir: ' + data.message);
-                        }
-                    })
-                    .catch(error => alert('Error de red: ' + error.message))
-                    .finally(() => {
-                        btnSubir.disabled = false;
-                        btnSubir.innerHTML = '<i class="fas fa-upload me-2"></i>Subir';
-                    });
-            });
-
-            // --- Manejador para AÑADIR LINK ---
-            formLink.addEventListener('submit', (e) => {
-                e.preventDefault();
-
-                const formData = new FormData();
-                formData.append('idMinuta', idMinuta);
-                formData.append('tipoAdjunto', 'link');
-                formData.append('urlLink', document.getElementById('inputUrlLink').value);
-
-                const btnLink = document.getElementById('btnAgregarLink');
-                btnLink.disabled = true;
-                btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
-
-                fetch('/corevota/controllers/agregar_adjunto.php', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            const listaUI = document.getElementById('listaAdjuntosExistentes');
-                            // Quitar "No hay adjuntos" si es el primero
-                            if (listaUI.querySelector('.text-muted')) {
-                                listaUI.innerHTML = '';
-                            }
-                            const li = crearItemAdjuntoUI(data.nuevoAdjunto);
-                            listaUI.appendChild(li);
-                            formLink.reset(); // Limpiar el formulario
-                        } else {
-                            alert('Error al añadir link: ' + data.message);
-                        }
-                    })
-                    .catch(error => alert('Error de red: ' + error.message))
-                    .finally(() => {
-                        btnLink.disabled = false;
-                        btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
-                    });
+                    const li = crearItemAdjuntoUI(data.nuevoAdjunto);
+                    listaUI.appendChild(li);
+                    formLink.reset(); // Limpiar el formulario
+                } else {
+                    alert('Error al añadir link: ' + data.message);
+                }
+            })
+            .catch(error => alert('Error de red: ' + error.message))
+            .finally(() => {
+                btnLink.disabled = false;
+                btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
             });
         });
+        
 
 
         // Función para aprobar minuta

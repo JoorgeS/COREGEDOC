@@ -3,7 +3,7 @@
 
 // 1. FORZAR QUE SE MUESTREN LOS ERRORES (Lo mantenemos)
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 // ---------------------------------------------
 
 // Ajustamos la ruta para que sea infalible, subiendo al directorio raíz

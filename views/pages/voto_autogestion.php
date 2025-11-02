@@ -9,7 +9,7 @@ if (!isset($_SESSION['idUsuario'])) {
 
 require_once __DIR__ . '/../../class/class.conectorDB.php';
 require_once __DIR__ . '/../../controllers/VotacionController.php';
-require_once __DIR__ . '/../../controllers/VotoController.php';
+require_once __DIR__ . '/../../controllers/VotoController.php'; // ruta correcta
 
 $db = new conectorDB();
 $pdo = $db->getDatabase();
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
   }
 
   // 2️⃣ Registrar voto
-  $response = $votoCtrl->registrarVoto($idVotacion, $idUsuario, $opcionVoto);
+  $response = $votoCtrl->registrarVoto((int)$idVotacion, (int)$idUsuario, (string)$opcionVoto);
   echo json_encode($response);
   exit;
 }
@@ -51,7 +51,7 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
   </h3>
 
   <?php
-  $habilitadas = array_filter($votaciones, fn($v) => $v['habilitada'] == 1);
+  $habilitadas = array_filter($votaciones, fn($v) => (int)$v['habilitada'] === 1);
   if (empty($habilitadas)): ?>
     <div class="alert alert-info shadow-sm">
       <i class="fa-solid fa-info-circle me-2"></i>
@@ -61,10 +61,10 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
     <div class="row g-4">
       <?php foreach ($habilitadas as $v):
         // verificar si el usuario ya votó esta votación
-$sqlCheck = "SELECT opcionVoto FROM t_voto 
+        $sqlCheck = "SELECT opcionVoto FROM t_voto 
                      WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
-    $stmt = $pdo->prepare($sqlCheck);
-    $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $v['idVotacion']]);
+        $stmt = $pdo->prepare($sqlCheck);
+        $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $v['idVotacion']]);
         $votoPrevio = $stmt->fetchColumn();
         $yaVoto = !empty($votoPrevio);
       ?>
@@ -94,8 +94,9 @@ $sqlCheck = "SELECT opcionVoto FROM t_voto
                 </form>
               <?php endif; ?>
               <div class="mt-3">
+                <!-- Agrego clase para que el JS pueda tomar el destino real -->
                 <a href="menu.php?pagina=tabla_votacion&idVotacion=<?= $v['idVotacion'] ?>"
-                  class="btn btn-outline-success btn-sm fw-semibold">
+                   class="btn btn-outline-success btn-sm fw-semibold js-resumen-url">
                   <i class="fa-solid fa-chart-simple me-1"></i> Ver resultados
                 </a>
               </div>
@@ -147,12 +148,23 @@ $sqlCheck = "SELECT opcionVoto FROM t_voto
                 Swal.fire({
                   icon: 'success',
                   title: '✅ Voto registrado correctamente',
+                  text: 'Redirigiendo al resumen...',
                   showConfirmButton: false,
-                  timer: 1500
+                  timer: 1600
                 });
                 setTimeout(() => {
-                  window.location.href = 'menu.php?pagina=tabla_votacion';
-                }, 1500);
+                  const id = form.querySelector('input[name="idVotacion"]').value;
+
+                  // 1) Intentar usar el mismo destino del botón "Ver resultados"
+                  const contenedor = form.closest('.card-body') || document;
+                  const linkResumen = contenedor.querySelector('.js-resumen-url');
+                  const hrefResumen = linkResumen ? linkResumen.getAttribute('href') : null;
+
+                  // 2) Fallback confiable al router que ya funciona
+                  const destino = hrefResumen || `menu.php?pagina=tabla_votacion&idVotacion=${id}`;
+
+                  window.location.href = destino;
+                }, 1600);
               } else {
                 Swal.fire({
                   icon: 'error',
@@ -162,7 +174,7 @@ $sqlCheck = "SELECT opcionVoto FROM t_voto
                 });
               }
             })
-            .catch(err => {
+            .catch(() => {
               Swal.fire({
                 icon: 'error',
                 title: 'Error de conexión',

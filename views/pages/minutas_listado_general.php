@@ -1,5 +1,24 @@
 <?php
 // views/pages/minutas_listado_general.php
+
+// --- INICIO DE MODIFICACIÓN: Conexión a BD ---
+// Necesaria para consultar el estado de firma individual en la lista
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once __DIR__ . '/../../class/class.conectorDB.php';
+try {
+    $db = new conectorDB();
+    $pdo = $db->getDatabase();
+} catch (Exception $e) {
+    // Si la app está funcionando, $pdo no debería ser null
+    // Si falla, los botones de firma no aparecerán.
+    $pdo = null;
+    error_log("Error de conexión BD en minutas_listado_general.php: " . $e->getMessage());
+}
+// --- FIN DE MODIFICACIÓN ---
+
+
 // Variables esperadas del Controlador:
 // $minutas (array), $estadoActual (string), $currentStartDate (string), $currentEndDate (string), $currentThemeName (string)
 
@@ -58,7 +77,7 @@ if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
 
         // Coincide si aparece en Tema o en Objetivo
         return (mb_stripos($temasNorm, $needle, 0, 'UTF-8') !== false) ||
-               (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
+            (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
     }));
 }
 
@@ -71,7 +90,8 @@ $pages    = max(1, (int)ceil(($total ?: 1) / $perPage));
 $minutasPage = array_slice($minutasFiltradas ?? [], $offset, $perPage);
 
 // Helper paginación
-function renderPaginationListado($current, $pages) {
+function renderPaginationListado($current, $pages)
+{
     if ($pages <= 1) return;
     echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm">';
     for ($i = 1; $i <= $pages; $i++) {
@@ -79,7 +99,7 @@ function renderPaginationListado($current, $pages) {
         $qsArr  = $_GET;
         $qsArr['p'] = $i;
         $qs = http_build_query($qsArr);
-        echo '<li class="page-item'.$active.'"><a class="page-link" href="?'.$qs.'">'.$i.'</a></li>';
+        echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qs . '">' . $i . '</a></li>';
     }
     echo '</ul></nav>';
 }
@@ -112,7 +132,6 @@ function renderPaginationListado($current, $pages) {
                         placeholder="Busca en “Nombre(s) del Tema” u “Objetivo(s)”…"
                         value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
                 <?php else: ?>
-                    <!-- En PENDIENTES: oculto para no cambiar flujo -->
                     <input type="hidden" id="themeName" name="themeName" value="">
                 <?php endif; ?>
             </div>
@@ -146,10 +165,35 @@ function renderPaginationListado($current, $pages) {
                             <?php
                             $minutaId = $minuta['idMinuta'];
                             $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
-                            $presidenteAsignado = $minuta['t_usuario_idPresidente'] ?? null;
+                            // $presidenteAsignado = $minuta['t_usuario_idPresidente'] ?? null; // Lógica antigua
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
+
+                            // --- INICIO DE MODIFICACIÓN: Lógica de Firma Individual ---
+                            $estadoFirmaUsuario = null;
+                            $esPresidenteRequerido = false;
+
+                            // Solo consultamos si el $pdo está activo, el usuario está logueado y la minuta no está aprobada
+                            if ($pdo && $idUsuarioLogueado && $estado !== 'APROBADA') {
+                                try {
+                                    // Consultamos el estado de firma del usuario logueado para ESTA minuta
+                                    $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
+                                                               WHERE t_minuta_idMinuta = :idMinuta 
+                                                               AND t_usuario_idPresidente = :idUsuario");
+                                    $sqlFirma->execute([':idMinuta' => $minutaId, ':idUsuario' => $idUsuarioLogueado]);
+                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn(); // 'EN_ESPERA', 'REQUIERE_REVISION', o false
+
+                                    if ($estadoFirmaUsuario !== false) { // false = no es firmante
+                                        $esPresidenteRequerido = true;
+                                    }
+                                } catch (Exception $e) {
+                                    // Error en la sub-consulta, no mostrará botones de firma
+                                    error_log("Error query firma en lista (ID Minuta: $minutaId): " . $e->getMessage());
+                                }
+                            }
+                            // --- FIN DE MODIFICACIÓN ---
                             ?>
+
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
                             <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
                             <td><?php echo $minuta['objetivos'] ?? 'N/A'; ?></td>
@@ -158,8 +202,8 @@ function renderPaginationListado($current, $pages) {
                             <td class="text-center">
                                 <?php if ($totalAdjuntos > 0): ?>
                                     <button type="button" class="btn btn-info btn-sm"
-                                            title="Ver adjuntos"
-                                            onclick="verAdjuntos(<?php echo (int)$minutaId; ?>)">
+                                        title="Ver adjuntos"
+                                        onclick="verAdjuntos(<?php echo (int)$minutaId; ?>)">
                                         <i class="fas fa-paperclip"></i> (<?php echo $totalAdjuntos; ?>)
                                     </button>
                                 <?php else: ?>
@@ -168,11 +212,51 @@ function renderPaginationListado($current, $pages) {
                             </td>
 
                             <td style="white-space: nowrap;">
-                                <?php if ($estado === 'PENDIENTE'): ?>
-                                    <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
-                                    <?php if ($idUsuarioLogueado && (int)$idUsuarioLogueado === (int)$presidenteAsignado): ?>
-                                        <button type="button" class="btn btn-sm btn-primary" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">Registrar mi Firma</button>
-                                    <?php endif; ?>
+                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): // Asumo que PARCIAL también es un estado posible 
+                                ?>
+
+                                    <?php
+                                    if ($esPresidenteRequerido):
+                                        // El usuario es un presidente firmante de esta minuta
+
+                                        if ($estadoFirmaUsuario === 'REQUIERE_REVISION') {
+                                            // 1. "Revisar actualización de la minuta"
+                                            // Este botón DEBE llevar a la página de edición.
+                                    ?>
+                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-warning fw-bold">
+                                                ⚠️ Confirmar Cambios y Re-Firmar
+                                            </a>
+                                        <?php
+                                        } else if ($estadoFirmaUsuario === 'EN_ESPERA') {
+                                            // 2. "a la espera de confirmacion"
+                                            // El usuario ya firmó, botón deshabilitado.
+                                        ?>
+                                            <button type="button" class="btn btn-sm btn-success" disabled>
+                                                ✅ Firma Registrada (En Espera)
+                                            </button>
+                                        <?php
+                                        } else {
+                                            // 3. Estado 'Pendiente' (null)
+                                            // El usuario debe firmar. 
+                                            // Mostramos "Editar" (por si quiere revisar) y "Registrar Firma" (como atajo).
+                                        ?>
+                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2" title="Editar Minuta">Editar</a>
+
+                                            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">
+                                                🔒 Registrar Mi Firma
+                                            </button>
+                                        <?php
+                                        }
+
+                                    else:
+                                        // El usuario NO es un presidente firmante (probablemente es secretario/admin).
+                                        // Solo debe ver el botón "Editar".
+                                        ?>
+                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white me-2">Editar</a>
+                                    <?php
+                                    endif; // Fin de $esPresidenteRequerido 
+                                    ?>
+
                                 <?php elseif ($estado === 'APROBADA'): ?>
                                     <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-success <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">Visualizar PDF</a>
                                 <?php else: ?>
@@ -186,24 +270,32 @@ function renderPaginationListado($current, $pages) {
         </table>
     </div>
 
+    <?php
+    // --- INICIO DE MODIFICACIÓN: Cerrar conexión ---
+    if ($pdo) {
+        $pdo = null;
+    }
+    // --- FIN DE MODIFICACIÓN ---
+    ?>
+
     <?php renderPaginationListado($page, $pages); ?>
 </div>
 
 <div class="modal fade" id="modalAdjuntos" tabindex="-1" aria-labelledby="modalAdjuntosLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalAdjuntosLabel">Documentos Adjuntos</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <ul id="listaDeAdjuntos" class="list-group list-group-flush">
-          <li class="list-group-item text-muted">Cargando...</li>
-        </ul>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-      </div>
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAdjuntosLabel">Documentos Adjuntos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul id="listaDeAdjuntos" class="list-group list-group-flush">
+                    <li class="list-group-item text-muted">Cargando...</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
