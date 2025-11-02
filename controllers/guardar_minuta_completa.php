@@ -17,6 +17,8 @@ header('Content-Type: application/json');
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+    $idSecretario = $_SESSION['idUsuario'] ?? 0;
+    // ... (resto del código)
 }
 
 // --- 1. Recepción de Datos desde $_POST y $_FILES ---
@@ -364,7 +366,6 @@ class MinutaManager extends BaseConexion
             $listaCompletaAdjuntos = $stmtTodosAdjuntos->fetchAll(PDO::FETCH_ASSOC);
 
             return ['status' => 'success', 'message' => $mensajeExito, 'idMinuta' => $idMinuta, 'adjuntosActualizados' => $listaCompletaAdjuntos];
-
         } catch (Exception $e) {
             error_log("ERROR CATCH idMinuta {$idMinuta}: Excepción capturada - " . $e->getMessage());
             if ($this->db->inTransaction()) {

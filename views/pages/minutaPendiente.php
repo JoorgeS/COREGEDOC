@@ -415,11 +415,13 @@ function renderPagination($current, $pages)
 
   // (Esta función JS está dentro del <script> al final de minutaPendiente.php)
 
+  // (Esta función JS está dentro del <script> al final de minutaPendiente.php)
+
   function enviarFeedback(idMinuta) {
     const boton = document.getElementById('btn-aprobar-' + idMinuta);
     const botonFeedback = document.getElementById('btn-feedback-' + idMinuta);
 
-    // HTML para el nuevo formulario de feedback
+    // El HTML para el formulario está perfecto, no cambia.
     const feedbackHtml = `
             <style>
                 .feedback-form-container { text-align: left; }
@@ -452,7 +454,7 @@ function renderPagination($current, $pages)
                     <input class="form-check-input" type="checkbox" value="Adjuntos" id="fb_adjuntos">
                     <label class="form-check-label" for="fb_adjuntos">Documentos Adjuntos</label>
                     <textarea id="fb_adjuntos_text" class="form-control" placeholder="Indique qué documento falta o debe corregirse..."></textarea>
-                    </div>
+                </div>
 
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" value="Otro" id="fb_otro">
@@ -463,7 +465,7 @@ function renderPagination($current, $pages)
 
     Swal.fire({
       title: 'Enviar Feedback al Secretario',
-      html: feedbackHtml, // Usamos el HTML que acabamos de crear
+      html: feedbackHtml,
       width: '80%',
       showCancelButton: true,
       confirmButtonText: 'Enviar Feedback',
@@ -471,48 +473,48 @@ function renderPagination($current, $pages)
       cancelButtonText: 'Cancelar',
       showLoaderOnConfirm: true,
 
-      // Función para validar y recolectar los datos
       preConfirm: () => {
         const items = ['asistencia', 'temas', 'votaciones', 'adjuntos', 'otro'];
         let feedbackCombinado = "";
         let itemsSeleccionados = 0;
+        let validationError = null;
 
-        items.forEach(id => {
+        for (const id of items) {
           const checkbox = document.getElementById('fb_' + id);
           if (checkbox.checked) {
             itemsSeleccionados++;
             const texto = document.getElementById('fb_' + id + '_text').value;
+
             if (texto.trim() === "") {
-              // Si marcó el check pero no escribió nada
-              Swal.showValidationMessage(`Por favor, escriba un comentario para la sección: ${checkbox.value}`);
-              return false; // Detiene el envío
+              validationError = `Por favor, escriba un comentario para la sección: ${checkbox.value}`;
+              break;
             }
             feedbackCombinado += `--- SECCIÓN: ${checkbox.value.toUpperCase()} ---\n${texto}\n\n`;
           }
-        });
+        }
+
+        if (validationError) {
+          Swal.showValidationMessage(validationError);
+          return false;
+        }
 
         if (itemsSeleccionados === 0) {
           Swal.showValidationMessage(`Debe seleccionar al menos una sección y escribir un comentario.`);
           return false;
         }
 
-        if (feedbackCombinado.trim() === "") {
-          Swal.showValidationMessage(`Por favor, escriba un comentario en las secciones seleccionadas.`);
-          return false;
-        }
-
         if (boton) boton.disabled = true;
         if (botonFeedback) botonFeedback.disabled = true;
 
-        // Si todo está bien, enviamos el feedback combinado
-        return fetch('../controllers/enviar_feedback.php', {
+        // --- ¡¡AQUÍ ESTÁ LA LÍNEA CORREGIDA!! ---
+        return fetch('../../controllers/enviar_feedback.php', { //
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               idMinuta: idMinuta,
-              feedback: feedbackCombinado // Enviamos el texto estructurado
+              feedback: feedbackCombinado
             })
           })
           .then(response => {
@@ -541,43 +543,8 @@ function renderPagination($current, $pages)
           location.reload();
         });
       } else if (!result.isConfirmed) {
-        // Si el usuario cancela, reactivamos los botones
         if (boton) boton.disabled = false;
         if (botonFeedback) botonFeedback.disabled = false;
-      }
-    });
-  }
-
-  function verAdjuntos(idMinuta) {
-    Swal.fire({
-      title: 'Cargando Adjuntos...',
-      didOpen: () => {
-        Swal.showLoading();
-        fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.status === 'success' && data.data.length > 0) {
-              let html = '<ul class="list-group list-group-flush text-start">';
-              data.data.forEach(adj => {
-                const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
-                const icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');
-                const nombre = adj.pathAdjunto.split('/').pop();
-                html += `<li class="list-group-item"><a href="${url}" target="_blank">${icon} ${nombre}</a></li>`;
-              });
-              html += '</ul>';
-              Swal.update({
-                title: 'Adjuntos de la Minuta',
-                html: html,
-                showConfirmButton: true,
-                icon: 'info'
-              });
-            } else {
-              Swal.fire('Sin Adjuntos', 'Esta minuta no tiene archivos adjuntos.', 'info');
-            }
-          })
-          .catch(err => {
-            Swal.fire('Error', 'No se pudieron cargar los adjuntos.', 'error');
-          });
       }
     });
   }

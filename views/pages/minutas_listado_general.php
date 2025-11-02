@@ -82,11 +82,11 @@ if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
 }
 
 // ---------- Paginación en la vista ----------
-$perPage  = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
-$page     = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$offset   = ($page - 1) * $perPage;
-$total    = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
-$pages    = max(1, (int)ceil(($total ?: 1) / $perPage));
+$perPage   = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
+$page      = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$offset    = ($page - 1) * $perPage;
+$total     = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
+$pages     = max(1, (int)ceil(($total ?: 1) / $perPage));
 $minutasPage = array_slice($minutasFiltradas ?? [], $offset, $perPage);
 
 // Helper paginación
@@ -103,6 +103,8 @@ function renderPaginationListado($current, $pages)
     }
     echo '</ul></nav>';
 }
+
+
 ?>
 
 <div class="container-fluid mt-4">
@@ -151,8 +153,8 @@ function renderPaginationListado($current, $pages)
                     <th scope="col">Objetivo(s)</th>
                     <th scope="col">Fecha Creación</th>
                     <th scope="col" class="text-center">Adjuntos</th>
-                    <th scope="col">Revisar</th>
-                    <th scope="col">Acciones</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col" class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -165,21 +167,22 @@ function renderPaginationListado($current, $pages)
                         <tr>
                             <?php
                             $minutaId = $minuta['idMinuta'];
-                            $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
+                            //$estado = $minuta['estadoMinuta'] ?? 'PENDIENTE'; // Esta variable se redefine abajo
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
 
                             // --- INICIO DE MODIFICACIÓN: Lógica de Firma Individual ---
+                            // (Se mantiene por si se usa en otro lado, aunque la nueva lógica no la usa)
                             $estadoFirmaUsuario = null;
                             $esPresidenteRequerido = false;
 
-                            if ($pdo && $idUsuarioLogueado && $estado !== 'APROBADA') {
+                            if ($pdo && $idUsuarioLogueado && ($minuta['estadoMinuta'] ?? 'PENDIENTE') !== 'APROBADA') {
                                 try {
                                     $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                                                                WHERE t_minuta_idMinuta = :idMinuta 
-                                                                AND t_usuario_idPresidente = :idUsuario");
+                                                                 WHERE t_minuta_idMinuta = :idMinuta 
+                                                                 AND t_usuario_idPresidente = :idUsuario");
                                     $sqlFirma->execute([':idMinuta' => $minutaId, ':idUsuario' => $idUsuarioLogueado]);
-                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn(); 
+                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn();
 
                                     if ($estadoFirmaUsuario !== false) { // false = no es firmante
                                         $esPresidenteRequerido = true;
@@ -208,56 +211,59 @@ function renderPaginationListado($current, $pages)
                                 <?php endif; ?>
                             </td>
 
-                            <td style="white-space: nowrap;">
-                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): ?>
-                                    
-                                    <?php if ($esPresidenteRequerido && $estadoFirmaUsuario === 'REQUIERE_REVISION'): ?>
-                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-warning fw-bold">
-                                            ⚠️ Revisar Cambios
-                                        </a>
-                                    <?php else: ?>
-                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo (int)$minutaId; ?>" class="btn btn-sm btn-info text-white" title="Revisar/Editar Minuta">
-                                            Revisar / Editar
-                                        </a>
-                                    <?php endif; ?>
+                            <?php
+                            // --- (INTEGRADO) INICIO DE AJUSTE: Lógica de Estado General (Secretario) ---
+                            $estado = $minuta['estadoMinuta'];
+                            $firmasActuales = (int)($minuta['firmasActuales'] ?? 0);
+                            $requeridos = max(1, (int)($minuta['presidentesRequeridos'] ?? 1));
+                            $tieneFeedback = (int)($minuta['tieneFeedback'] > 0);
 
-                                <?php elseif ($estado === 'APROBADA'): ?>
-                                    <a href="<?php echo htmlspecialchars($minuta['pathArchivo'] ?? '#'); ?>" target="_blank" class="btn btn-sm btn-secondary <?php echo empty($minuta['pathArchivo']) ? 'disabled' : ''; ?>">
-                                        Ver PDF Final
-                                    </a>
-                                <?php else: ?>
-                                    —
-                                <?php endif; ?>
+                            $statusText = 'Aprobación Pendiente';
+                            $statusClass = 'text-warning'; // Amarillo
+
+                            if ($tieneFeedback) {
+                                $statusText = 'Requiere Revisión (Feedback)';
+                                $statusClass = 'text-danger'; // Rojo
+                            } elseif ($estado === 'PARCIAL') {
+                                $statusText = "Aprobación Parcial ($firmasActuales / $requeridos)";
+                                $statusClass = 'text-info'; // Azul claro
+                            } elseif ($estado === 'PENDIENTE') {
+                                $statusText = "Pendiente de Firma ($firmasActuales / $requeridos)";
+                                $statusClass = 'text-warning';
+                            } elseif ($estado === 'APROBADA') {
+                                $statusText = 'Aprobada y Finalizada';
+                                $statusClass = 'text-success'; // Verde
+                            } elseif ($estado === 'BORRADOR') {
+                                $statusText = 'Borrador (No enviado)';
+                                $statusClass = 'text-muted'; // Gris
+                            }
+                            // --- FIN DE AJUSTE ---
+                            ?>
+
+                            <td>
+                                <strong class="<?php echo $statusClass; ?>"><?php echo htmlspecialchars($statusText); ?></strong>
                             </td>
-                            <td style="white-space: nowrap;">
-                                <?php if ($estado === 'PENDIENTE' || $estado === 'PARCIAL'): ?>
-                                    
-                                    <?php if ($esPresidenteRequerido): ?>
-                                        <?php if ($estadoFirmaUsuario === 'REQUIERE_REVISION'): ?>
-                                            <span class="badge bg-warning text-dark">Requiere Re-Firma</span>
-                                        
-                                        <?php elseif ($estadoFirmaUsuario === 'EN_ESPERA'): ?>
-                                            <button type="button" class="btn btn-sm btn-success" disabled>
-                                                ✅ Firma Registrada (En Espera)
-                                            </button>
-                                        
-                                        <?php else: // $estadoFirmaUsuario es null (pendiente) ?>
-                                            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="aprobarMinuta(<?php echo (int)$minutaId; ?>)">
-                                                🔒 Registrar Mi Firma
-                                            </button>
-                                        <?php endif; ?>
 
-                                    <?php else: ?>
-                                        <span class="badge bg-light text-dark">Gestión ST</span>
-                                    <?php endif; ?>
-
-                                <?php elseif ($estado === 'APROBADA'): ?>
-                                    <span class="badge bg-success">Minuta Aprobada</span>
-                                <?php else: ?>
-                                    —
+                            <td class="text-end" style="white-space: nowrap;">
+                                <?php if ($estado === 'BORRADOR'): ?>
+                                    <button class="btn btn-danger btn-sm" onclick="enviarAprobacion(<?php echo $minuta['idMinuta']; ?>)">
+                                        <i class="fas fa-paper-plane"></i> Enviar p/ Aprobación
+                                    </button>
+                                <?php elseif ($tieneFeedback): ?>
+                                    <button class="btn btn-success btn-sm" onclick="aplicarFeedback(<?php echo $minuta['idMinuta']; ?>)">
+                                        <i class="fas fa-check-double"></i> Aplicar Corrección y Reenviar
+                                    </button>
                                 <?php endif; ?>
+
+                                <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+
+                                <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
+                                    <i class="fas fa-edit"></i>
+                                </a>
                             </td>
-                            </tr>
+                        </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
@@ -293,3 +299,137 @@ function renderPaginationListado($current, $pages)
         </div>
     </div>
 </div>
+
+<script>
+/**
+ * (INTEGRADO)
+ * Confirma y reenvía una minuta que tenía feedback para aprobación.
+ */
+function aplicarFeedback(idMinuta) {
+    if (!confirm('¿Confirma que ya aplicó las correcciones y desea reenviar la minuta para su aprobación?')) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('idMinuta', idMinuta);
+
+    // Asegúrate que esta ruta sea correcta desde la raíz de tu proyecto
+    fetch('../controllers/aplicar_feedback.php', { 
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error en aplicarFeedback:', error)
+        alert('Ocurrió un error de conexión al aplicar el feedback.');
+    });
+}
+
+/**
+ * Envía una minuta en estado BORRADOR para aprobación por primera vez.
+ * (Placeholder: Debes crear el controlador 'enviar_aprobacion.php')
+ */
+function enviarAprobacion(idMinuta) {
+    if (!confirm('¿Está seguro de que desea enviar esta minuta para aprobación? Una vez enviada, no podrá editarla a menos que reciba feedback.')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('idMinuta', idMinuta);
+
+    // Asegúrate que esta ruta sea correcta
+    fetch('../controllers/enviar_aprobacion.php', { // DEBES CREAR ESTE ARCHIVO
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error en enviarAprobacion:', error);
+        alert('Ocurrió un error de conexión al enviar la minuta.');
+    });
+}
+
+/**
+ * Muestra el modal con la lista de adjuntos (Placeholder)
+ * (Esta función probablemente ya existe en tu JS principal, si no, debes implementarla)
+ */
+function verAdjuntos(idMinuta) {
+    console.log("Solicitando adjuntos para la minuta ID:", idMinuta);
+    const modalElement = document.getElementById('modalAdjuntos');
+    const modalList = document.getElementById('listaDeAdjuntos');
+    
+    if (!modalElement || !modalList) {
+        console.error("No se encontraron los elementos del modal.");
+        return;
+    }
+
+    // Mostrar modal (requiere Bootstrap)
+    const modal = new bootstrap.Modal(modalElement);
+    
+    // Limpiar lista y mostrar 'Cargando...'
+    modalList.innerHTML = '<li class="list-group-item text-muted">Cargando...</li>';
+    modal.show();
+
+    // Lógica (fetch) para obtener los adjuntos
+    // (Debes crear un controlador 'get_adjuntos.php' o similar)
+    /*
+    fetch('../controllers/get_adjuntos.php?id=' + idMinuta)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success' && data.adjuntos.length > 0) {
+            modalList.innerHTML = ''; // Limpiar 'Cargando...'
+            data.adjuntos.forEach(adj => {
+                // Asumiendo que 'adj.url' es la ruta y 'adj.nombre' es el nombre
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.innerHTML = `
+                    <span><i class="fas fa-file-alt me-2"></i> ${adj.nombre}</span>
+                    <a href="${adj.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download"></i>
+                    </a>
+                `;
+                modalList.appendChild(li);
+            });
+        } else {
+             modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
+        }
+    })
+    .catch(error => {
+        console.error('Error al cargar adjuntos:', error);
+        modalList.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
+    });
+    */
+    
+    // --- INICIO DE CÓDIGO DE EJEMPLO (BORRAR DESPUÉS) ---
+    // Simulación de carga (reemplaza esto con tu 'fetch')
+    setTimeout(() => {
+         modalList.innerHTML = `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-file-pdf me-2"></i> Documento_Ejemplo_1.pdf</span>
+                <a href="#" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-file-image me-2"></i> Imagen_Referencia.png</span>
+                <a href="#" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>
+            </li>
+         `;
+    }, 1000);
+    // --- FIN DE CÓDIGO DE EJEMPLO ---
+}
+</script>

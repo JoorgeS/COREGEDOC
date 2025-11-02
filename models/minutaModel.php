@@ -25,29 +25,63 @@ class MinutaModel
 
         // SELECT con alias esperados por las vistas
         $sql = "
-            SELECT
-                m.idMinuta AS idMinuta,
-                m.t_usuario_idPresidente,  -- se mantiene tal cual para no romper vistas
-                /* estadoMinuta calculado por pathArchivo para no depender de una columna inexistente */
-                CASE 
-                    WHEN COALESCE(m.pathArchivo,'') <> '' THEN 'APROBADA'
-                    ELSE 'PENDIENTE'
-                END AS estadoMinuta,
-                m.pathArchivo,
-                m.fechaMinuta,
+            SELECT 
+    m.idMinuta,
+    m.t_comision_idComision, 
+    c.nombreComision, 
+    u.pNombre AS presidenteNombre,
+    u.aPaterno AS presidenteApellido,
+    m.fechaMinuta AS fecha,
+    m.horaMinuta AS hora,
+    m.estadoMinuta, -- Se mantiene el estado de la nueva consulta
+    m.presidentesRequeridos,
+    m.pathArchivo, -- Se agrega el pathArchivo desde la consulta original
 
-                /* Temas y objetivos agregados; si no hay, devolvemos 'N/A' */
-                IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
-                IFNULL(GROUP_CONCAT(DISTINCT t.objetivo   ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS objetivos,
+    -- (NUEVO) Conteo de firmas actuales (de la nueva consulta)
+    (SELECT COUNT(DISTINCT am_count.t_usuario_idPresidente) 
+     FROM t_aprobacion_minuta am_count 
+     WHERE am_count.t_minuta_idMinuta = m.idMinuta
+     AND am_count.estado_firma = 'FIRMADO') AS firmasActuales,
 
-                /* Conteo de adjuntos reales */
-                COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos
+    -- (NUEVO) Verificar si tiene feedback (de la nueva consulta)
+    (SELECT COUNT(*) 
+     FROM t_aprobacion_minuta am3 
+     WHERE am3.t_minuta_idMinuta = m.idMinuta 
+       AND am3.estado_firma = 'REQUIERE_REVISION') AS tieneFeedback,
 
-            FROM t_minuta m
-            /* LEFT JOIN para no perder minutas sin temas ni adjuntos */
-            LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
-            LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
-            WHERE 1=1
+    -- (ORIGINAL) Temas y objetivos agregados
+    IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
+    IFNULL(GROUP_CONCAT(DISTINCT t.objetivo   ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS objetivos,
+
+    -- (ORIGINAL) Conteo de adjuntos reales
+    COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos
+
+FROM t_minuta m
+/* Joins de la NUEVA consulta */
+LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+LEFT JOIN t_usuario u ON m.t_usuario_idPresidente = u.idUsuario
+/* Joins de la consulta ORIGINAL */
+LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
+LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+
+/* Filtro de la NUEVA consulta */
+WHERE m.estadoMinuta = :estado
+
+/* (REQUERIDO) GROUP BY para las funciones de agregación (COUNT y GROUP_CONCAT) */
+GROUP BY
+    m.idMinuta,
+    m.t_comision_idComision, 
+    c.nombreComision, 
+    u.pNombre,
+    u.aPaterno,
+    m.fechaMinuta,
+    m.horaMinuta,
+    m.estadoMinuta,
+    m.presidentesRequeridos,
+    m.pathArchivo
+
+/* Orden de la NUEVA consulta */
+ORDER BY m.idMinuta DESC
         ";
 
         $valores = [];

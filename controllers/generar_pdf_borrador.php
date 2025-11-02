@@ -1,6 +1,7 @@
 <?php
 // /corevota/controllers/generar_pdf_borrador.php
-// Este script genera una VISTA PREVIA de la minuta en PDF, sin firmas.
+// Este script genera una VISTA PREVIA de la minuta en PDF,
+// (AJUSTADO) AHORA INCLUYE LOS SELLOS DE VALIDACIÓN DEL ST.
 
 header('Content-Type: application/pdf');
 error_reporting(0); // Suprimimos errores para que no rompan el PDF
@@ -52,9 +53,9 @@ function ImageToDataUrl(String $filename): String
 
 // -----------------------------------------------------------------------------
 // FUNCIÓN PARA GENERAR HTML (Copiada de aprobar_minuta.php)
-// MODIFICADA: Se eliminó el bloque de firmas (Punto 6 y 7)
+// (INTEGRADO) MODIFICADA: Se añaden los sellos de validación del ST
 // -----------------------------------------------------------------------------
-function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri) // <-- Se quitan las firmas de aquí
+function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], $selloVerdeUri = '')
 {
     // --- Preparar datos del encabezado ---
     $idMinuta = htmlspecialchars($data['minuta_info']['idMinuta'] ?? 'N/A');
@@ -108,7 +109,18 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri) // <-- Se quitan 
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
         '.votacion-detalle{columns:2;-webkit-columns:2;column-gap:20px;padding-left:20px;margin-top:5px;}' .
-        // (NUEVO) Estilo para el pie de página de borrador
+        
+        // (INTEGRADO) Estilos para firmas y sellos
+        '.signature-box-container{width:100%; margin-top:30px; padding-top: 15px; border-top: 1px solid #ccc; page-break-inside:avoid; text-align:center;}' .
+        '.firma-chip{width: 220px; border: 1px solid #999; border-radius: 8px; padding: 10px; margin: 5px; display: inline-block; position: relative; overflow: hidden; background: #f9f9f9; font-size: 8pt; text-align: center; vertical-align: top; page-break-inside: avoid; }' .
+        '.firma-chip p{ margin: 0; padding: 1px 0; line-height: 1.2; }' .
+        '.firma-nombre{ font-weight: bold; }' .
+        '.firma-cargo{ font-style: italic; color: #333; }' .
+        '.firma-detalle{ font-size: 7pt; color: #555; margin-top: 5px; }' .
+        '.firma-fecha{ font-size: 7pt; color: #555; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px; }' .
+        '.sello-st-chip{ background-color: #e6ffed; border-color: #5cb85c; }' . // Fondo verde para sellos ST
+
+        // Estilo para el pie de página de borrador
         'footer { position: fixed; bottom: -30px; left: 0px; right: 0px; height: 50px; text-align: center; color: #999; font-size: 9pt; }' .
         '</style></head><body>';
 
@@ -230,6 +242,47 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri) // <-- Se quitan 
     // Pie de página de borrador
     $html .= '<footer>Documento Borrador - Pendiente de Aprobación - Generado el ' . date('d-m-Y H:i') . '</footer>';
 
+    // --- (INTEGRADO) BLOQUE DE FIRMAS/SELLOS (AL FINAL, ANTES DE </body>) ---
+    $html .= '<div class="signature-box-container">';
+
+    // (NUEVO) Función helper para renderizar CUALQUIER tipo de firma/sello
+    $generarChipFirma = function ($nombre, $cargo, $detalle, $fechaHora, $imagenUri, $claseExtra = '') {
+        $chipHtml = '<div class="firma-chip ' . $claseExtra . '">';
+        
+        // Imagen de fondo (sello)
+        if (!empty($imagenUri)) {
+            $chipHtml .= '<img src="' . $imagenUri . '" alt="Sello" ' .
+            'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
+        }
+        
+        // (INTEGRADO) Contenido del chip (texto)
+        $chipHtml .= '<div style="position: relative; z-index: 2;">'; // Contenedor para el texto
+        $chipHtml .= '<p class="firma-nombre">' . htmlspecialchars($nombre) . '</p>';
+        $chipHtml .= '<p class="firma-cargo">' . htmlspecialchars($cargo) . '</p>';
+        $chipHtml .= '<p class="firma-detalle">' . htmlspecialchars($detalle) . '</p>';
+        $chipHtml .= '<p class="firma-fecha">' . htmlspecialchars($fechaHora) . '</p>';
+        $chipHtml .= '</div>'; // Cierre del contenedor de texto
+        
+        $chipHtml .= '</div>'; // Cierre de .firma-chip
+        return $chipHtml;
+    };
+
+    // (NUEVO) Renderizar Sellos de Validación ST
+    if (!empty($sellos_st) && is_array($sellos_st)) {
+        foreach ($sellos_st as $sello) {
+            $html .= $generarChipFirma(
+                $sello['nombreSecretario'],
+                'Secretario Técnico',
+                'Validación de Feedback',
+                date('d-m-Y H:i:s', strtotime($sello['fechaValidacion'])),
+                $selloVerdeUri, // Sello verde
+                'sello-st-chip' // Clase CSS para fondo verde
+            );
+        }
+    }
+
+    $html .= '</div>'; // cierre signature-box-container
+    
     $html .= '</body></html>';
     return $html;
 }
@@ -305,10 +358,10 @@ try {
 
     // 2d. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                FROM t_tema t 
-                LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                WHERE t.t_minuta_idMinuta = :id
-                ORDER BY t.idTema ASC";
+                 FROM t_tema t 
+                 LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                 WHERE t.t_minuta_idMinuta = :id
+                 ORDER BY t.idTema ASC";
     $stmtTemas = $pdo->prepare($sqlTemas);
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
@@ -331,14 +384,27 @@ try {
         }
     }
 
+    // 2f. (INTEGRADO) Cargar SELLOS del ST
+    $sqlSellos = $pdo->prepare("SELECT 
+                                    CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
+                                    v.fechaValidacion
+                                    FROM t_validacion_st v
+                                    JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
+                                    WHERE v.t_minuta_idMinuta = :idMinuta
+                                    ORDER BY v.fechaValidacion ASC");
+    $sqlSellos->execute([':idMinuta' => $idMinuta]);
+    $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
+
 
     // --- 3. DEFINIR LOGOS ---
     $logoGoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logo2.png');
     $logoCoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logoCore1.png');
+    // (INTEGRADO) Cargar el sello verde
+    $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png'); 
 
     // --- 4. GENERAR HTML ---
-    // (Llamamos a la función sin las firmas)
-    $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri);
+    // (INTEGRADO) Pasamos los nuevos datos a la función
+    $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri, $data_pdf['sellos_st'], $selloVerdeUri);
 
     // --- 5. INICIALIZAR DOMPDF Y RENDERIZAR ---
     $options = new Options();

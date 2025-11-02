@@ -2,7 +2,7 @@
 // controllers/enviar_feedback.php
 
 // ----------------------------------------------------------------------
-// (CORREGIDO) Configuración de errores: NO MOSTRAR (rompe JSON), SÍ registrarlos.
+// Configuración de errores: NO MOSTRAR (rompe JSON), SÍ registrarlos.
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -26,7 +26,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $data['idMinuta'] ?? null;
 $feedbackTexto = $data['feedback'] ?? null;
-$idUsuarioPresidente = $_SESSION['idUsuario'] ?? 0;
+$idUsuarioPresidente = $_SESSION['idUsuario'] ?? 0; // El usuario de la sesión es el Presidente
 
 if (empty($idMinuta) || empty($feedbackTexto) || empty($idUsuarioPresidente)) {
     http_response_code(400);
@@ -50,25 +50,48 @@ class FeedbackManager extends BaseConexion
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
-    private function getEmailSecretarioTecnico(int $idMinuta)
+    /**
+     * (ADECUADO)
+     * Obtiene el email y nombre del Secretario Técnico que CREÓ la minuta.
+     * Utiliza la lógica SQL que proporcionaste.
+     */
+    private function getSecretarioTecnicoInfo(int $idMinuta): array
     {
-        // --- ADVERTENCIA: LÓGICA DE ST HARDCODEADA ---
-        // (Tu lógica original para obtener el email del ST)
+        // Esta es la consulta que proporcionaste
+        $sql = "SELECT u.correo, u.pNombre
+                FROM t_minuta m
+                JOIN t_usuario u ON m.t_usuario_idSecretario = u.idUsuario
+                WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id = 2"; // tipoUsuario 2 = Secretario
 
-        // (Lógica ideal futura: buscar el ST de la comisión asociada a la minuta)
-        // $sql = "SELECT u.correo FROM t_usuario u 
-        //         JOIN t_comision c ON u.idUsuario = c.id_secretario_tecnico
-        //         JOIN t_minuta m ON m.t_comision_idComision = c.idComision
-        //         WHERE m.idMinuta = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':idMinuta' => $idMinuta]);
+        $secretario = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return 'genesis.contreras.vargas@gmail.com';
+        if (!$secretario) {
+            // Fallback por si no se encuentra. Usamos el correo anterior como emergencia.
+            error_log("ADVERTENCIA (enviar_feedback.php): No se encontró Secretario (tipo 2) para la minuta {$idMinuta}. Usando fallback.");
+            return [
+                'email' => 'genesis.contreras.vargas@gmail.com', // Correo de fallback
+                'nombre' => 'Secretario Técnico'
+            ];
+        } else {
+            // Devuelve los datos encontrados
+            return [
+                'email' => $secretario['correo'],
+                'nombre' => $secretario['pNombre']
+            ];
+        }
     }
 
-    private function notificarSecretario($emailST, $idMinuta, $nombrePresidente, $feedbackTexto)
+    /**
+     * (ADECUADO)
+     * Envía la notificación. Ahora acepta el nombre del ST para personalizar el saludo.
+     */
+    private function notificarSecretario($emailST, $nombreST, $idMinuta, $nombrePresidente, $feedbackTexto)
     {
         $mail = new PHPMailer(true);
         try {
-            // Configuración SMTP (tomada de tu script guardar_minuta_completa.php)
+            // Configuración SMTP
             $mail->isSMTP();
             $mail->Host = 'smtp.gmail.com';
             $mail->SMTPAuth = true;
@@ -79,13 +102,17 @@ class FeedbackManager extends BaseConexion
             $mail->CharSet = 'UTF-8';
 
             $mail->setFrom('equiposieteduocuc@gmail.com', 'CoreVota - Sistema de Minutas');
-            $mail->addAddress($emailST);
+
+            // (ADECUADO) Añade la dirección con el nombre del secretario
+            $mail->addAddress($emailST, $nombreST);
 
             $mail->isHTML(true);
             $mail->Subject = "Feedback Requerido - Minuta N° {$idMinuta}";
+
+            // (ADECUADO) Cuerpo del correo personalizado con el nombre del ST
             $mail->Body = "
                 <html><body>
-                <p>Estimado Secretario Técnico,</p>
+                <p>Estimado {$nombreST},</p>
                 <p>La minuta <b>N° {$idMinuta}</b> ha recibido feedback del presidente <b>{$nombrePresidente}</b> y requiere su revisión.</p>
                 <hr>
                 <p><b>Comentario del Presidente:</b></p>
@@ -104,6 +131,10 @@ class FeedbackManager extends BaseConexion
         }
     }
 
+    /**
+     * (ADECUADO)
+     * Procesa el feedback y llama a las funciones actualizadas de búsqueda y notificación.
+     */
     public function procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto)
     {
         try {
@@ -146,9 +177,21 @@ class FeedbackManager extends BaseConexion
             $this->db->commit();
 
             // 5. Enviar notificación al ST (Fuera de la transacción)
-            $emailST = $this->getEmailSecretarioTecnico($idMinuta);
+
+            // (ADECUADO) Llama a la nueva función
+            $secretarioInfo = $this->getSecretarioTecnicoInfo($idMinuta);
+
+            // El nombre del Presidente se saca de la sesión actual
             $nombrePresidente = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
-            $this->notificarSecretario($emailST, $idMinuta, $nombrePresidente, $feedbackTexto);
+
+            // (ADECUADO) Llama a la función de notificación con los nuevos parámetros
+            $this->notificarSecretario(
+                $secretarioInfo['email'],
+                $secretarioInfo['nombre'],
+                $idMinuta,
+                $nombrePresidente,
+                $feedbackTexto
+            );
 
             return ['status' => 'success', 'message' => 'Feedback enviado con éxito.'];
         } catch (Exception $e) {
@@ -157,6 +200,7 @@ class FeedbackManager extends BaseConexion
             }
             error_log("ERROR procesarFeedback: " . $e->getMessage());
             http_response_code(500);
+            // Mostrar el mensaje de error de la excepción es útil para depurar
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
