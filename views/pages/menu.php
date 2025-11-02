@@ -12,6 +12,20 @@ if (!isset($_SESSION['idUsuario'])) {
     exit;
 }
 
+// --- ¡NUEVO! CAPTURAR ROL DE USUARIO ---
+// Asegúrate de que loginController.php esté guardando 'tipoUsuario_id' en la sesión
+$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0; // 0 = default/invitado
+
+// --- ¡NUEVO! DEFINIR CONSTANTES DE ROL (según tu BBDD t_tipousuario) ---
+define('ROL_CONSEJERO', 1);
+define('ROL_SECRETARIO_TECNICO', 2);
+define('ROL_PRESIDENTE_COMISION', 3);
+define('ROL_ADMINISTRADOR', 6);
+// (Puedes añadir los otros roles si los necesitas)
+
+// --- Lógica para Saludo y Fecha ---
+$nombreUsuario = 'Invitado'; // .
+
 // Capturar la página a cargar
 $paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
 $id_param = $_GET['id'] ?? null; // Capturamos el ID también
@@ -370,42 +384,98 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         </a>
                     </li>
 
-                    <li class="nav-item">
-                        <a href="menu.php?pagina=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                            <i class="fas fa-file-alt fa-fw"></i>
-                            Minutas
-                        </a>
-                    </li>
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-file-alt fa-fw"></i>
+                                Minutas
+                            </a>
+                        </li>
+                    <?php elseif ($tipoUsuario == ROL_CONSEJERO) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=minutas_aprobadas" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-file-check fa-fw"></i>
+                                Minutas Aprobadas
+                            </a>
+                        </li>
+                    <?php endif; ?>
 
-                    <li class="nav-item">
-                        <a href="menu.php?pagina=usuarios_dashboard" class="nav-link <?php echo esActivo('usuarios', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                            <i class="fas fa-users fa-fw"></i>
-                            Usuarios
-                        </a>
-                    </li>
 
-                    <li class="nav-item">
-                        <a href="menu.php?pagina=comisiones_dashboard" class="nav-link <?php echo esActivo('comisiones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                            <i class="fas fa-landmark fa-fw"></i>
-                            Comisiones
-                        </a>
-                    </li>
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=usuarios_dashboard" class="nav-link <?php echo esActivo('usuarios', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-users fa-fw"></i>
+                                Usuarios
+                            </a>
+                        </li>
+                    <?php endif; ?>
 
-                    <li class="nav-item">
-                        <a href="menu.php?pagina=reuniones_dashboard" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                            <i class="fas fa-calendar-check fa-fw"></i>
-                            Reuniones
-                        </a>
-                    </li>
 
-                    <li class="nav-item">
-                        <a href="menu.php?pagina=votaciones_dashboard" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                            <i class="fas fa-list-check fa-fw"></i>
-                            Votaciones
-                        </a>
-                    </li>
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=comisiones_dashboard" class="nav-link <?php echo esActivo('comisiones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-landmark fa-fw"></i>
+                                Comisiones
+                            </a>
+                        </li>
+                    <?php endif; ?>
 
-                    <li class="nav-item mt-auto"> <a href="/corevota/logout.php" class="nav-link nav-link-logout">
+
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=reuniones_dashboard" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-calendar-plus fa-fw"></i>
+                                Gestión Reuniones
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-hand-paper fa-fw"></i>
+                                Registrar Asistencia
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if ($tipoUsuario != ROL_SECRETARIO_TECNICO) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=reunion_calendario" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-calendar-alt fa-fw"></i>
+                                Calendario Reuniones
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=votaciones_dashboard" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-tasks fa-fw"></i>
+                                Gestión Votaciones
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=voto_autogestion" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-vote-yea fa-fw"></i>
+                                Votar ahora
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="menu.php?pagina=historial_votacion" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fas fa-history fa-fw"></i>
+                                Historial Votación
+                            </a>
+                        </li>
+                    <?php endif; ?>
+
+
+                    <li class="nav-item mt-auto">
+                        <a href="/corevota/logout.php" class="nav-link nav-link-logout">
                             <i class="fas fa-sign-out-alt fa-fw"></i>
                             Cerrar Sesión
                         </a>
@@ -651,43 +721,43 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
         // --- Manejador para AÑADIR LINK ---
         formLink.addEventListener('submit', (e) => {
-        e.preventDefault();
+            e.preventDefault();
 
-        const formData = new FormData();
-        formData.append('idMinuta', idMinuta);
-        formData.append('tipoAdjunto', 'link');
-        formData.append('urlLink', document.getElementById('inputUrlLink').value);
+            const formData = new FormData();
+            formData.append('idMinuta', idMinuta);
+            formData.append('tipoAdjunto', 'link');
+            formData.append('urlLink', document.getElementById('inputUrlLink').value);
 
-        const btnLink = document.getElementById('btnAgregarLink');
-        btnLink.disabled = true;
-        btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
+            const btnLink = document.getElementById('btnAgregarLink');
+            btnLink.disabled = true;
+            btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
 
-        fetch('/corevota/controllers/agregar_adjunto.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    const listaUI = document.getElementById('listaAdjuntosExistentes');
-                    // Quitar "No hay adjuntos" si es el primero
-                    if (listaUI.querySelector('.text-muted')) {
-                        listaUI.innerHTML = '';
+            fetch('/corevota/controllers/agregar_adjunto.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const listaUI = document.getElementById('listaAdjuntosExistentes');
+                        // Quitar "No hay adjuntos" si es el primero
+                        if (listaUI.querySelector('.text-muted')) {
+                            listaUI.innerHTML = '';
+                        }
+                        const li = crearItemAdjuntoUI(data.nuevoAdjunto);
+                        listaUI.appendChild(li);
+                        formLink.reset(); // Limpiar el formulario
+                    } else {
+                        alert('Error al añadir link: ' + data.message);
                     }
-                    const li = crearItemAdjuntoUI(data.nuevoAdjunto);
-                    listaUI.appendChild(li);
-                    formLink.reset(); // Limpiar el formulario
-                } else {
-                    alert('Error al añadir link: ' + data.message);
-                }
-            })
-            .catch(error => alert('Error de red: ' + error.message))
-            .finally(() => {
-                btnLink.disabled = false;
-                btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
-            });
+                })
+                .catch(error => alert('Error de red: ' + error.message))
+                .finally(() => {
+                    btnLink.disabled = false;
+                    btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
+                });
         });
-        
+
 
 
         // Función para aprobar minuta

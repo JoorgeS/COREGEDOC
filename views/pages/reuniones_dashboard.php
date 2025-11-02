@@ -1,5 +1,12 @@
 <?php
 // views/pages/reuniones_dashboard.php
+
+if (session_status() === PHP_SESSION_NONE) session_start();
+$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
+
+// Definir constantes (o incluirlas desde un archivo global)
+if (!defined('ROL_SECRETARIO_TECNICO')) define('ROL_SECRETARIO_TECNICO', 2);
+if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 6);
 ?>
 
 <div class="container-fluid">
