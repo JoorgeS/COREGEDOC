@@ -69,7 +69,9 @@ $gruposPaginas = [
         'minutas_pendientes',
         'minutas_aprobadas',
         'crear_minuta',
-        'editar_minuta'
+        'editar_minuta',
+        'seguimiento_minuta',
+        'seguimiento_general'
     ],
 
     // Todas las páginas que activarán el enlace 'Usuarios'
@@ -595,7 +597,10 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             $routes = [
                 // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
                 'home' => ['type' => 'view', 'file' => $base_path . '/home.php'],
+                // ESTA ES LA LÍNEA CORRECTA:
+'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
+                'seguimiento_general' => ['type' => 'view', 'file' => $base_path . '/seguimiento_general.php'],
                 'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php'],
                 'comisiones_dashboard' => ['type' => 'view', 'file' => $base_path . '/comisiones_dashboard.php'],
                 'reuniones_dashboard' => ['type' => 'view', 'file' => $base_path . '/reuniones_dashboard.php'],

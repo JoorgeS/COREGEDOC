@@ -15,6 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 define('ROOT_PATH', dirname(__DIR__) . '/');
 require_once ROOT_PATH . 'class/class.conectorDB.php';
 require_once ROOT_PATH . 'vendor/autoload.php';
+require_once ROOT_PATH . 'models/minutaModel.php';
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -109,7 +110,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
         '.votacion-detalle{columns:2;-webkit-columns:2;column-gap:20px;padding-left:20px;margin-top:5px;}' .
-        
+
         // (INTEGRADO) Estilos para firmas y sellos
         '.signature-box-container{width:100%; margin-top:30px; padding-top: 15px; border-top: 1px solid #ccc; page-break-inside:avoid; text-align:center;}' .
         '.firma-chip{width: 220px; border: 1px solid #999; border-radius: 8px; padding: 10px; margin: 5px; display: inline-block; position: relative; overflow: hidden; background: #f9f9f9; font-size: 8pt; text-align: center; vertical-align: top; page-break-inside: avoid; }' .
@@ -248,13 +249,13 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     // (NUEVO) Función helper para renderizar CUALQUIER tipo de firma/sello
     $generarChipFirma = function ($nombre, $cargo, $detalle, $fechaHora, $imagenUri, $claseExtra = '') {
         $chipHtml = '<div class="firma-chip ' . $claseExtra . '">';
-        
+
         // Imagen de fondo (sello)
         if (!empty($imagenUri)) {
             $chipHtml .= '<img src="' . $imagenUri . '" alt="Sello" ' .
-            'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
+                'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
         }
-        
+
         // (INTEGRADO) Contenido del chip (texto)
         $chipHtml .= '<div style="position: relative; z-index: 2;">'; // Contenedor para el texto
         $chipHtml .= '<p class="firma-nombre">' . htmlspecialchars($nombre) . '</p>';
@@ -262,7 +263,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         $chipHtml .= '<p class="firma-detalle">' . htmlspecialchars($detalle) . '</p>';
         $chipHtml .= '<p class="firma-fecha">' . htmlspecialchars($fechaHora) . '</p>';
         $chipHtml .= '</div>'; // Cierre del contenedor de texto
-        
+
         $chipHtml .= '</div>'; // Cierre de .firma-chip
         return $chipHtml;
     };
@@ -282,7 +283,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     }
 
     $html .= '</div>'; // cierre signature-box-container
-    
+
     $html .= '</body></html>';
     return $html;
 }
@@ -297,6 +298,7 @@ try {
     // CORRECCIÓN: Usar conectorDB
     $db = new conectorDB();
     $pdo = $db->getDatabase();
+    $minutaModel = new MinutaModel();
 
     $data_pdf = [];
 
@@ -400,7 +402,7 @@ try {
     $logoGoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logo2.png');
     $logoCoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logoCore1.png');
     // (INTEGRADO) Cargar el sello verde
-    $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png'); 
+    $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png');
 
     // --- 4. GENERAR HTML ---
     // (INTEGRADO) Pasamos los nuevos datos a la función
@@ -415,6 +417,29 @@ try {
     $dompdf->loadHtml($html);
     $dompdf->setPaper('letter', 'portrait');
     $dompdf->render();
+    // --- INICIO DE CÓDIGO AÑADIDO: GUARDAR BORRADOR ---
+
+    // 1. Definir la ruta de guardado (usando tu constante ROOT_PATH)
+    $directorioBorrador = ROOT_PATH . 'public/docs/minutas_borradores/';
+    if (!is_dir($directorioBorrador)) {
+        mkdir($directorioBorrador, 0777, true);
+    }
+
+    // 2. Definir nombre y ruta completa
+    $nombreArchivoBorrador = 'Minuta_Borrador_N' . $idMinuta . '.pdf';
+    $rutaCompletaBorrador = $directorioBorrador . $nombreArchivoBorrador;
+
+    // 3. Definir la ruta que se guardará en la BD (relativa al root)
+    $rutaParaDB_Borrador = 'public/docs/minutas_borradores/' . $nombreArchivoBorrador;
+
+    // 4. Obtener el contenido del PDF
+    $output = $dompdf->output();
+
+    // 5. Guardar el archivo en el servidor
+    file_put_contents($rutaCompletaBorrador, $output);
+
+    // 6. Actualizar la base de datos (usando el modelo)
+    $minutaModel->actualizarPathBorrador($idMinuta, $rutaParaDB_Borrador);
 
     // --- 6. MOSTRAR EL PDF AL NAVEGADOR ---
     // Limpiamos cualquier salida de buffer anterior

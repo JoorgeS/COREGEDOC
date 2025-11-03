@@ -18,6 +18,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../cfg/config.php';
 require_once __DIR__ . '/../class/class.conectorDB.php';
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../models/minutaModel.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -251,10 +252,45 @@ class AprobacionSender extends BaseConexion
             
             error_log("[LOG MINUTA $idMinuta]: Notificaciones por correo ENVIADAS."); // Log 7
 
-            // 8. COMMIT (Solo si la BD y los Correos funcionaron)
             $this->db->commit();
             
             error_log("[LOG MINUTA $idMinuta]: Transacción COMMIT exitosa."); // Log 8
+            
+            try {
+                $minutaModel = new MinutaModel($this->db);
+                
+                if ($esRespuestaAFeedback) {
+                    // Log 1: El ST aplicó el feedback (ya que este script guarda el sello)
+                    $minutaModel->logAccion(
+                        $idMinuta,
+                        $idUsuarioSecretario,
+                        'FEEDBACK_APLICADO',
+                        "Secretario Técnico ha aplicado feedback (Sello Verde)."
+                    );
+                    // Log 2: Se re-envió
+                    $minutaModel->logAccion(
+                        $idMinuta,
+                        $idUsuarioSecretario,
+                        'ENVIADA_APROBACION',
+                        'Minuta actualizada y reenviada a Presidencia.'
+                    );
+                } else {
+                    // Log único: Primer envío
+                    $minutaModel->logAccion(
+                        $idMinuta,
+                        $idUsuarioSecretario,
+                        'ENVIADA_APROBACION',
+                        'Minuta enviada a Presidencia para aprobación por primera vez.'
+                    );
+                }
+                error_log("[LOG MINUTA $idMinuta]: Acción(es) registradas en bitácora.");
+            } catch (Exception $logException) {
+                error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log: " . $logException->getMessage());
+                // No detenemos la transacción por un error de log
+            }
+
+            // 8. COMMIT (Solo si la BD y los Correos funcionaron)
+            
 
             $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s).";
             if ($esRespuestaAFeedback) {

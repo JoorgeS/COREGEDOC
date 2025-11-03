@@ -23,30 +23,41 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
         // Mostramos esta "card" SÓLO si es Secretario, Presidente o Admin
         if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR):
         ?>
-        <div class="col-md-6">
-            <a href="menu.php?pagina=minutas_pendientes" class="dashboard-card h-100">
-                <i class="fas fa-clock text-warning"></i>
-                <h5 class="mt-3">Minutas Pendientes</h5>
-                <p class="mb-0 text-muted">Revisar, firmar y gestionar las minutas que requieren aprobación.</p>
-            </a>
-        </div>
-        <?php endif; // --- FIN DE LÓGICA DE VISIBILIDAD --- ?>
+            <div class="col-md-6">
+                <a href="menu.php?pagina=minutas_pendientes" class="dashboard-card h-100">
+                    <i class="fas fa-clock text-warning"></i>
+                    <h5 class="mt-3">Minutas Pendientes</h5>
+                    <p class="mb-0 text-muted">Revisar, firmar y gestionar las minutas que requieren aprobación.</p>
+                </a>
+            </div>
+        <?php endif; // --- FIN DE LÓGICA DE VISIBILIDAD --- 
+        ?>
 
 
         <?php
         // --- LÓGICA PARA LA CARD DE APROBADAS ---
         // Si el usuario puede ver pendientes, la card de aprobadas comparte la fila (col-md-6)
         // Si no (como un Consejero), la card de aprobadas ocupa todo el ancho (col-md-12)
-        
+
         $esAdminSecretarioOPresidente = ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR);
         $colClass = $esAdminSecretarioOPresidente ? 'col-md-6' : 'col-md-12';
         ?>
-        
+
         <div class="<?php echo $colClass; ?>">
             <a href="menu.php?pagina=minutas_aprobadas" class="dashboard-card h-100">
                 <i class="fas fa-check-circle text-success"></i>
                 <h5 class="mt-3">Minutas Aprobadas</h5>
                 <p class="mb-0 text-muted">Consultar el archivo histórico de todas las minutas firmadas y finalizadas.</p>
+            </a>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <a href="menu.php?pagina=seguimiento_general" class="dashboard-card text-decoration-none">
+                <div class="card-body text-center">
+                    <i class="fas fa-tasks fa-3x mb-3 text-info"></i>
+                    <h5 class="card-title mb-2 font-weight-bold text-info">Seguimiento General</h5>
+                    <p class="card-text text-muted">Ver el estado actual y la última acción de todas las minutas en proceso.</p>
+                </div>
             </a>
         </div>
 

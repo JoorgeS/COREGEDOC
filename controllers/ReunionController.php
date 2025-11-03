@@ -4,6 +4,7 @@
 // Dependencias
 require_once __DIR__ . '/../cfg/config.php';
 require_once __DIR__ . '/../class/class.conectorDB.php';
+require_once __DIR__ . '/../models/minutaModel.php'; //
 
 class ReunionManager extends BaseConexion
 {
@@ -172,7 +173,7 @@ class ReunionManager extends BaseConexion
     /**
      * Crea la minuta para una reunión existente y la vincula.
      */
-    public function iniciarMinuta($idReunion,$idSecretarioLogueado)
+    public function iniciarMinuta($idReunion, $idSecretarioLogueado)
     {
         $idReunion = (int)$idReunion;
         if ($idReunion <= 0) {
@@ -182,7 +183,7 @@ class ReunionManager extends BaseConexion
         if ($idSecretarioLogueado <= 0) {
             return ['status' => 'error', 'message' => 'ID de secretario inválido. Su sesión puede haber expirado.'];
         }
-        
+
 
         try {
             $this->db->beginTransaction();
@@ -252,6 +253,8 @@ class ReunionManager extends BaseConexion
             }
 
             // 4. Actualizar la REUNIÓN para vincular la minuta creada
+            // ... (dentro de iniciarMinuta)
+            // 4. Actualizar la REUNIÓN para vincular la minuta creada
             $sql_update_reunion = "UPDATE t_reunion SET t_minuta_idMinuta = :idMinuta WHERE idReunion = :idReunion";
             $stmt_update = $this->db->prepare($sql_update_reunion);
             $success_update = $stmt_update->execute([
@@ -263,9 +266,29 @@ class ReunionManager extends BaseConexion
                 throw new Exception('No se pudo vincular la minuta a la reunión.');
             }
 
+            // --- INICIO DE CÓDIGO DE LOG ---
+            // Usamos el $idSecretarioLogueado que ya estaba disponible en esta función
+
             $this->db->commit();
+            try {
+                $minutaModel = new MinutaModel($this->db);
+                $minutaModel->logAccion(
+                    $newIdMinuta, // El ID de la minuta que se acaba de crear
+                    $idSecretarioLogueado,
+                    'CREADA',
+                    'Minuta creada en estado BORRADOR por Secretario Técnico.'
+                );
+            } catch (Exception $logException) {
+                // Si el log falla, no queremos detener la creación de la minuta.
+                // Solo registramos el error de log.
+                error_log("Error al registrar log 'CREADA' para minuta " . $newIdMinuta . ": " . $logException->getMessage());
+            }
+            // --- FIN DE CÓDIGO DE LOG ---
+
+           
 
             return [
+                // ...
                 'status' => 'success',
                 'message' => 'Minuta iniciada correctamente.',
                 'idMinuta' => $newIdMinuta // Necesario para redirigir

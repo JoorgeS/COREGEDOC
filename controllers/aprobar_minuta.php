@@ -11,6 +11,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // 1. INCLUIR DEPENDENCIAS Y CONFIGURACIÓN
 define('ROOT_PATH', dirname(__DIR__) . '/');
 require_once ROOT_PATH . 'class/class.conectorDB.php';
+
+require_once ROOT_PATH . 'models/minutaModel.php';
 require_once ROOT_PATH . 'vendor/autoload.php'; // Dompdf
 
 use Dompdf\Dompdf;
@@ -60,7 +62,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
     $idMinuta = htmlspecialchars($data['minuta_info']['idMinuta'] ?? 'N/A');
     $fecha = htmlspecialchars(date('d-m-Y', strtotime($data['minuta_info']['fechaMinuta'] ?? 'now')));
     $hora = htmlspecialchars(date('H:i', strtotime($data['minuta_info']['horaMinuta'] ?? 'now')));
-    
+
     // --- (CORRECCIÓN IMPORTANTE) ---
     // El secretario debe ser el que CREÓ la minuta, no el que aprueba.
     $secretario = htmlspecialchars($data['secretario_info']['nombreCompleto'] ?? 'N/A');
@@ -107,8 +109,8 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         '.desarrollo-tema div{margin:0 0 8px 5px;padding-left:5px;border-left:2px solid #eee;}' .
         '.desarrollo-tema strong{display:block;margin-bottom:2px;font-size:9pt;color:#555;}' .
         '.signature-box-container{margin-top:40px;text-align:center;page-break-inside:avoid; clear:both;}' .
-        '.firma-chip{font-size:9pt;color:#222; text-align:center; width:45%; margin: 10px 2.5%; border:1px dashed #aaa;padding:8px;border-radius:6px;' .
-        'position: relative; min-height: 100px; overflow: hidden; display: inline-block; float:left; page-break-inside:avoid;} ' .
+        '.firma-chip{font-size:9pt;color:#222; text-align:center; width:90%; margin: 10px auto; border:1px dashed #aaa;padding:8px;border-radius:6px;' .
+        'position: relative; min-height: 100px; overflow: hidden; display: block; page-break-inside:avoid;} ' .
         '.sello-st-chip{border-style: solid; border-color: #008a00; background-color: #f0fff0;}' .
         '.votacion-block{page-break-inside:avoid; margin-bottom:15px; font-size:9pt;}' .
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
@@ -243,7 +245,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
             $chipHtml .= '<img src="' . $imagenUri . '" alt="Firma" ' .
                 'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
         } else {
-             $chipHtml .= '<span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; color: #a00; font-size: 8pt; opacity: 0.3;">[SELLO NO ENCONTRADO]</span>';
+            $chipHtml .= '<span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; color: #a00; font-size: 8pt; opacity: 0.3;">[SELLO NO ENCONTRADO]</span>';
         }
         $chipHtml .= '<div style="position: relative; z-index: 2; font-size: 9pt; line-height: 1.3; display: inline-block; text-align: left;">' .
             '<strong style="font-size: 10pt;">' . htmlspecialchars($nombre) . '</strong><br/>' .
@@ -269,8 +271,10 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
             );
         }
     }
-    
+
+
     // Renderizar Sellos de Validación ST
+    /*
     if (!empty($data['sellos_st']) && is_array($data['sellos_st'])) {
         foreach ($data['sellos_st'] as $sello) {
             $html .= $generarChipFirma(
@@ -283,6 +287,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
             );
         }
     }
+    */
 
     $html .= '</div>'; // cierre signature-box-container
     $html .= '</body></html>';
@@ -311,7 +316,7 @@ try {
     if (!$data_pdf['minuta_info']) {
         throw new Exception('No se encontró la minuta.');
     }
-    
+
     $totalRequeridos = max(1, (int)($data_pdf['minuta_info']['presidentesRequeridos'] ?? 1));
 
     // --- 2. REGISTRAR LA FIRMA (LÓGICA CORREGIDA) ---
@@ -320,7 +325,7 @@ try {
                    WHERE t_minuta_idMinuta = :idMinuta
                    AND t_usuario_idPresidente = :idUsuario
                    AND estado_firma = 'EN_ESPERA'";
-                   
+
     $stmtAprobar = $pdo->prepare($sqlAprobar);
     $stmtAprobar->execute([
         ':idMinuta' => $idMinuta,
@@ -333,7 +338,7 @@ try {
 
     // --- 3. (OPCIONAL) REGISTRAR EN t_firma ---
     $sqlFirma = "INSERT INTO t_firma (descFirma, idTipoUsuario, fechaGuardado, idUsuario, idComision)
-                 VALUES (:desc, 3, CURTIME(), :idUsuario, 0)"; 
+                 VALUES (:desc, 3, CURTIME(), :idUsuario, 0)";
     $pdo->prepare($sqlFirma)->execute([
         ':desc' => 'Firma electrónica registrada al aprobar minuta ' . $idMinuta,
         ':idUsuario' => $idUsuarioLogueado
@@ -353,7 +358,22 @@ try {
         // --- AÚN FALTAN FIRMAS (PARCIAL) ---
         $sqlUpdParcial = "UPDATE t_minuta SET estadoMinuta = 'PARCIAL' WHERE idMinuta = :id";
         $pdo->prepare($sqlUpdParcial)->execute([':id' => $idMinuta]);
-        $pdo->commit(); 
+        $pdo->commit();
+
+        try {
+            $minutaModel = new MinutaModel();
+            $faltanLog = $totalRequeridos - $totalAprobaciones;
+            $minutaModel->logAccion(
+                $idMinuta,
+                $idUsuarioLogueado,
+                'FIRMADA_PARCIAL',
+                "Presidente ($nombreUsuarioLogueado) ha firmado. Faltan $faltanLog firma(s)."
+            );
+        } catch (Exception $logException) {
+            error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log de 'FIRMADA_PARCIAL': " . $logException->getMessage());
+        }
+
+
 
         $faltan = $totalRequeridos - $totalAprobaciones;
         $mensaje = "Firma registrada. Faltan {$faltan} aprobación(es) más.";
@@ -380,8 +400,8 @@ try {
                              WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id IN (2, 6)"); // 2=ST, 6=Admin
     $sqlSec->execute([':idMinuta' => $idMinuta]);
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
-    if(!$data_pdf['secretario_info']) {
-         $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (Asignado)']; // Fallback
+    if (!$data_pdf['secretario_info']) {
+        $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (Asignado)']; // Fallback
     }
 
 
@@ -417,7 +437,7 @@ try {
             $data_pdf['comisiones_info']['com3'] = $getDatosComision($comisionesMixtas['t_comision_idComision_mixta2']);
         }
     }
-    
+
     // (Mapa de ID de Presidente -> Nombre de Comisión)
     $mapaPresidentes = [];
     if (isset($data_pdf['comisiones_info']['com1'])) $mapaPresidentes[$data_pdf['comisiones_info']['com1']['idPresidente']] = $data_pdf['comisiones_info']['com1']['nombre'];
@@ -445,7 +465,7 @@ try {
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
-    
+
     // --- 5e. VOTACIONES (¡¡CORREGIDO!!) ---
     $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion WHERE t_minuta_idMinuta = :idMinuta");
     $sqlVotaciones->execute([':idMinuta' => $idMinuta]);
@@ -490,7 +510,8 @@ try {
         ];
     }
     $data_pdf['firmas_aprobadas'] = $firmasCorregidas;
-    
+
+    /*
     $sqlSellos = $pdo->prepare("SELECT 
                                     CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
                                     v.fechaValidacion
@@ -500,6 +521,7 @@ try {
                                    ORDER BY v.fechaValidacion ASC");
     $sqlSellos->execute([':idMinuta' => $idMinuta]);
     $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
+    */
 
 
     // --- 7. DEFINIR LOGOS Y SELLO DE FIRMA ---
@@ -516,7 +538,7 @@ try {
     $options = new Options();
     $options->set('isHtml5ParserEnabled', true);
     $options->set('isRemoteEnabled', true);
-    $options->set('chroot', ROOT_PATH); 
+    $options->set('chroot', ROOT_PATH);
     $dompdf = new Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('letter', 'portrait');
@@ -529,7 +551,7 @@ try {
     }
     $nombreArchivo = "Minuta_Aprobada_N" . $idMinuta . "_" . date('Ymd_His') . ".pdf";
     $pathCompleto = $pathDirectorio . $nombreArchivo;
-    $pathParaBD = 'public/docs/minutas_aprobadas/' . $nombreArchivo; 
+    $pathParaBD = 'public/docs/minutas_aprobadas/' . $nombreArchivo;
 
     file_put_contents($pathCompleto, $dompdf->output());
 
@@ -545,10 +567,34 @@ try {
         ':id' => $idMinuta
     ]);
 
-    // --- 12. COMMIT Y RESPUESTA EXITOSA FINAL ---
     $pdo->commit();
-    echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y PDF generado con todas las firmas.', 'pdf_path' => $pathParaBD]);
+    try {
+            $minutaModel = new MinutaModel();
+            // Log 1: Aprobación final
+            $minutaModel->logAccion(
+                $idMinuta,
+                $idUsuarioLogueado,
+                'APROBADA_FINAL',
+                "Presidente ($nombreUsuarioLogueado) ha dado la firma final. Minuta Aprobada."
+            );
+            // Log 2: PDF Generado (acción del sistema, por eso 'null' en usuario)
+            $minutaModel->logAccion(
+                $idMinuta,
+                null, 
+                'PDF_GENERADO',
+                "PDF final generado y guardado en: " . $pathParaBD
+            );
+        } catch (Exception $logException) {
+            error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log de 'APROBADA_FINAL': " . $logException->getMessage());
+        }
 
+
+
+
+
+    // --- 12. COMMIT Y RESPUESTA EXITOSA FINAL ---
+    
+    echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y PDF generado con todas las firmas.', 'pdf_path' => $pathParaBD]);
 } catch (Exception $e) {
     // --- 13. ROLLBACK Y RESPUESTA DE ERROR ---
     if (isset($pdo) && $pdo->inTransaction()) {

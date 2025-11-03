@@ -9,6 +9,7 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/../cfg/config.php';
 require_once __DIR__ . '/../class/class.conectorDB.php';
+require_once __DIR__ . '/../models/minutaModel.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -172,6 +173,22 @@ class FeedbackManager extends BaseConexion
             $this->db->prepare($sqlResetMinuta)->execute([':idMinuta' => $idMinuta]);
 
             $this->db->commit();
+            
+            try {
+                $minutaModel = new MinutaModel($this->db);
+                $nombrePresidenteLog = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
+                $minutaModel->logAccion(
+                    $idMinuta,
+                    $idUsuarioPresidente,
+                    'FEEDBACK_RECIBIDO',
+                    "Presidente ($nombrePresidenteLog) ha enviado feedback. Requiere revisión."
+                );
+            } catch (Exception $logException) {
+                error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log de 'FEEDBACK_RECIBIDO': " . $logException->getMessage());
+            }
+
+
+
 
             // 5. Enviar notificación al ST (Sin cambios)
             $secretarioInfo = $this->getSecretarioTecnicoInfo($idMinuta);

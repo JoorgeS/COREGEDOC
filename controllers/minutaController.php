@@ -29,14 +29,14 @@ switch ($action) {
         }
 
         // --- INICIO BLOQUE DE SEGURIDAD POR ROL ---
-        
+
         // Definimos los roles para que el código sea legible.
         // (Asegúrate de que estos números coincidan con tu BBDD)
         if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 1);
         if (!defined('ROL_SECRETARIO')) define('ROL_SECRETARIO', 2);
         if (!defined('ROL_PRESIDENTE')) define('ROL_PRESIDENTE', 3);
         if (!defined('ROL_CONSEJERO')) define('ROL_CONSEJERO', 4);
-        
+
         $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 
         // REGLA 1: La lista 'PENDIENTE' es SÓLO para el Secretario (o Admin).
@@ -58,7 +58,7 @@ switch ($action) {
         $startDate = $_GET['startDate'] ?? date('Y-m-01');
         $endDate = $_GET['endDate'] ?? date('Y-m-d');
         $themeName = $_GET['themeName'] ?? '';
-        
+
         // 3. Validar estado y llamar al Modelo
         // (La validación de roles ya se hizo arriba, aquí solo validamos el string)
         if ($estado_filtro !== 'PENDIENTE' && $estado_filtro !== 'APROBADA') {
@@ -82,7 +82,7 @@ switch ($action) {
     case 'view':
         // ... (Tu código view original) ...
         $id = (int)($_GET['id'] ?? 0);
-        $tema = $model->getTemaById($id); 
+        $tema = $model->getTemaById($id);
         if (!$tema) {
             $_SESSION['error'] = 'Tema no encontrado.';
             header('Location: menu.php?pagina=minutas_pendientes');
@@ -92,25 +92,47 @@ switch ($action) {
         break;
 
 
-    case 'edit': 
+    case 'edit':
         // ... (Tu código edit original) ...
         header('Location: menu.php?pagina=editar_minuta&id=' . ($_GET['id'] ?? 0));
         exit;
         break;
 
 
-    case 'update': 
+    case 'update':
         // ... (Tu código update original) ...
-        $id = (int)($_POST['idTema'] ?? 0); 
+        $id = (int)($_POST['idTema'] ?? 0);
         $data = [ /* ... tus datos ... */];
-        
-        if ($model->updateTema($id, $data)) { 
+
+        if ($model->updateTema($id, $data)) {
             $_SESSION['success'] = 'Actualizado con éxito.';
         } else {
             $_SESSION['error'] = 'Error al actualizar.';
         }
-        header('Location: menu.php?pagina=minutas_pendientes'); 
+        header('Location: menu.php?pagina=minutas_pendientes');
         exit;
+        break;
+
+    case 'seguimiento':
+        if (!isset($_GET['id'])) {
+            echo "<div class='alert alert-danger'>Error: No se proporcionó ID de minuta.</div>";
+            break; // Detiene la ejecución de este case
+        }
+
+        $minuta_id = (int)$_GET['id'];
+
+        // $model ya está definido al inicio del archivo
+        $minuta = $model->getMinutaById($minuta_id);
+        $seguimiento = $model->getSeguimiento($minuta_id);
+
+        if (!$minuta) {
+            echo "<div class='alert alert-danger'>Error: Minuta no encontrada (ID: $minuta_id).</div>";
+            break; // Detiene la ejecución de este case
+        }
+
+        // Ahora que $minuta y $seguimiento existen, incluimos la vista
+        // Esto es igual a como funciona tu case 'list'
+        include __DIR__ . '/../views/pages/seguimiento_minuta.php';
         break;
 
 

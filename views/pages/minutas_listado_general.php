@@ -23,6 +23,8 @@ try {
 // $minutas (array), $estadoActual (string), $currentStartDate (string), $currentEndDate (string), $currentThemeName (string)
 
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
+// (INCLUIDO) Se asume que $rol viene de la sesión, necesario para el botón de editar
+$rol = $_SESSION['idRol'] ?? null;
 
 // Determinar el título y la página del formulario
 $estadoActual = $estadoActual ?? 'PENDIENTE';
@@ -36,7 +38,7 @@ $currentEndDate   = $_GET['endDate']   ?? date('Y-m-d');
 // Palabra clave (para buscar en Tema y Objetivo)
 $currentThemeName = $_GET['themeName'] ?? '';
 
-// ---------- PREFILTRO: buscar en Tema y Objetivo (vista) ----------
+// ---------- (CÓDIGO ACTUAL) PREFILTRO: buscar en Tema y Objetivo (vista) ----------
 $minutasFiltradas = $minutas;
 
 // Normalizador robusto (quita <br>, tags, decodifica entidades y pasa a minúsculas)
@@ -77,24 +79,24 @@ if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
 
         // Coincide si aparece en Tema o en Objetivo
         return (mb_stripos($temasNorm, $needle, 0, 'UTF-8') !== false) ||
-           (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
+            (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
     }));
 }
 
-// ---------- Paginación en la vista ----------
-$perPage   = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
-$page      = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$offset    = ($page - 1) * $perPage;
-$total     = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
-$pages     = max(1, (int)ceil(($total ?: 1) / $perPage));
-$minutasPage = array_slice($minutasFiltradas ?? [], $offset, $perPage);
+
+// ---------- (CÓDIGO ACTUAL) Paginación en la vista ----------
+$perPage    = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
+$page       = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$offset     = ($page - 1) * $perPage;
+$total      = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
+$pages      = max(1, (int)ceil(($total ?: 1) / $perPage));
 
 if (!is_array($minutasFiltradas)) {
-        $minutasFiltradas = []; // Si no es un array, la convertimos en un array vacío
-    }
+    $minutasFiltradas = []; // Si no es un array, la convertimos en un array vacío
+}
 
-    // (Esta es tu línea 90, que ahora es segura y no fallará)
-    $minutasPaginadas = array_slice($minutasFiltradas, $offset, $perPage);
+// (Esta es tu línea 90, que ahora es segura y no fallará)
+$minutasPaginadas = array_slice($minutasFiltradas, $offset, $perPage);
 
 // Helper paginación
 function renderPaginationListado($current, $pages)
@@ -131,18 +133,14 @@ function renderPaginationListado($current, $pages)
             </div>
 
             <div class="col-md-4">
-                <?php if ($estadoActual === 'APROBADA'): ?>
-                    <label for="themeName" class="form-label">Buscar por palabra clave</label>
-                    <input
-                        type="text"
-                        class="form-control form-control-sm"
-                        id="themeName"
-                        name="themeName"
-                        placeholder="Busca en “Nombre(s) del Tema” u “Objetivo(s)”…"
-                        value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
-                <?php else: ?>
-                    <input type="hidden" id="themeName" name="themeName" value="">
-                <?php endif; ?>
+                <label for="themeName" class="form-label">Buscar por palabra clave</label>
+                <input
+                    type="text"
+                    class="form-control form-control-sm"
+                    id="themeName"
+                    name="themeName"
+                    placeholder="Busca en “Nombre(s) del Tema” u “Objetivo(s)”…"
+                    value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
             </div>
 
             <div class="col-md-2">
@@ -156,8 +154,9 @@ function renderPaginationListado($current, $pages)
             <thead class="table-dark sticky-top">
                 <tr>
                     <th scope="col">ID</th>
+                    <th scope="col">Comisión</th>
+                    <th scope="col">Presidente(s)</th>
                     <th scope="col">Nombre(s) del Tema</th>
-                    <th scope="col">Objetivo(s)</th>
                     <th scope="col">Fecha Creación</th>
                     <th scope="col" class="text-center">Adjuntos</th>
                     <th scope="col">Estado</th>
@@ -165,45 +164,30 @@ function renderPaginationListado($current, $pages)
                 </tr>
             </thead>
             <tbody>
-                <?php if (empty($minutasPage) || !is_array($minutasPage)): ?>
+                <?php if (empty($minutasPaginadas) || !is_array($minutasPaginadas)): ?>
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
+                        <td colspan="8" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($minutasPage as $minuta): ?>
+                    <?php foreach ($minutasPaginadas as $minuta): ?>
                         <tr>
                             <?php
                             $minutaId = $minuta['idMinuta'];
-                            //$estado = $minuta['estadoMinuta'] ?? 'PENDIENTE'; // Esta variable se redefine abajo
+                            $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE'; // 'PENDIENTE' o 'APROBADA'
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
 
-                            // --- INICIO DE MODIFICACIÓN: Lógica de Firma Individual ---
-                            // (Se mantiene por si se usa en otro lado, aunque la nueva lógica no la usa)
-                            $estadoFirmaUsuario = null;
-                            $esPresidenteRequerido = false;
-
-                            if ($pdo && $idUsuarioLogueado && ($minuta['estadoMinuta'] ?? 'PENDIENTE') !== 'APROBADA') {
-                                try {
-                                    $sqlFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                                                                 WHERE t_minuta_idMinuta = :idMinuta 
-                                                                 AND t_usuario_idPresidente = :idUsuario");
-                                    $sqlFirma->execute([':idMinuta' => $minutaId, ':idUsuario' => $idUsuarioLogueado]);
-                                    $estadoFirmaUsuario = $sqlFirma->fetchColumn();
-
-                                    if ($estadoFirmaUsuario !== false) { // false = no es firmante
-                                        $esPresidenteRequerido = true;
-                                    }
-                                } catch (Exception $e) {
-                                    error_log("Error query firma en lista (ID Minuta: $minutaId): " . $e->getMessage());
-                                }
-                            }
-                            // --- FIN DE MODIFICACIÓN ---
+                            // (NUEVO) Datos de la lógica de feedback
+                            $firmasActuales = (int)($minuta['firmasActuales'] ?? 0);
+                            $requeridos = max(1, (int)($minuta['presidentesRequeridos'] ?? 1));
+                            $tieneFeedback = (int)($minuta['tieneFeedback'] > 0);
                             ?>
 
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
+
+                            <td><?php echo htmlspecialchars($minuta['nombreComision'] ?? 'N/A'); ?></td>
+                            <td><?php echo htmlspecialchars(trim(($minuta['presidenteNombre'] ?? 'N/A') . ' ' . ($minuta['presidenteApellido'] ?? ''))); ?></td>
                             <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
-                            <td><?php echo $minuta['objetivos'] ?? 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
 
                             <td class="text-center">
@@ -214,37 +198,31 @@ function renderPaginationListado($current, $pages)
                                         <i class="fas fa-paperclip"></i> (<?php echo $totalAdjuntos; ?>)
                                     </button>
                                 <?php else: ?>
-                                    <span class="text-muted">No posee archivo adjunto</span>
+                                    <span class="text-muted" title="Sin adjuntos">N/A</span>
                                 <?php endif; ?>
                             </td>
 
                             <?php
-                            // --- (INTEGRADO) INICIO DE AJUSTE: Lógica de Estado General (Secretario) ---
-                            $estado = $minuta['estadoMinuta'];
-                            $firmasActuales = (int)($minuta['firmasActuales'] ?? 0);
-                            $requeridos = max(1, (int)($minuta['presidentesRequeridos'] ?? 1));
-                            $tieneFeedback = (int)($minuta['tieneFeedback'] > 0);
+                            // --- (MODIFICADO) Lógica de Estado para Secretario ---
 
-                            $statusText = 'Aprobación Pendiente';
-                            $statusClass = 'text-warning'; // Amarillo
+                            if ($estado === 'APROBADA') {
+                                $statusText = "Aprobada ($firmasActuales / $requeridos)";
+                                $statusClass = 'text-success'; // Verde
 
-                            if ($tieneFeedback) {
+                            } elseif ($tieneFeedback) {
+                                // ¡ESTA ES LA LÍNEA QUE MODIFICAMOS!
                                 $statusText = 'Feedback Recibido';
                                 $statusClass = 'text-danger'; // Rojo
-                            } elseif ($estado === 'PARCIAL') {
+
+                            } elseif ($firmasActuales > 0 && $firmasActuales < $requeridos) {
                                 $statusText = "Aprobación Parcial ($firmasActuales / $requeridos)";
                                 $statusClass = 'text-info'; // Azul claro
-                            } elseif ($estado === 'PENDIENTE') {
+
+                            } else {
+                                // Default para PENDIENTE (0 firmas)
                                 $statusText = "Pendiente de Firma ($firmasActuales / $requeridos)";
-                                $statusClass = 'text-warning';
-                            } elseif ($estado === 'APROBADA') {
-                                $statusText = 'Aprobada y Finalizada';
-                                $statusClass = 'text-success'; // Verde
-                            } elseif ($estado === 'BORRADOR') {
-                                $statusText = 'Borrador (No enviado)';
-                                $statusClass = 'text-muted'; // Gris
+                                $statusClass = 'text-warning'; // Amarillo
                             }
-                            // --- FIN DE AJUSTE ---
                             ?>
 
                             <td>
@@ -252,22 +230,36 @@ function renderPaginationListado($current, $pages)
                             </td>
 
                             <td class="text-end" style="white-space: nowrap;">
-                                <?php if ($estado === 'BORRADOR'): ?>
-                                    <button class="btn btn-danger btn-sm" onclick="enviarAprobacion(<?php echo $minuta['idMinuta']; ?>)">
-                                        <i class="fas fa-paper-plane"></i> Enviar p/ Aprobación
-                                    </button>
-                                <?php elseif ($tieneFeedback): ?>
-                                    <button class="btn btn-success btn-sm" onclick="aplicarFeedback(<?php echo $minuta['idMinuta']; ?>)">
-                                        <i class="fas fa-check-double"></i> Aplicar Corrección y Reenviar
-                                    </button>
+
+                                <?php if ($estado === 'APROBADA'): ?>
+                                    <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
+                                        <i class="fas fa-file-pdf"></i> Ver PDF Final
+                                    </a>
+                                <?php else: ?>
+                                    <?php if ($tieneFeedback): ?>
+                                        <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="Primero debe editar la minuta y guardar los cambios. El botón de reenvío aparecerá en la página de edición.">
+                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-danger btn-sm" title="Revisar Feedback y Editar">
+                                                <i class="fas fa-edit"></i> Revisar Feedback
+                                            </a>
+                                        </span>
+                                    <?php else: ?>
+                                        <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+
+                                        <?php if ($rol == 2): ?>
+                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
                                 <?php endif; ?>
 
-                                <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-
-                                <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
-                                    <i class="fas fa-edit"></i>
+                                <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>"
+                                    class="btn btn-info btn-sm"
+                                    title="Seguimiento de Aprobación">
+                                    <i class="fas fa-route"></i>
                                 </a>
                             </td>
                         </tr>
@@ -308,135 +300,131 @@ function renderPaginationListado($current, $pages)
 </div>
 
 <script>
-/**
- * (INTEGRADO)
- * Confirma y reenvía una minuta que tenía feedback para aprobación.
- */
-function aplicarFeedback(idMinuta) {
-    if (!confirm('¿Confirma que ya aplicó las correcciones y desea reenviar la minuta para su aprobación?')) {
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('idMinuta', idMinuta);
-
-    // Asegúrate que esta ruta sea correcta desde la raíz de tu proyecto
-    fetch('../controllers/aplicar_feedback.php', { 
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
+    /**
+     * (CÓDIGO ACTUAL - MANTENIDO)
+     * Confirma y reenvía una minuta que tenía feedback para aprobación.
+     * (Esta función se llama desde la página de edición, no desde esta lista)
+     */
+    function aplicarFeedback(idMinuta) {
+        if (!confirm('¿Confirma que ya aplicó las correcciones y desea reenviar la minuta para su aprobación?')) {
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error en aplicarFeedback:', error)
-        alert('Ocurrió un error de conexión al aplicar el feedback.');
-    });
-}
 
-/**
- * Envía una minuta en estado BORRADOR para aprobación por primera vez.
- * (Placeholder: Debes crear el controlador 'enviar_aprobacion.php')
- */
-function enviarAprobacion(idMinuta) {
-    if (!confirm('¿Está seguro de que desea enviar esta minuta para aprobación? Una vez enviada, no podrá editarla a menos que reciba feedback.')) {
-        return;
-    }
+        const formData = new FormData();
+        formData.append('idMinuta', idMinuta);
 
-    const formData = new FormData();
-    formData.append('idMinuta', idMinuta);
-
-    // Asegúrate que esta ruta sea correcta
-    fetch('../controllers/enviar_aprobacion.php', { // DEBES CREAR ESTE ARCHIVO
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error en enviarAprobacion:', error);
-        alert('Ocurrió un error de conexión al enviar la minuta.');
-    });
-}
-
-/**
- * Muestra el modal con la lista de adjuntos (Placeholder)
- * (Esta función probablemente ya existe en tu JS principal, si no, debes implementarla)
- */
-function verAdjuntos(idMinuta) {
-    console.log("Solicitando adjuntos para la minuta ID:", idMinuta);
-    const modalElement = document.getElementById('modalAdjuntos');
-    const modalList = document.getElementById('listaDeAdjuntos');
-    
-    if (!modalElement || !modalList) {
-        console.error("No se encontraron los elementos del modal.");
-        return;
-    }
-
-    // Mostrar modal (requiere Bootstrap)
-    const modal = new bootstrap.Modal(modalElement);
-    
-    // Limpiar lista y mostrar 'Cargando...'
-    modalList.innerHTML = '<li class="list-group-item text-muted">Cargando...</li>';
-    modal.show();
-
-    // Lógica (fetch) para obtener los adjuntos
-    // (Debes crear un controlador 'get_adjuntos.php' o similar)
-    /*
-    fetch('../controllers/get_adjuntos.php?id=' + idMinuta)
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success' && data.adjuntos.length > 0) {
-            modalList.innerHTML = ''; // Limpiar 'Cargando...'
-            data.adjuntos.forEach(adj => {
-                // Asumiendo que 'adj.url' es la ruta y 'adj.nombre' es el nombre
-                const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                li.innerHTML = `
-                    <span><i class="fas fa-file-alt me-2"></i> ${adj.nombre}</span>
-                    <a href="${adj.url}" target="_blank" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-download"></i>
-                    </a>
-                `;
-                modalList.appendChild(li);
+        // Asegúrate que esta ruta sea correcta desde la raíz de tu proyecto
+        fetch('../controllers/aplicar_feedback.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error en aplicarFeedback:', error)
+                alert('Ocurrió un error de conexión al aplicar el feedback.');
             });
-        } else {
-             modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
+    }
+
+    /**
+     * (CÓDIGO ACTUAL - MANTENIDO)
+     * Envía una minuta en estado BORRADOR para aprobación por primera vez.
+     * (Esta función se llama desde la página de edición, no desde esta lista)
+     */
+    function enviarAprobacion(idMinuta) {
+        if (!confirm('¿Está seguro de que desea enviar esta minuta para aprobación? Una vez enviada, no podrá editarla a menos que reciba feedback.')) {
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error al cargar adjuntos:', error);
-        modalList.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
-    });
-    */
-    
-    // --- INICIO DE CÓDIGO DE EJEMPLO (BORRAR DESPUÉS) ---
-    // Simulación de carga (reemplaza esto con tu 'fetch')
-    setTimeout(() => {
-         modalList.innerHTML = `
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-file-pdf me-2"></i> Documento_Ejemplo_1.pdf</span>
-                <a href="#" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-file-image me-2"></i> Imagen_Referencia.png</span>
-                <a href="#" target="_blank" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>
-            </li>
-         `;
-    }, 1000);
-    // --- FIN DE CÓDIGO DE EJEMPLO ---
-}
+
+        const formData = new FormData();
+        formData.append('idMinuta', idMinuta);
+
+        // Asegúrate que esta ruta sea correcta
+        fetch('../controllers/enviar_aprobacion.php', { // DEBES CREAR ESTE ARCHIVO
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error en enviarAprobacion:', error);
+                alert('Ocurrió un error de conexión al enviar la minuta.');
+            });
+    }
+
+    /**
+     * (CÓDIGO ANTIGUO - RESTAURADO)
+     * Muestra el modal con la lista de adjuntos (Versión funcional)
+     */
+    if (typeof verAdjuntos !== 'function') {
+        function verAdjuntos(idMinuta) {
+            console.log("Solicitando adjuntos para la minuta ID:", idMinuta);
+            const modalElement = document.getElementById('modalAdjuntos');
+            const modalList = document.getElementById('listaDeAdjuntos');
+
+            if (!modalElement || !modalList) {
+                console.error("No se encontraron los elementos del modal.");
+                alert("Error: No se encontró el modal de adjuntos.");
+                return;
+            }
+
+            const modal = new bootstrap.Modal(modalElement);
+
+            modalList.innerHTML = '<li class="list-group-item text-muted">Cargando...</li>';
+            modal.show();
+
+            // (Ruta absoluta corregida)
+            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${new Date().getTime()}`)
+                .then(response => response.ok ? response.json() : Promise.reject('Error al obtener adjuntos'))
+                .then(data => {
+                    if (data.status === 'success' && data.data && data.data.length > 0) {
+                        modalList.innerHTML = ''; // Limpiar 'Cargando...'
+                        data.data.forEach(adj => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+                            const link = document.createElement('a');
+                            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
+                            link.href = url;
+                            link.target = '_blank';
+
+                            let icon = '🔗'; // link
+                            if (adj.tipoAdjunto === 'asistencia') icon = '👥';
+                            else if (adj.tipoAdjunto === 'file') icon = '📄';
+
+                            let nombreArchivo = adj.pathAdjunto.split('/').pop();
+                            if (adj.tipoAdjunto === 'link') {
+                                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
+                            }
+
+                            link.textContent = ` ${icon} ${nombreArchivo}`;
+                            link.title = adj.pathAdjunto;
+                            li.appendChild(link);
+
+                            modalList.appendChild(li);
+                        });
+                    } else {
+                        modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar adjuntos:', error);
+                    modalList.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
+                });
+        }
+    }
 </script>
