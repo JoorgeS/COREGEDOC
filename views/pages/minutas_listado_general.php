@@ -89,6 +89,13 @@ $total     = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 
 $pages     = max(1, (int)ceil(($total ?: 1) / $perPage));
 $minutasPage = array_slice($minutasFiltradas ?? [], $offset, $perPage);
 
+if (!is_array($minutasFiltradas)) {
+        $minutasFiltradas = []; // Si no es un array, la convertimos en un array vacío
+    }
+
+    // (Esta es tu línea 90, que ahora es segura y no fallará)
+    $minutasPaginadas = array_slice($minutasFiltradas, $offset, $perPage);
+
 // Helper paginación
 function renderPaginationListado($current, $pages)
 {

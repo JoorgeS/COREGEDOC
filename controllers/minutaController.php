@@ -28,40 +28,57 @@ switch ($action) {
             $estado_filtro = 'PENDIENTE';
         }
 
-        // --- INICIO DIAGNÓSTICO CONTROLLER ---
-        echo ""; // (Dejamos los echos en blanco del archivo original)
-        // --- FIN DIAGNÓSTICO CONTROLLER ---
+        // --- INICIO BLOQUE DE SEGURIDAD POR ROL ---
+        
+        // Definimos los roles para que el código sea legible.
+        // (Asegúrate de que estos números coincidan con tu BBDD)
+        if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 1);
+        if (!defined('ROL_SECRETARIO')) define('ROL_SECRETARIO', 2);
+        if (!defined('ROL_PRESIDENTE')) define('ROL_PRESIDENTE', 3);
+        if (!defined('ROL_CONSEJERO')) define('ROL_CONSEJERO', 4);
+        
+        $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 
-        // 2. LÓGICA DE FECHAS POR DEFECTO (Tu nueva función)
+        // REGLA 1: La lista 'PENDIENTE' es SÓLO para el Secretario (o Admin).
+        if ($estado_filtro == 'PENDIENTE' && ($tipoUsuario != ROL_SECRETARIO && $tipoUsuario != ROL_ADMINISTRADOR)) {
+            // ¡Acceso Denegado!
+            // Redirigimos al dashboard con un mensaje de error.
+            header('Location: menu.php?pagina=minutas_dashboard&error=acceso_denegado');
+            exit;
+        }
+
+        // REGLA 2: La lista 'APROBADA' es para todos.
+        // No se necesita hacer nada, simplemente dejamos que el script continúe.
+
+        // --- FIN BLOQUE DE SEGURIDAD ---
+
+
+        // 2. LÓGICA DE FECHAS POR DEFECTO
         $today = date('Y-m-d'); // Obtenemos la fecha de hoy
-
-        // Capturar filtros (usar 'hoy' como default si no vienen)
         $startDate = $_GET['startDate'] ?? date('Y-m-01');
         $endDate = $_GET['endDate'] ?? date('Y-m-d');
         $themeName = $_GET['themeName'] ?? '';
-        // ---------------------------------------
-
+        
         // 3. Validar estado y llamar al Modelo
+        // (La validación de roles ya se hizo arriba, aquí solo validamos el string)
         if ($estado_filtro !== 'PENDIENTE' && $estado_filtro !== 'APROBADA') {
             $minutas = []; // Estado inválido, no buscar nada
-            echo ""; 
         } else {
             // Llamar al modelo con todos los parámetros
+            // (Asegúrate de que tu modelo acepte $themeName, mira el Paso 3)
             $minutas = $model->getMinutasByEstado($estado_filtro, $startDate, $endDate, $themeName);
         }
 
         // 4. Preparar variables para la Vista (con nombres limpios)
         $estadoActual = $estado_filtro;
-        $currentStartDate = $startDate; // Pasa la fecha (de filtro o de hoy)
-        $currentEndDate = $endDate;     // Pasa la fecha (de filtro o de hoy)
+        $currentStartDate = $startDate;
+        $currentEndDate = $endDate;
         $currentThemeName = $themeName;
         // $minutas ya está definida por el modelo
 
         // 5. Incluir la Vista (Paso final)
         include __DIR__ . '/../views/pages/minutas_listado_general.php';
         break; // Fin case 'list'
-
-
     case 'view':
         // ... (Tu código view original) ...
         $id = (int)($_GET['id'] ?? 0);
