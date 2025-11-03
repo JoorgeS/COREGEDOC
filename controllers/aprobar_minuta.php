@@ -2,7 +2,7 @@
 // /corevota/controllers/aprobar_minuta.php
 header('Content-Type: application/json');
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 0); // Errores a log, no a la pantalla
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -11,7 +11,6 @@ if (session_status() === PHP_SESSION_NONE) {
 // 1. INCLUIR DEPENDENCIAS Y CONFIGURACIÓN
 define('ROOT_PATH', dirname(__DIR__) . '/');
 require_once ROOT_PATH . 'class/class.conectorDB.php';
-// require_once ROOT_PATH . 'models/FirmaModel.php'; // (Opcional si t_firma es crítico)
 require_once ROOT_PATH . 'vendor/autoload.php'; // Dompdf
 
 use Dompdf\Dompdf;
@@ -53,7 +52,7 @@ function ImageToDataUrl(String $filename): String
 
 
 // -----------------------------------------------------------------------------
-// FUNCIÓN PARA GENERAR HTML (MODIFICADA para Sello ST - Punto 7)
+// FUNCIÓN PARA GENERAR HTML (Sin cambios, ya está correcta)
 // -----------------------------------------------------------------------------
 function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $selloVerdeUri)
 {
@@ -61,7 +60,11 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
     $idMinuta = htmlspecialchars($data['minuta_info']['idMinuta'] ?? 'N/A');
     $fecha = htmlspecialchars(date('d-m-Y', strtotime($data['minuta_info']['fechaMinuta'] ?? 'now')));
     $hora = htmlspecialchars(date('H:i', strtotime($data['minuta_info']['horaMinuta'] ?? 'now')));
+    
+    // --- (CORRECCIÓN IMPORTANTE) ---
+    // El secretario debe ser el que CREÓ la minuta, no el que aprueba.
     $secretario = htmlspecialchars($data['secretario_info']['nombreCompleto'] ?? 'N/A');
+    // --- FIN CORRECCIÓN ---
 
     $com1 = $data['comisiones_info']['com1'] ?? null;
     $com2 = $data['comisiones_info']['com2'] ?? null;
@@ -104,10 +107,8 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         '.desarrollo-tema div{margin:0 0 8px 5px;padding-left:5px;border-left:2px solid #eee;}' .
         '.desarrollo-tema strong{display:block;margin-bottom:2px;font-size:9pt;color:#555;}' .
         '.signature-box-container{margin-top:40px;text-align:center;page-break-inside:avoid; clear:both;}' .
-        // (NUEVO) Estilo del chip modificado para ST y Presidente
         '.firma-chip{font-size:9pt;color:#222; text-align:center; width:45%; margin: 10px 2.5%; border:1px dashed #aaa;padding:8px;border-radius:6px;' .
         'position: relative; min-height: 100px; overflow: hidden; display: inline-block; float:left; page-break-inside:avoid;} ' .
-        // (NUEVO) Estilo específico para el Sello ST (Punto 7)
         '.sello-st-chip{border-style: solid; border-color: #008a00; background-color: #f0fff0;}' .
         '.votacion-block{page-break-inside:avoid; margin-bottom:15px; font-size:9pt;}' .
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
@@ -193,15 +194,49 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         $html .= '<p style="font-size:10pt;">No hay detalles registrados para los temas.</p>';
     }
 
-    // --- BLOQUE DE VOTACIONES (Sin cambios) ---
+    // --- BLOQUE DE VOTACIONES (¡CORREGIDO!) ---
     if (!empty($data['votaciones']) && is_array($data['votaciones'])) {
-        // (Tu lógica de votación... la omito por brevedad, es correcta)
-    }
+        $html .= '<div class="seccion-titulo">Votaciones Realizadas:</div>';
+        foreach ($data['votaciones'] as $votacion) {
+            $votosSi = 0;
+            $votosNo = 0;
+            $votosAbs = 0;
+            $listaVotos = ['SI' => [], 'NO' => [], 'ABSTENCION' => []];
 
-    // --- BLOQUE DE FIRMAS MÚLTIPLES (MODIFICADO) ---
+            if (!empty($votacion['votos'])) {
+                foreach ($votacion['votos'] as $voto) {
+                    if ($voto['opcionVoto'] == 'SI') {
+                        $votosSi++;
+                        $listaVotos['SI'][] = htmlspecialchars($voto['nombreVotante']);
+                    } elseif ($voto['opcionVoto'] == 'NO') {
+                        $votosNo++;
+                        $listaVotos['NO'][] = htmlspecialchars($voto['nombreVotante']);
+                    } else {
+                        $votosAbs++;
+                        $listaVotos['ABSTENCION'][] = htmlspecialchars($voto['nombreVotante']);
+                    }
+                }
+            }
+
+            $html .= '<div class="votacion-block">' .
+                '<h4>Votación: ' . htmlspecialchars($votacion['nombreVotacion']) . '</h4>' .
+                '<table class="votacion-tabla">' .
+                '<thead><tr><th>A Favor (' . $votosSi . ')</th><th>En Contra (' . $votosNo . ')</th><th>Abstención (' . $votosAbs . ')</th></tr></thead>' .
+                '<tbody><tr>' .
+                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['SI']) . '</td>' .
+                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['NO']) . '</td>' .
+                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['ABSTENCION']) . '</td>' .
+                '</tr></tbody>' .
+                '</table>' .
+                '</div>';
+        }
+    }
+    // --- FIN BLOQUE DE VOTACIONES ---
+
+
+    // --- BLOQUE DE FIRMAS MÚLTIPLES (Sin cambios) ---
     $html .= '<div class="signature-box-container">';
 
-    // (NUEVO) Función helper para renderizar CUALQUIER tipo de firma/sello
     $generarChipFirma = function ($nombre, $cargo, $detalle, $fechaHora, $imagenUri, $claseExtra = '') {
         $chipHtml = '<div class="firma-chip ' . $claseExtra . '">';
         if (!empty($imagenUri)) {
@@ -221,7 +256,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         return $chipHtml;
     };
 
-    // (Punto 6) Renderizar Firmas de Presidentes
+    // Renderizar Firmas de Presidentes
     if (!empty($data['firmas_aprobadas']) && is_array($data['firmas_aprobadas'])) {
         foreach ($data['firmas_aprobadas'] as $firma) {
             $html .= $generarChipFirma(
@@ -235,7 +270,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         }
     }
     
-    // (NUEVO - Punto 7) Renderizar Sellos de Validación ST
+    // Renderizar Sellos de Validación ST
     if (!empty($data['sellos_st']) && is_array($data['sellos_st'])) {
         foreach ($data['sellos_st'] as $sello) {
             $html .= $generarChipFirma(
@@ -277,17 +312,14 @@ try {
         throw new Exception('No se encontró la minuta.');
     }
     
-    // (NUEVO) Obtener el conteo REQUERIDO desde la minuta
     $totalRequeridos = max(1, (int)($data_pdf['minuta_info']['presidentesRequeridos'] ?? 1));
 
-    // --- 2. (NUEVO) REGISTRAR LA FIRMA (LÓGICA CORREGIDA) ---
-    // En lugar de INSERT, hacemos UPDATE.
-    
+    // --- 2. REGISTRAR LA FIRMA (LÓGICA CORREGIDA) ---
     $sqlAprobar = "UPDATE t_aprobacion_minuta 
                    SET estado_firma = 'FIRMADO', fechaAprobacion = NOW()
                    WHERE t_minuta_idMinuta = :idMinuta
                    AND t_usuario_idPresidente = :idUsuario
-                   AND estado_firma = 'EN_ESPERA'"; // Solo puede firmar si está EN_ESPERA
+                   AND estado_firma = 'EN_ESPERA'";
                    
     $stmtAprobar = $pdo->prepare($sqlAprobar);
     $stmtAprobar->execute([
@@ -295,15 +327,13 @@ try {
         ':idUsuario' => $idUsuarioLogueado
     ]);
 
-    // Verificar si la firma fue exitosa
     if ($stmtAprobar->rowCount() == 0) {
-        // Si rowCount es 0, es porque no estaba 'EN_ESPERA' (ya firmó, o no tiene permiso, o está en revisión)
         throw new Exception('No tiene permisos para firmar esta minuta, ya la ha firmado o la minuta está en revisión.');
     }
 
-    // --- 3. (OPCIONAL) REGISTRAR EN t_firma (Tu lógica original) ---
+    // --- 3. (OPCIONAL) REGISTRAR EN t_firma ---
     $sqlFirma = "INSERT INTO t_firma (descFirma, idTipoUsuario, fechaGuardado, idUsuario, idComision)
-                 VALUES (:desc, 3, CURTIME(), :idUsuario, 0)"; // Asumimos idComision=0
+                 VALUES (:desc, 3, CURTIME(), :idUsuario, 0)"; 
     $pdo->prepare($sqlFirma)->execute([
         ':desc' => 'Firma electrónica registrada al aprobar minuta ' . $idMinuta,
         ':idUsuario' => $idUsuarioLogueado
@@ -314,22 +344,19 @@ try {
     $sqlCount = $pdo->prepare("SELECT COUNT(DISTINCT t_usuario_idPresidente)
                                FROM t_aprobacion_minuta
                                WHERE t_minuta_idMinuta = :idMinuta
-                               AND estado_firma = 'FIRMADO'"); // Contamos las 'FIRMADO'
+                               AND estado_firma = 'FIRMADO'");
     $sqlCount->execute([':idMinuta' => $idMinuta]);
     $totalAprobaciones = (int)$sqlCount->fetchColumn();
 
 
     if ($totalAprobaciones < $totalRequeridos) {
         // --- AÚN FALTAN FIRMAS (PARCIAL) ---
-
         $sqlUpdParcial = "UPDATE t_minuta SET estadoMinuta = 'PARCIAL' WHERE idMinuta = :id";
         $pdo->prepare($sqlUpdParcial)->execute([':id' => $idMinuta]);
-
-        $pdo->commit(); // Guardamos la firma Y el estado 'PARCIAL'.
+        $pdo->commit(); 
 
         $faltan = $totalRequeridos - $totalAprobaciones;
         $mensaje = "Firma registrada. Faltan {$faltan} aprobación(es) más.";
-
         echo json_encode([
             'status' => 'success_partial',
             'message' => $mensaje,
@@ -345,13 +372,16 @@ try {
 
     // --- 5. CARGAR DATOS PARA EL PDF (Asistentes, Temas, Votos, Comisiones) ---
 
-    // 5a. CARGAR INFO SECRETARIO (Asumimos el ST es quien está logueado, o un admin)
-    // (Esta lógica puede necesitar ajuste si el ST no es el que aprueba)
-    $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto FROM t_usuario WHERE idUsuario = :idSec LIMIT 1");
-    $sqlSec->execute([':idSec' => $idUsuarioLogueado]); // Usamos el logueado como referencia
+    // 5a. CARGAR INFO SECRETARIO (¡CORREGIDO!)
+    // Buscamos al secretario que CREÓ la minuta, no al que está logueado
+    $sqlSec = $pdo->prepare("SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
+                             FROM t_usuario u 
+                             JOIN t_minuta m ON u.idUsuario = m.t_usuario_idSecretario
+                             WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id IN (2, 6)"); // 2=ST, 6=Admin
+    $sqlSec->execute([':idMinuta' => $idMinuta]);
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
     if(!$data_pdf['secretario_info']) {
-         $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico']; // Fallback
+         $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (Asignado)']; // Fallback
     }
 
 
@@ -372,7 +402,6 @@ try {
         return ['nombre' => $comData['nombreComision'], 'presidente' => $nombrePresidente, 'idPresidente' => $idPresidente];
     };
 
-    // *** CORRECCIÓN CRÍTICA: Usar t_comision_idComision de t_minuta ***
     $idCom1 = $data_pdf['minuta_info']['t_comision_idComision'];
     $data_pdf['comisiones_info']['com1'] = $getDatosComision($idCom1);
 
@@ -398,41 +427,56 @@ try {
 
     // 5c. ASISTENTES
     $sqlAsis = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
-            FROM t_asistencia a
-            JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-            WHERE a.t_minuta_idMinuta = :id
-            ORDER BY u.aPaterno, u.pNombre";
+                FROM t_asistencia a
+                JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                WHERE a.t_minuta_idMinuta = :id
+                ORDER BY u.aPaterno, u.pNombre";
     $stmtAsis = $pdo->prepare($sqlAsis);
     $stmtAsis->execute([':id' => $idMinuta]);
     $data_pdf['asistentes'] = $stmtAsis->fetchAll(PDO::FETCH_ASSOC);
 
     // 5d. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-            FROM t_tema t 
-            LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-            WHERE t.t_minuta_idMinuta = :id
-            ORDER BY t.idTema ASC";
+                 FROM t_tema t 
+                 LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                 WHERE t.t_minuta_idMinuta = :id
+                 ORDER BY t.idTema ASC";
     $stmtTemas = $pdo->prepare($sqlTemas);
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
-    // 5e. VOTACIONES (Tu lógica original)
-    $data_pdf['votaciones'] = [];
-    // (Tu lógica de votación... la omito por brevedad, es correcta)
-
-    // --- 6. CARGAR FIRMAS Y SELLOS PARA EL PDF ---
     
-    // (Punto 6) Cargar firmas de PRESIDENTES
+    // --- 5e. VOTACIONES (¡¡CORREGIDO!!) ---
+    $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion WHERE t_minuta_idMinuta = :idMinuta");
+    $sqlVotaciones->execute([':idMinuta' => $idMinuta]);
+    $data_pdf['votaciones'] = $sqlVotaciones->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!empty($data_pdf['votaciones'])) {
+        $sqlVotos = $pdo->prepare("
+            SELECT v.idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+            FROM t_voto v
+            JOIN t_usuario u ON v.idUsuario = u.idUsuario
+            WHERE v.idVotacion = :idVotacion
+        ");
+        foreach ($data_pdf['votaciones'] as $i => $votacion) {
+            $sqlVotos->execute([':idVotacion' => $votacion['idVotacion']]);
+            $data_pdf['votaciones'][$i]['votos'] = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+    // --- FIN CORRECCIÓN VOTACIONES ---
+
+
+    // --- 6. CARGAR FIRMAS Y SELLOS PARA EL PDF (Sin cambios) ---
     $sqlFirmasRevisado = $pdo->prepare("SELECT 
-                                        a.t_usuario_idPresidente,
-                                        CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente, 
-                                        a.fechaAprobacion 
-                                      FROM t_aprobacion_minuta a
-                                      JOIN t_usuario u ON a.t_usuario_idPresidente = u.idUsuario
-                                      WHERE a.t_minuta_idMinuta = :idMinuta
-                                      AND a.estado_firma = 'FIRMADO' -- (CORREGIDO)
-                                      GROUP BY u.idUsuario
-                                      ORDER BY a.fechaAprobacion ASC");
+                                            a.t_usuario_idPresidente,
+                                            CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente, 
+                                            a.fechaAprobacion 
+                                          FROM t_aprobacion_minuta a
+                                          JOIN t_usuario u ON a.t_usuario_idPresidente = u.idUsuario
+                                          WHERE a.t_minuta_idMinuta = :idMinuta
+                                          AND a.estado_firma = 'FIRMADO'
+                                          GROUP BY u.idUsuario
+                                          ORDER BY a.fechaAprobacion ASC");
     $sqlFirmasRevisado->execute([':idMinuta' => $idMinuta]);
     $firmas_temp = $sqlFirmasRevisado->fetchAll(PDO::FETCH_ASSOC);
 
@@ -447,23 +491,23 @@ try {
     }
     $data_pdf['firmas_aprobadas'] = $firmasCorregidas;
     
-    // (NUEVO - Punto 7) Cargar SELLOS del ST
     $sqlSellos = $pdo->prepare("SELECT 
-                                CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
-                                v.fechaValidacion
-                               FROM t_validacion_st v
-                               JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
-                               WHERE v.t_minuta_idMinuta = :idMinuta
-                               ORDER BY v.fechaValidacion ASC");
+                                    CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
+                                    v.fechaValidacion
+                                   FROM t_validacion_st v
+                                   JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
+                                   WHERE v.t_minuta_idMinuta = :idMinuta
+                                   ORDER BY v.fechaValidacion ASC");
     $sqlSellos->execute([':idMinuta' => $idMinuta]);
     $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
 
 
     // --- 7. DEFINIR LOGOS Y SELLO DE FIRMA ---
+    // (Asegúrate que estas imágenes existan en tu servidor)
     $logoGoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logo2.png');
     $logoCoreUri = ImageToDataUrl(ROOT_PATH . 'public/img/logoCore1.png');
     $firmaImgUri = ImageToDataUrl(ROOT_PATH . 'public/img/firmadigital.png');
-    $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/sello_verde.png'); // (NUEVO)
+    $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png'); // (Nombre corregido)
 
     // --- 8. GENERAR HTML ---
     $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri, $firmaImgUri, $selloVerdeUri);
@@ -472,8 +516,7 @@ try {
     $options = new Options();
     $options->set('isHtml5ParserEnabled', true);
     $options->set('isRemoteEnabled', true);
-    // (NUEVO) Habilitar chroot para que dompdf pueda ver las imágenes locales
-    $options->set('chroot', ROOT_PATH);
+    $options->set('chroot', ROOT_PATH); 
     $dompdf = new Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('letter', 'portrait');
@@ -486,8 +529,6 @@ try {
     }
     $nombreArchivo = "Minuta_Aprobada_N" . $idMinuta . "_" . date('Ymd_His') . ".pdf";
     $pathCompleto = $pathDirectorio . $nombreArchivo;
-    
-    // (CORREGIDO) Ruta relativa correcta para la BD
     $pathParaBD = 'public/docs/minutas_aprobadas/' . $nombreArchivo; 
 
     file_put_contents($pathCompleto, $dompdf->output());

@@ -1,6 +1,15 @@
 <?php
 // 1. LÓGICA PHP INICIAL PARA CARGAR DATOS DE EDICIÓN
 // La ruta es '../../' porque este archivo está en views/pages/
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$idSecretarioLogueado = $_SESSION['idUsuario'] ?? 0;
+// --- FIN NUEVO ---
+
+// La ruta es '../../' porque este archivo está en views/pages/
+
 $controllerPath = __DIR__ . '/../../controllers/ReunionController.php';
 
 $reunionData = null;
@@ -87,6 +96,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
         // --- FUNCIÓN DE CARGA DE COMISIONES (ASÍNCRONA) ---
         async function cargarComisiones(selectId) {
             try {
+                const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($idSecretarioLogueado); ?>;
                 const response = await fetch("/corevota/controllers/fetch_data.php?action=comisiones");
                 const data = await response.json();
                 const select = document.getElementById(selectId);
@@ -142,7 +152,8 @@ if ($managerExists && $action === 'edit' && $reunionId) {
                 t_comision_idComision: comisionId,
                 fechaInicioReunion: fechaInicio.replace('T', ' '),
                 fechaTerminoReunion: fechaTermino.replace('T', ' '),
-                vigente: 1
+                vigente: 1,
+                idSecretario: ID_SECRETARIO_LOGUEADO
             };
 
             fetch("/corevota/controllers/ReunionController.php?action=create", {

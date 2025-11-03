@@ -2,7 +2,6 @@
 // controllers/enviar_feedback.php
 
 // ----------------------------------------------------------------------
-// Configuración de errores: NO MOSTRAR (rompe JSON), SÍ registrarlos.
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -26,6 +25,12 @@ if (session_status() === PHP_SESSION_NONE) {
 $data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $data['idMinuta'] ?? null;
 $feedbackTexto = $data['feedback'] ?? null;
+
+// --- ¡NUEVO! ---
+// Capturamos el objeto de campos (ej: {"asistencia": true, "temas": true, ...})
+$feedbackCampos = $data['feedbackCampos'] ?? []; 
+// --- FIN NUEVO ---
+
 $idUsuarioPresidente = $_SESSION['idUsuario'] ?? 0; // El usuario de la sesión es el Presidente
 
 if (empty($idMinuta) || empty($feedbackTexto) || empty($idUsuarioPresidente)) {
@@ -51,31 +56,26 @@ class FeedbackManager extends BaseConexion
     }
 
     /**
-     * (ADECUADO)
-     * Obtiene el email y nombre del Secretario Técnico que CREÓ la minuta.
-     * Utiliza la lógica SQL que proporcionaste.
+     * (Sin cambios)
      */
     private function getSecretarioTecnicoInfo(int $idMinuta): array
     {
-        // Esta es la consulta que proporcionaste
         $sql = "SELECT u.correo, u.pNombre
                 FROM t_minuta m
                 JOIN t_usuario u ON m.t_usuario_idSecretario = u.idUsuario
-                WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id = 2"; // tipoUsuario 2 = Secretario
+                WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id = 2"; 
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':idMinuta' => $idMinuta]);
         $secretario = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$secretario) {
-            // Fallback por si no se encuentra. Usamos el correo anterior como emergencia.
             error_log("ADVERTENCIA (enviar_feedback.php): No se encontró Secretario (tipo 2) para la minuta {$idMinuta}. Usando fallback.");
             return [
                 'email' => 'genesis.contreras.vargas@gmail.com', // Correo de fallback
                 'nombre' => 'Secretario Técnico'
             ];
         } else {
-            // Devuelve los datos encontrados
             return [
                 'email' => $secretario['correo'],
                 'nombre' => $secretario['pNombre']
@@ -84,8 +84,7 @@ class FeedbackManager extends BaseConexion
     }
 
     /**
-     * (ADECUADO)
-     * Envía la notificación. Ahora acepta el nombre del ST para personalizar el saludo.
+     * (Sin cambios)
      */
     private function notificarSecretario($emailST, $nombreST, $idMinuta, $nombrePresidente, $feedbackTexto)
     {
@@ -102,14 +101,11 @@ class FeedbackManager extends BaseConexion
             $mail->CharSet = 'UTF-8';
 
             $mail->setFrom('equiposieteduocuc@gmail.com', 'CoreVota - Sistema de Minutas');
-
-            // (ADECUADO) Añade la dirección con el nombre del secretario
             $mail->addAddress($emailST, $nombreST);
 
             $mail->isHTML(true);
             $mail->Subject = "Feedback Requerido - Minuta N° {$idMinuta}";
 
-            // (ADECUADO) Cuerpo del correo personalizado con el nombre del ST
             $mail->Body = "
                 <html><body>
                 <p>Estimado {$nombreST},</p>
@@ -132,15 +128,15 @@ class FeedbackManager extends BaseConexion
     }
 
     /**
-     * (ADECUADO)
-     * Procesa el feedback y llama a las funciones actualizadas de búsqueda y notificación.
+     * --- ¡MODIFICADO! ---
+     * Ahora acepta $feedbackCampos para guardarlos en la BBDD.
      */
-    public function procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto)
+    public function procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto, $feedbackCampos)
     {
         try {
             $this->db->beginTransaction();
 
-            // 1. Verificar que el usuario puede enviar feedback
+            // 1. Verificar que el usuario puede enviar feedback (Sin cambios)
             $sqlCheck = "SELECT COUNT(*) FROM t_aprobacion_minuta 
                          WHERE t_minuta_idMinuta = :idMinuta 
                          AND t_usuario_idPresidente = :idPresidente
@@ -152,17 +148,18 @@ class FeedbackManager extends BaseConexion
                 throw new Exception('No tiene permisos para enviar feedback. Es posible que ya haya firmado o enviado feedback previamente.');
             }
 
-            // 2. Guardar el feedback en la nueva tabla
-            $sqlInsert = "INSERT INTO t_minuta_feedback (t_minuta_idMinuta, t_usuario_idPresidente, textoFeedback)
-                          VALUES (:idMinuta, :idPresidente, :feedback)";
+            // 2. Guardar el feedback en la nueva tabla (¡MODIFICADO!)
+            $sqlInsert = "INSERT INTO t_minuta_feedback (t_minuta_idMinuta, t_usuario_idPresidente, textoFeedback, feedback_json)
+                          VALUES (:idMinuta, :idPresidente, :feedback, :feedbackJson)";
             $stmtInsert = $this->db->prepare($sqlInsert);
             $stmtInsert->execute([
                 ':idMinuta' => $idMinuta,
                 ':idPresidente' => $idUsuarioPresidente,
-                ':feedback' => $feedbackTexto
+                ':feedback' => $feedbackTexto,
+                ':feedbackJson' => json_encode($feedbackCampos) // <-- ¡NUEVO! Guardamos el JSON
             ]);
 
-            // 3. Marcar el estado de ESTE presidente como 'REQUIERE_REVISION'
+            // 3. Marcar el estado de ESTE presidente como 'REQUIERE_REVISION' (Sin cambios)
             $sqlUpdate = "UPDATE t_aprobacion_minuta 
                           SET estado_firma = 'REQUIERE_REVISION' 
                           WHERE t_minuta_idMinuta = :idMinuta 
@@ -170,21 +167,15 @@ class FeedbackManager extends BaseConexion
             $stmtUpdate = $this->db->prepare($sqlUpdate);
             $stmtUpdate->execute([':idMinuta' => $idMinuta, ':idPresidente' => $idUsuarioPresidente]);
 
-            // 4. Resetear el estado de la minuta a PENDIENTE
+            // 4. Resetear el estado de la minuta a PENDIENTE (Sin cambios)
             $sqlResetMinuta = "UPDATE t_minuta SET estadoMinuta = 'PENDIENTE' WHERE idMinuta = :idMinuta";
             $this->db->prepare($sqlResetMinuta)->execute([':idMinuta' => $idMinuta]);
 
             $this->db->commit();
 
-            // 5. Enviar notificación al ST (Fuera de la transacción)
-
-            // (ADECUADO) Llama a la nueva función
+            // 5. Enviar notificación al ST (Sin cambios)
             $secretarioInfo = $this->getSecretarioTecnicoInfo($idMinuta);
-
-            // El nombre del Presidente se saca de la sesión actual
             $nombrePresidente = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
-
-            // (ADECUADO) Llama a la función de notificación con los nuevos parámetros
             $this->notificarSecretario(
                 $secretarioInfo['email'],
                 $secretarioInfo['nombre'],
@@ -200,14 +191,14 @@ class FeedbackManager extends BaseConexion
             }
             error_log("ERROR procesarFeedback: " . $e->getMessage());
             http_response_code(500);
-            // Mostrar el mensaje de error de la excepción es útil para depurar
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
 }
 
-// --- Ejecución ---
+// --- Ejecución (¡MODIFICADO!) ---
 $manager = new FeedbackManager();
-$resultado = $manager->procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto);
+// Pasamos la nueva variable $feedbackCampos a la función
+$resultado = $manager->procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto, $feedbackCampos); 
 echo json_encode($resultado);
 exit;

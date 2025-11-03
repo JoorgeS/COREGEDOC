@@ -36,6 +36,8 @@ class MinutaModel
      * READ: Obtiene minutas por estado con filtros opcionales y cuenta de adjuntos.
      * (Versión corregida que agrupa estados pendientes y filtra por tema)
      */
+    // models/minutaModel.php
+
     public function getMinutasByEstado($estado, $startDate = null, $endDate = null, $themeName = null)
     {
         // Normalizamos estado (Esta es tu lógica original, la respetamos)
@@ -46,30 +48,40 @@ class MinutaModel
             SELECT
                 m.idMinuta AS idMinuta,
                 
-                /* CAMPOS NUEVOS AÑADIDOS */
                 c.nombreComision, 
                 u.pNombre AS presidenteNombre,
                 u.aPaterno AS presidenteApellido,
-                /* FIN CAMPOS NUEVOS */
 
                 CASE 
                     WHEN COALESCE(m.pathArchivo,'') <> '' THEN 'APROBADA'
                     ELSE 'PENDIENTE'
                 END AS estadoMinuta,
+                
                 m.pathArchivo,
                 m.fechaMinuta,
 
                 IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
                 IFNULL(GROUP_CONCAT(DISTINCT t.objetivo   ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS objetivos,
-                COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos
+                COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos,
+
+                /* --- INICIO DE NUEVOS CAMPOS --- */
+                (SELECT COUNT(DISTINCT am_count.t_usuario_idPresidente) 
+                 FROM t_aprobacion_minuta am_count 
+                 WHERE am_count.t_minuta_idMinuta = m.idMinuta
+                 AND am_count.estado_firma = 'FIRMADO') AS firmasActuales,
+                
+                (SELECT COUNT(*) 
+                 FROM t_aprobacion_minuta am3 
+                 WHERE am3.t_minuta_idMinuta = m.idMinuta 
+                 AND am3.estado_firma = 'REQUIERE_REVISION') AS tieneFeedback,
+
+                m.presidentesRequeridos
+                /* --- FIN DE NUEVOS CAMPOS --- */
 
             FROM t_minuta m
             
-            /* JOINS de tu lógica original */
             LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
             LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
-
-            /* JOINS NUEVOS AÑADIDOS */
             LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
             LEFT JOIN t_usuario u ON c.t_usuario_idPresidente = u.idUsuario
 
@@ -91,13 +103,11 @@ class MinutaModel
             $valores['startDate'] = $startDate;
         }
         if (!empty($endDate)) {
-            // ¡IMPORTANTE! Tu lógica antigua era MÁS INTELIGENTE aquí.
-            // Añadía ' 23:59:59' para incluir el día completo. La mantendremos.
             $sql .= " AND m.fechaMinuta <= :endDate ";
             $valores['endDate'] = $endDate . ' 23:59:59';
         }
 
-        // Filtro por palabra clave (Tu lógica original, que usa EXISTS y es excelente)
+        // Filtro por palabra clave (Tu lógica original)
         if (!empty($themeName)) {
             $sql .= "
                 AND EXISTS (
@@ -115,7 +125,7 @@ class MinutaModel
 
         // Agrupación y orden (MODIFICADO para incluir los campos nuevos)
         $sql .= "
-            GROUP BY m.idMinuta, c.nombreComision, u.pNombre, u.aPaterno, m.pathArchivo, m.fechaMinuta
+            GROUP BY m.idMinuta, c.nombreComision, u.pNombre, u.aPaterno, m.pathArchivo, m.fechaMinuta, m.presidentesRequeridos
             ORDER BY m.fechaMinuta DESC, m.idMinuta DESC
         ";
 
@@ -126,19 +136,21 @@ class MinutaModel
             return [];
         }
 
-        // Asegurarnos de devolver siempre un array (Tu lógica original)
         $minutas = is_array($result) ? $result : [];
 
-        // Claves seguras para la vista (Tu lógica original)
+        // Claves seguras para la vista (Tu lógica original + campos nuevos)
         foreach ($minutas as &$minuta) {
             $minuta['nombreTemas']   = $minuta['nombreTemas']   ?? 'N/A';
             $minuta['objetivos']     = $minuta['objetivos']     ?? 'N/A';
             $minuta['totalAdjuntos'] = $minuta['totalAdjuntos'] ?? 0;
-
-            // (NUEVO) Aseguramos los campos nuevos por si el JOIN falla
             $minuta['nombreComision'] = $minuta['nombreComision'] ?? 'Comisión no asignada';
             $minuta['presidenteNombre'] = $minuta['presidenteNombre'] ?? 'Presidente no asignado';
             $minuta['presidenteApellido'] = $minuta['presidenteApellido'] ?? '';
+
+            // Aseguramos los nuevos campos
+            $minuta['firmasActuales'] = $minuta['firmasActuales'] ?? 0;
+            $minuta['tieneFeedback'] = $minuta['tieneFeedback'] ?? 0;
+            $minuta['presidentesRequeridos'] = $minuta['presidentesRequeridos'] ?? 1; // Asumimos 1 si no está
         }
         unset($minuta);
 

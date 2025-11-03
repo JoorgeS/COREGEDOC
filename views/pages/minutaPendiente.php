@@ -473,14 +473,30 @@ function renderPagination($current, $pages)
       cancelButtonText: 'Cancelar',
       showLoaderOnConfirm: true,
 
+      // --- INICIO DE LA CORRECCIÓN ---
+      // Esta función 'preConfirm' es la que tenía el error
+      //... (dentro de Swal.fire({ ... )
+
       preConfirm: () => {
         const items = ['asistencia', 'temas', 'votaciones', 'adjuntos', 'otro'];
         let feedbackCombinado = "";
+
+        // --- ¡NUEVO! ---
+        // Este objeto guardará qué campos se marcaron
+        let feedbackCampos = {};
+        // --- FIN NUEVO ---
+
         let itemsSeleccionados = 0;
         let validationError = null;
 
         for (const id of items) {
           const checkbox = document.getElementById('fb_' + id);
+
+          // --- ¡NUEVO! ---
+          // Guardamos el estado (true/false) de CADA checkbox
+          feedbackCampos[id] = checkbox.checked;
+          // --- FIN NUEVO ---
+
           if (checkbox.checked) {
             itemsSeleccionados++;
             const texto = document.getElementById('fb_' + id + '_text').value;
@@ -506,16 +522,20 @@ function renderPagination($current, $pages)
         if (boton) boton.disabled = true;
         if (botonFeedback) botonFeedback.disabled = true;
 
-        // --- ¡¡AQUÍ ESTÁ LA LÍNEA CORREGIDA!! ---
-        return fetch('../../controllers/enviar_feedback.php', { //
+        // ¡Ruta corregida a ../../! (Ya la tenías bien)
+        return fetch('../../controllers/enviar_feedback.php', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
+            // --- ¡MODIFICADO! ---
+            // Ahora enviamos 3 cosas: idMinuta, el texto y el objeto de campos
             body: JSON.stringify({
               idMinuta: idMinuta,
-              feedback: feedbackCombinado
+              feedback: feedbackCombinado,
+              feedbackCampos: feedbackCampos // <-- ¡NUEVO!
             })
+            // --- FIN MODIFICADO ---
           })
           .then(response => {
             if (!response.ok) {
@@ -532,6 +552,10 @@ function renderPagination($current, $pages)
             if (botonFeedback) botonFeedback.disabled = false;
           });
       },
+
+      //... (el resto de la función sigue igual)
+      // --- FIN DE LA CORRECCIÓN ---
+
       allowOutsideClick: () => !Swal.isLoading()
     }).then((result) => {
       if (result.isConfirmed && result.value.status === 'success') {
@@ -543,6 +567,7 @@ function renderPagination($current, $pages)
           location.reload();
         });
       } else if (!result.isConfirmed) {
+        // Si el usuario cancela, reactivamos los botones
         if (boton) boton.disabled = false;
         if (botonFeedback) botonFeedback.disabled = false;
       }

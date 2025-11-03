@@ -229,7 +229,7 @@ function renderPaginationListado($current, $pages)
                             $statusClass = 'text-warning'; // Amarillo
 
                             if ($tieneFeedback) {
-                                $statusText = 'Requiere Revisión (Feedback)';
+                                $statusText = 'Feedback Recibido';
                                 $statusClass = 'text-danger'; // Rojo
                             } elseif ($estado === 'PARCIAL') {
                                 $statusText = "Aprobación Parcial ($firmasActuales / $requeridos)";

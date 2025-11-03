@@ -1,15 +1,16 @@
 <?php
 // views/pages/minutas_dashboard.php
 
-// Definimos los roles aquí también para poder ocultar la "card"
-if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 1);
-if (!defined('ROL_SECRETARIO')) define('ROL_SECRETARIO', 2);
+// Definimos los roles para controlar la visibilidad
+if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 6);
+if (!defined('ROL_SECRETARIO_TECNICO')) define('ROL_SECRETARIO_TECNICO', 2);
+if (!defined('ROL_PRESIDENTE_COMISION')) define('ROL_PRESIDENTE_COMISION', 3);
 
 $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 ?>
 
 <div class="container-fluid">
-    <div class="d-flex justify-content/between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Módulo de Minutas</h2>
     </div>
 
@@ -18,15 +19,15 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
     <div class="row g-4">
 
         <?php
-        // --- INICIO DE LÓGICA DE VISIBILIDAD ---
-        // Mostramos esta "card" SÓLO si es Secretario o Administrador
-        if ($tipoUsuario == ROL_SECRETARIO || $tipoUsuario == ROL_ADMINISTRADOR):
+        // --- INICIO DE LÓGICA DE VISIBILIDAD (CORREGIDA) ---
+        // Mostramos esta "card" SÓLO si es Secretario, Presidente o Admin
+        if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR):
         ?>
         <div class="col-md-6">
             <a href="menu.php?pagina=minutas_pendientes" class="dashboard-card h-100">
                 <i class="fas fa-clock text-warning"></i>
                 <h5 class="mt-3">Minutas Pendientes</h5>
-                <p class="mb-0 text-muted">Gestionar las minutas que requieren edición, feedback o envío.</p>
+                <p class="mb-0 text-muted">Revisar, firmar y gestionar las minutas que requieren aprobación.</p>
             </a>
         </div>
         <?php endif; // --- FIN DE LÓGICA DE VISIBILIDAD --- ?>
@@ -34,11 +35,13 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 
         <?php
         // --- LÓGICA PARA LA CARD DE APROBADAS ---
-        // Si el usuario es Secretario, la "card" de aprobadas comparte la fila (col-md-6)
-        // Si NO es Secretario, la "card" de aprobadas ocupa todo el ancho (col-md-12)
+        // Si el usuario puede ver pendientes, la card de aprobadas comparte la fila (col-md-6)
+        // Si no (como un Consejero), la card de aprobadas ocupa todo el ancho (col-md-12)
         
-        $colClass = ($tipoUsuario == ROL_SECRETARIO || $tipoUsuario == ROL_ADMINISTRADOR) ? 'col-md-6' : 'col-md-12';
+        $esAdminSecretarioOPresidente = ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR);
+        $colClass = $esAdminSecretarioOPresidente ? 'col-md-6' : 'col-md-12';
         ?>
+        
         <div class="<?php echo $colClass; ?>">
             <a href="menu.php?pagina=minutas_aprobadas" class="dashboard-card h-100">
                 <i class="fas fa-check-circle text-success"></i>

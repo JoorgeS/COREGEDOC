@@ -172,12 +172,17 @@ class ReunionManager extends BaseConexion
     /**
      * Crea la minuta para una reunión existente y la vincula.
      */
-    public function iniciarMinuta($idReunion)
+    public function iniciarMinuta($idReunion,$idSecretarioLogueado)
     {
         $idReunion = (int)$idReunion;
         if ($idReunion <= 0) {
             return ['status' => 'error', 'message' => 'ID de reunión inválido.'];
         }
+
+        if ($idSecretarioLogueado <= 0) {
+            return ['status' => 'error', 'message' => 'ID de secretario inválido. Su sesión puede haber expirado.'];
+        }
+        
 
         try {
             $this->db->beginTransaction();
@@ -223,17 +228,22 @@ class ReunionManager extends BaseConexion
 
             $sql_minuta = "INSERT INTO t_minuta (
                                     t_comision_idComision, t_usuario_idPresidente, estadoMinuta,
-                                    horaMinuta, fechaMinuta, pathArchivo
+                                    horaMinuta, fechaMinuta, pathArchivo,
+                                    t_usuario_idSecretario
                                 ) VALUES (
-                                    :comisionId, :presidenteId, 'PENDIENTE',
-                                    :horaMinuta, :fechaMinuta, ''
+                                    :comisionId, :presidenteId, 'BORRADOR',
+                                    :horaMinuta, :fechaMinuta, '',
+                                    :idSecretario
                                 )";
             $stmt_minuta = $this->db->prepare($sql_minuta);
             $stmt_minuta->execute([
                 ':comisionId' => $comisionId,
                 ':presidenteId' => $presidenteId,
                 ':horaMinuta' => $horaMinuta,
-                ':fechaMinuta' => $fechaMinuta
+                ':fechaMinuta' => $fechaMinuta,
+                ':idSecretario' => $idSecretarioLogueado
+
+
             ]);
 
             $newIdMinuta = $this->db->lastInsertId();
@@ -358,7 +368,6 @@ class ReunionManager extends BaseConexion
             unset($r);
 
             return ['status' => 'success', 'data' => $rows];
-
         } catch (Throwable $e) {
             error_log('[getReunionesCalendarData] ' . $e->getMessage());
             return ['status' => 'error', 'message' => 'No fue posible cargar el calendario', 'data' => []];
@@ -444,15 +453,20 @@ try {
             }
             // No hay 'exit' ni 'header' aquí si tiene éxito
 
-        } elseif ($action === 'delete' && isset($_GET['id'])) {
-            $reunionId = (int)$_GET['id'];
-            $response = $manager->deleteReunion($reunionId);
-            $_SESSION[$response['status']] = $response['message'];
-            header('Location: ' . $listRedirectUrl);
-            exit;
         } elseif ($action === 'iniciarMinuta' && isset($_GET['idReunion'])) {
             $reunionId = (int)$_GET['idReunion'];
-            $response = $manager->iniciarMinuta($reunionId);
+
+            // --- ¡NUEVO! Capturamos el ID del Secretario ---
+            $idSecretarioLogueado = $_SESSION['idUsuario'] ?? 0;
+            if ($idSecretarioLogueado == 0) {
+                $_SESSION['error'] = 'Su sesión ha expirado. Por favor, ingrese de nuevo.';
+                header('Location: ' . $listRedirectUrl);
+                exit;
+            }
+            // --- FIN NUEVO ---
+
+            // --- ¡MODIFICADO! Pasamos el ID a la función ---
+            $response = $manager->iniciarMinuta($reunionId, $idSecretarioLogueado);
 
             if ($response['status'] === 'success') {
                 $_SESSION['success'] = $response['message'];

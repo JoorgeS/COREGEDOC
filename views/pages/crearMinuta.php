@@ -219,6 +219,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
     <div class="container-fluid app-container p-4">
         <h5 class="fw-bold mb-3">GESTIÓN DE LA MINUTA</h5>
 
+        <div id="feedback-display-container" class="alert alert-danger shadow-sm" style="display:none;">
+            <h4 class="alert-heading"><i class="fas fa-comment-dots me-2"></i> Feedback Pendiente</h4>
+            <p>Un presidente ha enviado las siguientes observaciones. Por favor, realiza las correcciones y luego haz clic en "Aplicar y Reenviar p/ Aprobación".</p>
+            <hr>
+            <div id="feedback-display-texto" style="white-space: pre-wrap; font-family: monospace; max-height: 200px; overflow-y: auto; background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
+            </div>
+        </div>
+
         <div class="row g-3">
 
             <div class="col-12 mb-3">
@@ -1239,6 +1247,267 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             }
         }
         // --- ⭐ ================== FIN BLOQUE ACCIONES ================== ⭐ ---
+
+        let REGLAS_FEEDBACK = null;
+
+        /**
+         * Se ejecuta después de que la página principal (crearMinuta.php)
+         * ha cargado todos sus datos iniciales (asistencia, temas, etc.).
+         */
+        document.addEventListener("DOMContentLoaded", () => {
+            // Solo intentamos cargar feedback si la minuta NO está Aprobada
+            if (ESTADO_MINUTA_ACTUAL !== 'APROBADA') {
+                cargarYAplicarFeedback();
+            }
+        });
+
+        /**
+         * Llama al controlador para ver si existe feedback para esta minuta.
+         */
+        async function cargarYAplicarFeedback() {
+            console.log("Buscando feedback para Minuta ID:", idMinutaGlobal);
+            try {
+                const response = await fetch(`/corevota/controllers/obtener_feedback_json.php?idMinuta=${idMinutaGlobal}`);
+                if (!response.ok) {
+                    throw new Error("No se pudo conectar al script de feedback.");
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success' && data.data) {
+                    console.log("Feedback encontrado:", data.data);
+                    REGLAS_FEEDBACK = data.data; // Guardamos las reglas globalmente
+
+                    // --- ¡NUEVO! MOSTRAR EL TEXTO DEL FEEDBACK ---
+                    if (data.textoFeedback) {
+                        const container = document.getElementById('feedback-display-container');
+                        const textoDiv = document.getElementById('feedback-display-texto');
+                        if (container && textoDiv) {
+                            textoDiv.textContent = data.textoFeedback;
+                            container.style.display = 'block';
+                        }
+                    }
+                    // --- FIN NUEVO ---
+
+                    // Si hay feedback, aplicamos las reglas
+                    deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
+                    actualizarBotonesParaFeedback();
+
+                } else if (data.status === 'no_feedback') {
+                    console.log("No hay feedback pendiente para esta minuta.");
+                    // No hacemos nada, la minuta se queda 100% editable
+                } else {
+                    throw new Error(data.message || "Error desconocido al cargar feedback.");
+                }
+            } catch (error) {
+                console.error("Error al cargar feedback:", error);
+                // No bloqueamos la UI, solo mostramos un aviso sutil
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'error',
+                    title: 'No se pudo cargar el estado de feedback.',
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }
+        }
+
+        /**
+         * Deshabilita las secciones del formulario según las reglas de feedback.
+         */
+        function deshabilitarCamposSegunFeedback(reglas) {
+
+            // Regla para Asistencia
+            if (reglas.asistencia === false) {
+                deshabilitarSeccion('asistenciaForm', 'Asistencia bloqueada (sin feedback)');
+            }
+
+            // Regla para Votaciones
+            if (reglas.votaciones === false) {
+                deshabilitarSeccion('votacionForm', 'Votaciones bloqueadas (sin feedback)');
+            }
+
+            // Regla para Adjuntos
+            if (reglas.adjuntos === false) {
+                deshabilitarSeccion('adjuntos-section', 'Adjuntos bloqueados (sin feedback)');
+            }
+
+            // Regla para Temas
+            // Si 'temas' es falso Y 'otro' es falso, bloqueamos los temas.
+            if (reglas.temas === false && reglas.otro === false) {
+                deshabilitarSeccion('contenedorTemas', 'Temas bloqueados (sin feedback)');
+                const btnAgregarTema = document.querySelector('button[onclick="agregarTema()"]');
+                if (btnAgregarTema) {
+                    btnAgregarTema.disabled = true;
+                    btnAgregarTema.title = 'Bloqueado (sin feedback)';
+                }
+            }
+        }
+
+        /**
+         * Función helper para deshabilitar visualmente una sección.
+         */
+        function deshabilitarSeccion(idElemento, mensaje) {
+            // Busca el botón que controla el colapso
+            const btnCollapse = document.querySelector(`button[data-bs-target="#${idElemento}"]`);
+            if (btnCollapse) {
+                btnCollapse.disabled = true;
+                btnCollapse.title = mensaje;
+                btnCollapse.classList.add('opacity-50');
+            }
+
+            // Busca el contenedor de la sección
+            const seccion = document.getElementById(idElemento);
+            if (seccion) {
+                // Deshabilita todos los inputs, selects, textareas y botones dentro
+                seccion.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
+                    el.disabled = true;
+                    el.contentEditable = false;
+                    el.style.cursor = 'not-allowed';
+                    el.style.backgroundColor = '#e9ecef'; // Color de fondo "disabled"
+                });
+
+                // Oculta las barras de herramientas de los editores
+                seccion.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
+                    toolbar.style.display = 'none';
+                });
+
+                // Si es un colapso, lo cerramos
+                if (seccion.classList.contains('collapse')) {
+                    const bsCollapse = bootstrap.Collapse.getInstance(seccion);
+                    if (bsCollapse) {
+                        bsCollapse.hide();
+                    }
+                }
+            }
+
+            // Caso especial para adjuntos (que no es un colapso)
+            if (idElemento === 'adjuntos-section') {
+                const seccionAdjuntos = document.querySelector('.adjuntos-section');
+                if (seccionAdjuntos) {
+                    seccionAdjuntos.style.opacity = '0.6';
+                    seccionAdjuntos.style.pointerEvents = 'none';
+                    seccionAdjuntos.title = mensaje;
+                }
+            }
+
+            // Caso especial para temas (que no es un colapso)
+            if (idElemento === 'contenedorTemas') {
+                const seccionTemas = document.getElementById('contenedorTemas');
+                if (seccionTemas) {
+                    seccionTemas.style.opacity = '0.6';
+                    seccionTemas.style.pointerEvents = 'none';
+                    seccionTemas.title = mensaje;
+                }
+            }
+        }
+
+        /**
+         * Cambia los botones de acción al final de la página.
+         */
+        function actualizarBotonesParaFeedback() {
+            const btnGuardar = document.getElementById('btnGuardarBorrador');
+            const btnEnviar = document.getElementById('btnEnviarAprobacion');
+
+            // 1. Modificar el botón de "Guardar"
+            if (btnGuardar) {
+                btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Correcciones';
+                // Mantenemos el onclick="guardarBorrador(false)"
+            }
+
+            // 2. Modificar el botón de "Enviar"
+            if (btnEnviar) {
+                btnEnviar.innerHTML = '<i class="fas fa-check-double"></i> Aplicar y Reenviar p/ Aprobación';
+                btnEnviar.classList.remove('btn-danger');
+                btnEnviar.classList.add('btn-success'); // Cambiamos a color verde
+
+                // ¡IMPORTANTE! Cambiamos la función que llama
+                btnEnviar.setAttribute('onclick', 'confirmarAplicarFeedback()');
+            }
+        }
+
+        /**
+         * Nueva función de confirmación que llama a aplicar_feedback.php
+         * (Esta se activa SOLO si estábamos en modo feedback)
+         */
+        function confirmarAplicarFeedback() {
+            // 1. Primero, guardamos los cambios en el borrador
+            Swal.fire({
+                title: 'Guardando Correcciones...',
+                text: 'Por favor espere, estamos guardando sus cambios antes de reenviar.',
+                icon: 'info',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            guardarBorrador(false, function(guardadoExitoso) {
+                if (!guardadoExitoso) {
+                    Swal.fire('Error al Guardar', 'No se pudieron guardar las correcciones. El re-envío fue cancelado.', 'error');
+                    return;
+                }
+
+                // 2. Si el guardado fue exitoso, llamamos a aplicar_feedback.php
+                Swal.fire({
+                    title: '¿Confirmar Re-envío?',
+                    text: "Sus correcciones fueron guardadas. ¿Desea aplicar el 'Sello Verde' y notificar a los presidentes para que firmen de nuevo?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#28a745',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Sí, Reenviar Ahora',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        llamarAplicarFeedback();
+                    }
+                });
+            });
+        }
+
+        /**
+         * Función final que llama al controlador aplicar_feedback.php
+         */
+        function llamarAplicarFeedback() {
+            const btnEnviar = document.getElementById('btnEnviarAprobacion');
+            if (btnEnviar) {
+                btnEnviar.disabled = true;
+                btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reenviando...';
+            }
+
+            const formData = new FormData();
+            formData.append('idMinuta', idMinutaGlobal);
+
+            // (CORREGIDO) Usar ruta absoluta
+            fetch('/corevota/controllers/aplicar_feedback.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire({
+                            title: '¡Minuta Reenviada!',
+                            text: data.message, // "Minuta corregida y reenviada..."
+                            icon: 'success'
+                        }).then(() => {
+                            // Volvemos a la lista de reuniones
+                            window.location.href = 'menu.php?pagina=reunion_listado';
+                        });
+                    } else {
+                        throw new Error(data.message);
+                    }
+                })
+                .catch(error => {
+                    Swal.fire('Error', 'Ocurrió un error al reenviar: ' + error.message, 'error');
+                    if (btnEnviar) {
+                        btnEnviar.disabled = false;
+                        btnEnviar.innerHTML = '<i class="fas fa-check-double"></i> Aplicar y Reenviar p/ Aprobación';
+                    }
+                });
+        }
     </script>
 </body>
 
