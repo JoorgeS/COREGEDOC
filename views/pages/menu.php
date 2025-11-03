@@ -393,7 +393,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Minutas
                             </a>
                         </li>
-                    <?php elseif ($tipoUsuario == ROL_CONSEJERO) : ?>
+                    <?php elseif ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=minutas_aprobadas" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-file-check fa-fw"></i>
@@ -432,7 +432,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         </li>
                     <?php endif; ?>
 
-                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
+                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-hand-paper fa-fw"></i>
@@ -506,8 +506,11 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         ?>
                     </span>
                     <ul class="dropdown-menu dropdown-menu-end">
+
                         <li><a class="dropdown-item" href="menu.php?pagina=perfil_usuario"><i class="fas fa-id-card fa-fw me-2"></i>Mi perfil</a></li>
-                        <li><a class="dropdown-item" href="menu.php?pagina=configuracion_vista"><i class="fas fa-cog fa-fw me-2"></i>Configuración</a></li>
+                        <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
+                            <li><a class="dropdown-item" href="menu.php?pagina=configuracion_vista"><i class="fas fa-cog fa-fw me-2"></i>Configuración</a></li>
+                        <?php endif; ?>
                         <li>
                             <hr class="dropdown-divider">
                         </li>
@@ -598,7 +601,11 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
                 'home' => ['type' => 'view', 'file' => $base_path . '/home.php'],
                 // ESTA ES LA LÍNEA CORRECTA:
-'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
+                'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php', 'roles' => [ROL_ADMINISTRADOR]],
+                'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php', 'roles' => [ROL_ADMINISTRADOR]],
+                'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create'], 'roles' => [ROL_ADMINISTRADOR]],
+
+                'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
                 'seguimiento_general' => ['type' => 'view', 'file' => $base_path . '/seguimiento_general.php'],
                 'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php'],
@@ -615,7 +622,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],
                 'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
-              
+
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php'],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create']],
                 'comision_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'list']],
@@ -631,7 +638,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 'votacion_crear' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_listado' => ['type' => 'view', 'file' => $base_path . '/votacion_listado.php'],
                 'historial_votacion' => ['type' => 'view', 'file' => $base_path . '/historial_votacion.php'],
-                'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php'],
+                'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php', 'roles' => [ROL_CONSEJERO, ROL_PRESIDENTE_COMISION, ROL_ADMINISTRADOR]],
                 'tabla_votacion' => ['type' => 'view', 'file' => $base_path . '/tablaVotacion.php'],
 
                 // --- VISTAS DE PERFIL Y CIERRE ---
@@ -644,6 +651,15 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             // --- Lógica del Router (SIN CAMBIOS) ---
             $route = $routes[$paginaActual] ?? $routes['home'];
 
+            if (isset($route['roles'])) {
+                // Comprueba si el $tipoUsuario NO está en el array de roles permitidos
+                if (!in_array($tipoUsuario, $route['roles'])) {
+                    // Si no tiene permiso, muestra un error y carga la vista 'home' en su lugar.
+                    echo "<div class='alert alert-danger m-3'>Acceso denegado. No tiene permiso para ver esta página.</div>";
+                    $route = $routes['home']; // Sobrescribe la ruta para forzar el home
+                    $paginaActual = 'home'; // Asegura que el saludo de 'home' se muestre
+                }
+            }
             if (!empty($route['params'])) {
                 foreach ($route['params'] as $key => $value) {
                     if (!isset($_GET[$key])) {

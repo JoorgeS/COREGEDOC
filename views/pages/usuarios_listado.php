@@ -1,5 +1,20 @@
 <?php
-// views/pages/usuarios_listado.php
+/**
+ * --------------------------------------
+ * GUARDIA DE ACCESO (ADMIN ONLY)
+ * --------------------------------------
+ * Las variables $tipoUsuario y ROL_ADMINISTRADOR son definidas 
+ * automáticamente por el archivo menu.php que incluye este script.
+ */
+if (!isset($tipoUsuario) || $tipoUsuario != ROL_ADMINISTRADOR) {
+    
+    // Oculta el contenido y redirige al inicio
+    echo "<div class='alert alert-danger m-3'>Acceso Denegado: No tiene permisos para ver esta página.</div>";
+    echo '<script>setTimeout(function() { window.location.href = "menu.php?pagina=home"; }, 2000);</script>';
+    
+    // Detiene la ejecución del resto de la página de admin
+    exit;
+}
 require_once(__DIR__ . '/../../Usuario.php');
 
 $usuarioObj   = new Usuario();
