@@ -4,6 +4,7 @@
 // SEGURIDAD: Iniciar la sesión de forma segura
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+    date_default_timezone_set('America/Santiago');
 }
 
 // SEGURIDAD: Redirigir si el usuario no está logueado
@@ -30,11 +31,35 @@ $nombreUsuario = 'Invitado'; // .
 $paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
 $id_param = $_GET['id'] ?? null; // Capturamos el ID también
 
-// --- Lógica para Saludo y Fecha ---
-$nombreUsuario = 'Invitado'; // Valor por defecto si no se encuentra el nombre
-if (isset($_SESSION['pNombre'])) { // Usamos pNombre como en tu código original
-    $nombreUsuario = htmlspecialchars($_SESSION['pNombre']);
+// --- Lógica para Saludo, Nombre y Fecha ---
+$nombreUsuario = trim(($_SESSION['pNombre'] ?? 'Invitado') . ' ' . ($_SESSION['aPaterno'] ?? ''));
+$nombreUsuario = trim($nombreUsuario); // por si falta aPaterno
+
+// Hora 0-23
+$horaActual = (int)date('G');
+
+// Mañana: 05:00–11:59 | Tarde: 12:00–19:59 | Noche: 20:00–04:59
+if ($horaActual >= 5 && $horaActual < 12) {
+    $saludo = 'Buenos días';
+} elseif ($horaActual >= 12 && $horaActual < 20) {
+    $saludo = 'Buenas tardes';
+} else {
+    $saludo = 'Buenas noches';
 }
+
+// Fecha en español (usa Intl si está disponible)
+if (class_exists('IntlDateFormatter')) {
+    $fmt = new IntlDateFormatter('es_CL', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'America/Santiago');
+    $fechaActual = $fmt->format(time()); // p.ej: martes, 4 de noviembre de 2025
+    // Capitaliza la primera letra
+    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+} else {
+    setlocale(LC_TIME, 'es_CL.UTF-8', 'es_ES.UTF-8', 'Spanish_Spain.1252');
+    $fechaActual = strftime('%A, %d de %B de %Y');
+    // Capitaliza la primera letra
+    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+}
+// --- Fin Lógica Saludo y Fecha ---
 
 // Determina el saludo según la hora del servidor
 $horaActual = date('H'); // Obtiene la hora en formato 24h (00-23)
@@ -393,7 +418,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Minutas
                             </a>
                         </li>
-                    <?php elseif ($tipoUsuario == ROL_CONSEJERO) : ?>
+                    <?php elseif ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=minutas_aprobadas" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-file-check fa-fw"></i>
@@ -432,7 +457,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         </li>
                     <?php endif; ?>
 
-                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
+                    <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-hand-paper fa-fw"></i>
@@ -473,18 +498,20 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Historial Votación
                             </a>
                         </li>
+                        
                     <?php endif; ?>
 
 
-                    <li class="nav-item mt-auto">
+                    
+
+                </ul>
+            </div>
+            <li class="nav-item mt-auto">
                         <a href="/corevota/logout.php" class="nav-link nav-link-logout">
                             <i class="fas fa-sign-out-alt fa-fw"></i>
                             Cerrar Sesión
                         </a>
                     </li>
-
-                </ul>
-            </div>
 
         </nav>
 
@@ -506,8 +533,11 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         ?>
                     </span>
                     <ul class="dropdown-menu dropdown-menu-end">
+
                         <li><a class="dropdown-item" href="menu.php?pagina=perfil_usuario"><i class="fas fa-id-card fa-fw me-2"></i>Mi perfil</a></li>
-                        <li><a class="dropdown-item" href="menu.php?pagina=configuracion_vista"><i class="fas fa-cog fa-fw me-2"></i>Configuración</a></li>
+                        <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
+                            <li><a class="dropdown-item" href="menu.php?pagina=configuracion_vista"><i class="fas fa-cog fa-fw me-2"></i>Configuración</a></li>
+                        <?php endif; ?>
                         <li>
                             <hr class="dropdown-divider">
                         </li>
@@ -551,8 +581,12 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 <div class="container-fluid mb-4">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h2 class="display-6"><?php echo $saludo . ' ' . $nombreUsuario; ?></h2>
-                            <p class="lead text-muted">Hoy es <?php echo ucfirst($fechaActual); ?></p>
+                            <h2 class="display-6">
+                            <?php echo htmlspecialchars($saludo . ' ' . $nombreUsuario, ENT_QUOTES, 'UTF-8'); ?>
+                            </h2>
+                            <p class="lead text-muted">
+                            Hoy es <?php echo htmlspecialchars($fechaActual, ENT_QUOTES, 'UTF-8'); ?>
+                            </p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <p id="temperatura-actual" class="fs-5 text-muted">Cargando clima...</p>
@@ -598,7 +632,17 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
                 'home' => ['type' => 'view', 'file' => $base_path . '/home.php'],
                 // ESTA ES LA LÍNEA CORRECTA:
-'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
+                'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php', 'roles' => [ROL_ADMINISTRADOR]],
+                'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php', 'roles' => [ROL_ADMINISTRADOR]],
+                'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create'], 'roles' => [ROL_ADMINISTRADOR]],
+                'usuario_editar' => [
+                'type'   => 'view',
+                'file'   => $base_path . '/usuario_formulario.php',
+                'params' => ['action' => 'edit'],
+                'roles'  => [ROL_ADMINISTRADOR]
+],
+
+                'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
                 'seguimiento_general' => ['type' => 'view', 'file' => $base_path . '/seguimiento_general.php'],
                 'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php'],
@@ -615,7 +659,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],
                 'editar_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
-              
+
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php'],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create']],
                 'comision_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ComisionController.php', 'params' => ['action' => 'list']],
@@ -631,7 +675,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 'votacion_crear' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
                 'votacion_listado' => ['type' => 'view', 'file' => $base_path . '/votacion_listado.php'],
                 'historial_votacion' => ['type' => 'view', 'file' => $base_path . '/historial_votacion.php'],
-                'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php'],
+                'voto_autogestion' => ['type' => 'view', 'file' => $base_path . '/voto_autogestion.php', 'roles' => [ROL_CONSEJERO, ROL_PRESIDENTE_COMISION, ROL_ADMINISTRADOR]],
                 'tabla_votacion' => ['type' => 'view', 'file' => $base_path . '/tablaVotacion.php'],
 
                 // --- VISTAS DE PERFIL Y CIERRE ---
@@ -644,6 +688,15 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             // --- Lógica del Router (SIN CAMBIOS) ---
             $route = $routes[$paginaActual] ?? $routes['home'];
 
+            if (isset($route['roles'])) {
+                // Comprueba si el $tipoUsuario NO está en el array de roles permitidos
+                if (!in_array($tipoUsuario, $route['roles'])) {
+                    // Si no tiene permiso, muestra un error y carga la vista 'home' en su lugar.
+                    echo "<div class='alert alert-danger m-3'>Acceso denegado. No tiene permiso para ver esta página.</div>";
+                    $route = $routes['home']; // Sobrescribe la ruta para forzar el home
+                    $paginaActual = 'home'; // Asegura que el saludo de 'home' se muestre
+                }
+            }
             if (!empty($route['params'])) {
                 foreach ($route['params'] as $key => $value) {
                     if (!isset($_GET[$key])) {
@@ -881,6 +934,48 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             </div>
         </div>
     </div>
+
+    <script>
+/* Popup por querystring ?status=[success|error]&msg=...  */
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('status') || !params.has('msg')) return;
+
+  const status = params.get('status'); // 'success' | 'error'
+  // el msg viene con urlencode, reponemos espacios por '+'
+  const msg = decodeURIComponent((params.get('msg') || '').replace(/\+/g, ' '));
+
+  const modalEl   = document.getElementById('confirmacionModal');
+  if (!modalEl) return;
+
+  const headerEl  = modalEl.querySelector('.modal-header');
+  const titleEl   = modalEl.querySelector('#confirmacionModalLabel');
+  const bodyEl    = modalEl.querySelector('#confirmacionModalMessage');
+  const btnFooter = modalEl.querySelector('.modal-footer .btn');
+
+  // Reset de estilos del header y botón
+  headerEl.classList.remove('bg-success', 'bg-danger', 'text-white');
+  btnFooter.classList.remove('btn-primary', 'btn-danger');
+
+  if (status === 'success') {
+    headerEl.classList.add('bg-success', 'text-white');
+    titleEl.innerHTML = '<i class="fas fa-check-circle me-2"></i>Operación Exitosa';
+    btnFooter.classList.add('btn-primary');
+  } else {
+    headerEl.classList.add('bg-danger', 'text-white');
+    titleEl.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+    btnFooter.classList.add('btn-danger');
+  }
+
+  // Mensaje del cuerpo (texto plano para evitar HTML inyectado)
+  bodyEl.textContent = msg;
+
+  // Mostrar modal
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+})();
+</script>
+
 </body>
 
 </html>

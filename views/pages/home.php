@@ -17,6 +17,9 @@
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="1" aria-label="Zona 2"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="2" aria-label="Zona 3"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="3" aria-label="Zona 4"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="4" aria-label="Zona 5"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="5" aria-label="Zona 6"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="6" aria-label="Zona 7"></button>
         </div>
 
         <div class="carousel-inner">
@@ -44,6 +47,26 @@
                     <h5>PROVINCIA DE SAN ANTONIO</h5>
                 </div>
             </div>
+            <div class="carousel-item">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_5.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>PROVINCIA DE LOS ANDES</h5>
+                </div>
+            </div>
+                        <div class="carousel-item">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_6.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>PROVINCIA DE PETORCA</h5>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_7.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>PROVINCIA SAN FELIPE DE ACONCAGUA</h5>
+                </div>
+            </div>
+
+            
         </div>
 
         <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="prev">
@@ -59,3 +82,130 @@
 
 <hr>
 
+<?php
+require_once __DIR__ . '/../../class/class.conectorDB.php';
+$db  = new conectorDB();
+$pdo = $db->getDatabase();
+
+$hoy    = date('Y-m-d');
+$hace14 = date('Y-m-d', strtotime('-14 days'));
+$prox14 = date('Y-m-d', strtotime('+14 days'));
+
+// Minutas aprobadas últimos 14 días (incluye pathArchivo para ver PDF)
+$sqlMinutas = "SELECT idMinuta, fechaMinuta, pathArchivo
+               FROM t_minuta 
+               WHERE estadoMinuta = 'APROBADA'
+               AND fechaMinuta BETWEEN :hace14 AND :hoy
+               ORDER BY fechaMinuta DESC";
+$stmt = $pdo->prepare($sqlMinutas);
+$stmt->execute([':hace14' => $hace14, ':hoy' => $hoy]);
+$minutasRecientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Reuniones próximas próximos 14 días
+$sqlReuniones = "SELECT idReunion, nombreReunion, fechaInicioReunion 
+                 FROM t_reunion 
+                 WHERE fechaInicioReunion BETWEEN :hoy AND :prox14
+                 ORDER BY fechaInicioReunion ASC";
+$stmt = $pdo->prepare($sqlReuniones);
+$stmt->execute([':hoy' => $hoy, ':prox14' => $prox14]);
+$reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<div class="container my-4">
+    <h4 class="mb-3">
+        <i class="fas fa-bell text-primary me-2"></i>Novedades Recientes
+    </h4>
+
+    <?php if (empty($minutasRecientes) && empty($reunionesProximas)): ?>
+        <div class="alert alert-secondary" role="alert">
+            <i class="fas fa-info-circle me-2"></i>No hay novedades recientes.
+        </div>
+    <?php else: ?>
+        <ul class="list-group shadow-sm">
+
+            <?php if (!empty($minutasRecientes)): ?>
+                <li class="list-group-item active fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-file-alt me-2"></i>Minutas Aprobadas (últimos 14 días)</span>
+                    <button id="toggleMinutasBtn" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-expand-arrows-alt"></i> Agrandar
+                    </button>
+                </li>
+                <div id="minutasContainer" class="collapse show">
+                    <?php foreach ($minutasRecientes as $m): 
+                        $path = trim((string)($m['pathArchivo'] ?? ''));
+                        // Si pathArchivo tiene ruta relativa almacenada como "uploads/.../archivo.pdf",
+                        // usamos /corevota/ + path. Si viniera absoluta, se usa tal cual.
+                        $urlPdf = $path !== '' 
+                            ? (preg_match('~^https?://~i', $path) ? $path : "/corevota/{$path}")
+                            : '';
+                    ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="me-2">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Minuta N° <?= htmlspecialchars($m['idMinuta']) ?>
+                                <span class="text-muted small ms-2"><?= date('d/m/Y', strtotime($m['fechaMinuta'])) ?></span>
+                            </span>
+
+                            <?php if ($urlPdf !== ''): ?>
+                                <a href="<?= htmlspecialchars($urlPdf) ?>" target="_blank" rel="noopener" class="btn btn-success btn-sm">
+                                    <i class="fas fa-file-pdf"></i> Ver PDF
+                                </a>
+                            <?php else: ?>
+                                <span class="text-muted small">Sin PDF</span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($reunionesProximas)): ?>
+                <li class="list-group-item active fw-bold d-flex justify-content-between align-items-center mt-3">
+                    <span><i class="fas fa-calendar-day me-2"></i>Reuniones Agendadas (próximos 14 días)</span>
+                    <button id="toggleReunionesBtn" class="btn btn-sm btn-outline-light">
+                        <i class="fas fa-expand-arrows-alt"></i> Agrandar
+                    </button>
+                </li>
+                <div id="reunionesContainer" class="collapse show">
+                    <?php foreach ($reunionesProximas as $r): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="fas fa-clock text-warning me-2"></i>
+                                <?= htmlspecialchars($r['nombreReunion'] ?: 'Reunión sin nombre') ?>
+                            </span>
+                            <span class="text-muted small"><?= date('d/m/Y', strtotime($r['fechaInicioReunion'])) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+        </ul>
+    <?php endif; ?>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleMinutasBtn = document.getElementById('toggleMinutasBtn');
+    const minutasContainer = document.getElementById('minutasContainer');
+    let minutasExpanded = true;
+
+    toggleMinutasBtn?.addEventListener('click', function() {
+        minutasContainer.classList.toggle('show');
+        minutasExpanded = !minutasExpanded;
+        toggleMinutasBtn.innerHTML = minutasExpanded
+            ? '<i class="fas fa-compress-arrows-alt"></i> Achicar'
+            : '<i class="fas fa-expand-arrows-alt"></i> Agrandar';
+    });
+
+    const toggleReunionesBtn = document.getElementById('toggleReunionesBtn');
+    const reunionesContainer = document.getElementById('reunionesContainer');
+    let reunionesExpanded = true;
+
+    toggleReunionesBtn?.addEventListener('click', function() {
+        reunionesContainer.classList.toggle('show');
+        reunionesExpanded = !reunionesExpanded;
+        toggleReunionesBtn.innerHTML = reunionesExpanded
+            ? '<i class="fas fa-compress-arrows-alt"></i> Achicar'
+            : '<i class="fas fa-expand-arrows-alt"></i> Agrandar';
+    });
+});
+</script>

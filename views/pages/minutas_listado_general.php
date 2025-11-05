@@ -155,12 +155,11 @@ function renderPaginationListado($current, $pages)
                 <tr>
                     <th scope="col">ID</th>
                     <th scope="col">Comisión</th>
-                    <th scope="col">Presidente(s)</th>
                     <th scope="col">Nombre(s) del Tema</th>
                     <th scope="col">Fecha Creación</th>
                     <th scope="col" class="text-center">Adjuntos</th>
                     <th scope="col">Estado</th>
-                    <th scope="col" class="text-end">Acciones</th>
+                    <th scope="col" class="text-center">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -186,7 +185,6 @@ function renderPaginationListado($current, $pages)
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
 
                             <td><?php echo htmlspecialchars($minuta['nombreComision'] ?? 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars(trim(($minuta['presidenteNombre'] ?? 'N/A') . ' ' . ($minuta['presidenteApellido'] ?? ''))); ?></td>
                             <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
 
@@ -198,7 +196,7 @@ function renderPaginationListado($current, $pages)
                                         <i class="fas fa-paperclip"></i> (<?php echo $totalAdjuntos; ?>)
                                     </button>
                                 <?php else: ?>
-                                    <span class="text-muted" title="Sin adjuntos">N/A</span>
+                                    <span class="text-muted" title="Sin adjuntos">No posee archivos adjuntos</span>
                                 <?php endif; ?>
                             </td>
 
@@ -229,7 +227,7 @@ function renderPaginationListado($current, $pages)
                                 <strong class="<?php echo $statusClass; ?>"><?php echo htmlspecialchars($statusText); ?></strong>
                             </td>
 
-                            <td class="text-end" style="white-space: nowrap;">
+                            <td class="text-center" style="white-space: nowrap;">
 
                                 <?php if ($estado === 'APROBADA'): ?>
                                     <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">

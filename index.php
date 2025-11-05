@@ -20,7 +20,7 @@ $error_message = '';
 // ====================================================
 // CRÍTICO: Se corrige el error sintáctico aquí (de 'e' a solo el operador '===').
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
+
     // Saneamiento y recolección de datos
     $usuario = isset($_POST['usuario']) ? trim($_POST['usuario']) : '';
     $clave = isset($_POST['password']) ? $_POST['password'] : '';
@@ -28,14 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($usuario) || empty($clave)) {
         $_SESSION['login_error'] = 'Por favor, ingrese usuario y contraseña.';
     } else {
+        // CÓDIGO CORREGIDO (Pégalo en index.php)
         try {
             // Conexión a la base de datos
             $conector = new conectorDB();
-            // Llama al método que devuelve el objeto PDO (ya implementado en conectorDB)
             $db = $conector->getDatabase(); 
 
-            // Consulta segura (Sentencia preparada)
-            $sql = 'SELECT idUsuario, correo, contrasena 
+            // 1. MODIFICACIÓN: Pedir TODOS los datos que menu.php necesita
+            $sql = 'SELECT idUsuario, correo, contrasena, pNombre, aPaterno, tipoUsuario_id 
                     FROM t_usuario 
                     WHERE correo = :user_input';
 
@@ -46,8 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user && password_verify($clave, $user['contrasena'])) {
                 
                 // ✅ ÉXITO: Iniciar la sesión
-                $_SESSION['user_id'] = $user['idUsuario'];
-                $_SESSION['user_email'] = $user['correo'];
+                
+                // 2. MODIFICACIÓN: Guardar TODAS las variables que menu.php usa
+                $_SESSION['idUsuario'] = $user['idUsuario'];      // Clave correcta para menu.php
+                $_SESSION['pNombre'] = $user['pNombre'];          // Clave correcta para menu.php
+                $_SESSION['aPaterno'] = $user['aPaterno'];       // Clave correcta para menu.php
+                $_SESSION['correo'] = $user['correo'];
+                $_SESSION['tipoUsuario_id'] = $user['tipoUsuario_id']; // ¡La clave que faltaba!
 
                 header('Location: /COREVOTA/index.php');
                 exit(); // CRÍTICO: Detiene el script después de la redirección.
@@ -58,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
         } catch (PDOException $e) {
+
             // Error de conexión o consulta
             // No exponer detalles del error al usuario final.
             $_SESSION['login_error'] = 'Error interno en el sistema. Intente de nuevo.';
@@ -94,4 +100,3 @@ if (isset($_SESSION['user_id'])) {
     include __DIR__ . '/views/pages/login.php';
 }
 // Fin del script PHP
-?>

@@ -1,9 +1,61 @@
 <?php
+
+/**
+ * --------------------------------------
+ * GUARDIA DE ACCESO (ADMIN ONLY)
+ * --------------------------------------
+ * Las variables $tipoUsuario y ROL_ADMINISTRADOR son definidas 
+ * automáticamente por el archivo menu.php que incluye este script.
+ */
+if (!isset($tipoUsuario) || $tipoUsuario != ROL_ADMINISTRADOR) {
+    
+    // Oculta el contenido y redirige al inicio
+    echo "<div class='alert alert-danger m-3'>Acceso Denegado: No tiene permisos para ver esta página.</div>";
+    echo '<script>setTimeout(function() { window.location.href = "menu.php?pagina=home"; }, 2000);</script>';
+    
+    // Detiene la ejecución del resto de la página de admin
+    exit;
+}
 // =====================================================================
 // views/pages/usuario_form.php
 // Mantiene el menú lateral en "Crear" y "Editar" usuarios
 // =====================================================================
 require_once(__DIR__ . '/../../Usuario.php');
+
+/* ---------------------------------------------------------------------------
+   ✅ ENDPOINT AJAX: validar correo no duplicado
+   - URL ejemplo: usuario_form.php?ajax=checkEmail&correo=mail@dominio.cl&idActual=123
+   - Respuesta: { "exists": true|false }
+--------------------------------------------------------------------------- */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'checkEmail') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $correo   = trim((string)($_GET['correo'] ?? ''));
+        $idActual = (int)($_GET['idActual'] ?? 0);
+
+        $tmpUsuario = new Usuario();
+        // Usamos listarUsuarios() para revisar duplicidad (sin tocar el modelo)
+        $lista = $tmpUsuario->listarUsuarios();
+        $existe = false;
+
+        if (is_array($lista)) {
+            $correoLower = mb_strtolower($correo, 'UTF-8');
+            foreach ($lista as $u) {
+                $idU = (int)($u['idUsuario'] ?? 0);
+                $mailU = mb_strtolower((string)($u['correo'] ?? ''), 'UTF-8');
+                if ($mailU !== '' && $mailU === $correoLower && $idU !== $idActual) {
+                    $existe = true;
+                    break;
+                }
+            }
+        }
+
+        echo json_encode(['exists' => $existe], JSON_UNESCAPED_UNICODE);
+    } catch (Throwable $e) {
+        echo json_encode(['exists' => false, 'error' => 'check-failed'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 
 // ---------------------------------------------------------------------------
 // 🔍 DETECCIÓN DE MODO EMBEBIDO (cuando se carga dentro de menu.php)
@@ -98,7 +150,7 @@ if (!$EMBED): ?>
 <?php endif; ?>
 
 <div class="card shadow-sm p-4">
-    <form action="usuario_acciones.php" method="POST" class="needs-validation" novalidate autocomplete="off">
+    <form action="usuario_acciones.php" method="POST" class="needs-validation" novalidate autocomplete="off" id="formUsuario">
         <input type="hidden" name="action" value="<?php echo htmlspecialchars($action); ?>">
         <?php if ($idUsuario): ?>
             <input type="hidden" name="idUsuario" value="<?php echo htmlspecialchars((string)$idUsuario); ?>">
@@ -132,6 +184,10 @@ if (!$EMBED): ?>
                 <label for="correo" class="form-label">Correo Electrónico *</label>
                 <input type="email" class="form-control" id="correo" name="correo"
                        value="<?php echo htmlspecialchars($userData['correo'] ?? ''); ?>" required>
+                <!-- feedback dinámico para duplicidad -->
+                <div id="correoFeedback" class="invalid-feedback">
+                    Este correo ya está registrado.
+                </div>
             </div>
 
             <div class="col-md-6">
@@ -209,7 +265,7 @@ if (!$EMBED): ?>
             </div>
 
             <div class="col-12 mt-4">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" id="btnSubmit">
                     <?php echo ($action === 'create') ? 'Registrar Usuario' : 'Guardar Cambios'; ?>
                 </button>
                 <?php
@@ -232,4 +288,84 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = document.querySelector('a[href*="usuarios_dashboard"], a[href*="usuarios_listado"]');
     if (item) item.classList.add('active', 'fw-bold', 'text-primary');
 });
+</script>
+
+<script>
+/* -----------------------------------------------------------
+   🔒 Validación de correo único (AJAX)
+----------------------------------------------------------- */
+(function() {
+    const correoInput = document.getElementById('correo');
+    const btnSubmit   = document.getElementById('btnSubmit');
+    const feedback    = document.getElementById('correoFeedback');
+    const form        = document.getElementById('formUsuario');
+
+    if (!correoInput) return;
+
+    const action = <?php echo json_encode($action); ?>;
+    const idActual = <?php echo json_encode($idUsuario); ?>;
+
+    let correoDuplicado = false;
+    let debounceTimer = null;
+
+    function setCorreoEstadoDuplicado(isDup) {
+        correoDuplicado = isDup;
+        if (isDup) {
+            correoInput.classList.add('is-invalid');
+            if (feedback) feedback.style.display = 'block';
+            if (btnSubmit) btnSubmit.disabled = true;
+        } else {
+            correoInput.classList.remove('is-invalid');
+            if (feedback) feedback.style.display = 'none';
+            if (btnSubmit) btnSubmit.disabled = false;
+        }
+    }
+
+    function checkEmail() {
+        const correo = (correoInput.value || '').trim();
+        if (correo === '') {
+            setCorreoEstadoDuplicado(false);
+            return;
+        }
+        const params = new URLSearchParams({
+            ajax: 'checkEmail',
+            correo: correo,
+            idActual: idActual || 0
+        });
+        // Importante: ruta relativa al archivo actual (la vista)
+        fetch('usuario_form.php?' + params.toString(), {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            const exists = !!(data && data.exists);
+            // En create: bloquear si existe. En edit: también, salvo que sea mi mismo id (ya manejado en backend)
+            setCorreoEstadoDuplicado(exists);
+        })
+        .catch(() => setCorreoEstadoDuplicado(false));
+    }
+
+    function debounceCheck() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(checkEmail, 300);
+    }
+
+    correoInput.addEventListener('input', debounceCheck);
+    correoInput.addEventListener('blur', checkEmail);
+
+    // Validación al enviar
+    form.addEventListener('submit', function(e) {
+        if (correoDuplicado) {
+            e.preventDefault();
+            e.stopPropagation();
+            correoInput.focus();
+        }
+    });
+
+    // Chequeo inicial si viene prellenado (editar)
+    if (correoInput.value) {
+        checkEmail();
+    }
+})();
 </script>
