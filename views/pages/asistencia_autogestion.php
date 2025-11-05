@@ -1,4 +1,5 @@
 <?php
+//probando adecuacion del git
 // views/pages/asistencia_autogestion.php
 require_once __DIR__ . '/../../class/class.conectorDB.php'; // Asegura que la timezone 'America/Santiago' esté cargada
 
