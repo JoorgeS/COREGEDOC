@@ -46,7 +46,8 @@ $offset  = ($page - 1) * $perPage;
 $reunionesPage = array_slice($reunionesFiltradas, $offset, $perPage);
 
 // Helper para paginación
-function renderPagination($current, $pages) {
+function renderPagination($current, $pages)
+{
     if ($pages <= 1) return;
     // Preservar querystring existente
     echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0">';
@@ -55,7 +56,7 @@ function renderPagination($current, $pages) {
         $qsArr['p'] = $i;
         $qs = http_build_query($qsArr);
         $active = ($i === $current) ? ' active' : '';
-        echo '<li class="page-item'.$active.'"><a class="page-link" href="?'.$qs.'">'.$i.'</a></li>';
+        echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qs . '">' . $i . '</a></li>';
     }
     echo '</ul></nav>';
 }
@@ -63,18 +64,36 @@ function renderPagination($current, $pages) {
 
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Listado de Reuniones</title>
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
-        .table-responsive { margin-top: 20px; }
-        .table th, .table td { vertical-align: middle; }
-        .filters-card{border:1px solid #e5e7eb;border-radius:.5rem;background:#f8fafc}
-        .sticky-th thead th{position:sticky;top:0;z-index:1}
+        .table-responsive {
+            margin-top: 20px;
+        }
+
+        .table th,
+        .table td {
+            vertical-align: middle;
+        }
+
+        .filters-card {
+            border: 1px solid #e5e7eb;
+            border-radius: .5rem;
+            background: #f8fafc
+        }
+
+        .sticky-th thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1
+        }
     </style>
 </head>
+
 <body>
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -100,8 +119,8 @@ function renderPagination($current, $pages) {
                 <div class="col-md-4">
                     <label for="per_page" class="form-label">Resultados</label>
                     <select name="per_page" id="per_page" class="form-select form-select-sm">
-                        <?php foreach ([10,25,50] as $opt): ?>
-                            <option value="<?php echo $opt; ?>" <?php echo ($perPage===$opt)?'selected':''; ?>>
+                        <?php foreach ([10, 25, 50] as $opt): ?>
+                            <option value="<?php echo $opt; ?>" <?php echo ($perPage === $opt) ? 'selected' : ''; ?>>
                                 <?php echo $opt; ?>/pág
                             </option>
                         <?php endforeach; ?>
@@ -139,7 +158,13 @@ function renderPagination($current, $pages) {
                                     // Determinar el texto y color del badge de estado
                                     $estadoTexto = 'No Iniciada';
                                     $badge_class = 'bg-secondary';
-                                    if ($estadoMinuta === 'PENDIENTE') {
+
+
+                                    if ($estadoMinuta === 'BORRADOR') {
+                                        $estadoTexto = 'Borrador';
+                                        $badge_class = 'bg-info text-dark'; // (Puedes usar bg-info o la que prefieras)
+                                        // --- FIN DE LA MODIFICACIÓN ---
+                                    } elseif ($estadoMinuta === 'PENDIENTE') {
                                         $estadoTexto = 'Pendiente';
                                         $badge_class = 'bg-warning text-dark';
                                     } elseif ($estadoMinuta === 'APROBADA') {
@@ -168,50 +193,50 @@ function renderPagination($current, $pages) {
                                                 if ($now < $meetingStartTime) {
                                                     $horaInicioFormato = htmlspecialchars(date('H:i', $meetingStartTime));
                                                     $fechaInicioFormato = htmlspecialchars(date('d-m-Y', $meetingStartTime));
-                                                    ?>
+                                            ?>
                                                     <span class="text-muted" title="Programada para el <?php echo $fechaInicioFormato; ?> a las <?php echo $horaInicioFormato; ?>">
                                                         <i class="fas fa-clock me-1"></i> Iniciar se habilita a las <?php echo $horaInicioFormato; ?>
                                                     </span>
-                                                    <?php
+                                                <?php
                                                 } else {
-                                                    ?>
+                                                ?>
                                                     <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary" title="Crear e iniciar la edición de la minuta">
                                                         <i class="fas fa-play me-1"></i> Iniciar Reunión
                                                     </a>
-                                                    <?php
+                                                <?php
                                                 }
-                                            } elseif ($estadoMinuta === 'PENDIENTE') {
+                                            } elseif ($estadoMinuta === 'PENDIENTE' || $estadoMinuta === 'BORRADOR') {
                                                 ?>
                                                 <a href="menu.php?pagina=editar_minuta&id=<?php echo $idMinuta; ?>" class="btn btn-sm btn-warning" title="Continuar editando la minuta">
                                                     <i class="fas fa-edit me-1"></i> Continuar Edición
                                                 </a>
-                                                <?php
+                                            <?php
                                             } elseif ($estadoMinuta === 'APROBADA') {
-                                                ?>
+                                            ?>
                                                 <span class="text-success">
                                                     <i class="fas fa-check-circle me-1"></i> Reunión Finalizada
                                                 </span>
-                                                <?php
+                                            <?php
                                             } else {
-                                                ?>
+                                            ?>
                                                 <span class="text-danger" title="Estado de minuta desconocido: <?php echo htmlspecialchars($estadoMinuta); ?>">
                                                     <i class="fas fa-exclamation-circle me-1"></i> Estado Inválido
                                                 </span>
-                                                <?php
+                                            <?php
                                             }
 
                                             if ($idMinuta === null) {
-                                                ?>
+                                            ?>
                                                 <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
                                                 <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>"
-                                                   class="btn btn-sm btn-danger ms-1"
-                                                   title="Deshabilitar Reunión"
-                                                   onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión? Esta acción la quitará del listado activo.');">
+                                                    class="btn btn-sm btn-danger ms-1"
+                                                    title="Deshabilitar Reunión"
+                                                    onclick="return confirm('¿Está seguro de que desea deshabilitar esta reunión? Esta acción la quitará del listado activo.');">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
-                                                <?php
+                                            <?php
                                             }
                                             ?>
                                         </td>
@@ -232,39 +257,42 @@ function renderPagination($current, $pages) {
 
     <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script>
-    (function(){
-      // Form de filtros principal
-      const form   = document.getElementById('filtrosForm');
-      const inputQ = document.getElementById('q');
-      const perSel = document.getElementById('per_page');
-      const pHid   = document.getElementById('pHidden');
+        (function() {
+            // Form de filtros principal
+            const form = document.getElementById('filtrosForm');
+            const inputQ = document.getElementById('q');
+            const perSel = document.getElementById('per_page');
+            const pHid = document.getElementById('pHidden');
 
-      // Ir siempre a la primera página al cambiar filtros
-      function toFirstPage(){ if (pHid) pHid.value = '1'; }
-
-      // Autosubmit por tamaño de página
-      if(perSel){
-        perSel.addEventListener('change', ()=>{
-          toFirstPage();
-          if (form) form.submit();
-        });
-      }
-
-      // Búsqueda automática (≥5 chars o vacío)
-      if(inputQ && form){
-        let t=null;
-        inputQ.addEventListener('input', ()=>{
-          clearTimeout(t);
-          t = setTimeout(()=>{
-            const val = (inputQ.value || '').trim();
-            if(val.length >= 5 || val.length === 0){
-              toFirstPage();
-              form.submit();
+            // Ir siempre a la primera página al cambiar filtros
+            function toFirstPage() {
+                if (pHid) pHid.value = '1';
             }
-          }, 400);
-        });
-      }
-    })();
+
+            // Autosubmit por tamaño de página
+            if (perSel) {
+                perSel.addEventListener('change', () => {
+                    toFirstPage();
+                    if (form) form.submit();
+                });
+            }
+
+            // Búsqueda automática (≥5 chars o vacío)
+            if (inputQ && form) {
+                let t = null;
+                inputQ.addEventListener('input', () => {
+                    clearTimeout(t);
+                    t = setTimeout(() => {
+                        const val = (inputQ.value || '').trim();
+                        if (val.length >= 5 || val.length === 0) {
+                            toFirstPage();
+                            form.submit();
+                        }
+                    }, 400);
+                });
+            }
+        })();
     </script>
 </body>
+
 </html>

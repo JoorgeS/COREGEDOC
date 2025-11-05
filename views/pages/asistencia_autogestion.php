@@ -24,7 +24,7 @@ try {
                     FROM t_reunion r
                     JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
                     JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                    WHERE r.vigente = 1 AND m.estadoMinuta = 'PENDIENTE'
+                    WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR')
                     ORDER BY r.fechaInicioReunion DESC";
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $reunionesActivas = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);

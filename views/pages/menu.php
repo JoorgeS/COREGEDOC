@@ -842,34 +842,56 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 
 
-        // Función para aprobar minuta
         function aprobarMinuta(idMinuta) {
-            if (confirm('¿Está seguro de que desea firmar y aprobar esta minuta? Esta acción es irreversible.')) {
-                console.log("Aprobando minuta: " + idMinuta);
-
+            Swal.fire({
+                title: '¿Confirmar Firma?',
+                text: '¿Desea firmar y aprobar esta minuta? Esta acción es irreversible.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, firmar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d'
+            }).then((result) => {
+                if (result.isConfirmed) {
                 fetch('/corevota/controllers/aprobar_minuta.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            idMinuta: idMinuta
-                        })
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ idMinuta: idMinuta })
                     })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.status === 'success') {
-                            alert('Minuta aprobada con éxito. La página se recargará.');
-                            window.location.reload();
-                        } else {
-                            alert('Error al aprobar: ' + data.message);
+                        let titulo = '¡Minuta aprobada!';
+                        let icono = 'success';
+
+                        if (data.status === 'success_partial') {
+                            titulo = 'Firma registrada';
+                        } else if (data.status === 'success_final') {
+                            titulo = '¡Minuta aprobada y PDF generado!';
+                        } else if (data.status !== 'success') {
+                            // Si no coincide con ninguno de los casos válidos, tratamos como error
+                            titulo = 'Error';
+                            icono = 'error';
                         }
+                        Swal.fire({
+                            title: titulo,
+                            text: data.message || 'Operación completada correctamente.',
+                            icon: icono,
+                            confirmButtonColor: '#28a745'
+                        }).then(() => {
+                            if (icono === 'success') {
+                            window.location.reload();
+                            }
+                        });
                     })
                     .catch(error => {
-                        console.error('Error en fetch al aprobar:', error);
-                        alert('Error de conexión al intentar aprobar la minuta.');
+                    console.error('Error en fetch al aprobar:', error);
+                    Swal.fire('Error', 'Error de conexión al intentar aprobar la minuta.', 'error');
                     });
-            }
+                }
+            });
         }
     </script>
 

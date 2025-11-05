@@ -2,7 +2,6 @@
 // views/pages/minutas_listado_general.php
 
 // --- INICIO DE MODIFICACIÓN: Conexión a BD ---
-// Necesaria para consultar el estado de firma individual en la lista
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,8 +10,6 @@ try {
     $db = new conectorDB();
     $pdo = $db->getDatabase();
 } catch (Exception $e) {
-    // Si la app está funcionando, $pdo no debería ser null
-    // Si falla, los botones de firma no aparecerán.
     $pdo = null;
     error_log("Error de conexión BD en minutas_listado_general.php: " . $e->getMessage());
 }
@@ -20,10 +17,7 @@ try {
 
 
 // Variables esperadas del Controlador:
-// $minutas (array), $estadoActual (string), $currentStartDate (string), $currentEndDate (string), $currentThemeName (string)
-
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-// (INCLUIDO) Se asume que $rol viene de la sesión, necesario para el botón de editar
 $rol = $_SESSION['idRol'] ?? null;
 
 // Determinar el título y la página del formulario
@@ -33,15 +27,19 @@ $paginaForm = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pe
 
 // Usar fechas de la URL si existen, si no, usar mes actual
 $currentStartDate = $_GET['startDate'] ?? date('Y-m-01');
-$currentEndDate   = $_GET['endDate']   ?? date('Y-m-d');
-
-// Palabra clave (para buscar en Tema y Objetivo)
+$currentEndDate = $_GET['endDate'] ?? date('Y-m-d');
 $currentThemeName = $_GET['themeName'] ?? '';
+
+
+// --- INICIO DE MODIFICACIÓN (Paso 1: Definir Pestaña) ---
+$esSecretarioTecnico = ($rol == 2);
+$activeTab = $_GET['tab'] ?? 'borradores'; // 'borradores' o 'pendientes_aprobacion'
+$esPaginaPendientes = ($estadoActual === 'PENDIENTE');
+// --- FIN DE MODIFICACIÓN ---
+
 
 // ---------- (CÓDIGO ACTUAL) PREFILTRO: buscar en Tema y Objetivo (vista) ----------
 $minutasFiltradas = $minutas;
-
-// Normalizador robusto (quita <br>, tags, decodifica entidades y pasa a minúsculas)
 $__normalize = function ($s) {
     $s = (string)$s;
     $s = preg_replace('/<br\s*\/?>/i', ' ', $s);
@@ -52,14 +50,10 @@ $__normalize = function ($s) {
     if (in_array($s, ['n/a', 'na', '-'], true)) $s = '';
     return $s;
 };
-
 if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
     $needle = mb_strtolower(trim($currentThemeName), 'UTF-8');
-
-    // claves posibles para tema y objetivo (por si cambian los alias en otra parte)
     $temaKeys = ['nombreTemas', 'nombreTema', 'temas', 'tema'];
-    $objKeys  = ['objetivos', 'objetivo', 'objetivosTexto'];
-
+    $objKeys = ['objetivos', 'objetivo', 'objetivosTexto'];
     $minutasFiltradas = array_values(array_filter($minutasFiltradas, function ($m) use ($needle, $__normalize, $temaKeys, $objKeys) {
         $temas = '';
         foreach ($temaKeys as $k) {
@@ -73,29 +67,45 @@ if (is_array($minutasFiltradas ?? null) && $currentThemeName !== '') {
                 $objs .= ' ' . $m[$k];
             }
         }
-
         $temasNorm = $__normalize($temas);
-        $objsNorm  = $__normalize($objs);
-
-        // Coincide si aparece en Tema o en Objetivo
+        $objsNorm = $__normalize($objs);
         return (mb_stripos($temasNorm, $needle, 0, 'UTF-8') !== false) ||
-            (mb_stripos($objsNorm,  $needle, 0, 'UTF-8') !== false);
+            (mb_stripos($objsNorm, $needle, 0, 'UTF-8') !== false);
     }));
 }
 
-
-// ---------- (CÓDIGO ACTUAL) Paginación en la vista ----------
-$perPage    = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
-$page       = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$offset     = ($page - 1) * $perPage;
-$total      = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
-$pages      = max(1, (int)ceil(($total ?: 1) / $perPage));
-
-if (!is_array($minutasFiltradas)) {
-    $minutasFiltradas = []; // Si no es un array, la convertimos en un array vacío
+// --- INICIO DE MODIFICACIÓN (Paso 3: Filtrar por Pestaña) ---
+if ($esSecretarioTecnico && $esPaginaPendientes) {
+    if ($activeTab === 'borradores') {
+        // TAREAS DEL ST: 'BORRADOR' o si tiene feedback ('REQUIERE_REVISION')
+        $pageTitle = "Mis Tareas (Borradores y Feedback)"; // Sobrescribir título
+        $minutasFiltradas = array_filter($minutasFiltradas, function ($m) {
+            // $m['tieneFeedback'] > 0 es verdadero si estadoMinuta es REQUIERE_REVISION
+            // (Añadimos BORRADOR que viene de reunion_listado)
+            $estado = $m['estadoMinuta'] ?? null;
+            return $estado === 'BORRADOR' || ($m['tieneFeedback'] > 0);
+        });
+    } else { // 'pendientes_aprobacion'
+        // EN ESPERA DE PRESIDENTES: 'PENDIENTE' o 'PARCIAL' (y sin feedback)
+        $pageTitle = "Minutas en Espera de Firma"; // Sobrescribir título
+        $minutasFiltradas = array_filter($minutasFiltradas, function ($m) {
+            $estado = $m['estadoMinuta'] ?? null;
+            return (in_array($estado, ['PENDIENTE', 'PARCIAL']) && ($m['tieneFeedback'] == 0));
+        });
+    }
 }
+// --- FIN DE MODIFICACIÓN ---
 
-// (Esta es tu línea 90, que ahora es segura y no fallará)
+
+// ---------- Paginación en la vista ----------
+$perPage = isset($_GET['per_page']) ? max(1, (int)$_GET['per_page']) : 10;
+$page = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$offset = ($page - 1) * $perPage;
+$total = (is_array($minutasFiltradas ?? null)) ? count($minutasFiltradas) : 0;
+$pages = max(1, (int)ceil(($total ?: 1) / $perPage));
+if (!is_array($minutasFiltradas)) {
+    $minutasFiltradas = [];
+}
 $minutasPaginadas = array_slice($minutasFiltradas, $offset, $perPage);
 
 // Helper paginación
@@ -105,19 +115,45 @@ function renderPaginationListado($current, $pages)
     echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm">';
     for ($i = 1; $i <= $pages; $i++) {
         $active = ($i === $current) ? ' active' : '';
-        $qsArr  = $_GET;
+
+        // --- INICIO MODIFICACIÓN (Paso 4A: Paginación) ---
+        $qsArr = $_GET;
+        if (isset($_GET['tab'])) $qsArr['tab'] = $_GET['tab']; // <-- Añadido
+        // --- FIN MODIFICACIÓN ---
+
         $qsArr['p'] = $i;
         $qs = http_build_query($qsArr);
         echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qs . '">' . $i . '</a></li>';
     }
     echo '</ul></nav>';
 }
-
-
 ?>
 
 <div class="container-fluid mt-4">
     <h3 class="mb-3"><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
+
+    <?php
+    // --- INICIO DE MODIFICACIÓN (Paso 2: HTML de Pestañas) ---
+    // Solo mostramos las pestañas si somos ST y estamos en la página de "Pendientes"
+    if ($esSecretarioTecnico && $esPaginaPendientes):
+    ?>
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($activeTab === 'borradores') ? 'active' : ''; ?>" 
+                   href="menu.php?pagina=minutas_pendientes&tab=borradores">
+                    <i class="fas fa-edit me-1"></i> Mis Tareas (Borradores y Feedback)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <?php echo ($activeTab === 'pendientes_aprobacion') ? 'active' : ''; ?>" 
+                   href="menu.php?pagina=minutas_pendientes&tab=pendientes_aprobacion">
+                    <i class="fas fa-clock me-1"></i> En Espera de Firma
+                </a>
+            </li>
+        </ul>
+    <?php endif;
+    // --- FIN DE MODIFICACIÓN ---
+    ?>
 
     <form method="GET" class="mb-4 p-3 border rounded bg-light">
         <input type="hidden" name="pagina" value="<?php echo htmlspecialchars($paginaForm, ENT_QUOTES, 'UTF-8'); ?>">
@@ -131,7 +167,6 @@ function renderPaginationListado($current, $pages)
                 <label for="endDate" class="form-label">Fecha Creación Hasta:</label>
                 <input type="date" class="form-control form-control-sm" id="endDate" name="endDate" value="<?php echo htmlspecialchars($currentEndDate ?? ''); ?>">
             </div>
-
             <div class="col-md-4">
                 <label for="themeName" class="form-label">Buscar por palabra clave</label>
                 <input
@@ -142,7 +177,6 @@ function renderPaginationListado($current, $pages)
                     placeholder="Busca en “Nombre(s) del Tema” u “Objetivo(s)”…"
                     value="<?php echo htmlspecialchars($currentThemeName ?? ''); ?>">
             </div>
-
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
             </div>
@@ -165,29 +199,38 @@ function renderPaginationListado($current, $pages)
             <tbody>
                 <?php if (empty($minutasPaginadas) || !is_array($minutasPaginadas)): ?>
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">No hay minutas que coincidan con los filtros aplicados.</td>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <?php 
+                            // --- INICIO MODIFICACIÓN (Paso 4B) ---
+                            if ($esSecretarioTecnico && $esPaginaPendientes && $activeTab === 'borradores') {
+                                echo "No tienes minutas en borrador o que requieran revisión.";
+                            } elseif ($esSecretarioTecnico && $esPaginaPendientes && $activeTab === 'pendientes_aprobacion') {
+                                echo "No hay minutas en espera de firma.";
+                            } else {
+                                echo "No hay minutas que coincidan con los filtros aplicados.";
+                            }
+                            // --- FIN MODIFICACIÓN ---
+                            ?>
+                        </td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($minutasPaginadas as $minuta): ?>
                         <tr>
                             <?php
                             $minutaId = $minuta['idMinuta'];
-                            $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE'; // 'PENDIENTE' o 'APROBADA'
+                            $estado = $minuta['estadoMinuta'] ?? 'PENDIENTE';
                             $fechaCreacion = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos = (int)($minuta['totalAdjuntos'] ?? 0);
-
-                            // (NUEVO) Datos de la lógica de feedback
                             $firmasActuales = (int)($minuta['firmasActuales'] ?? 0);
                             $requeridos = max(1, (int)($minuta['presidentesRequeridos'] ?? 1));
                             $tieneFeedback = (int)($minuta['tieneFeedback'] > 0);
+                            // (Añadimos BORRADOR a la lógica de estado)
+                            $esBorrador = ($estado === 'BORRADOR');
                             ?>
-
                             <td><?php echo htmlspecialchars($minutaId); ?></td>
-
                             <td><?php echo htmlspecialchars($minuta['nombreComision'] ?? 'N/A'); ?></td>
                             <td><?php echo $minuta['nombreTemas'] ?? 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($fechaCreacion); ?></td>
-
                             <td class="text-center">
                                 <?php if ($totalAdjuntos > 0): ?>
                                     <button type="button" class="btn btn-info btn-sm"
@@ -199,35 +242,30 @@ function renderPaginationListado($current, $pages)
                                     <span class="text-muted" title="Sin adjuntos">No posee archivos adjuntos</span>
                                 <?php endif; ?>
                             </td>
-
                             <?php
-                            // --- (MODIFICADO) Lógica de Estado para Secretario ---
-
+                            // --- Lógica de Estado para Secretario (Se añade BORRADOR) ---
                             if ($estado === 'APROBADA') {
                                 $statusText = "Aprobada ($firmasActuales / $requeridos)";
-                                $statusClass = 'text-success'; // Verde
-
+                                $statusClass = 'text-success';
+                            } elseif ($esBorrador) {
+                                $statusText = 'Borrador';
+                                $statusClass = 'text-info';
                             } elseif ($tieneFeedback) {
-                                // ¡ESTA ES LA LÍNEA QUE MODIFICAMOS!
                                 $statusText = 'Feedback Recibido';
-                                $statusClass = 'text-danger'; // Rojo
-
+                                $statusClass = 'text-danger';
                             } elseif ($firmasActuales > 0 && $firmasActuales < $requeridos) {
                                 $statusText = "Aprobación Parcial ($firmasActuales / $requeridos)";
-                                $statusClass = 'text-info'; // Azul claro
-
+                                $statusClass = 'text-info';
                             } else {
-                                // Default para PENDIENTE (0 firmas)
                                 $statusText = "Pendiente de Firma ($firmasActuales / $requeridos)";
-                                $statusClass = 'text-warning'; // Amarillo
+                                $statusClass = 'text-warning';
                             }
                             ?>
-
                             <td>
                                 <strong class="<?php echo $statusClass; ?>"><?php echo htmlspecialchars($statusText); ?></strong>
                             </td>
 
-                            <td class="text-center" style="white-space: nowrap;">
+                            <td class="text-end" style="white-space: nowrap;">
 
                                 <?php if ($estado === 'APROBADA'): ?>
                                     <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
@@ -240,18 +278,22 @@ function renderPaginationListado($current, $pages)
                                                 <i class="fas fa-edit"></i> Revisar Feedback
                                             </a>
                                         </span>
-                                    <?php else: ?>
+                                    <?php elseif ($esBorrador && $rol == 2): // <-- ¡NUEVO! Botón editar para Borrador 
+                                    ?>
+                                        <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Continuar Edición (Borrador)">
+                                            <i class="fas fa-edit"></i> Editar Borrador
+                                        </a>
+                                    <?php else: // Es PENDIENTE o PARCIAL 
+                                    ?>
                                         <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
                                             <i class="fas fa-eye"></i>
                                         </a>
-
                                         <?php if ($rol == 2): ?>
                                             <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                         <?php endif; ?>
                                     <?php endif; ?>
-
                                 <?php endif; ?>
 
                                 <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>"
