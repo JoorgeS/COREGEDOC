@@ -119,8 +119,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
         // 5. Cargar temas (sin cambios)
         $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                       FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                       WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
         $stmt_temas = $pdo->prepare($sql_temas);
         $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
         $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -409,11 +409,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
                     <div class="text-end">
 
-                        <button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador" onclick="guardarBorrador(false)">
+                        <button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
+                            onclick="if (validarCamposMinuta()) guardarBorrador(true);">
                             <i class="fas fa-save"></i> Guardar Borrador
                         </button>
 
-                        <button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion" onclick="confirmarEnvioAprobacion()" <?php echo !$puedeEnviar ? 'disabled' : ''; ?>>
+                        <button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
+                            onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();"
+                            <?php echo !$puedeEnviar ? 'disabled' : ''; ?>>
                             <i class="fas fa-paper-plane"></i> Enviar para Aprobación
                         </button>
 
@@ -958,7 +961,10 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         } else {
                             Swal.fire('Guardado', 'Borrador guardado con éxito.', 'success');
                             if (guardarYSalir) {
-                                window.location.href = 'menu.php?pagina=reunion_listado';
+                                // ===== INICIO DE MODIFICACIÓN (Redirección 1) =====
+                                // (Apunta a menu.php y al listado general del ST con la pestaña correcta)
+                                window.location.href = 'menu.php?pagina=minutas_listado_general&tab=borradores';
+                                // ===== FIN DE MODIFICACIÓN =====
                             }
                         }
                     } else {
@@ -1046,7 +1052,10 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                                         text: data.message, // 'Minuta enviada con éxito...'
                                         icon: 'success'
                                     }).then(() => {
-                                        window.location.href = 'menu.php?pagina=reunion_listado';
+                                        // ===== INICIO DE MODIFICACIÓN (Redirección 2) =====
+                                        // (Apunta a la pestaña de pendientes)
+                                        window.location.href = 'menu.php?pagina=minutas_listado_general&tab=pendientes_aprobacion';
+                                        // ===== FIN DE MODIFICACIÓN =====
                                     });
                                 } else {
                                     throw new Error(data.message || 'Error desconocido al enviar.');
@@ -1413,7 +1422,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             // 1. Modificar el botón de "Guardar"
             if (btnGuardar) {
                 btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Correcciones';
-                // Mantenemos el onclick="guardarBorrador(false)"
+                // Mantenemos el onclick="guardarBorrador(true)"
             }
 
             // 2. Modificar el botón de "Enviar"
@@ -1423,7 +1432,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 btnEnviar.classList.add('btn-success'); // Cambiamos a color verde
 
                 // ¡IMPORTANTE! Cambiamos la función que llama
-                btnEnviar.setAttribute('onclick', 'confirmarAplicarFeedback()');
+                btnEnviar.setAttribute('onclick', 'if (validarCamposMinuta()) confirmarAplicarFeedback()');
             }
         }
 
@@ -1493,8 +1502,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                             text: data.message, // "Minuta corregida y reenviada..."
                             icon: 'success'
                         }).then(() => {
-                            // Volvemos a la lista de reuniones
-                            window.location.href = 'menu.php?pagina=reunion_listado';
+                            // ===== INICIO DE MODIFICACIÓN (Redirección 3) =====
+                            window.location.href = 'menu.php?pagina=minutas_listado_general&tab=pendientes_aprobacion';
+                            // ===== FIN DE MODIFICACIÓN =====
                         });
                     } else {
                         throw new Error(data.message);
@@ -1507,6 +1517,48 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         btnEnviar.innerHTML = '<i class="fas fa-check-double"></i> Aplicar y Reenviar p/ Aprobación';
                     }
                 });
+        }
+
+        function validarCamposMinuta() {
+            const bloques = document.querySelectorAll('#contenedorTemas .tema-block');
+            let valido = true;
+
+            bloques.forEach((bloque, index) => {
+                const areas = bloque.querySelectorAll('.editable-area');
+                const temaEl = areas[0];
+                const objetivoEl = areas[1];
+
+                const tema = temaEl ? temaEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
+                const objetivo = objetivoEl ? objetivoEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
+
+                if (!tema || !objetivo) {
+                    valido = false;
+
+                    let faltantes = [];
+                    if (!tema) faltantes.push('Tema tratado');
+                    if (!objetivo) faltantes.push('Objetivo');
+
+                    Swal.fire({
+                        icon: 'warning',
+                        title: `Campos obligatorios en Tema ${index + 1}`,
+                        text: `Debes ingresar: ${faltantes.join(' y ')} antes de continuar.`,
+                        confirmButtonColor: '#198754'
+                    });
+
+                    // Abrir el bloque del tema y enfocar el campo vacío
+                    const collapse = bloque.querySelector('.collapse');
+                    if (collapse && collapse.classList.contains('collapse')) {
+                        const bsCollapse = new bootstrap.Collapse(collapse, {
+                            show: true
+                        });
+                    }
+
+                    (tema ? objetivoEl : temaEl)?.focus();
+                    return false; // sale del bucle en el primer error
+                }
+            });
+
+            return valido;
         }
     </script>
 </body>

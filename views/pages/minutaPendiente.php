@@ -301,28 +301,39 @@ function renderPagination($current, $pages)
               <i class="fas fa-check-circle"></i> Ya has firmado esta versión.
             </span>
           <?php elseif ($puedeAccionar) : ?>
-            <!-- Caso 3: Es el turno del usuario (la condición que faltaba) -->
+          <!-- Caso 3: Es el turno del usuario (la condición que faltaba) -->
+          <?php
+          // Verificar si el usuario ya envió feedback anteriormente
+          require_once __DIR__ . '/../../models/minutaModel.php';
+          $minutaModel = new MinutaModel();
+          $idUsuario = $_SESSION['idUsuario'] ?? 0;
+          $yaEnvioFeedback = $minutaModel->verificarAccion($idMinuta, $idUsuario, 'FEEDBACK_ENVIADO');
+          ?>
+
+          <?php if (!$yaEnvioFeedback): ?>
             <button type="button" class="btn btn-warning btn-sm ms-2"
               id="btn-feedback-<?= $idMinuta ?>"
-              onclick="enviarFeedback(<?= $idMinuta ?>)"> <i class="fas fa-comment-dots"></i> Enviar Feedback
-            </button>
-            <button type="button" class="btn btn-success btn-sm ms-2"
-              id="btn-aprobar-<?= $idMinuta ?>"
-              onclick="aprobarMinuta(<?= $idMinuta ?>)">
-              <i class="fas fa-check"></i> Aprobar con Firma
+              onclick="enviarFeedback(<?= $idMinuta ?>)">
+              <i class="fas fa-comment-dots"></i> Enviar Feedback
             </button>
           <?php else: ?>
+            <span class="badge bg-secondary ms-2">
+              <i class="fas fa-comment-slash"></i> Feedback enviado
+            </span>
+          <?php endif; ?>
+
+          <button type="button" class="btn btn-success btn-sm ms-2"
+            id="btn-aprobar-<?= $idMinuta ?>"
+            onclick="aprobarMinuta(<?= $idMinuta ?>)">
+            <i class="fas fa-check"></i> Aprobar con Firma
+          </button>
+        <?php else: ?>
+
             <!-- Caso 4: Otro (Ej. $esPresidenteRequerido falló, aunque no debería) -->
             <span class="text-warning fw-bold ms-2">
               <i class="fas fa-hourglass-start"></i> Firma en espera.
             </span>
           <?php endif; ?>
-          <!-- 
-                    * ==================
-                    * FIN DE LA CORRECCIÓN
-                    * ==================
-                    *
-                    -->
         </div>
       </div>
     <?php endforeach; ?>
@@ -333,135 +344,81 @@ function renderPagination($current, $pages)
     <p class="text-muted">No hay minutas pendientes de aprobación.</p>
   <?php endif; ?>
 </div>
-
-<script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  // --- SIN CAMBIOS EN EL SCRIPT ---
-  // Las funciones JS (aprobarMinuta, enviarFeedback, verAdjuntos)
-  // están correctas y ahora los botones las llamarán.
+  // === BLOQUE DE FIRMA ===
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[id^="btn-aprobar-"]').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
 
-  function aprobarMinuta(idMinuta) {
-    const boton = document.getElementById('btn-aprobar-' + idMinuta);
-    const botonFeedback = document.getElementById('btn-feedback-' + idMinuta);
-    if (boton) boton.disabled = true;
-    if (botonFeedback) botonFeedback.disabled = true;
-    if (boton) boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+        const id = this.id.split('-')[2];
 
-    Swal.fire({
-      title: '¿Confirmar Aprobación?',
-      text: "Esta acción registrará su firma digital y no se puede deshacer. ¿Está seguro?",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#28a745',
-      cancelButtonColor: '#6c757d',
-      confirmButtonText: 'Sí, aprobar',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        fetch('../controllers/aprobar_minuta.php', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              idMinuta: idMinuta
-            })
-          })
-          .then(response => {
-            if (!response.ok) {
-              return response.text().then(text => {
-                console.error("Respuesta de error del servidor:", text);
-                throw new Error('Error del servidor (ver consola).');
-              });
-            }
-            return response.json();
-          })
-          .then(data => {
-            if (data.status === 'success_final') {
-              Swal.fire({
-                title: '¡Aprobada!',
-                text: data.message,
-                icon: 'success',
-                timer: 2500,
-                showConfirmButton: false
-              }).then(() => {
-                document.getElementById('card-minuta-' + idMinuta).style.display = 'none';
-              });
-            } else if (data.status === 'success_partial') {
-              Swal.fire({
-                title: 'Firma Registrada',
-                text: data.message,
-                icon: 'info'
-              }).then(() => {
-                location.reload();
-              });
-            } else {
-              throw new Error(data.message || 'Error desconocido al aprobar.');
-            }
-          })
-          .catch(error => {
-            Swal.fire('Error', error.message, 'error');
-            if (boton) boton.disabled = false;
-            if (botonFeedback) botonFeedback.disabled = false;
-            if (boton) boton.innerHTML = '<i class="fas fa-check"></i> Aprobar con Firma';
-          });
-      } else {
-        if (boton) boton.disabled = false;
-        if (botonFeedback) botonFeedback.disabled = false;
-        if (boton) boton.innerHTML = '<i class="fas fa-check"></i> Aprobar con Firma';
-      }
-    });
-  }
+        Swal.fire({
+          title: '¿Confirmar Firma?',
+          text: '¿Deseas firmar esta minuta?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, firmar',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#28a745'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire({
+              title: '¡Firma registrada!',
+              text: 'Tu firma fue realizada con éxito.',
+              icon: 'success',
+              confirmButtonColor: '#28a745',
+              confirmButtonText: 'Aceptar'
+            });
+            aprobarMinuta(id); // <- se ejecuta después de confirmar
+          }
+        });
+      });
+    }); // <- cierra forEach
+  });   // <- cierra DOMContentLoaded
 
-  // (Esta función JS está dentro del <script> al final de minutaPendiente.php)
 
-  // (Esta función JS está dentro del <script> al final de minutaPendiente.php)
-
+  // === FUNCIÓN GLOBAL enviarFeedback ===
   function enviarFeedback(idMinuta) {
     const boton = document.getElementById('btn-aprobar-' + idMinuta);
     const botonFeedback = document.getElementById('btn-feedback-' + idMinuta);
 
-    // El HTML para el formulario está perfecto, no cambia.
     const feedbackHtml = `
-            <style>
-                .feedback-form-container { text-align: left; }
-                .feedback-form-container .form-check { margin-top: 15px; }
-                .feedback-form-container .form-control { display: none; margin-top: 8px; }
-                .feedback-form-container .form-check-input:checked ~ .form-control { display: block; }
-            </style>
-            <div id="feedbackForm" class="feedback-form-container">
-                <p>Por favor, marca las secciones que requieren revisión:</p>
-                
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="Asistencia" id="fb_asistencia">
-                    <label class="form-check-label" for="fb_asistencia">Asistencia</label>
-                    <textarea id="fb_asistencia_text" class="form-control" placeholder="Escriba su observación sobre la asistencia..."></textarea>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="Temas" id="fb_temas">
-                    <label class="form-check-label" for="fb_temas">Temas Tratados (Objetivos, Acuerdos, etc.)</label>
-                    <textarea id="fb_temas_text" class="form-control" placeholder="Escriba su observación sobre los temas..."></textarea>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="Votaciones" id="fb_votaciones">
-                    <label class="form-check-label" for="fb_votaciones">Gestión de Votaciones</label>
-                    <textarea id="fb_votaciones_text" class="form-control" placeholder="Escriba su observación sobre la votación..."></textarea>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="Adjuntos" id="fb_adjuntos">
-                    <label class="form-check-label" for="fb_adjuntos">Documentos Adjuntos</label>
-                    <textarea id="fb_adjuntos_text" class="form-control" placeholder="Indique qué documento falta o debe corregirse..."></textarea>
-                </div>
-
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="Otro" id="fb_otro">
-                    <label class="form-check-label" for="fb_otro">Otro (General)</label>
-                    <textarea id="fb_otro_text" class="form-control" placeholder="Escriba cualquier otra observación general..."></textarea>
-                </div>
-            </div>`;
+      <style>
+        .feedback-form-container { text-align: left; }
+        .feedback-form-container .form-check { margin-top: 15px; }
+        .feedback-form-container .form-control { display: none; margin-top: 8px; }
+        .feedback-form-container .form-check-input:checked ~ .form-control { display: block; }
+      </style>
+      <div id="feedbackForm" class="feedback-form-container">
+        <p>Por favor, marca las secciones que requieren revisión:</p>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="Asistencia" id="fb_asistencia">
+          <label class="form-check-label" for="fb_asistencia">Asistencia</label>
+          <textarea id="fb_asistencia_text" class="form-control" placeholder="Escriba su observación sobre la asistencia..."></textarea>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="Temas" id="fb_temas">
+          <label class="form-check-label" for="fb_temas">Temas Tratados (Objetivos, Acuerdos, etc.)</label>
+          <textarea id="fb_temas_text" class="form-control" placeholder="Escriba su observación sobre los temas..."></textarea>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="Votaciones" id="fb_votaciones">
+          <label class="form-check-label" for="fb_votaciones">Gestión de Votaciones</label>
+          <textarea id="fb_votaciones_text" class="form-control" placeholder="Escriba su observación sobre la votación..."></textarea>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="Adjuntos" id="fb_adjuntos">
+          <label class="form-check-label" for="fb_adjuntos">Documentos Adjuntos</label>
+          <textarea id="fb_adjuntos_text" class="form-control" placeholder="Indique qué documento falta o debe corregirse..."></textarea>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="Otro" id="fb_otro">
+          <label class="form-check-label" for="fb_otro">Otro (General)</label>
+          <textarea id="fb_otro_text" class="form-control" placeholder="Escriba cualquier otra observación general..."></textarea>
+        </div>
+      </div>`;
 
     Swal.fire({
       title: 'Enviar Feedback al Secretario',
@@ -472,30 +429,18 @@ function renderPagination($current, $pages)
       confirmButtonColor: '#ffc107',
       cancelButtonText: 'Cancelar',
       showLoaderOnConfirm: true,
-
-      // --- INICIO DE LA CORRECCIÓN ---
-      // Esta función 'preConfirm' es la que tenía el error
-      //... (dentro de Swal.fire({ ... )
+      allowOutsideClick: () => !Swal.isLoading(),
 
       preConfirm: () => {
         const items = ['asistencia', 'temas', 'votaciones', 'adjuntos', 'otro'];
         let feedbackCombinado = "";
-
-        // --- ¡NUEVO! ---
-        // Este objeto guardará qué campos se marcaron
         let feedbackCampos = {};
-        // --- FIN NUEVO ---
-
         let itemsSeleccionados = 0;
         let validationError = null;
 
         for (const id of items) {
           const checkbox = document.getElementById('fb_' + id);
-
-          // --- ¡NUEVO! ---
-          // Guardamos el estado (true/false) de CADA checkbox
           feedbackCampos[id] = checkbox.checked;
-          // --- FIN NUEVO ---
 
           if (checkbox.checked) {
             itemsSeleccionados++;
@@ -515,29 +460,46 @@ function renderPagination($current, $pages)
         }
 
         if (itemsSeleccionados === 0) {
-          Swal.showValidationMessage(`Debe seleccionar al menos una sección y escribir un comentario.`);
+          Swal.showValidationMessage('Debe seleccionar al menos una sección y escribir un comentario.');
           return false;
         }
 
         if (boton) boton.disabled = true;
         if (botonFeedback) botonFeedback.disabled = true;
 
-        // ¡Ruta corregida a ../../! (Ya la tenías bien)
-        return fetch('../../controllers/enviar_feedback.php', {
+        // 🔹 Confirmación previa antes de enviar
+        return Swal.fire({
+          title: '¿Confirmar Envío?',
+          html: `
+            <p>¿Está seguro de enviar este feedback al Secretario Técnico?</p>
+            <p><b>Secciones seleccionadas:</b><br>${
+              Object.keys(feedbackCampos)
+                .filter(k => feedbackCampos[k])
+                .map(k => '• ' + k.charAt(0).toUpperCase() + k.slice(1))
+                .join('<br>') || 'Ninguna'
+            }</p>
+          `,
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Sí, enviar',
+          cancelButtonText: 'No, cancelar',
+          confirmButtonColor: '#28a745',
+          cancelButtonColor: '#dc3545'
+        }).then(confirmResult => {
+          if (!confirmResult.isConfirmed) {
+            throw new Error('Envío cancelado por el usuario.');
+          }
+
+          // 🔹 Si confirma, ejecutar el envío real
+          return fetch('../../controllers/enviar_feedback.php', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            // --- ¡MODIFICADO! ---
-            // Ahora enviamos 3 cosas: idMinuta, el texto y el objeto de campos
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               idMinuta: idMinuta,
               feedback: feedbackCombinado,
-              feedbackCampos: feedbackCampos // <-- ¡NUEVO!
+              feedbackCampos: feedbackCampos
             })
-            // --- FIN MODIFICADO ---
-          })
-          .then(response => {
+          }).then(response => {
             if (!response.ok) {
               return response.text().then(text => {
                 console.error("Respuesta de error del servidor (feedback):", text);
@@ -545,32 +507,33 @@ function renderPagination($current, $pages)
               });
             }
             return response.json();
-          })
-          .catch(error => {
-            Swal.showValidationMessage(`Error: ${error.message}`);
-            if (boton) boton.disabled = false;
-            if (botonFeedback) botonFeedback.disabled = false;
           });
-      },
-
-      //... (el resto de la función sigue igual)
-      // --- FIN DE LA CORRECCIÓN ---
-
-      allowOutsideClick: () => !Swal.isLoading()
+        }).catch(error => {
+          Swal.showValidationMessage(`Error: ${error.message}`);
+          if (boton) boton.disabled = false;
+          if (botonFeedback) botonFeedback.disabled = false;
+        });
+      }
     }).then((result) => {
-      if (result.isConfirmed && result.value.status === 'success') {
+      if (result.isConfirmed && result.value && result.value.status === 'success') {
         Swal.fire({
           title: 'Feedback Enviado',
           text: 'Se ha notificado al Secretario Técnico. La minuta queda en espera de revisión.',
-          icon: 'success'
-        }).then(() => {
-          location.reload();
-        });
-      } else if (!result.isConfirmed) {
-        // Si el usuario cancela, reactivamos los botones
+          icon: 'success',
+          confirmButtonColor: '#28a745'
+        }).then(() => location.reload());
+      } else if (result.isConfirmed && result.value && result.value.status !== 'success') {
+        Swal.fire('Error', result.value.message || 'Ocurrió un error al enviar el feedback.', 'error');
+        if (boton) boton.disabled = false;
+        if (botonFeedback) botonFeedback.disabled = false;
+      } else {
         if (boton) boton.disabled = false;
         if (botonFeedback) botonFeedback.disabled = false;
       }
+    });
+    // --- Recarga automática simple tras acciones confirmadas ---
+    document.addEventListener('corevota:accionConfirmada', () => {
+      setTimeout(() => location.reload(), 1000); // espera 1 seg. para que se vea el mensaje
     });
   }
 </script>

@@ -4,6 +4,7 @@
 // SEGURIDAD: Iniciar la sesión de forma segura
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+    date_default_timezone_set('America/Santiago');
 }
 
 // SEGURIDAD: Redirigir si el usuario no está logueado
@@ -30,11 +31,35 @@ $nombreUsuario = 'Invitado'; // .
 $paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
 $id_param = $_GET['id'] ?? null; // Capturamos el ID también
 
-// --- Lógica para Saludo y Fecha ---
-$nombreUsuario = 'Invitado'; // Valor por defecto si no se encuentra el nombre
-if (isset($_SESSION['pNombre'])) { // Usamos pNombre como en tu código original
-    $nombreUsuario = htmlspecialchars($_SESSION['pNombre']);
+// --- Lógica para Saludo, Nombre y Fecha ---
+$nombreUsuario = trim(($_SESSION['pNombre'] ?? 'Invitado') . ' ' . ($_SESSION['aPaterno'] ?? ''));
+$nombreUsuario = trim($nombreUsuario); // por si falta aPaterno
+
+// Hora 0-23
+$horaActual = (int)date('G');
+
+// Mañana: 05:00–11:59 | Tarde: 12:00–19:59 | Noche: 20:00–04:59
+if ($horaActual >= 5 && $horaActual < 12) {
+    $saludo = 'Buenos días';
+} elseif ($horaActual >= 12 && $horaActual < 20) {
+    $saludo = 'Buenas tardes';
+} else {
+    $saludo = 'Buenas noches';
 }
+
+// Fecha en español (usa Intl si está disponible)
+if (class_exists('IntlDateFormatter')) {
+    $fmt = new IntlDateFormatter('es_CL', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'America/Santiago');
+    $fechaActual = $fmt->format(time()); // p.ej: martes, 4 de noviembre de 2025
+    // Capitaliza la primera letra
+    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+} else {
+    setlocale(LC_TIME, 'es_CL.UTF-8', 'es_ES.UTF-8', 'Spanish_Spain.1252');
+    $fechaActual = strftime('%A, %d de %B de %Y');
+    // Capitaliza la primera letra
+    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+}
+// --- Fin Lógica Saludo y Fecha ---
 
 // Determina el saludo según la hora del servidor
 $horaActual = date('H'); // Obtiene la hora en formato 24h (00-23)
@@ -473,18 +498,20 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Historial Votación
                             </a>
                         </li>
+                        
                     <?php endif; ?>
 
 
-                    <li class="nav-item mt-auto">
+                    
+
+                </ul>
+            </div>
+            <li class="nav-item mt-auto">
                         <a href="/corevota/logout.php" class="nav-link nav-link-logout">
                             <i class="fas fa-sign-out-alt fa-fw"></i>
                             Cerrar Sesión
                         </a>
                     </li>
-
-                </ul>
-            </div>
 
         </nav>
 
@@ -554,8 +581,12 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 <div class="container-fluid mb-4">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h2 class="display-6"><?php echo $saludo . ' ' . $nombreUsuario; ?></h2>
-                            <p class="lead text-muted">Hoy es <?php echo ucfirst($fechaActual); ?></p>
+                            <h2 class="display-6">
+                            <?php echo htmlspecialchars($saludo . ' ' . $nombreUsuario, ENT_QUOTES, 'UTF-8'); ?>
+                            </h2>
+                            <p class="lead text-muted">
+                            Hoy es <?php echo htmlspecialchars($fechaActual, ENT_QUOTES, 'UTF-8'); ?>
+                            </p>
                         </div>
                         <div class="col-md-4 text-md-end">
                             <p id="temperatura-actual" class="fs-5 text-muted">Cargando clima...</p>
@@ -604,6 +635,12 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 'usuarios_dashboard' => ['type' => 'view', 'file' => $base_path . '/usuarios_dashboard.php', 'roles' => [ROL_ADMINISTRADOR]],
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php', 'roles' => [ROL_ADMINISTRADOR]],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create'], 'roles' => [ROL_ADMINISTRADOR]],
+                'usuario_editar' => [
+                'type'   => 'view',
+                'file'   => $base_path . '/usuario_formulario.php',
+                'params' => ['action' => 'edit'],
+                'roles'  => [ROL_ADMINISTRADOR]
+],
 
                 'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
@@ -805,34 +842,56 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 
 
-        // Función para aprobar minuta
         function aprobarMinuta(idMinuta) {
-            if (confirm('¿Está seguro de que desea firmar y aprobar esta minuta? Esta acción es irreversible.')) {
-                console.log("Aprobando minuta: " + idMinuta);
-
+            Swal.fire({
+                title: '¿Confirmar Firma?',
+                text: '¿Desea firmar y aprobar esta minuta? Esta acción es irreversible.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, firmar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d'
+            }).then((result) => {
+                if (result.isConfirmed) {
                 fetch('/corevota/controllers/aprobar_minuta.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            idMinuta: idMinuta
-                        })
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ idMinuta: idMinuta })
                     })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.status === 'success') {
-                            alert('Minuta aprobada con éxito. La página se recargará.');
-                            window.location.reload();
-                        } else {
-                            alert('Error al aprobar: ' + data.message);
+                        let titulo = '¡Minuta aprobada!';
+                        let icono = 'success';
+
+                        if (data.status === 'success_partial') {
+                            titulo = 'Firma registrada';
+                        } else if (data.status === 'success_final') {
+                            titulo = '¡Minuta aprobada y PDF generado!';
+                        } else if (data.status !== 'success') {
+                            // Si no coincide con ninguno de los casos válidos, tratamos como error
+                            titulo = 'Error';
+                            icono = 'error';
                         }
+                        Swal.fire({
+                            title: titulo,
+                            text: data.message || 'Operación completada correctamente.',
+                            icon: icono,
+                            confirmButtonColor: '#28a745'
+                        }).then(() => {
+                            if (icono === 'success') {
+                            window.location.reload();
+                            }
+                        });
                     })
                     .catch(error => {
-                        console.error('Error en fetch al aprobar:', error);
-                        alert('Error de conexión al intentar aprobar la minuta.');
+                    console.error('Error en fetch al aprobar:', error);
+                    Swal.fire('Error', 'Error de conexión al intentar aprobar la minuta.', 'error');
                     });
-            }
+                }
+            });
         }
     </script>
 
@@ -897,6 +956,48 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             </div>
         </div>
     </div>
+
+    <script>
+/* Popup por querystring ?status=[success|error]&msg=...  */
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('status') || !params.has('msg')) return;
+
+  const status = params.get('status'); // 'success' | 'error'
+  // el msg viene con urlencode, reponemos espacios por '+'
+  const msg = decodeURIComponent((params.get('msg') || '').replace(/\+/g, ' '));
+
+  const modalEl   = document.getElementById('confirmacionModal');
+  if (!modalEl) return;
+
+  const headerEl  = modalEl.querySelector('.modal-header');
+  const titleEl   = modalEl.querySelector('#confirmacionModalLabel');
+  const bodyEl    = modalEl.querySelector('#confirmacionModalMessage');
+  const btnFooter = modalEl.querySelector('.modal-footer .btn');
+
+  // Reset de estilos del header y botón
+  headerEl.classList.remove('bg-success', 'bg-danger', 'text-white');
+  btnFooter.classList.remove('btn-primary', 'btn-danger');
+
+  if (status === 'success') {
+    headerEl.classList.add('bg-success', 'text-white');
+    titleEl.innerHTML = '<i class="fas fa-check-circle me-2"></i>Operación Exitosa';
+    btnFooter.classList.add('btn-primary');
+  } else {
+    headerEl.classList.add('bg-danger', 'text-white');
+    titleEl.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+    btnFooter.classList.add('btn-danger');
+  }
+
+  // Mensaje del cuerpo (texto plano para evitar HTML inyectado)
+  bodyEl.textContent = msg;
+
+  // Mostrar modal
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+})();
+</script>
+
 </body>
 
 </html>

@@ -31,14 +31,22 @@ $serverToday = date('Y-m-d');
         #fullCalendarContainer {
             position: relative;
             width: 95%;
-            height: 80vh;
+            min-height: 70vh;          /* altura mínima */
+            height: auto;              /* altura flexible */
             margin: 20px auto;
             background-color: #fff;
             padding: 15px;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
+            overflow: visible;          /* deja que crezca si necesita más */
+            }
+
+            .fc {
+            position: relative;
+            z-index: 1;
+            min-height: 60vh;           /* asegura que tenga espacio base */
+            }
+
         #fullCalendarContainer::before {
             content: "";
             position: absolute;
@@ -53,7 +61,6 @@ $serverToday = date('Y-m-d');
             z-index: 0;
             pointer-events: none;
         }
-        .fc { position: relative; z-index: 1; }
 
         .calendar-title {
             margin-bottom: 20px;
@@ -116,8 +123,8 @@ $serverToday = date('Y-m-d');
             border: 2px solid #28a745 !important; /* verde Bootstrap */
             border-radius: 8px !important;
         }
-
-
+        
+        
         .fc-event, .fc-daygrid-event {
             border-radius: .5rem;
             border: 0;
@@ -126,6 +133,25 @@ $serverToday = date('Y-m-d');
             padding: .25rem .4rem;
         }
         .fc-event:hover { filter: brightness(0.9); }
+
+        .fc-daygrid-event {
+            background-color: transparent !important;
+            border: none !important;
+            color: #0d6efd !important; /* color del texto (Bootstrap azul) */
+            font-weight: 500;
+            padding: 0 !important;
+            }
+
+            .fc-daygrid-dot-event {
+            display: flex !important;
+            align-items: center !important;
+            }
+
+            /* Hover más sutil */
+            .fc-daygrid-event:hover {
+            text-decoration: underline;
+            filter: brightness(0.9);
+        }
     </style>
 </head>
 <body>
@@ -154,10 +180,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function looksAllDay(str) {
-        if (isEmpty(str)) return true;
-        const s = String(str);
-        return /^\d{4}-\d{2}-\d{2}$/.test(s) || /\b00:00(:00)?\b/.test(s);
-    }
+        return false; // fuerza todos los eventos a mostrarse con color sólido
+        }
+
 
     const calendarEvents = (reunionesPHP || []).map(reunion => {
         const colorMap = {
@@ -172,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const startStr = normalizeDateString(startRaw);
         const endStr   = normalizeDateString(endRaw);
         const allDay = looksAllDay(startRaw) && (isEmpty(endRaw) || looksAllDay(endRaw));
-
+        
         const event = {
             id: reunion.idReunion,
             title: (reunion.nombreComision || '') + (reunion.nombreReunion ? ': ' + reunion.nombreReunion : ''),
@@ -192,11 +217,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar dentro de try/catch para que, ante cualquier error, no “desaparezca” la vista
     try {
         const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialDate: new Date(serverToday),
-            now: new Date(serverToday),
             initialView: 'dayGridMonth',
             locale: 'es',
             firstDay: 1,
+            allDayText: 'Todo el día',
             dayHeaderFormat: { weekday: 'long' },
             headerToolbar: {
                 left: 'prev,next today',
@@ -207,8 +231,17 @@ document.addEventListener('DOMContentLoaded', function() {
             height: 'auto',
             contentHeight: 'auto',
             aspectRatio: 2,
+            displayEventTime: false, 
+            displayEventEnd: false,
             editable: false,
             events: calendarEvents,
+            dayMaxEvents: 5,
+            moreLinkText: 'más',
+            moreLinkClick: 'popover', 
+            moreLinkHint: (num) => `Mostrar ${num} eventos más`,
+            initialDate: serverToday,
+            now: serverToday,
+            navLinks: true, // permite hacer clic en el día
 
             eventClick: function(info) {
                 if (info.event.url) {
@@ -217,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
 
-            // Ajuste robusto del título al “punto medio” del rango visible
+            // ✅ Corrige el título del mes
             datesSet: function(info) {
                 const start = info.start;
                 const end = info.end;
@@ -232,9 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         calendar.render();
 
-        // Forzar a “hoy” y marcar el botón
+        // ✅ Forzar vista centrada en “hoy” después de renderizar
         setTimeout(() => {
-            calendar.gotoDate(new Date(serverToday));
+            calendar.gotoDate(serverToday);
             const todayBtn = document.querySelector('.fc-today-button');
             if (todayBtn) todayBtn.classList.add('fc-button-active');
         }, 300);

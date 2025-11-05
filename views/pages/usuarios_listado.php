@@ -1,20 +1,35 @@
 <?php
 /**
  * --------------------------------------
+ * BOOTSTRAP PARA ACCESO DIRECTO (AJAX)
+ * --------------------------------------
+ * Si este archivo se carga por AJAX (sin pasar por menu.php),
+ * aseguramos sesión, constantes y $tipoUsuario.
+ */
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+    date_default_timezone_set('America/Santiago');
+}
+if (!defined('ROL_ADMINISTRADOR')) {
+    define('ROL_ADMINISTRADOR', 6);
+}
+$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? ($tipoUsuario ?? null);
+
+/**
+ * --------------------------------------
  * GUARDIA DE ACCESO (ADMIN ONLY)
  * --------------------------------------
- * Las variables $tipoUsuario y ROL_ADMINISTRADOR son definidas 
- * automáticamente por el archivo menu.php que incluye este script.
+ * Si no hay sesión o no es admin, deniega acceso.
  */
-if (!isset($tipoUsuario) || $tipoUsuario != ROL_ADMINISTRADOR) {
-    
-    // Oculta el contenido y redirige al inicio
+if (!isset($_SESSION['idUsuario']) || !isset($tipoUsuario) || $tipoUsuario != ROL_ADMINISTRADOR) {
     echo "<div class='alert alert-danger m-3'>Acceso Denegado: No tiene permisos para ver esta página.</div>";
-    echo '<script>setTimeout(function() { window.location.href = "menu.php?pagina=home"; }, 2000);</script>';
-    
-    // Detiene la ejecución del resto de la página de admin
+    // Si NO es una petición AJAX, redirige al home; si es AJAX, solo muestra el mensaje.
+    if (!(isset($_GET['ajax']) && $_GET['ajax'] === '1')) {
+        echo '<script>setTimeout(function(){ window.location.href = "menu.php?pagina=home"; }, 2000);</script>';
+    }
     exit;
 }
+
 require_once(__DIR__ . '/../../Usuario.php');
 
 $usuarioObj   = new Usuario();
@@ -259,7 +274,7 @@ $msg    = $_GET['msg'] ?? '';
     function currentPageSize() {
         const sel = cont.querySelector('#pageSize');
         return sel ? parseInt(sel.value, 10) : 10;
-    }
+        }
 
     function buildAjaxUrl(params) {
         const p = new URLSearchParams(params);

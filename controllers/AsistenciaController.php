@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null; // Asumiendo que guardas tipoUsuario_id en sesión
+$tipoUsuario = $_SESSION['idTipoUsuario'] ?? null; // Asumiendo que guardas tipoUsuario_id en sesión
 $response = ['status' => 'error', 'message' => 'Error desconocido.'];
 
 
