@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
   <title>CORE Vota</title>
@@ -11,20 +10,17 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
   <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
+  
   <script src="/corevota/public/js/app.js"></script>
-
-</head>
-
+  
+  </head>
 <body>
 
   <?php include __DIR__ . '/pages/menu.php'; ?>
 
   <main class="container-fluid p-4">
-    <?php echo $content; // aquí se carga la vista (que incluye el script de la página) 
-    ?>
+    <?php echo $content; // aquí se carga la vista (que incluye el script de la página) ?>
   </main>
 
-</body>
-
+  </body>
 </html>

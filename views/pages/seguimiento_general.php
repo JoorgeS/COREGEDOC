@@ -15,12 +15,9 @@ try {
     // 3. Obtener la lista de comisiones para el filtro
     $comisiones = $model->getComisiones();
 
-    // 4. Definir y obtener los valores de los filtros (desde la URL o por defecto)
+    // 4. Definir y obtener los valores de los filtros
     $filtroComision = $_GET['comisionId'] ?? null;
-
-    // Por defecto: desde el día 1 del mes actual
     $filtroStartDate = $_GET['startDate'] ?? date('Y-m-01');
-    // Por defecto: hasta hoy
     $filtroEndDate = $_GET['endDate'] ?? date('Y-m-d');
 
     // 5. Preparar el array de filtros para el modelo
@@ -48,9 +45,12 @@ try {
         </div>
         <div class="card-body">
 
-            <div id="contenedor-timeline" class="mb-4 border rounded p-3" style="display: none; background-color: #f8f9fa;">
-                </div>
+            <!-- ESTE ES EL DIV DONDE SE CARGARÁ EL DETALLE -->
+            <div id="contenedor-timeline" class="mb-4 border rounded p-3" style="display: none; background-color: #f8f9fa; position: relative;">
+                <!-- El contenido se carga por AJAX -->
+            </div>
             
+            <!-- Formulario de Filtros -->
             <form method="GET" class="mb-4 p-3 border rounded bg-light">
                 <input type="hidden" name="pagina" value="seguimiento_general">
                 <div class="row g-3 align-items-end">
@@ -84,6 +84,7 @@ try {
                 </div>
             </form>
             
+            <!-- Tabla Principal de Minutas -->
             <div class="table-responsive">
                 <table id="tablaSeguimiento" class="table table-bordered table-striped table-hover">
                     <thead class="thead-dark">
@@ -106,6 +107,7 @@ try {
                             </tr>
                         <?php else: ?>
                             <?php foreach ($minutasEnSeguimiento as $minuta): ?>
+                                <!-- Esta es la fila clickeable -->
                                 <tr class="fila-clickeable" data-id="<?php echo $minuta['idMinuta']; ?>">
                                     <td class="text-center">
                                         <strong>#<?php echo htmlspecialchars($minuta['idMinuta']); ?></strong>
@@ -139,6 +141,7 @@ try {
     </div>
 </div>
 
+<!-- Este SCRIPT es el que hace la magia. Ya está correcto. -->
 <script>
 $(document).ready(function() {
     
@@ -155,11 +158,20 @@ $(document).ready(function() {
         
         var minutaId = $(this).data('id');
         console.log("Clic detectado en fila. ID Minuta: " + minutaId);
+        
+        // Resaltar fila seleccionada (opcional pero recomendado)
+        $('.fila-clickeable').removeClass('table-active'); // Quita resaltado previo
+        $(this).addClass('table-active'); // Añade resaltado a la fila actual
 
         if (minutaId) {
             // 4. Mostrar "Cargando..." en el DIV y hacerlo visible con animación
             contenedor.html('<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>');
             contenedor.slideDown(); // Mostrar con animación
+            
+            // Scroll suave hacia el contenedor (opcional)
+            $('html, body').animate({
+                scrollTop: contenedor.offset().top - 70 // 70px de offset por el navbar
+            }, 500);
 
             // 5. Llamada AJAX al controlador
             $.ajax({
@@ -168,21 +180,20 @@ $(document).ready(function() {
                 data: { id: minutaId },
                 success: function(response) {
                     // 6. Cargar la respuesta en el DIV
-                    // Añadimos un título y un botón de cerrar
-                    var contenidoHtml = '<h5><i class="fas fa-history"></i> Seguimiento de Minuta N° ' + minutaId + '</h5>';
+                    var contenidoHtml = '<h5><i class="fas fa-file-alt"></i> Detalle de Minuta N° ' + minutaId + '</h5>';
                     // Botón de cerrar
                     contenidoHtml += '<button id="cerrar-timeline" class="btn btn-sm btn-outline-secondary" style="position: absolute; top: 10px; right: 15px;">';
                     contenidoHtml += '<i class="fas fa-times"></i></button>';
                     
                     contenidoHtml += '<hr>';
-                    contenidoHtml += response; // El HTML del controlador
+                    contenidoHtml += response; // El HTML del controlador (que ahora es una tabla)
                     
                     contenedor.html(contenidoHtml);
                 },
                 error: function(xhr, status, error) {
                     var errorMsg = '<p class="alert alert-danger"><strong>Error al cargar los datos.</strong></p>';
                     console.error("Error AJAX: " + status + " - " + error);
-                    // Mostramos el error de PHP en el modal para saber qué pasó
+                    // Mostramos el error de PHP en el div para saber qué pasó
                     contenedor.html(errorMsg + '<pre>' + xhr.responseText + '</pre>');
                 }
             });
@@ -192,6 +203,7 @@ $(document).ready(function() {
     // 7. Añadir evento para el nuevo botón de cerrar (delegado)
     contenedor.on('click', '#cerrar-timeline', function() {
         contenedor.slideUp(); // Ocultar el DIV con animación
+        $('.fila-clickeable').removeClass('table-active'); // Quitar resaltado
     });
 });
 </script>

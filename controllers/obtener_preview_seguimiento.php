@@ -26,34 +26,48 @@ try {
 
     // 3. Obtener los datos
     $historial = $model->getSeguimiento($idMinuta);
-    $feedbacks = $model->getFeedbackDeMinuta($idMinuta); // <-- Esta es la función que debías añadir a tu modelo
+    $feedbacks = $model->getFeedbackDeMinuta($idMinuta);
 
     // 4. Construir el HTML
 
-    // --- Historial de Estados ---
+    // --- Historial de Estados (AHORA COMO TABLA) ---
+    $html .= '<h5><i class="fas fa-history"></i> Historial de Estados</h5>';
     if (!empty($historial)) {
-        $html .= '<h5><i class="fas fa-history"></i> Historial de Estados</h5>';
-        $html .= '<ul class="list-group list-group-flush mb-3">';
+        $html .= '<div class="table-responsive mb-3">';
+        $html .= '<table class="table table-bordered table-striped table-sm" id="tabla-seguimiento-detalle" width="100%" cellspacing="0">';
+        $html .= '<thead class="thead-light">';
+        $html .= '<tr>';
+        $html .= '<th>ID Seguimiento</th>';
+        $html .= '<th>Estado</th>';
+        $html .= '<th>Usuario</th>';
+        $html .= '<th>Fecha y Hora</th>';
+        $html .= '</tr>';
+        $html .= '</thead>';
+        $html .= '<tbody>';
+        
         foreach ($historial as $item) {
-            $html .= '<li class="list-group-item d-flex justify-content-between align-items-center" style="background-color: transparent;">'; // Hacemos fondo transparente
-            $html .= '<div>';
-            $html .= '<strong>' . htmlspecialchars($item['detalle']) . '</strong>';
-            $html .= '<br><small class="text-muted">Por: ' . htmlspecialchars($item['usuario_nombre']) . '</small>';
-            $html .= '</div>';
-            $html .= '<span class="badge bg-secondary rounded-pill">' . date('d-m-Y H:i', strtotime($item['fecha_hora'])) . '</span>';
-            $html .= '</li>';
+            $html .= '<tr>';
+            // Asumiendo que la columna se llama 'id_seguimiento', si no, ajústala.
+            $html .= '<td>' . htmlspecialchars($item['id_seguimiento'] ?? $item['id'] ?? 'N/A') . '</td>'; 
+            $html .= '<td>' . htmlspecialchars($item['detalle']) . '</td>';
+            $html .= '<td>' . htmlspecialchars($item['usuario_nombre']) . '</td>';
+            $html .= '<td>' . date('d-m-Y H:i', strtotime($item['fecha_hora'])) . '</td>';
+            $html .= '</tr>';
         }
-        $html .= '</ul>';
+        
+        $html .= '</tbody>';
+        $html .= '</table>';
+        $html .= '</div>';
     } else {
         $html .= '<p class="text-muted">No se encontró historial de estados.</p>';
     }
 
-    // --- Feedbacks ---
+    // --- Feedbacks (Se mantiene como lista, igual que en tu código original) ---
     if (!empty($feedbacks)) {
         $html .= '<h5 class="mt-4"><i class="fas fa-comments"></i> Feedback Recibido</h5>';
         $html .= '<div class="list-group list-group-flush">';
         foreach ($feedbacks as $fb) {
-            $html .= '<div class="list-group-item" style="background-color: transparent;">'; // Hacemos fondo transparente
+            $html .= '<div class="list-group-item" style="background-color: transparent;">';
             $html .= '<div class="d-flex w-100 justify-content-between">';
             $html .= '<h6 class="mb-1">De: ' . htmlspecialchars($fb['nombreUsuario']) . '</h6>';
             $html .= '<small>' . date('d-m-Y H:i', strtotime($fb['fecha_feedback'])) . '</small>';
@@ -68,7 +82,9 @@ try {
 
     // 5. Devolver el HTML
     echo $html;
+
 } catch (Exception $e) {
     // Si ves este error, es probable que te falte la función getFeedbackDeMinuta() en tu modelo
     echo "<div class='alert alert-danger'>Error al cargar datos: " . $e->getMessage() . "</div>";
 }
+?>

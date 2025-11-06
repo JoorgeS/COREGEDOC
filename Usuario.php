@@ -173,4 +173,99 @@ class Usuario
     {
         return $this->db->consultarBD("SELECT idComuna, nombreComuna FROM t_comuna");
     }
+
+    /**
+     * Actualiza la contraseña de un usuario específico.
+     * (Esta función es necesaria para la página de perfil)
+     */
+    /**
+     * Actualiza la contraseña de un usuario específico.
+     * (Esta función es necesaria para la página de perfil)
+     * * --- VERSIÓN CORREGIDA ---
+     */
+    /**
+     * Actualiza la contraseña de un usuario específico.
+     * (Esta función es necesaria para la página de perfil)
+     * * --- VERSIÓN CORREGIDA FINAL ---
+     */
+    public function actualizarContrasena($idUsuario, $nuevaContrasena)
+    {
+        if (empty($idUsuario) || empty($nuevaContrasena)) {
+            return false;
+        }
+
+        // Hashear la nueva contraseña
+        $hashContrasena = password_hash($nuevaContrasena, PASSWORD_DEFAULT);
+
+        // --- INICIO DE LA CORRECCIÓN ---
+        // 1. Obtenemos la conexión PDO real, que está en la variable pública 'conexion' del objeto conectorDB
+        // (según el constructor que me mostraste: $this->conexion = parent::conectar();)
+        
+        // Asumo que 'conexion' es pública. Si no lo es, necesitamos un getter como 'getDatabase()'
+        // Vamos a probar con getDatabase() primero, que es más limpio.
+        $pdo = $this->db->getDatabase(); 
+        
+        if (!$pdo) {
+            error_log("Error al conectar a la BD en Usuario::actualizarContrasena");
+            return false;
+        }
+        // --- FIN DE LA CORRECCIÓN ---
+
+        $sql = "UPDATE t_usuario 
+                SET contrasena = :contrasena 
+                WHERE idUsuario = :idUsuario";
+        
+        try {
+            // 2. Usamos la variable $pdo (la conexión real) para llamar a prepare()
+            $stmt = $pdo->prepare($sql); 
+            $stmt->execute([
+                'contrasena' => $hashContrasena,
+                'idUsuario'  => (int)$idUsuario
+            ]);
+            
+            // Verificar si la fila fue afectada
+            return $stmt->rowCount() > 0;
+
+        } catch (Exception $e) {
+            // Manejar el error
+            error_log("Error SQL (actualizarContrasena): " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function validarContrasenaActual($idUsuario, $passwordActual)
+    {
+        if (empty($idUsuario) || empty($passwordActual)) {
+            return false;
+        }
+
+        // 1. Obtenemos la conexión PDO real
+        $pdo = $this->db->getDatabase(); 
+        
+        if (!$pdo) {
+            error_log("Error al conectar a la BD en Usuario::validarContrasenaActual");
+            return false;
+        }
+
+        // 2. Buscamos el hash de la contraseña actual
+        $sql = "SELECT contrasena FROM t_usuario WHERE idUsuario = :idUsuario LIMIT 1";
+        
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['idUsuario' => (int)$idUsuario]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && isset($user['contrasena'])) {
+                // 3. Verificamos la contraseña ingresada contra el hash guardado
+                return password_verify($passwordActual, $user['contrasena']);
+            }
+
+            return false; // Usuario no encontrado
+
+        } catch (Exception $e) {
+            error_log("Error SQL (validarContrasenaActual): " . $e->getMessage());
+            return false;
+        }
+    }
 }
+
