@@ -15,7 +15,7 @@ $idMinutaActual = $_GET['id'] ?? null;
 $minutaData = null;
 $reunionData = null;
 $temas_de_la_minuta = [];
-$asistencia_guardada_ids = [];
+$asistencia_guardada_ids = []; // Esta variable ahora solo se usa para la carga inicial
 $existeAsistenciaGuardada = false;
 $secretarioNombre = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? 'N/A'));
 
@@ -125,7 +125,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
         $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
 
-        // 6. Cargar asistencia (sin cambios)
+        // 6. Cargar asistencia (SOLO PARA LA CARGA INICIAL)
         $sql_asistencia = "SELECT t_usuario_idUsuario FROM t_asistencia WHERE t_minuta_idMinuta = :idMinutaActual";
         $stmt_asistencia = $pdo->prepare($sql_asistencia);
         $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
@@ -332,8 +332,13 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                             <div id="contenedorTablaAsistenciaEstado" style="max-height: 400px; overflow-y: auto;">
                                 <p class="text-muted">Cargando lista de consejeros...</p>
                             </div>
+
                             <div class="d-flex justify-content-end align-items-center mt-3 gap-2" id="botonesAsistenciaContainer">
                                 <span id="guardarAsistenciaStatus" class="me-auto small text-muted"></span>
+
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="btn-refrescar-asistencia" onclick="cargarTablaAsistencia()">
+                                    <i class="fas fa-sync me-1"></i> Refrescar
+                                </button>
                                 <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()">
                                     <i class="fas fa-save me-1"></i> Guardar Asistencia
                                 </button>
@@ -528,36 +533,61 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
         const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
         const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
+
+        // ¡MODIFICADO! Esta variable AHORA se actualizará con cada fetch
         let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>;
 
         // --- Evento Principal de Carga (Tu JS) ---
         document.addEventListener("DOMContentLoaded", () => {
-            cargarTablaAsistencia();
+            cargarTablaAsistencia(); // Esta función ahora refresca la lista de IDs
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
             cargarVotacionesDeLaMinuta();
-            // ===================================
-            // INICIO: Carga de Votos en Vivo
-            // ===================================
             cargarResultadosVotacion();
-            // ===================================
-            // FIN: Carga de Votos en Vivo
-            // ===================================
         });
 
-        // --- Funciones de Carga de Datos (Tu JS - Con rutas corregidas) ---
+        // ==================================================================
+        // --- INICIO: SECCIÓN DE ASISTENCIA MODIFICADA ---
+        // ==================================================================
+
         function cargarTablaAsistencia() {
-            // (CORREGIDO) Usar ruta absoluta
-            fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
-                .then(res => res.ok ? res.json() : Promise.reject(res))
-                .then(response => {
-                    const cont = document.getElementById("contenedorTablaAsistenciaEstado");
-                    if (response.status === 'success' && response.data && response.data.length > 0) {
-                        const data = response.data;
-                        const asistenciaGuardadaStrings = Array.isArray(ASISTENCIA_GUARDADA_IDS) ? ASISTENCIA_GUARDADA_IDS.map(String) : [];
+            const cont = document.getElementById("contenedorTablaAsistenciaEstado");
+            const btnRefresh = document.getElementById("btn-refrescar-asistencia");
+            if (btnRefresh) btnRefresh.disabled = true;
+
+            cont.innerHTML = '<p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando lista de consejeros y asistencia...</p>';
+
+            // 1. Cargar la lista MAESTRA de consejeros
+            const fetchConsejeros = fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
+                .then(res => res.ok ? res.json() : Promise.reject(new Error('Error fetch_data.php')));
+
+            // 2. Cargar la lista ACTUAL de asistencia (NUEVA API)
+            const fetchAsistenciaActual = fetch(`/corevota/controllers/obtener_asistencia_actual.php?idMinuta=${idMinutaGlobal}`)
+                .then(res => res.ok ? res.json() : Promise.reject(new Error('Error obtener_asistencia_actual.php')));
+
+            // 3. Esperar ambas
+            Promise.all([fetchConsejeros, fetchAsistenciaActual])
+                .then(([responseConsejeros, responseAsistencia]) => {
+
+                    if (responseConsejeros.status !== 'success') {
+                        throw new Error('No se pudo cargar la lista de consejeros.');
+                    }
+                    if (responseAsistencia.status !== 'success') {
+                        throw new Error('No se pudo cargar la asistencia actual.');
+                    }
+
+                    const data = responseConsejeros.data; // Lista de usuarios
+
+                    // ¡ACTUALIZAMOS LA VARIABLE GLOBAL!
+                    ASISTENCIA_GUARDADA_IDS = responseAsistencia.data; // Array de IDs [15, 37, 40]
+
+                    if (data && data.length > 0) {
+                        const asistenciaGuardadaStrings = ASISTENCIA_GUARDADA_IDS.map(String);
+
                         let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
                         data.forEach(c => {
                             const userIdString = String(c.idUsuario);
+                            // Usamos la lista NUEVA (asistenciaGuardadaStrings)
                             const isPresent = asistenciaGuardadaStrings.includes(userIdString);
                             const isAbsent = !isPresent;
                             tabla += `<tr data-userid="${c.idUsuario}"><td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td><td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''}></td><td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''}></td></tr>`;
@@ -565,13 +595,15 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         tabla += `</tbody></table>`;
                         cont.innerHTML = tabla;
                     } else {
-                        cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar o error en la respuesta.</p>';
+                        cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar.</p>';
                     }
                 })
                 .catch(err => {
                     console.error("Error carga asistencia:", err);
-                    const cont = document.getElementById("contenedorTablaAsistenciaEstado");
-                    if (cont) cont.innerHTML = '<p class="text-danger">Error al conectar para cargar asistencia.</p>';
+                    cont.innerHTML = `<p class="text-danger">Error al refrescar asistencia: ${err.message}</p>`;
+                })
+                .finally(() => {
+                    if (btnRefresh) btnRefresh.disabled = false;
                 });
         }
 
@@ -607,7 +639,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             btn.disabled = true;
             status.textContent = 'Guardando...';
             status.className = 'me-auto small text-muted';
-            // (CORREGIDO) Usar ruta absoluta
+
             fetch("/corevota/controllers/guardar_asistencia.php", {
                     method: "POST",
                     headers: {
@@ -621,7 +653,13 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     if (resp.status === "success") {
                         status.textContent = "✅ Guardado";
                         status.className = 'me-auto small text-success fw-bold';
-                        ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String); // Actualiza la lista global
+
+                        // ¡MODIFICACIÓN!
+                        // Volvemos a cargar la tabla para asegurar que el estado (local y servidor)
+                        // estén sincronizados.
+                        cargarTablaAsistencia();
+                        // ¡FIN MODIFICACIÓN!
+
                         setTimeout(() => {
                             status.textContent = '';
                         }, 3000);
@@ -640,6 +678,11 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     }, 5000);
                 });
         }
+
+        // ==================================================================
+        // --- FIN: SECCIÓN DE ASISTENCIA MODIFICADA ---
+        // ==================================================================
+
 
         function format(command) {
             try {
@@ -1618,7 +1661,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         }
 
         // ==================================================================
-        // --- INICIO: FUNCIONES JS PARA VOTACIÓN EN VIVO (AÑADIDAS) ---
+        // --- INICIO: FUNCIONES JS PARA VOTACIÓN EN VIVO (Sin cambios) ---
         // ==================================================================
 
         /**
