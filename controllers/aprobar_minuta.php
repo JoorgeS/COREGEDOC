@@ -56,7 +56,7 @@ function ImageToDataUrl(String $filename): String
 
 
 // -----------------------------------------------------------------------------
-// FUNCIÓN PARA GENERAR HTML (MODIFICADA)
+// FUNCIÓN PARA GENERAR HTML (Sin cambios)
 // -----------------------------------------------------------------------------
 function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $selloVerdeUri)
 {
@@ -198,7 +198,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         $html .= '<p style="font-size:10pt;">No hay detalles registrados para los temas.</p>';
     }
 
-    // --- BLOQUE DE VOTACIONES (¡CORREGIDO!) ---
+    // --- BLOQUE DE VOTACIONES (Sin cambios, ya estaba correcto) ---
     if (!empty($data['votaciones']) && is_array($data['votaciones'])) {
         $html .= '<div class="seccion-titulo">Votaciones Realizadas:</div>';
         foreach ($data['votaciones'] as $votacion) {
@@ -277,7 +277,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
     $html .= '</div>'; // cierre signature-box-container
 
     // =========================================================================
-    // --- INICIO: BLOQUE DE QR Y HASH DE VALIDACIÓN (MODIFICADO) ---
+    // --- INICIO: BLOQUE DE QR Y HASH DE VALIDACIÓN (Sin cambios) ---
     // =========================================================================
     if (!empty($data['qrBase64'])) { // <-- Comprobamos 'qrBase64'
         $html .= '
@@ -396,13 +396,6 @@ try {
         $pdo->commit();
 
         try {
-            // Nota: El constructor de MinutaModel espera un $pdo.
-            // Si tu clase MinutaModel no lo espera, debes instanciarla como new MinutaModel();
-            // Pero dado que se usa $pdo->commit() ANTES, es más seguro que MinutaModel
-            // cree su propia conexión o que se le pase el $pdo *antes* del commit.
-            // Para tu caso, como MinutaModel hereda de BaseConexion y crea su
-            // propia conexión, esto está bien, pero el $pdo->commit() ya cerró la transacción.
-
             // Re-instanciamos MinutaModel para que cree su propia conexión (como está en tu archivo)
             $minutaModel = new MinutaModel();
             $faltanLog = $totalRequeridos - $totalAprobaciones;
@@ -446,6 +439,18 @@ try {
     if (!$data_pdf['secretario_info']) {
         $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (Asignado)']; // Fallback
     }
+
+    // =========================================================================
+    // --- INICIO DE LA MODIFICACIÓN 1 ---
+    // =========================================================================
+    // 5a-bis. OBTENER IDREUNION (para buscar votaciones asociadas a la reunión)
+    $sqlReunion = $pdo->prepare("SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1");
+    $sqlReunion->execute([':idMinuta' => $idMinuta]);
+    $reunion = $sqlReunion->fetch(PDO::FETCH_ASSOC);
+    $idReunion = $reunion ? $reunion['idReunion'] : null;
+    // =========================================================================
+    // --- FIN DE LA MODIFICACIÓN 1 ---
+    // =========================================================================
 
 
     // 5b. CARGAR COMISIONES Y PRESIDENTES (Lógica CORREGIDA)
@@ -509,17 +514,27 @@ try {
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
 
+    // =========================================================================
+    // --- INICIO DE LA MODIFICACIÓN 2 ---
+    // =========================================================================
     // --- 5e. VOTACIONES (¡¡CORREGIDO!!) ---
-    $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion WHERE t_minuta_idMinuta = :idMinuta");
-    $sqlVotaciones->execute([':idMinuta' => $idMinuta]);
+    // Buscamos votaciones ligadas a la minuta DIRECTAMENTE o a través de la REUNIÓN
+    $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion 
+                                   WHERE t_minuta_idMinuta = :idMinuta 
+                                   OR t_reunion_idReunion = :idReunion");
+    $sqlVotaciones->execute([
+        ':idMinuta' => $idMinuta,
+        ':idReunion' => $idReunion // Usamos el $idReunion que obtuvimos en 5a-bis
+    ]);
     $data_pdf['votaciones'] = $sqlVotaciones->fetchAll(PDO::FETCH_ASSOC);
 
     if (!empty($data_pdf['votaciones'])) {
+        // Esta consulta anidada para buscar los votos de CADA votación está CORRECTA
         $sqlVotos = $pdo->prepare("
-             SELECT v.idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+             SELECT v.t_votacion_idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
              FROM t_voto v
-             JOIN t_usuario u ON v.idUsuario = u.idUsuario
-             WHERE v.idVotacion = :idVotacion
+             JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
+             WHERE v.t_votacion_idVotacion = :idVotacion
         ");
         foreach ($data_pdf['votaciones'] as $i => $votacion) {
             $sqlVotos->execute([':idVotacion' => $votacion['idVotacion']]);
@@ -527,6 +542,9 @@ try {
         }
     }
     // --- FIN CORRECCIÓN VOTACIONES ---
+    // =========================================================================
+    // --- FIN DE LA MODIFICACIÓN 2 ---
+    // =========================================================================
 
 
     // --- 6. CARGAR FIRMAS Y SELLOS PARA EL PDF (Sin cambios) ---
