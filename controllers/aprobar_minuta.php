@@ -17,6 +17,8 @@ require_once ROOT_PATH . 'vendor/autoload.php'; // Dompdf
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+// (Se eliminan 'use' de chillerlan/QRCode, ya que no se usan)
+
 
 // 2. OBTENER DATOS DE ENTRADA Y SESIÓN
 $input_data = json_decode(file_get_contents('php://input'), true);
@@ -54,7 +56,7 @@ function ImageToDataUrl(String $filename): String
 
 
 // -----------------------------------------------------------------------------
-// FUNCIÓN PARA GENERAR HTML (Sin cambios, ya está correcta)
+// FUNCIÓN PARA GENERAR HTML (MODIFICADA)
 // -----------------------------------------------------------------------------
 function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $selloVerdeUri)
 {
@@ -272,24 +274,39 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         }
     }
 
-
-    // Renderizar Sellos de Validación ST
-    /*
-    if (!empty($data['sellos_st']) && is_array($data['sellos_st'])) {
-        foreach ($data['sellos_st'] as $sello) {
-            $html .= $generarChipFirma(
-                $sello['nombreSecretario'],
-                'Secretario Técnico',
-                'Validación de Feedback',
-                date('d-m-Y H:i:s', strtotime($sello['fechaValidacion'])),
-                $selloVerdeUri, // Sello verde específico
-                'sello-st-chip' // Clase CSS para fondo verde
-            );
-        }
-    }
-    */
-
     $html .= '</div>'; // cierre signature-box-container
+
+    // =========================================================================
+    // --- INICIO: BLOQUE DE QR Y HASH DE VALIDACIÓN (MODIFICADO) ---
+    // =========================================================================
+    if (!empty($data['qrBase64'])) { // <-- Comprobamos 'qrBase64'
+        $html .= '
+        <div style="margin-top:40px; margin-right:30px; page-break-inside:avoid; text-align:right;">
+            <table style="width: auto; margin-left: auto; margin-right: 0px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 90px; padding-right: 10px; vertical-align: top;">
+                        <img src="' . $data['qrBase64'] . '" 
+                             alt="QR de verificación" 
+                             style="width:85px; height:auto; opacity:0.9; border:1px solid #ccc; padding:4px; background:#fff;">
+                    </td>
+                    <td style="width: auto; vertical-align: top; text-align: left; font-size: 8pt; line-height: 1.3;">
+                        <p style="margin:0; padding:0; font-size:8pt; font-weight:bold;">Este documento tiene firma electrónica y su original puede ser validado en:</p>
+                        <p style="margin:2px 0 0 0; padding:0; font-size:7pt; color:#333;">' .
+            htmlspecialchars($data['urlValidacion'] ?? '') .
+            '</p>
+                        <p style="margin:5px 0 0 0; padding:0; font-size:8pt;">
+                            Código de Verificación: <span style="font-family:monospace; font-weight:bold;">' .
+            htmlspecialchars($data['minuta_info']['hashValidacion'] ?? '---') . '</span>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </div>';
+    }
+    // =========================================================================
+    // --- FIN: BLOQUE DE QR Y HASH DE VALIDACIÓN ---
+    // =========================================================================
+
     $html .= '</body></html>';
     return $html;
 }
@@ -299,6 +316,21 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
  🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT (MODIFICADO) 🔽
 =============================================================================
 */
+
+// ... (justo antes de la línea 285 "try {")
+
+// --- Directorio para QRs temporales ---
+// (Esta sección ya no es necesaria si usamos la API, pero no molesta)
+$tempQrDir = ROOT_PATH . 'public/docs/temp_qrs/';
+if (!file_exists($tempQrDir)) {
+    @mkdir($tempQrDir, 0775, true);
+}
+
+/* =============================================================================
+ 🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT (MODIFICADO) 🔽
+=============================================================================
+*/
+
 
 try {
     $db = new conectorDB();
@@ -321,10 +353,10 @@ try {
 
     // --- 2. REGISTRAR LA FIRMA (LÓGICA CORREGIDA) ---
     $sqlAprobar = "UPDATE t_aprobacion_minuta 
-                   SET estado_firma = 'FIRMADO', fechaAprobacion = NOW()
-                   WHERE t_minuta_idMinuta = :idMinuta
-                   AND t_usuario_idPresidente = :idUsuario
-                   AND estado_firma = 'EN_ESPERA'";
+                    SET estado_firma = 'FIRMADO', fechaAprobacion = NOW()
+                    WHERE t_minuta_idMinuta = :idMinuta
+                    AND t_usuario_idPresidente = :idUsuario
+                    AND estado_firma = 'EN_ESPERA'";
 
     $stmtAprobar = $pdo->prepare($sqlAprobar);
     $stmtAprobar->execute([
@@ -337,19 +369,22 @@ try {
     }
 
     // --- 3. (OPCIONAL) REGISTRAR EN t_firma ---
+    $descripcionFirma = substr('Firma electrónica minuta ' . $idMinuta, 0, 45);
+
     $sqlFirma = "INSERT INTO t_firma (descFirma, idTipoUsuario, fechaGuardado, idUsuario, idComision)
-                 VALUES (:desc, 3, CURTIME(), :idUsuario, 0)";
-    $pdo->prepare($sqlFirma)->execute([
-        ':desc' => 'Firma electrónica registrada al aprobar minuta ' . $idMinuta,
+                 VALUES (:desc, 3, NOW(), :idUsuario, 0)";
+    $stmtFirma = $pdo->prepare($sqlFirma);
+    $stmtFirma->execute([
+        ':desc' => $descripcionFirma,
         ':idUsuario' => $idUsuarioLogueado
     ]);
 
 
     // --- 4. VERIFICAR SI YA SE COMPLETARON LAS APROBACIONES ---
     $sqlCount = $pdo->prepare("SELECT COUNT(DISTINCT t_usuario_idPresidente)
-                               FROM t_aprobacion_minuta
-                               WHERE t_minuta_idMinuta = :idMinuta
-                               AND estado_firma = 'FIRMADO'");
+                                  FROM t_aprobacion_minuta
+                                  WHERE t_minuta_idMinuta = :idMinuta
+                                  AND estado_firma = 'FIRMADO'");
     $sqlCount->execute([':idMinuta' => $idMinuta]);
     $totalAprobaciones = (int)$sqlCount->fetchColumn();
 
@@ -361,6 +396,14 @@ try {
         $pdo->commit();
 
         try {
+            // Nota: El constructor de MinutaModel espera un $pdo.
+            // Si tu clase MinutaModel no lo espera, debes instanciarla como new MinutaModel();
+            // Pero dado que se usa $pdo->commit() ANTES, es más seguro que MinutaModel
+            // cree su propia conexión o que se le pase el $pdo *antes* del commit.
+            // Para tu caso, como MinutaModel hereda de BaseConexion y crea su
+            // propia conexión, esto está bien, pero el $pdo->commit() ya cerró la transacción.
+
+            // Re-instanciamos MinutaModel para que cree su propia conexión (como está en tu archivo)
             $minutaModel = new MinutaModel();
             $faltanLog = $totalRequeridos - $totalAprobaciones;
             $minutaModel->logAccion(
@@ -395,9 +438,9 @@ try {
     // 5a. CARGAR INFO SECRETARIO (¡CORREGIDO!)
     // Buscamos al secretario que CREÓ la minuta, no al que está logueado
     $sqlSec = $pdo->prepare("SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
-                             FROM t_usuario u 
-                             JOIN t_minuta m ON u.idUsuario = m.t_usuario_idSecretario
-                             WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id IN (2, 6)"); // 2=ST, 6=Admin
+                                 FROM t_usuario u 
+                                 JOIN t_minuta m ON u.idUsuario = m.t_usuario_idSecretario
+                                 WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id IN (2, 6)"); // 2=ST, 6=Admin
     $sqlSec->execute([':idMinuta' => $idMinuta]);
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
     if (!$data_pdf['secretario_info']) {
@@ -447,20 +490,20 @@ try {
 
     // 5c. ASISTENTES
     $sqlAsis = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
-                FROM t_asistencia a
-                JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                WHERE a.t_minuta_idMinuta = :id
-                ORDER BY u.aPaterno, u.pNombre";
+                 FROM t_asistencia a
+                 JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                 WHERE a.t_minuta_idMinuta = :id
+                 ORDER BY u.aPaterno, u.pNombre";
     $stmtAsis = $pdo->prepare($sqlAsis);
     $stmtAsis->execute([':id' => $idMinuta]);
     $data_pdf['asistentes'] = $stmtAsis->fetchAll(PDO::FETCH_ASSOC);
 
     // 5d. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                 FROM t_tema t 
-                 LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                 WHERE t.t_minuta_idMinuta = :id
-                 ORDER BY t.idTema ASC";
+                  FROM t_tema t 
+                  LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                  WHERE t.t_minuta_idMinuta = :id
+                  ORDER BY t.idTema ASC";
     $stmtTemas = $pdo->prepare($sqlTemas);
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
@@ -473,10 +516,10 @@ try {
 
     if (!empty($data_pdf['votaciones'])) {
         $sqlVotos = $pdo->prepare("
-            SELECT v.idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
-            FROM t_voto v
-            JOIN t_usuario u ON v.idUsuario = u.idUsuario
-            WHERE v.idVotacion = :idVotacion
+             SELECT v.idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+             FROM t_voto v
+             JOIN t_usuario u ON v.idUsuario = u.idUsuario
+             WHERE v.idVotacion = :idVotacion
         ");
         foreach ($data_pdf['votaciones'] as $i => $votacion) {
             $sqlVotos->execute([':idVotacion' => $votacion['idVotacion']]);
@@ -488,15 +531,15 @@ try {
 
     // --- 6. CARGAR FIRMAS Y SELLOS PARA EL PDF (Sin cambios) ---
     $sqlFirmasRevisado = $pdo->prepare("SELECT 
-                                            a.t_usuario_idPresidente,
-                                            CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente, 
-                                            a.fechaAprobacion 
-                                          FROM t_aprobacion_minuta a
-                                          JOIN t_usuario u ON a.t_usuario_idPresidente = u.idUsuario
-                                          WHERE a.t_minuta_idMinuta = :idMinuta
-                                          AND a.estado_firma = 'FIRMADO'
-                                          GROUP BY u.idUsuario
-                                          ORDER BY a.fechaAprobacion ASC");
+                                             a.t_usuario_idPresidente,
+                                             CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente, 
+                                             a.fechaAprobacion 
+                                           FROM t_aprobacion_minuta a
+                                           JOIN t_usuario u ON a.t_usuario_idPresidente = u.idUsuario
+                                           WHERE a.t_minuta_idMinuta = :idMinuta
+                                           AND a.estado_firma = 'FIRMADO'
+                                           GROUP BY u.idUsuario
+                                           ORDER BY a.fechaAprobacion ASC");
     $sqlFirmasRevisado->execute([':idMinuta' => $idMinuta]);
     $firmas_temp = $sqlFirmasRevisado->fetchAll(PDO::FETCH_ASSOC);
 
@@ -511,18 +554,6 @@ try {
     }
     $data_pdf['firmas_aprobadas'] = $firmasCorregidas;
 
-    /*
-    $sqlSellos = $pdo->prepare("SELECT 
-                                    CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
-                                    v.fechaValidacion
-                                   FROM t_validacion_st v
-                                   JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
-                                   WHERE v.t_minuta_idMinuta = :idMinuta
-                                   ORDER BY v.fechaValidacion ASC");
-    $sqlSellos->execute([':idMinuta' => $idMinuta]);
-    $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
-    */
-
 
     // --- 7. DEFINIR LOGOS Y SELLO DE FIRMA ---
     // (Asegúrate que estas imágenes existan en tu servidor)
@@ -531,14 +562,55 @@ try {
     $firmaImgUri = ImageToDataUrl(ROOT_PATH . 'public/img/firmadigital.png');
     $selloVerdeUri = ImageToDataUrl(ROOT_PATH . 'public/img/aprobacion.png'); // (Nombre corregido)
 
+    // -- GENERACION DEL QR EN EL PDF -- 
+    $hashValidacion = hash('sha256', $idMinuta . '-' . time() . '-' . rand());
+
+    // URL de verificación (DINÁMICA)
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost'; // Usa el host del servidor
+    $urlValidacion = $protocol . '://' . $host . "/corevota/public/validar.php?hash={$hashValidacion}";
+
+
+    // --- INICIO: SOLUCIÓN (Usar API Externa, evita problemas de GD/SVG) ---
+
+    // 1. Definir la URL de la API externa
+    $qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=' . urlencode($urlValidacion);
+
+    // --- INICIO DE LA CORRECCIÓN (file_get_contents para URL) ---
+    // No usamos ImageToDataUrl para URLs, ya que esa función usa file_exists()
+    // que no funciona con enlaces web. Usamos file_get_contents directamente.
+
+    $qrBase64 = ''; // Inicializar
+
+    // Usamos @ para suprimir warnings si 'allow_url_fopen' está desactivado o falla la conexión
+    $rawQrData = @file_get_contents($qrApiUrl);
+
+    if ($rawQrData === false || empty($rawQrData)) {
+        // Log por si la API falla o allow_url_fopen está apagado
+        error_log("Error al generar QR: No se pudo obtener la imagen desde la API en " . $qrApiUrl);
+        $qrBase64 = ''; // Dejar vacío para que no rompa el PDF
+    } else {
+        // Si tuvimos éxito, convertimos a Base64. Asumimos que es PNG (la API devuelve PNG).
+        $qrBase64 = "data:image/png;base64," . base64_encode($rawQrData);
+    }
+    // --- FIN DE LA CORRECCIÓN ---
+    // --- FIN: SOLUCIÓN API ---
+
+
+    // Pasar datos al arreglo que usa generateMinutaHtml()
+    $data_pdf['qrBase64'] = $qrBase64;
+    $data_pdf['urlValidacion'] = $urlValidacion;
+    $data_pdf['minuta_info']['hashValidacion'] = $hashValidacion;
+
+
     // --- 8. GENERAR HTML ---
     $html = generateMinutaHtml($data_pdf, $logoGoreUri, $logoCoreUri, $firmaImgUri, $selloVerdeUri);
 
     // --- 9. INICIALIZAR DOMPDF Y RENDERIZAR ---
     $options = new Options();
     $options->set('isHtml5ParserEnabled', true);
-    $options->set('isRemoteEnabled', true);
-    $options->set('chroot', ROOT_PATH);
+    $options->set('isRemoteEnabled', true); // Necesario para que Dompdf cargue el QR (data:image)
+    $options->set('chroot', ROOT_PATH); // Seguridad, aunque las imágenes locales se cargan con ImageToDataUrl
     $dompdf = new Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('letter', 'portrait');
@@ -555,48 +627,48 @@ try {
 
     file_put_contents($pathCompleto, $dompdf->output());
 
-    // --- 11. ACTUALIZAR MINUTA EN BD (Estado final) ---
-    $sqlUpd = "UPDATE t_minuta SET 
-                estadoMinuta = 'APROBADA', 
-                pathArchivo = :pathArchivo, 
-                fechaAprobacion = NOW() 
-               WHERE idMinuta = :id";
+    // --- 11. ACTUALIZAR MINUTA CON PATH FINAL Y HASH ---
+    $sqlUpd =  "UPDATE t_minuta SET 
+                     estadoMinuta = 'APROBADA',
+                     pathArchivo = :pathArchivo,
+                     fechaAprobacion = NOW(),
+                     hashValidacion = :hash
+                 WHERE   idMinuta = :id";
     $stmtUpd = $pdo->prepare($sqlUpd);
     $stmtUpd->execute([
         ':pathArchivo' => $pathParaBD,
+        ':hash' => $hashValidacion,
         ':id' => $idMinuta
     ]);
 
-    $pdo->commit();
-    try {
-            $minutaModel = new MinutaModel();
-            // Log 1: Aprobación final
-            $minutaModel->logAccion(
-                $idMinuta,
-                $idUsuarioLogueado,
-                'APROBADA_FINAL',
-                "Presidente ($nombreUsuarioLogueado) ha dado la firma final. Minuta Aprobada."
-            );
-            // Log 2: PDF Generado (acción del sistema, por eso 'null' en usuario)
-            $minutaModel->logAccion(
-                $idMinuta,
-                null, 
-                'PDF_GENERADO',
-                "PDF final generado y guardado en: " . $pathParaBD
-            );
-        } catch (Exception $logException) {
-            error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log de 'APROBADA_FINAL': " . $logException->getMessage());
-        }
-
-
-
-
-
     // --- 12. COMMIT Y RESPUESTA EXITOSA FINAL ---
-    
+    $pdo->commit(); // Hacemos commit DE LA TRANSACCIÓN DE LA FIRMA Y PDF
+
+    // --- 13. REGISTRO DE LOGS (Fuera de la transacción) ---
+    try {
+        $minutaModel = new MinutaModel(); // Crea su propia conexión
+        // Log 1: Aprobación final
+        $minutaModel->logAccion(
+            $idMinuta,
+            $idUsuarioLogueado,
+            'APROBADA_FINAL',
+            "Presidente ($nombreUsuarioLogueado) ha dado la firma final. Minuta Aprobada."
+        );
+        // Log 2: PDF Generado (acción del sistema, por eso 'null' en usuario)
+        $minutaModel->logAccion(
+            $idMinuta,
+            null,
+            'PDF_GENERADO',
+            "PDF final generado y guardado en: " . $pathParaBD
+        );
+    } catch (Exception $logException) {
+        error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log de 'APROBADA_FINAL': " . $logException->getMessage());
+    }
+
+
     echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y PDF generado con todas las firmas.', 'pdf_path' => $pathParaBD]);
 } catch (Exception $e) {
-    // --- 13. ROLLBACK Y RESPUESTA DE ERROR ---
+    // --- 14. ROLLBACK Y RESPUESTA DE ERROR ---
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }

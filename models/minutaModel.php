@@ -39,6 +39,7 @@ class MinutaModel extends BaseConexion
                     ELSE 'PENDIENTE'
                 END AS estadoMinuta,
                 m.pathArchivo,
+                r.nombreReunion,
                 m.fechaMinuta,
                 IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
                 IFNULL(GROUP_CONCAT(DISTINCT t.objetivo   ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS objetivos,
@@ -57,6 +58,7 @@ class MinutaModel extends BaseConexion
             LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
             LEFT JOIN t_comision c  ON m.t_comision_idComision = c.idComision
             LEFT JOIN t_usuario u   ON c.t_usuario_idPresidente = u.idUsuario
+            LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
             WHERE 1=1
         ";
 
@@ -431,7 +433,7 @@ class MinutaModel extends BaseConexion
                     AND f.feedback <> ''
                 ORDER BY 
                     f.fecha_feedback DESC";
-        
+
         try {
             $stmt = $this->db->prepare($sql);
             $stmt->execute(['idMinuta' => (int)$idMinuta]);
@@ -442,5 +444,72 @@ class MinutaModel extends BaseConexion
         }
     }
 
+    public function obtenerMinutaPorHash(string $hashValidacion): ?array
+    {
+        try {
+            $sql = "SELECT idMinuta, pathArchivo, fechaAprobacion, nombreArchivo
+                        FROM t_minuta 
+                        WHERE hashValidacion = :hash 
+                        LIMIT 1";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([':hash' => $hashValidacion]);
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $resultado ?: null;
+        } catch (Exception $e) {
+            error_log("❌ Error al obtener minuta por hash: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function actualizarHashValidacion(int $idMinuta, string $hashValidacion): bool
+    {
+        try {
+            $sql = "UPDATE t_minuta 
+                    SET hashValidacion = :hash, fechaAprobacion = NOW()
+                    WHERE idMinuta = :id";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':hash' => $hashValidacion,
+                ':id'   => $idMinuta
+            ]);
+            return $stmt->rowCount() > 0;
+        } catch (Exception $e) {
+            error_log("❌ Error al actualizar hashValidacion (MinutaModel): " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verifica si un usuario ya ha realizado una acción específica sobre una minuta.
+     * @param int $idMinuta
+     * @param int $idUsuario
+     * @param string $tipoAccion
+     * @return bool true si existe la acción, false si no
+     */
+
+    public function verificarAccion(int $idMinuta, int $idUsuario, string $tipoAccion): bool
+    {
+        try {
+            $sql = "SELECT COUNT(*) FROM t_minuta_log
+                        WHERE t_minuta_idMinuta = :idMinuta
+                        AND t_usuario_idUsuario = :idUsuario
+                        AND tipoAccion = :tipoAccion";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':idMinuta' => $idMinuta,
+                ':idUsuario' => $idUsuario,
+                ':tipoAccion' => $tipoAccion
+            ]);
+            return $stmt->fetchColumn() > 0;
+        } catch (Exception $e) {
+            error_log("Error en verificarAccion (MinutaModel): " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Guarda o actualiza el hash de validación de una minuta.
+     * Si ya existe, lo reemplaza.
+     */
 
 }

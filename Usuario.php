@@ -267,5 +267,91 @@ class Usuario
             return false;
         }
     }
+
+/**
+     * Sube y actualiza la foto de perfil de un usuario.
+     * --- VERSIÓN CORREGIDA (Usa DOCUMENT_ROOT) ---
+     */
+    /**
+     * Sube y actualiza la foto de perfil de un usuario.
+     * --- VERSIÓN CORREGIDA FINAL (Guarda la RUTA WEB en la BD) ---
+     */
+    public function actualizarFotoPerfil($idUsuario, $fileData)
+    {
+        // --- 1. Validaciones ---
+        if (!isset($fileData) || $fileData['error'] !== UPLOAD_ERR_OK) {
+            return ['success' => false, 'message' => 'Error: No se recibió ningún archivo.'];
+        }
+        $check = @getimagesize($fileData['tmp_name']);
+        if ($check === false) {
+            return ['success' => false, 'message' => 'Error: El archivo no es una imagen.'];
+        }
+        if ($fileData['size'] > 2 * 1024 * 1024) { // 2 MB
+            return ['success' => false, 'message' => 'Error: La imagen es demasiado pesada (máx 2MB).'];
+        }
+        
+        // --- 2. Definir rutas ---
+        $extension = strtolower(pathinfo($fileData['name'], PATHINFO_EXTENSION));
+        $fileName = 'user_' . $idUsuario . '_' . time() . '.' . $extension;
+        
+        // RUTA WEB (la que se debe guardar en la BD)
+        // ej: /corevota/public/img/perfiles/user_41_12345.jpg
+        $webPath = '/corevota/public/img/perfiles/' . $fileName;
+
+        // RUTA FÍSICA (donde se moverá el archivo)
+        // __DIR__ es la carpeta de Usuario.php (ej: C:/xampp/htdocs/corevota)
+        $serverSavePath = __DIR__ . '/public/img/perfiles/' . $fileName;
+        
+        // --- 3. Obtener foto antigua para borrarla ---
+        $usuarioActual = $this->obtenerUsuario($idUsuario);
+        $oldDbPath = $usuarioActual['foto_perfil'] ?? null; // Puede ser la ruta C: (error) o la ruta /corevota/ (correcto)
+
+        // --- 4. Mover el nuevo archivo ---
+        if (move_uploaded_file($fileData['tmp_name'], $serverSavePath)) {
+            
+            // --- 5. Actualizar la BD con la RUTA WEB ---
+            $pdo = $this->db->getDatabase();
+            $sql = "UPDATE t_usuario SET foto_perfil = :foto WHERE idUsuario = :id";
+            
+            try {
+                $stmt = $pdo->prepare($sql);
+                
+                // *** ¡LA CORRECCIÓN ESTÁ AQUÍ! ***
+                // Guardamos la RUTA WEB ($webPath) en la BD, NO la ruta del servidor ($serverSavePath).
+                $stmt->execute(['foto' => $webPath, 'id' => $idUsuario]);
+
+                // --- 6. Borrar la foto antigua (lógica mejorada) ---
+                if ($oldDbPath) {
+                    $oldServerPath = null;
+                    
+                    // Comprobar si la ruta antigua es una ruta de servidor (el error anterior)
+                    // (strpos($oldDbPath, 'C:') === 0) -> Chequea si empieza con C:
+                    if (strpos($oldDbPath, 'C:') === 0 || strpos($oldDbPath, '/xampp/') !== false) {
+                        $oldServerPath = $oldDbPath; // Ya es una ruta de servidor
+                    } else {
+                        // Es una ruta web (ej: /corevota/public/...)
+                        // La convertimos a ruta de servidor
+                        $oldServerPath = $_SERVER['DOCUMENT_ROOT'] . $oldDbPath;
+                    }
+
+                    if (file_exists($oldServerPath)) {
+                        @unlink($oldServerPath);
+                    }
+                }
+                
+                return [
+                    'success' => true,
+                    'message' => 'Foto de perfil actualizada con éxito.'
+                ];
+
+            } catch (Exception $e) {
+                error_log("Error SQL (actualizarFotoPerfil): " . $e->getMessage());
+                return ['success' => false, 'message' => 'Error al guardar la foto en la base de datos.'];
+            }
+
+        } else {
+            return ['success' => false, 'message' => 'Error: No se pudo mover el archivo. (Ruta de guardado: ' . $serverSavePath . ')'];
+        }
+    }
 }
 
