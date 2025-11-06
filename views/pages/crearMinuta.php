@@ -44,8 +44,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     try {
         // 1. Cargar datos de t_minuta
         $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta 
-                       FROM t_minuta 
-                       WHERE idMinuta = :idMinutaActual";
+                        FROM t_minuta 
+                        WHERE idMinuta = :idMinutaActual";
         $stmt_minuta = $pdo->prepare($sql_minuta);
         $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
         $minutaData = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
@@ -119,8 +119,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
         // 5. Cargar temas (sin cambios)
         $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                       FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                       WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                        FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                        WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
         $stmt_temas = $pdo->prepare($sql_temas);
         $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
         $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -211,6 +211,24 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         .dropdown-form-block .btn.collapsed {
             background-color: #f8f9fa;
         }
+
+        /* == INICIO: ESTILOS PARA VOTACIÓN EN VIVO == */
+        .votacion-block-ui ul {
+            padding-left: 1.2rem;
+            margin: 0.5rem 0;
+            list-style-type: disc;
+        }
+
+        .votacion-block-ui td {
+            vertical-align: top;
+            font-size: 0.85rem;
+        }
+
+        .votacion-block-ui h5 {
+            font-size: 1.1rem;
+        }
+
+        /* == FIN: ESTILOS PARA VOTACIÓN EN VIVO == */
     </style>
 </head>
 
@@ -369,7 +387,24 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 </div>
             </div>
 
-            <div class="col-12 mt-2">
+            <div class="col-md-12 mt-2">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-chart-simple me-2"></i>
+                            Resultados Preliminares de Votación
+                        </h5>
+                        <button class="btn btn-sm btn-outline-primary" id="btn-refrescar-votaciones" onclick="cargarResultadosVotacion()">
+                            <i class="fa-solid fa-sync me-1"></i> Refrescar
+                        </button>
+                    </div>
+
+                    <div class="card-body" id="votacion-resultados-live">
+                        <p class="text-muted text-center" id="votacion-placeholder">Cargando resultados...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 mt-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">DESARROLLO DE LA MINUTA</h5>
                 </div>
@@ -500,7 +535,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             cargarTablaAsistencia();
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
-            cargarVotacionesDeLaMinuta(); // (NUEVO) Habilitado
+            cargarVotacionesDeLaMinuta();
+            // ===================================
+            // INICIO: Carga de Votos en Vivo
+            // ===================================
+            cargarResultadosVotacion();
+            // ===================================
+            // FIN: Carga de Votos en Vivo
+            // ===================================
         });
 
         // --- Funciones de Carga de Datos (Tu JS - Con rutas corregidas) ---
@@ -1109,6 +1151,13 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
                     document.getElementById('votacionNombre').value = '';
                     cargarVotacionesDeLaMinuta();
+                    // ===================================
+                    // INICIO: Refrescar Votos en Vivo
+                    // ===================================
+                    cargarResultadosVotacion();
+                    // ===================================
+                    // FIN: Refrescar Votos en Vivo
+                    // ===================================
                 } else {
                     Swal.fire('Error', 'No se pudo crear la votación: ' + data.message, 'error');
                 }
@@ -1205,10 +1254,10 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     } else {
                         modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
                         modalHtml += `<td class="text-center" style="white-space: nowrap;">
-                                         <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
-                                         <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
-                                         <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
-                                     </td>`;
+                                             <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
+                                             <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
+                                             <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
+                                         </td>`;
                     }
                     modalHtml += '</tr>';
                 });
@@ -1247,6 +1296,13 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     if (voto === 'NO') badge = 'danger';
                     statusTD.innerHTML = `<span class="badge bg-${badge}">${voto}</span>`;
                     parentTD.innerHTML = '✅ Registrado';
+                    // ===================================
+                    // INICIO: Refrescar Votos en Vivo
+                    // ===================================
+                    cargarResultadosVotacion();
+                    // ===================================
+                    // FIN: Refrescar Votos en Vivo
+                    // ===================================
                 } else {
                     throw new Error(data.message);
                 }
@@ -1560,6 +1616,120 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
 
             return valido;
         }
+
+        // ==================================================================
+        // --- INICIO: FUNCIONES JS PARA VOTACIÓN EN VIVO (AÑADIDAS) ---
+        // ==================================================================
+
+        /**
+         * Llama a la API y renderiza los resultados de la votación
+         */
+        function cargarResultadosVotacion() {
+            const container = document.getElementById('votacion-resultados-live');
+            const placeholder = document.getElementById('votacion-placeholder');
+            const refreshButton = document.getElementById('btn-refrescar-votaciones');
+
+            if (!container || !idMinutaGlobal) {
+                console.error("No se pudo encontrar el contenedor o el idMinuta.");
+                if (container) container.innerHTML = '<p class="text-danger text-center">Error: No se pudo cargar el ID de la minuta.</p>';
+                return;
+            }
+
+            // Poner en modo "cargando"
+            if (refreshButton) refreshButton.disabled = true;
+            if (placeholder) placeholder.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Cargando resultados...';
+
+            // Llamar a la nueva API (usando la ruta absoluta)
+            fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinutaGlobal}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error de red al cargar votaciones.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (refreshButton) refreshButton.disabled = false;
+
+                    if (data.status !== 'success') {
+                        throw new Error(data.message || 'Error en la respuesta del servidor.');
+                    }
+
+                    if (data.data.length === 0) {
+                        container.innerHTML = '<p class="text-muted text-center" id="votacion-placeholder">No hay votaciones asociadas a esta minuta/reunión todavía.</p>';
+                        return;
+                    }
+
+                    // Limpiar contenedor
+                    container.innerHTML = '';
+
+                    // Construir el HTML (similar al PDF)
+                    data.data.forEach(votacion => {
+                        const votosSi = [];
+                        const votosNo = [];
+                        const votosAbs = [];
+
+                        if (votacion.votos) {
+                            votacion.votos.forEach(voto => {
+                                const nombre = escapeHTML(voto.nombreVotante);
+                                if (voto.opcionVoto === 'SI') {
+                                    votosSi.push(nombre);
+                                } else if (voto.opcionVoto === 'NO') {
+                                    votosNo.push(nombre);
+                                } else {
+                                    votosAbs.push(nombre);
+                                }
+                            });
+                        }
+
+                        const votacionHtml = `
+                            <div class="votacion-block-ui mb-4">
+                                <h5 class="fw-bold border-bottom pb-2">${escapeHTML(votacion.nombreVotacion)}</h5>
+                                <table class="table table-sm table-bordered table-striped" style="font-size: 0.9rem;">
+                                    <thead class="table-light text-center">
+                                        <tr>
+                                            <th style="width: 33.3%;">A Favor (${votosSi.length})</th>
+                                            <th style="width: 33.3%;">En Contra (${votosNo.length})</th>
+                                            <th style="width: 33.3%;">Abstención (${votosAbs.length})</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>${votosSi.length > 0 ? '<ul><li>' + votosSi.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
+                                            <td>${votosNo.length > 0 ? '<ul><li>' + votosNo.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
+                                            <td>${votosAbs.length > 0 ? '<ul><li>' + votosAbs.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                        container.innerHTML += votacionHtml;
+                    });
+                })
+                .catch(error => {
+                    if (refreshButton) refreshButton.disabled = false;
+                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${error.message}</p>`;
+                    console.error('Error al cargar votaciones:', error);
+                });
+        }
+
+        /**
+         * Helper para evitar inyección XSS
+         */
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                } [m];
+            });
+        }
+        // ==================================================================
+        // --- FIN: FUNCIONES JS PARA VOTACIÓN EN VIVO ---
+        // ==================================================================
     </script>
 </body>
 
