@@ -57,7 +57,7 @@ try {
                         <label for="comisionId" class="form-label">Filtrar por Comisión:</label>
                         <select class="form-select form-select-sm" id="comisionId" name="comisionId">
                             <option value="">-- Todas las Comisiones --</option>
-                            <?php foreach ($comisiones as $comision): ?>
+                            <?php foreach (($comisiones ?? []) as $comision): ?>
                                 <option value="<?php echo $comision['idComision']; ?>"
                                     <?php echo ($filtroComision == $comision['idComision']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($comision['nombreComision']); ?>

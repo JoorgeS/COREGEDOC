@@ -242,5 +242,20 @@ $reuniones = $stHist->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- === SweetAlert2 === -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<?php if (isset($_GET['asistencia']) && $_GET['asistencia'] === 'ok'): ?>
+<script>
+Swal.fire({
+    icon: 'success',
+    title: '¡Asistencia registrada!',
+    text: 'Tu asistencia fue registrada correctamente.',
+    confirmButtonColor: '#3085d6',
+    confirmButtonText: 'Aceptar'
+});
+</script>
+<?php endif; ?>
+
 </body>
 </html>
