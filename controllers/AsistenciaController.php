@@ -7,22 +7,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// --- INICIO DE LA CORRECCIÓN ---
+// Estas dos líneas leen la sesión. La segunda línea (idtipoUsuario)
+// es la que faltaba y causaba el "Undefined variable" warning.
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-$tipoUsuario = $_SESSION['idTipoUsuario'] ?? null; // Asumiendo que guardas tipoUsuario_id en sesión
+$idtipoUsuario = $_SESSION['tipoUsuario_id'] ?? null; 
+// --- FIN DE LA CORRECCIÓN ---
+
 $response = ['status' => 'error', 'message' => 'Error desconocido.'];
-
-
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$idUsuarioLogueado) {
     echo json_encode(['status' => 'error', 'message' => 'Acceso no válido.']);
     exit;
 }
 
-// Solo Consejeros Regionales (idTipoUsuario = 1) pueden autogestionar
-if ($tipoUsuario != 1 and $tipoUsuario != 3) {
+// Esta lógica ahora funcionará, ya que $idtipoUsuario SÍ existe.
+// Permite que Consejeros (1) y Presidentes (3) registren.
+if (!($idtipoUsuario == 1 || $idtipoUsuario == 3)) {
     echo json_encode(['status' => 'error', 'message' => 'Acción no permitida para este tipo de usuario.']);
     exit;
 }
+
 
 $data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $data['idMinuta'] ?? null;
@@ -43,8 +48,7 @@ try {
     $existe = $stmt_check->fetch();
 
     if ($existe) {
-        // Si ya existe, solo actualizamos la hora (o no hacemos nada, pero damos éxito)
-        // Optamos por actualizar la hora para registrar el último "check-in"
+        // Si ya existe, actualizamos la hora
         $sql_update = "UPDATE t_asistencia SET fechaRegistroAsistencia = NOW() 
                        WHERE idAsistencia = :idAsistencia";
         $stmt_update = $pdo->prepare($sql_update);
@@ -52,15 +56,17 @@ try {
         $response = ['status' => 'success', 'message' => 'Asistencia re-confirmada.'];
     } else {
         // Si no existe, la insertamos
+        // NOTA: Asumimos '1' para t_tipoReunion_idTipoReunion. 
+        // Si esto es variable, deberás obtenerlo de la BBDD.
         $sql_insert = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
-                       VALUES (:idMinuta, :idUsuario, 1, NOW())"; // Asumimos t_tipoReunion_idTipoReunion = 1
+                       VALUES (:idMinuta, :idUsuario, 1, NOW())"; 
         $stmt_insert = $pdo->prepare($sql_insert);
         $stmt_insert->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
         $response = ['status' => 'success', 'message' => 'Asistencia registrada con éxito.'];
     }
 } catch (Exception $e) {
     error_log("Error en AsistenciaController: " . $e->getMessage());
-    $response = ['status' => 'error', 'message' => 'Error de base de datos.'];
+    $response = ['status' => 'error', 'message' => 'Error de base de datos: ' . $e->getMessage()];
 }
 
 echo json_encode($response);

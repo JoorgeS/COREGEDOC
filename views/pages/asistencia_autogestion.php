@@ -1,12 +1,11 @@
 <?php
-//probando adecuacion del git
 // views/pages/asistencia_autogestion.php
-require_once __DIR__ . '/../../class/class.conectorDB.php'; // Asegura que la timezone 'America/Santiago' esté cargada
 
-// Asegurarse de que la sesión esté iniciada
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// 1. CORRECCIÓN DE RUTA: Subir DOS niveles a /corevota/
+require_once __DIR__ . '/../../class/class.conectorDB.php'; 
+
+// 2. ELIMINACIÓN: El session_start() se borra de aquí.
+// menu.php (el archivo padre) ya inició la sesión.
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 
 // Obtener la lista de reuniones INICIADAS (tienen idMinuta) y PENDIENTES
@@ -25,23 +24,27 @@ try {
                     FROM t_reunion r
                     JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
                     JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                    WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR')
-                    ORDER BY r.fechaInicioReunion DESC";
+                    WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR', 'PARCIAL')
+                    ORDER BY r.fechaInicioReunion DESC"; // Agregado estado PARCIAL
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $reunionesActivas = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Verificar asistencia previa (sin cambios)
     if ($idUsuarioLogueado && !empty($reunionesActivas)) {
         $idsMinutasActivas = array_column($reunionesActivas, 'idMinuta');
-        $placeholders = implode(',', array_fill(0, count($idsMinutasActivas), '?'));
-        $sql_asistencia = "SELECT t_minuta_idMinuta 
-                           FROM t_asistencia 
-                           WHERE t_usuario_idUsuario = ? 
-                           AND t_minuta_idMinuta IN ({$placeholders})";
-        $stmt_asistencia = $pdo->prepare($sql_asistencia);
-        $params = array_merge([$idUsuarioLogueado], $idsMinutasActivas);
-        $stmt_asistencia->execute($params);
-        $asistenciaUsuario = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
+        
+        // Evitar error si el array está vacío (aunque ya lo chequeamos)
+        if (!empty($idsMinutasActivas)) {
+            $placeholders = implode(',', array_fill(0, count($idsMinutasActivas), '?'));
+            $sql_asistencia = "SELECT t_minuta_idMinuta 
+                               FROM t_asistencia 
+                               WHERE t_usuario_idUsuario = ? 
+                               AND t_minuta_idMinuta IN ({$placeholders})";
+            $stmt_asistencia = $pdo->prepare($sql_asistencia);
+            $params = array_merge([$idUsuarioLogueado], $idsMinutasActivas);
+            $stmt_asistencia->execute($params);
+            $asistenciaUsuario = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
+        }
     }
 
     $pdo = null;
