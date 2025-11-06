@@ -407,4 +407,40 @@ class MinutaModel extends BaseConexion
             return [];
         }
     }
+
+    /**
+     * NUEVA FUNCIÓN: Obtiene los feedbacks de una minuta.
+     */
+    public function getFeedbackDeMinuta($idMinuta)
+    {
+        // Asumo que la tabla de feedback es 't_aprobacion_minuta'
+        // y que el comentario está en la columna 'feedback'.
+        // ¡Ajusta el nombre de las columnas si es necesario!
+        $sql = "SELECT 
+                    f.feedback, 
+                    f.fecha_feedback, 
+                    COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Usuario') as nombreUsuario
+                FROM 
+                    t_aprobacion_minuta f
+                LEFT JOIN 
+                    t_usuario u ON f.t_usuario_idPresidente = u.idUsuario
+                WHERE 
+                    f.t_minuta_idMinuta = :idMinuta
+                    AND f.estado_firma = 'REQUIERE_REVISION'
+                    AND f.feedback IS NOT NULL 
+                    AND f.feedback <> ''
+                ORDER BY 
+                    f.fecha_feedback DESC";
+        
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(['idMinuta' => (int)$idMinuta]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error SQL (getFeedbackDeMinuta): " . $e->getMessage());
+            return []; // Devuelve array vacío en caso de error
+        }
+    }
+
+
 }
