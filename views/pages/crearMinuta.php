@@ -420,24 +420,21 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 <div class="adjuntos-section mt-4 pt-3 border-top">
                     <h5 class="fw-bold mb-3">DOCUMENTOS ADJUNTOS</h5>
                     <input type="hidden" id="idMinutaActual" value="<?php echo htmlspecialchars($idMinutaActual); ?>">
+
                     <form id="formSubirArchivo" class="mb-3">
-                        <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, XLSX, MP4, PPT, DOCX)</label>
+                        <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, XLSX, MP4, PPT, DOCX) <span id="file-upload-status" class="badge bg-light text-dark"></span></label>
                         <div class="input-group">
                             <input type="file" class="form-control" id="inputArchivo" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx">
-                            <button class="btn btn-primary" type="submit" id="btnSubirArchivo">
-                                <i class="fas fa-upload me-2"></i>Subir
-                            </button>
                         </div>
                     </form>
+
                     <form id="formAgregarLink" class="mb-3">
-                        <label for="inputUrlLink" class="form-label">Añadir nuevo enlace</label>
+                        <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Presione Enter o haga clic fuera para añadir)</label>
                         <div class="input-group">
                             <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required>
-                            <button class="btn btn-info" type="submit" id="btnAgregarLink">
-                                <i class="fas fa-link me-2"></i>Añadir
-                            </button>
                         </div>
                     </form>
+
                     <div id="adjuntosExistentesContainer" class="mt-4">
                         <h6>Archivos y Enlaces Existentes:</h6>
                         <ul id="listaAdjuntosExistentes" class="list-group list-group-flush">
@@ -533,6 +530,39 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
         const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
         const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
+        const formSubirArchivo = document.getElementById('formSubirArchivo');
+        const inputArchivo = document.getElementById('inputArchivo');
+        const formAgregarLink = document.getElementById('formAgregarLink');
+        const inputUrlLink = document.getElementById('inputUrlLink');
+        const fileStatus = document.getElementById('file-upload-status');
+
+        // 1. Manejo de Subida de Archivos: Se dispara automáticamente al seleccionar un archivo (change).
+        if (inputArchivo) {
+            inputArchivo.addEventListener('change', function(e) {
+                if (this.files.length > 0) {
+                    // Usamos dispatchEvent para invocar el evento 'submit' al que está suscrito handleSubirArchivo
+                    formSubirArchivo.dispatchEvent(new Event('submit', {
+                        cancelable: true
+                    }));
+                }
+            });
+        }
+
+        // 2. Manejo de Adición de Enlaces: Se dispara automáticamente al presionar Enter o perder el foco (change).
+        if (inputUrlLink) {
+            inputUrlLink.addEventListener('change', function() {
+                const url = this.value.trim();
+                // Solo intentar subir si el campo no está vacío y parece una URL
+                if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
+                    // Usamos dispatchEvent para invocar el evento 'submit' al que está suscrito handleAgregarLink
+                    formAgregarLink.dispatchEvent(new Event('submit', {
+                        cancelable: true
+                    }));
+                } else if (url !== '') {
+                    Swal.fire('Formato Inválido', 'Asegúrese de que el enlace sea una URL completa y válida (ej: https://ejemplo.com).', 'warning');
+                }
+            });
+        }
 
         // ¡MODIFICADO! Esta variable AHORA se actualizará con cada fetch
         let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>;
@@ -763,7 +793,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         function handleSubirArchivo(e) {
             e.preventDefault();
             const input = document.getElementById('inputArchivo');
-            const btn = document.getElementById('btnSubirArchivo');
+            // El botón ha sido eliminado, ya no se referencia 'btn'
             if (!input.files || input.files.length === 0) {
                 Swal.fire('Error', 'Debe seleccionar un archivo.', 'warning');
                 return;
@@ -771,8 +801,11 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('archivo', input.files[0]);
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...';
+
+            // Actualizamos el estado de la UI
+            fileStatus.textContent = 'Subiendo...';
+            fileStatus.className = 'badge bg-warning text-dark';
+            input.disabled = true; // Deshabilitar input mientras sube
 
             // (CORREGIDO) Usar ruta absoluta
             fetch('/corevota/controllers/agregar_adjunto.php?action=upload', {
@@ -785,7 +818,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     }
                     return res.text().then(text => {
                         console.error("Respuesta de error del servidor (upload):", text);
-                        // El error 404/HTML entrará aquí
                         throw new Error("El servidor respondió con un error (ver consola).");
                     });
                 })
@@ -793,16 +825,29 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     if (data.status === 'success') {
                         Swal.fire('Éxito', 'Archivo subido correctamente.', 'success');
                         agregarAdjuntoALista(data.data);
-                        input.value = '';
+                        input.value = ''; // Limpiar el input
+
+                        // Actualizamos el estado de la UI
+                        fileStatus.textContent = '✅ Subido con éxito';
+                        fileStatus.className = 'badge bg-success';
                     } else {
-                        // El error "Acción no válida" entrará aquí
                         Swal.fire('Error', data.message || 'No se pudo subir el archivo.', 'error');
+                        // Actualizamos el estado de la UI
+                        fileStatus.textContent = '❌ Error de subida';
+                        fileStatus.className = 'badge bg-danger';
                     }
                 })
-                .catch(err => Swal.fire('Error', 'Error de conexión al subir: ' + err.message, 'error'))
+                .catch(err => {
+                    Swal.fire('Error', 'Error de conexión al subir: ' + err.message, 'error');
+                    // Actualizamos el estado de la UI
+                    fileStatus.textContent = '❌ Error de conexión';
+                    fileStatus.className = 'badge bg-danger';
+                })
                 .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-upload me-2"></i>Subir';
+                    input.disabled = false; // Habilitar input
+                    setTimeout(() => {
+                        fileStatus.textContent = ''; // Limpiar estado
+                    }, 3000);
                 });
         }
         // --- (NUEVA FUNCIÓN AUXILIAR) ---
@@ -855,17 +900,23 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         function handleAgregarLink(e) {
             e.preventDefault();
             const input = document.getElementById('inputUrlLink');
-            const btn = document.getElementById('btnAgregarLink');
             const url = input.value.trim();
-            if (!url) {
-                Swal.fire('Error', 'Debe ingresar una URL.', 'warning');
+
+            // El botón ha sido eliminado, ya no se referencia 'btn'
+
+            // Validación duplicada pero necesaria si el evento 'change' dispara esto
+            if (!url || !filterUrl(url)) {
+                Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
                 return;
             }
+
+            // Deshabilitar input mientras procesa
+            input.disabled = true;
+            input.placeholder = 'Añadiendo...';
+
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('urlLink', url);
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
             // (CORREGIDO) Usar ruta absoluta
             fetch('/corevota/controllers/agregar_adjunto.php?action=link', {
@@ -892,9 +943,20 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 })
                 .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
                 .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
+                    input.disabled = false; // Habilitar input
+                    input.placeholder = 'https://ejemplo.com';
                 });
+        }
+
+        // Función de validación de URL (necesaria en el cliente si no queremos depender del servidor)
+        function filterUrl(str) {
+            const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+                '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+                '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+                '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+                '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+                '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+            return !!pattern.test(str);
         }
 
         function cargarYMostrarAdjuntosExistentes() {

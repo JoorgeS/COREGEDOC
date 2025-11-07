@@ -15,8 +15,17 @@ require_once ROOT_PATH . 'class/class.conectorDB.php';
 
 // 2. Validar sesión y datos de entrada
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
+
+// [✅ CORRECCIÓN INICIADA]
+// 2.1. Intentar leer idAdjunto desde el cuerpo JSON (si es un fetch con body)
 $data = json_decode(file_get_contents('php://input'), true);
 $idAdjunto = $data['idAdjunto'] ?? null;
+
+// 2.2. Si no se encontró en el cuerpo JSON, intentar leer desde el Query String (para llamadas GET/URL)
+if (is_null($idAdjunto)) {
+    $idAdjunto = $_GET['idAdjunto'] ?? null;
+}
+// [✅ CORRECCIÓN FINALIZADA]
 
 if (!$idUsuarioLogueado || !$idAdjunto || !is_numeric($idAdjunto)) {
     echo json_encode(['status' => 'error', 'message' => 'Datos insuficientes o sesión no válida.']);

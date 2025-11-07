@@ -498,52 +498,73 @@ function renderPaginationListado($current, $pages)
 </div>
 
 <script>
-    // Modal de adjuntos
-    if (typeof verAdjuntos !== 'function') {
-        function verAdjuntos(idMinuta) {
-            const modalElement = document.getElementById('modalAdjuntos');
-            const modalList = document.getElementById('listaDeAdjuntos');
-            if (!modalElement || !modalList) {
-                alert("Error: No se encontró el modal de adjuntos.");
-                return;
-            }
-            const modal = new bootstrap.Modal(modalElement);
-            modalList.innerHTML = '<li class="list-group-item text-muted">Cargando...</li>';
-            modal.show();
+    // Definición directa de la función global 'verAdjuntos'
+    window.verAdjuntos = function(idMinuta) {
+        const modalElement = document.getElementById('modalAdjuntos');
+        const modalList = document.getElementById('listaDeAdjuntos');
 
-            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
-                .then(r => r.ok ? r.json() : Promise.reject('Error al obtener adjuntos'))
-                .then(data => {
-                    if (data.status === 'success' && data.data && data.data.length > 0) {
-                        modalList.innerHTML = '';
-                        data.data.forEach(adj => {
-                            const li = document.createElement('li');
-                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                            const link = document.createElement('a');
-                            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
-                            link.href = url;
-                            link.target = '_blank';
-                            let icon = '🔗';
-                            if (adj.tipoAdjunto === 'asistencia') icon = '👥';
-                            else if (adj.tipoAdjunto === 'file') icon = '📄';
-                            let nombreArchivo = (adj.pathAdjunto || '').split('/').pop();
-                            if (adj.tipoAdjunto === 'link') {
-                                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
-                            }
-                            link.textContent = ` ${icon} ${nombreArchivo}`;
-                            link.title = adj.pathAdjunto;
-                            li.appendChild(link);
-                            modalList.appendChild(li);
-                        });
-                    } else {
-                        modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
-                    }
-                })
-                .catch(() => modalList.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>');
+        // Mostrar error si faltan elementos cruciales
+        if (!modalElement || !modalList) {
+            // Utilizamos Swal para alertar al usuario si el modal no existe
+            Swal.fire("Error", "No se encontró el modal de adjuntos (Elementos HTML faltantes).", "error");
+            return;
         }
-    }
+
+        // Es esencial usar una instancia de Modal
+        const modal = new bootstrap.Modal(modalElement);
+
+        // Mostrar estado de carga antes del fetch
+        modalList.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
+        modal.show();
+
+        // La URL utiliza el ID de la minuta
+        fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
+            .then(r => {
+                if (!r.ok) {
+                    // Si el servidor devuelve un error HTTP (ej: 500)
+                    return r.text().then(text => Promise.reject(`Error HTTP ${r.status}: ${text.substring(0, 50)}...`));
+                }
+                return r.json();
+            })
+            .then(data => {
+                // Verificar el formato de la respuesta del controlador
+                if (data.status === 'success' && data.adjuntos && data.adjuntos.length > 0) { // <-- Usar data.adjuntos
+                    modalList.innerHTML = '';
+                    data.adjuntos.forEach(adj => { // <-- Iterar sobre data.adjuntos
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        const link = document.createElement('a');
+
+                        // Construcción de URL (el controlador ahora devuelve el pathWebFinal)
+                        // NOTA: El controlador en el paso anterior devolvía 'pathArchivo' y no 'pathAdjunto'
+                        const url = adj.pathArchivo;
+
+                        link.href = url;
+                        link.target = '_blank';
+                        let icon = '🔗';
+                        if (adj.tipoAdjunto === 'asistencia') icon = '👥';
+                        else if (adj.tipoAdjunto === 'file') icon = '📄';
+
+                        // El controlador devuelve el nombre ya simplificado en 'nombreArchivo'
+                        const displayName = adj.nombreArchivo;
+
+                        link.innerHTML = ` ${icon} ${displayName}`;
+                        link.title = adj.pathArchivo;
+                        li.appendChild(link);
+                        modalList.appendChild(li);
+                    });
+                } else {
+                    modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
+                }
+            })
+            .catch((error) => {
+                console.error("Error al cargar adjuntos:", error);
+                modalList.innerHTML = `<li class="list-group-item text-danger">Error al cargar adjuntos. Verifique la consola (F12) para detalles.</li>`;
+            });
+    };
 
     // Autosubmit y manejo de filtros SIEMPRE ACTIVOS
+    // ... (Tu código de filtros original va aquí) ...
     (function() {
         const form = document.getElementById('filtrosForm');
         if (!form) return;

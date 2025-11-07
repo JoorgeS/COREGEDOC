@@ -1,7 +1,6 @@
 <?php
 // /corevota/controllers/obtener_adjuntos.php
-// --- VERSIÓN ACTUALIZADA (v2) ---
-// Ahora devuelve idAdjunto y tipoAdjunto para la página de EDICIÓN.
+// --- VERSIÓN CORREGIDA Y ROBUSTA (Maneja GET y POST) ---
 
 header('Content-Type: application/json');
 error_reporting(0); // Desactivar errores en producción
@@ -15,11 +14,20 @@ define('ROOT_PATH', dirname(__DIR__) . '/');
 require_once ROOT_PATH . 'class/class.conectorDB.php';
 
 // 2. Obtener datos de entrada y sesión
-$data = json_decode(file_get_contents('php://input'), true);
-$idMinuta = $data['idMinuta'] ?? null;
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 
+// Intentar leer idMinuta de la URL (GET) primero (usado por minutas_listado_general.php)
+$idMinuta = $_GET['idMinuta'] ?? null;
+
+// Si no se encontró en GET, intentar leer desde el cuerpo JSON (POST)
+if (is_null($idMinuta)) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $idMinuta = $data['idMinuta'] ?? null;
+}
+
 if (!$idMinuta || !is_numeric($idMinuta) || !$idUsuarioLogueado) {
+    // Usamos 400 Bad Request si faltan datos
+    http_response_code(400); 
     echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado o datos incompletos.', 'adjuntos' => []]);
     exit;
 }
@@ -29,15 +37,14 @@ try {
     $db = new conectorDB();
     $pdo = $db->getDatabase();
 
-    // 3. --- CONSULTA SQL ACTUALIZADA ---
-    // Ahora seleccionamos MÁS campos: idAdjunto y tipoAdjunto
+    // 3. CONSULTA SQL
     $sql = "SELECT 
                 idAdjunto, 
                 pathAdjunto,
                 tipoAdjunto 
             FROM t_adjunto
-            WHERE t_minuta_idMinuta = :idMinuta";
-    // Quitamos el filtro de 'file' para que también traiga los 'link'
+            WHERE t_minuta_idMinuta = :idMinuta
+            ORDER BY tipoAdjunto ASC, idAdjunto DESC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':idMinuta' => $idMinuta]);
@@ -46,29 +53,27 @@ try {
     // 4. Procesar resultados para el JSON
     $adjuntosProcesados = [];
     foreach ($adjuntos as $adjunto) {
-
         $pathOriginal = $adjunto['pathAdjunto'];
         $tipo = $adjunto['tipoAdjunto'];
         $pathWebFinal = '';
 
+        // Corregir la ruta web-accessible
         if ($tipo === 'link') {
-            // Si es un link, el path es la URL completa
             $pathWebFinal = $pathOriginal;
-            $nombreArchivo = $pathOriginal; // Para links, el nombre es la URL
+            $nombreArchivo = $pathOriginal;
         } else {
-            // Si es un archivo (file, asistencia, etc.), construimos la ruta
-            $pathCorregido = $pathOriginal;
-            if (strpos($pathCorregido, 'public/') !== 0) {
-                // Asumimos que es un 'file' y le prefijamos la ruta
-                $pathCorregido = 'public/docs/' . $pathCorregido;
-            }
+            // Asumimos que la BD guarda la ruta relativa (e.g., 'public/docs/...')
+            // Si el path ya tiene 'public/', lo usamos; si no, lo prefijamos.
+            $pathCorregido = (strpos($pathOriginal, 'public/') === 0) ? $pathOriginal : ('public/docs/' . $pathOriginal);
+            
+            // Construir la URL absoluta para el navegador
             $pathWebFinal = '/corevota/' . $pathCorregido;
-            $nombreArchivo = basename($pathOriginal); // Extrae solo el nombre
+            $nombreArchivo = basename($pathOriginal);
         }
 
         $adjuntosProcesados[] = [
-            'idAdjunto'     => (int)$adjunto['idAdjunto'], // <-- ¡NUEVO!
-            'tipoAdjunto'   => $tipo,                       // <-- ¡NUEVO!
+            'idAdjunto'     => (int)$adjunto['idAdjunto'],
+            'tipoAdjunto'   => $tipo,
             'nombreArchivo' => $nombreArchivo,
             'pathArchivo'   => $pathWebFinal
         ];
@@ -79,6 +84,7 @@ try {
     echo json_encode(['status' => 'success', 'adjuntos' => $adjuntosProcesados]);
 } catch (Exception $e) {
     error_log("Error en obtener_adjuntos.php (Minuta ID: $idMinuta): " . $e->getMessage());
+    http_response_code(500); 
     echo json_encode(['status' => 'error', 'message' => 'Error al consultar la base de datos.', 'adjuntos' => []]);
 } finally {
     $pdo = null;
