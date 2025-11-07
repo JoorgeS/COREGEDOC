@@ -34,7 +34,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
     exit;
   }
 
-  // 2️⃣ Registrar voto
+  // --- INICIO: NUEVA VALIDACIÓN DE ASISTENCIA ---
+  // A. Obtener el idMinuta asociado a la votación (asumiendo FK t_minuta_idMinuta en t_votacion)
+  $sqlMinuta = "SELECT t_minuta_idMinuta FROM t_votacion WHERE idVotacion = :idVotacion";
+  $stmtMinuta = $pdo->prepare($sqlMinuta);
+  $stmtMinuta->execute([':idVotacion' => $idVotacion]);
+  $idMinuta = $stmtMinuta->fetchColumn();
+
+  if (!$idMinuta) {
+    // Si no hay minuta asociada, lo bloqueamos para evitar votos inválidos.
+    echo json_encode(['status' => 'error', 'message' => 'Votación no asociada a ninguna minuta para verificar asistencia.']);
+    exit;
+  }
+
+  // B. Verificar si el usuario está presente en la minuta (t_asistencia)
+  $sqlAsistencia = "SELECT COUNT(*) FROM t_asistencia 
+                    WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
+  $stmtAsistencia = $pdo->prepare($sqlAsistencia);
+  $stmtAsistencia->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
+
+  if ($stmtAsistencia->fetchColumn() == 0) {
+    echo json_encode([
+      'status' => 'unauthorized',
+      'message' => 'No puede votar. Debe registrar su asistencia a la reunión correspondiente.'
+    ]);
+    exit;
+  }
+  // --- FIN: NUEVA VALIDACIÓN DE ASISTENCIA ---
+
+  // 3️⃣ Registrar voto
   $response = $votoCtrl->registrarVoto((int)$idVotacion, (int)$idUsuario, (string)$opcionVoto);
   echo json_encode($response);
   exit;
@@ -94,9 +122,8 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                 </form>
               <?php endif; ?>
               <div class="mt-3">
-                <!-- Agrego clase para que el JS pueda tomar el destino real -->
                 <a href="menu.php?pagina=tabla_votacion&idVotacion=<?= $v['idVotacion'] ?>"
-                   class="btn btn-outline-success btn-sm fw-semibold js-resumen-url">
+                  class="btn btn-outline-success btn-sm fw-semibold js-resumen-url">
                   <i class="fa-solid fa-chart-simple me-1"></i> Ver resultados
                 </a>
               </div>
@@ -143,6 +170,14 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                   title: '⚠️ Ya registraste tu voto',
                   text: 'No puedes votar nuevamente en esta votación.',
                   confirmButtonColor: '#198754'
+                });
+              } else if (resp.status === 'unauthorized') {
+                // Manejar error de asistencia
+                Swal.fire({
+                  icon: 'error',
+                  title: '❌ Voto no permitido',
+                  text: resp.message || 'Debe registrar su asistencia para poder votar.',
+                  confirmButtonColor: '#dc3545'
                 });
               } else if (resp.status === 'success') {
                 Swal.fire({
