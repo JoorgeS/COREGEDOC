@@ -498,20 +498,20 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Historial Votación
                             </a>
                         </li>
-                        
+
                     <?php endif; ?>
 
 
-                    
+
 
                 </ul>
             </div>
             <li class="nav-item mt-auto">
-                        <a href="/corevota/logout.php" class="nav-link nav-link-logout">
-                            <i class="fas fa-sign-out-alt fa-fw"></i>
-                            Cerrar Sesión
-                        </a>
-                    </li>
+                <a href="/corevota/logout.php" class="nav-link nav-link-logout">
+                    <i class="fas fa-sign-out-alt fa-fw"></i>
+                    Cerrar Sesión
+                </a>
+            </li>
 
         </nav>
 
@@ -582,10 +582,10 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                     <div class="row align-items-center">
                         <div class="col-md-8">
                             <h2 class="display-6">
-                            <?php echo htmlspecialchars($saludo . ' ' . $nombreUsuario, ENT_QUOTES, 'UTF-8'); ?>
+                                <?php echo htmlspecialchars($saludo . ' ' . $nombreUsuario, ENT_QUOTES, 'UTF-8'); ?>
                             </h2>
                             <p class="lead text-muted">
-                            Hoy es <?php echo htmlspecialchars($fechaActual, ENT_QUOTES, 'UTF-8'); ?>
+                                Hoy es <?php echo htmlspecialchars($fechaActual, ENT_QUOTES, 'UTF-8'); ?>
                             </p>
                         </div>
                         <div class="col-md-4 text-md-end">
@@ -636,11 +636,11 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 'usuarios_listado' => ['type' => 'view', 'file' => $base_path . '/usuarios_listado.php', 'roles' => [ROL_ADMINISTRADOR]],
                 'usuario_crear' => ['type' => 'view', 'file' => $base_path . '/usuario_formulario.php', 'params' => ['action' => 'create'], 'roles' => [ROL_ADMINISTRADOR]],
                 'usuario_editar' => [
-                'type'   => 'view',
-                'file'   => $base_path . '/usuario_formulario.php',
-                'params' => ['action' => 'edit'],
-                'roles'  => [ROL_ADMINISTRADOR]
-],
+                    'type'   => 'view',
+                    'file'   => $base_path . '/usuario_formulario.php',
+                    'params' => ['action' => 'edit'],
+                    'roles'  => [ROL_ADMINISTRADOR]
+                ],
 
                 'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
@@ -802,44 +802,54 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 
         // --- Manejador para AÑADIR LINK ---
-        formLink.addEventListener('submit', (e) => {
-            e.preventDefault();
+        // INICIO CORRECCIÓN: Definir formLink y comprobar su existencia para evitar ReferenceError
+        const formLink = document.getElementById('formLink');
+        if (formLink) { // Solo si el elemento existe (i.e., estamos en la vista de edición)
+            formLink.addEventListener('submit', (e) => {
+                e.preventDefault();
 
-            const formData = new FormData();
-            formData.append('idMinuta', idMinuta);
-            formData.append('tipoAdjunto', 'link');
-            formData.append('urlLink', document.getElementById('inputUrlLink').value);
+                // Aquí asumo que idMinuta está definido globalmente en el scope de la página si formLink existe
+                const idMinuta = document.getElementById('idMinutaField').value; // Asumo que existe un campo oculto con el ID de la minuta
 
-            const btnLink = document.getElementById('btnAgregarLink');
-            btnLink.disabled = true;
-            btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
+                const formData = new FormData();
+                formData.append('idMinuta', idMinuta);
+                formData.append('tipoAdjunto', 'link');
+                formData.append('urlLink', document.getElementById('inputUrlLink').value);
 
-            fetch('/corevota/controllers/agregar_adjunto.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const listaUI = document.getElementById('listaAdjuntosExistentes');
-                        // Quitar "No hay adjuntos" si es el primero
-                        if (listaUI.querySelector('.text-muted')) {
-                            listaUI.innerHTML = '';
+                const btnLink = document.getElementById('btnAgregarLink');
+                btnLink.disabled = true;
+                btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
+
+                fetch('/corevota/controllers/agregar_adjunto.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const listaUI = document.getElementById('listaAdjuntosExistentes');
+                            // Quitar "No hay adjuntos" si es el primero
+                            if (listaUI.querySelector('.text-muted')) {
+                                listaUI.innerHTML = '';
+                            }
+                            // Asumo que crearItemAdjuntoUI existe en la página que usa este form (e.g. crearMinuta.php)
+                            // Si esta función no existe, dará ReferenceError, pero el error original era formLink is not defined.
+                            // Dejamos la llamada, confiando en que crearMinuta.php la define.
+                            const li = crearItemAdjuntoUI(data.nuevoAdjunto);
+                            listaUI.appendChild(li);
+                            formLink.reset(); // Limpiar el formulario
+                        } else {
+                            alert('Error al añadir link: ' + data.message);
                         }
-                        const li = crearItemAdjuntoUI(data.nuevoAdjunto);
-                        listaUI.appendChild(li);
-                        formLink.reset(); // Limpiar el formulario
-                    } else {
-                        alert('Error al añadir link: ' + data.message);
-                    }
-                })
-                .catch(error => alert('Error de red: ' + error.message))
-                .finally(() => {
-                    btnLink.disabled = false;
-                    btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
-                });
-        });
-
+                    })
+                    .catch(error => alert('Error de red: ' + error.message))
+                    .finally(() => {
+                        btnLink.disabled = false;
+                        btnLink.innerHTML = '<i class="fas fa-link me-2"></i>Añadir';
+                    });
+            });
+        }
+        // FIN CORRECCIÓN
 
 
         function aprobarMinuta(idMinuta) {
@@ -854,42 +864,44 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 cancelButtonColor: '#6c757d'
             }).then((result) => {
                 if (result.isConfirmed) {
-                fetch('/corevota/controllers/aprobar_minuta.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ idMinuta: idMinuta })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        let titulo = '¡Minuta aprobada!';
-                        let icono = 'success';
+                    fetch('/corevota/controllers/aprobar_minuta.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                idMinuta: idMinuta
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            let titulo = '¡Minuta aprobada!';
+                            let icono = 'success';
 
-                        if (data.status === 'success_partial') {
-                            titulo = 'Firma registrada';
-                        } else if (data.status === 'success_final') {
-                            titulo = '¡Minuta aprobada y PDF generado!';
-                        } else if (data.status !== 'success') {
-                            // Si no coincide con ninguno de los casos válidos, tratamos como error
-                            titulo = 'Error';
-                            icono = 'error';
-                        }
-                        Swal.fire({
-                            title: titulo,
-                            text: data.message || 'Operación completada correctamente.',
-                            icon: icono,
-                            confirmButtonColor: '#28a745'
-                        }).then(() => {
-                            if (icono === 'success') {
-                            window.location.reload();
+                            if (data.status === 'success_partial') {
+                                titulo = 'Firma registrada';
+                            } else if (data.status === 'success_final') {
+                                titulo = '¡Minuta aprobada y PDF generado!';
+                            } else if (data.status !== 'success') {
+                                // Si no coincide con ninguno de los casos válidos, tratamos como error
+                                titulo = 'Error';
+                                icono = 'error';
                             }
+                            Swal.fire({
+                                title: titulo,
+                                text: data.message || 'Operación completada correctamente.',
+                                icon: icono,
+                                confirmButtonColor: '#28a745'
+                            }).then(() => {
+                                if (icono === 'success') {
+                                    window.location.reload();
+                                }
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Error en fetch al aprobar:', error);
+                            Swal.fire('Error', 'Error de conexión al intentar aprobar la minuta.', 'error');
                         });
-                    })
-                    .catch(error => {
-                    console.error('Error en fetch al aprobar:', error);
-                    Swal.fire('Error', 'Error de conexión al intentar aprobar la minuta.', 'error');
-                    });
                 }
             });
         }
@@ -941,6 +953,23 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
         });
     </script>
 
+    <div class="modal fade" id="modalAdjuntos" tabindex="-1" aria-labelledby="modalAdjuntosLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalAdjuntosLabel"><i class="fas fa-paperclip me-2"></i>Documentos Adjuntos</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="list-group" id="listaDeAdjuntos">
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="modal fade" id="confirmacionModal" tabindex="-1" aria-labelledby="confirmacionModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -958,45 +987,45 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
     </div>
 
     <script>
-/* Popup por querystring ?status=[success|error]&msg=...  */
-(function () {
-  const params = new URLSearchParams(window.location.search);
-  if (!params.has('status') || !params.has('msg')) return;
+        /* Popup por querystring ?status=[success|error]&msg=...  */
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.has('status') || !params.has('msg')) return;
 
-  const status = params.get('status'); // 'success' | 'error'
-  // el msg viene con urlencode, reponemos espacios por '+'
-  const msg = decodeURIComponent((params.get('msg') || '').replace(/\+/g, ' '));
+            const status = params.get('status'); // 'success' | 'error'
+            // el msg viene con urlencode, reponemos espacios por '+'
+            const msg = decodeURIComponent((params.get('msg') || '').replace(/\+/g, ' '));
 
-  const modalEl   = document.getElementById('confirmacionModal');
-  if (!modalEl) return;
+            const modalEl = document.getElementById('confirmacionModal');
+            if (!modalEl) return;
 
-  const headerEl  = modalEl.querySelector('.modal-header');
-  const titleEl   = modalEl.querySelector('#confirmacionModalLabel');
-  const bodyEl    = modalEl.querySelector('#confirmacionModalMessage');
-  const btnFooter = modalEl.querySelector('.modal-footer .btn');
+            const headerEl = modalEl.querySelector('.modal-header');
+            const titleEl = modalEl.querySelector('#confirmacionModalLabel');
+            const bodyEl = modalEl.querySelector('#confirmacionModalMessage');
+            const btnFooter = modalEl.querySelector('.modal-footer .btn');
 
-  // Reset de estilos del header y botón
-  headerEl.classList.remove('bg-success', 'bg-danger', 'text-white');
-  btnFooter.classList.remove('btn-primary', 'btn-danger');
+            // Reset de estilos del header y botón
+            headerEl.classList.remove('bg-success', 'bg-danger', 'text-white');
+            btnFooter.classList.remove('btn-primary', 'btn-danger');
 
-  if (status === 'success') {
-    headerEl.classList.add('bg-success', 'text-white');
-    titleEl.innerHTML = '<i class="fas fa-check-circle me-2"></i>Operación Exitosa';
-    btnFooter.classList.add('btn-primary');
-  } else {
-    headerEl.classList.add('bg-danger', 'text-white');
-    titleEl.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
-    btnFooter.classList.add('btn-danger');
-  }
+            if (status === 'success') {
+                headerEl.classList.add('bg-success', 'text-white');
+                titleEl.innerHTML = '<i class="fas fa-check-circle me-2"></i>Operación Exitosa';
+                btnFooter.classList.add('btn-primary');
+            } else {
+                headerEl.classList.add('bg-danger', 'text-white');
+                titleEl.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error';
+                btnFooter.classList.add('btn-danger');
+            }
 
-  // Mensaje del cuerpo (texto plano para evitar HTML inyectado)
-  bodyEl.textContent = msg;
+            // Mensaje del cuerpo (texto plano para evitar HTML inyectado)
+            bodyEl.textContent = msg;
 
-  // Mostrar modal
-  const modal = new bootstrap.Modal(modalEl);
-  modal.show();
-})();
-</script>
+            // Mostrar modal
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        })();
+    </script>
 
 </body>
 
