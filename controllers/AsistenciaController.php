@@ -7,12 +7,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// --- INICIO DE LA CORRECCIÓN ---
-// Estas dos líneas leen la sesión. La segunda línea (idtipoUsuario)
-// es la que faltaba y causaba el "Undefined variable" warning.
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-$idtipoUsuario = $_SESSION['tipoUsuario_id'] ?? null; 
-// --- FIN DE LA CORRECCIÓN ---
+$idtipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
 $response = ['status' => 'error', 'message' => 'Error desconocido.'];
 
@@ -21,13 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$idUsuarioLogueado) {
     exit;
 }
 
-// Esta lógica ahora funcionará, ya que $idtipoUsuario SÍ existe.
 // Permite que Consejeros (1) y Presidentes (3) registren.
 if (!($idtipoUsuario == 1 || $idtipoUsuario == 3)) {
     echo json_encode(['status' => 'error', 'message' => 'Acción no permitida para este tipo de usuario.']);
     exit;
 }
-
 
 $data = json_decode(file_get_contents('php://input'), true);
 $idMinuta = $data['idMinuta'] ?? null;
@@ -40,6 +34,33 @@ if (!$idMinuta) {
 try {
     $db = new conectorDB();
     $pdo = $db->getDatabase();
+
+    // --- NUEVO: Verificar el plazo de 30 minutos ---
+    // Consulta para obtener la hora de inicio de la reunión (t_reunion) a partir del idMinuta
+    $sql_time = "SELECT fechaInicioReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta";
+    $stmt_time = $pdo->prepare($sql_time);
+    $stmt_time->execute([':idMinuta' => $idMinuta]);
+    $reunionTime = $stmt_time->fetch(PDO::FETCH_ASSOC);
+
+    if (!$reunionTime) {
+        echo json_encode(['status' => 'error', 'message' => 'Reunión no encontrada.']);
+        exit;
+    }
+
+    $inicioReunion = new DateTime($reunionTime['fechaInicioReunion']);
+    // Calculamos el límite añadiendo 30 minutos a la hora de inicio.
+    $limiteRegistro = (clone $inicioReunion)->modify('+30 minutes');
+    $ahora = new DateTime();
+
+    if ($ahora > $limiteRegistro) {
+        $limiteFormat = $limiteRegistro->format('H:i');
+        echo json_encode([
+            'status' => 'error',
+            'message' => "El plazo de registro de asistencia ha expirado. El límite era a las {$limiteFormat} hrs."
+        ]);
+        exit;
+    }
+    // --- FIN NUEVO: Verificar el plazo de 30 minutos ---
 
     // Revisar si ya existe
     $sql_check = "SELECT idAsistencia FROM t_asistencia WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
@@ -56,10 +77,8 @@ try {
         $response = ['status' => 'success', 'message' => 'Asistencia re-confirmada.'];
     } else {
         // Si no existe, la insertamos
-        // NOTA: Asumimos '1' para t_tipoReunion_idTipoReunion. 
-        // Si esto es variable, deberás obtenerlo de la BBDD.
         $sql_insert = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
-                       VALUES (:idMinuta, :idUsuario, 1, NOW())"; 
+                       VALUES (:idMinuta, :idUsuario, 1, NOW())";
         $stmt_insert = $pdo->prepare($sql_insert);
         $stmt_insert->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
         $response = ['status' => 'success', 'message' => 'Asistencia registrada con éxito.'];

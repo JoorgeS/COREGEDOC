@@ -2,7 +2,7 @@
 // views/pages/asistencia_autogestion.php
 
 // 1. CORRECCIÓN DE RUTA: Subir DOS niveles a /corevota/
-require_once __DIR__ . '/../../class/class.conectorDB.php'; 
+require_once __DIR__ . '/../../class/class.conectorDB.php';
 
 // 2. ELIMINACIÓN: El session_start() se borra de aquí.
 // menu.php (el archivo padre) ya inició la sesión.
@@ -18,21 +18,21 @@ try {
 
     // 1. Obtener reuniones activas (AÑADIMOS fechaTerminoReunion)
     $sql_reuniones = "SELECT 
-                        r.idReunion, r.nombreReunion, 
-                        r.fechaInicioReunion, r.fechaTerminoReunion, /* <-- Añadido término */
-                        c.nombreComision, m.idMinuta
-                    FROM t_reunion r
-                    JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
-                    JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                    WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR', 'PARCIAL')
-                    ORDER BY r.fechaInicioReunion DESC"; // Agregado estado PARCIAL
+                         r.idReunion, r.nombreReunion, 
+                         r.fechaInicioReunion, r.fechaTerminoReunion, /* <-- Añadido término */
+                         c.nombreComision, m.idMinuta
+                     FROM t_reunion r
+                     JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
+                     JOIN t_comision c ON r.t_comision_idComision = c.idComision
+                     WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR', 'PARCIAL')
+                     ORDER BY r.fechaInicioReunion DESC"; // Agregado estado PARCIAL
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $reunionesActivas = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Verificar asistencia previa (sin cambios)
     if ($idUsuarioLogueado && !empty($reunionesActivas)) {
         $idsMinutasActivas = array_column($reunionesActivas, 'idMinuta');
-        
+
         // Evitar error si el array está vacío (aunque ya lo chequeamos)
         if (!empty($idsMinutasActivas)) {
             $placeholders = implode(',', array_fill(0, count($idsMinutasActivas), '?'));
@@ -53,12 +53,13 @@ try {
 }
 
 // 3. OBTENER HORA ACTUAL (CON LA ZONA HORARIA CORRECTA)
+// Asume que la zona horaria ya fue establecida en menu.php (America/Santiago)
 $ahora = new DateTime();
 ?>
 
 <div class="container mt-4">
     <h3 class="mb-4">Registro de Asistencia (Consejeros)</h3>
-    <p>Aquí puede registrar su asistencia a las reuniones activas. El botón solo estará disponible durante el horario programado de la reunión.</p>
+    <p>Aquí puede registrar su asistencia a las reuniones activas. El botón solo estará disponible durante los **primeros 30 minutos** contados desde la hora de inicio de la sesión.</p>
 
     <div class="list-group shadow-sm">
         <?php if (empty($reunionesActivas)): ?>
@@ -68,12 +69,18 @@ $ahora = new DateTime();
                 <?php
                 // 4. COMPARAR HORAS DENTRO DEL BUCLE
                 $inicioReunion = new DateTime($reunion['fechaInicioReunion']);
-                $terminoReunion = new DateTime($reunion['fechaTerminoReunion']);
-                // Comprueba si la hora actual está ENTRE o es IGUAL a inicio Y término
-                $dentroDelHorario = ($ahora >= $inicioReunion && $ahora <= $terminoReunion);
+                // --- NUEVO CÁLCULO DE LÍMITE ---
+                // Calculamos el límite añadiendo 30 minutos a la hora de inicio.
+                $limiteRegistro = (clone $inicioReunion)->modify('+30 minutes');
+                // Comprueba si la hora actual está DENTRO del período de 30 minutos (inicio <= ahora <= limite)
+                $dentroDelPlazo = ($ahora >= $inicioReunion && $ahora <= $limiteRegistro);
+                // --- FIN NUEVO CÁLCULO DE LÍMITE ---
 
                 // Comprueba si ya asistió (sin cambios)
                 $yaAsistio = in_array($reunion['idMinuta'], $asistenciaUsuario);
+
+                // Formato de la hora de límite para el mensaje
+                $limiteFormat = $limiteRegistro->format('H:i');
                 ?>
                 <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                     <div>
@@ -81,7 +88,7 @@ $ahora = new DateTime();
                         <p class="mb-1 text-muted"><?php echo htmlspecialchars($reunion['nombreComision']); ?></p>
                         <small>
                             Programada: <?php echo htmlspecialchars($inicioReunion->format('d-m-Y H:i')); ?>
-                            a <?php echo htmlspecialchars($terminoReunion->format('H:i')); ?> hrs.
+                            (Límite de registro: **<?php echo htmlspecialchars($limiteFormat); ?>** hrs.)
                         </small>
                     </div>
 
@@ -92,17 +99,21 @@ $ahora = new DateTime();
                         <button class="btn btn-outline-success disabled">
                             <i class="fa-solid fa-check-double me-2"></i> Asistencia Registrada
                         </button>
-                    <?php elseif ($dentroDelHorario): // Si NO ha asistido Y está DENTRO del horario 
+                    <?php elseif ($dentroDelPlazo): // Si NO ha asistido Y está DENTRO del plazo
                     ?>
                         <button class="btn btn-success"
                             id="btn_asistencia_<?php echo $reunion['idMinuta']; ?>"
                             onclick="registrarAsistencia(this, <?php echo $reunion['idMinuta']; ?>)">
                             <i class="fa-solid fa-check me-2"></i> Registrar mi Asistencia
                         </button>
-                    <?php else: // Si NO ha asistido Y está FUERA del horario 
+                    <?php else: // Si NO ha asistido Y está FUERA del plazo
+                        // Mensaje ajustado para reflejar la regla de 30 minutos
+                        $mensajeFueraPlazo = ($ahora < $inicioReunion)
+                            ? 'Registro no iniciado (Inicia: ' . $inicioReunion->format('H:i') . ')'
+                            : 'Plazo expirado (Límite: ' . $limiteFormat . ' hrs.)';
                     ?>
-                        <button class="btn btn-outline-secondary disabled">
-                            <i class="fa-solid fa-clock me-2"></i> Fuera de horario
+                        <button class="btn btn-outline-secondary disabled" title="El registro de asistencia sólo está habilitado durante los primeros 30 minutos de la reunión.">
+                            <i class="fa-solid fa-clock me-2"></i> <?php echo $mensajeFueraPlazo; ?>
                         </button>
                     <?php endif; ?>
 
@@ -135,9 +146,13 @@ $ahora = new DateTime();
             .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta inválida: " + text))))
             .then(data => {
                 if (data.status === 'success') {
+                    // Si el registro fue exitoso, actualiza el botón
                     button.className = "btn btn-outline-success disabled";
                     button.innerHTML = '<i class="fa-solid fa-check-double me-2"></i> Asistencia Registrada';
+                    // Muestra una notificación de éxito
+                    alert('Éxito: ' + data.message);
                 } else {
+                    // Si hubo un error (incluyendo el error de plazo expirado del controlador)
                     alert('Error: ' + data.message);
                     button.disabled = false;
                     button.innerHTML = '<i class="fa-solid fa-check me-2"></i> Registrar mi Asistencia';
