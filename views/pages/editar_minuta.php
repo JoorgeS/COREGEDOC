@@ -73,7 +73,7 @@ try {
     }
 } catch (Exception $e) {
     error_log("Error al cargar asistencia: " . $e->getMessage());
-    $listaAsistencia = []; 
+    $listaAsistencia = [];
 }
 
 // --- 3. DETERMINAR ROL Y PERMISOS ---
@@ -91,10 +91,10 @@ if ($estadoMinuta === 'PENDIENTE' || $estadoMinuta === 'PARCIAL') {
     $stmtFirma->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
     $estadoFirma = $stmtFirma->fetchColumn();
 
-    if ($estadoFirma !== false) { 
+    if ($estadoFirma !== false) {
         $esPresidenteFirmante = true;
         if ($estadoFirma === 'REQUIERE_REVISION') {
-            $haEnviadoFeedback = true; 
+            $haEnviadoFeedback = true;
         }
     }
 }
@@ -105,7 +105,7 @@ if ($esSecretarioTecnico) {
 }
 
 // Lógica de solo lectura
-$esSoloLectura = true; 
+$esSoloLectura = true;
 if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
     $esSoloLectura = false;
 } elseif ($esPresidenteFirmante || $estadoMinuta === 'APROBADA') {
@@ -204,7 +204,7 @@ $pdo = null; // Cerrar conexión
                         <i class="fas fa-save"></i> Guardar Borrador
                     </button>
 
-                    <button type="button" class="btn btn-danger" id="btn-enviar-aprobacion" onclick="enviarParaAprobacion(<?php echo $idMinuta; ?>)">
+                    <button type="button" class="btn btn-danger" id="btn-enviar-aprobacion">
                         <i class="fas fa-paper-plane"></i> Enviar para Aprobación
                     </button>
 
@@ -244,101 +244,256 @@ $pdo = null; // Cerrar conexión
         </div>
     </form>
 </div>
+<div class="modal fade" id="modalConfirmarAsistencia" tabindex="-1" aria-labelledby="modalConfirmarAsistenciaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmarAsistenciaLabel">Verificar Asistencia Antes de Enviar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p>Por favor, revisa la lista de asistencia actual. Esta es la asistencia que se registrará y enviará.</p>
+                <p>Si la lista es correcta, presiona "Confirmar y Enviar". Si necesitas hacer ajustes, presiona "Cancelar" y edita la asistencia usando el botón "Guardar Borrador".</p>
+
+                <div class="mt-3">
+                    <h6><i class="fas fa-users"></i> Asistencia Actual de la Reunión</h6>
+                    <hr>
+                    <div id="asistenciaPreviewList" style="max-height: 400px; overflow-y: auto;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <p>Cargando asistencia...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times"></i> Cancelar</button>
+                <button type="button" class="btn btn-success" id="btnConfirmarEnvioDefinitivo">
+                    <i class="fas fa-check"></i> Confirmar y Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script src="../../public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // --- (INICIO DEL SCRIPT) ---
+    // NO USAMOS DOMContentLoaded porque esta página se carga dinámicamente
 
-        const checkFeedback = document.getElementById('checkFeedback');
-        const feedbackBox = document.getElementById('cajaFeedbackContenedor');
-        const btnAccion = document.getElementById('btn-accion-presidente');
-        const feedbackTexto = document.getElementById('cajaFeedbackTexto');
-        const idMinuta = document.getElementById('idMinuta').value;
-        const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
-        const formMinuta = document.getElementById('form-crear-minuta');
+    const checkFeedback = document.getElementById('checkFeedback');
+    const feedbackBox = document.getElementById('cajaFeedbackContenedor');
+    const btnAccion = document.getElementById('btn-accion-presidente');
+    const feedbackTexto = document.getElementById('cajaFeedbackTexto');
+    const idMinuta = document.getElementById('idMinuta').value;
+    const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
+    const formMinuta = document.getElementById('form-crear-minuta');
+    
+    // --- Variables del Modal ---
+    const modalConfirmarElement = document.getElementById('modalConfirmarAsistencia');
+    
+    // Validamos que el JS de Bootstrap se haya cargado
+    if (typeof bootstrap !== 'undefined' && modalConfirmarElement) {
 
-        if (checkFeedback) {
-            checkFeedback.addEventListener('change', function() {
-                if (this.checked) {
-                    feedbackBox.style.display = 'block';
-                    btnAccion.classList.remove('btn-success');
-                    btnAccion.classList.add('btn-warning');
-                    btnAccion.innerHTML = '<i class="fas fa-comment-dots"></i> Enviar Feedback';
-                } else {
-                    feedbackBox.style.display = 'none';
-                    btnAccion.classList.remove('btn-warning');
-                    btnAccion.classList.add('btn-success');
-                    btnAccion.innerHTML = '<i class="fas fa-check"></i> Firmar Minuta';
+        const modalConfirmar = new bootstrap.Modal(modalConfirmarElement);
+        const btnAbrirModalAprobacion = document.getElementById('btn-enviar-aprobacion'); // El botón ROJO
+        const btnConfirmarEnvioDefinitivo = document.getElementById('btnConfirmarEnvioDefinitivo'); // El botón VERDE del modal
+        const asistenciaPreviewList = document.getElementById('asistenciaPreviewList');
+
+        // 1. Lógica del botón ROJO ("Enviar para Aprobación")
+        // Esto ahora ABRE EL MODAL
+        if (btnAbrirModalAprobacion) {
+            btnAbrirModalAprobacion.addEventListener('click', async (e) => {
+                e.preventDefault(); 
+                
+                // Mostrar estado de carga en el modal
+                asistenciaPreviewList.innerHTML = `<div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p>Cargando asistencia guardada...</p>
+                </div>`;
+                
+                // Abrir el modal
+                modalConfirmar.show();
+
+                // Llamar al nuevo controlador (Paso 2) para obtener la asistencia
+                try {
+                    // Usamos la ruta relativa correcta (igual que la de guardar_minuta_completa.php)
+                    const response = await fetch(`../controllers/obtener_preview_asistencia.php?idMinuta=${idMinuta}`);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Error de red al cargar la asistencia: ${response.status} ${errorText}`);
+                    }
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        // Construir la lista HTML
+                        let html = '<ul class="list-group">';
+                        if (data.asistencia.length === 0) {
+                             html += '<li class="list-group-item text-muted">No hay miembros de comisión (Tipo 1 o 3) para listar.</li>';
+                        }
+                        
+                        data.asistencia.forEach(miembro => {
+                            if (miembro.presente) {
+                                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                                    ${miembro.nombreCompleto}
+                                    <span class="badge bg-success rounded-pill"><i class="fas fa-check"></i> Presente</span>
+                                </li>`;
+                            } else {
+                                html += `<li class="list-group-item d-flex justify-content-between align-items-center text-muted">
+                                    ${miembro.nombreCompleto}
+                                    <span class="badge bg-secondary rounded-pill"><i class="fas fa-times"></i> Ausente</span>
+                                </li>`;
+                            }
+                        });
+                        html += '</ul>';
+                        asistenciaPreviewList.innerHTML = html;
+                    } else {
+                        throw new Error(data.message || 'Error al cargar los datos.');
+                    }
+
+                } catch (error) {
+                    asistenciaPreviewList.innerHTML = `<div class="alert alert-danger"><b>Error:</b> ${error.message}<br><small>Si la asistencia en pantalla es incorrecta, cierre esta ventana, edite la asistencia y presione <strong>Guardar Borrador</strong> antes de intentar enviar de nuevo.</small></div>`;
                 }
             });
         }
 
-        if (btnAccion) {
-            btnAccion.addEventListener('click', function() {
-                if (checkFeedback.checked) {
-                    enviarFeedbackDesdeEditor();
-                } else {
-                    firmarMinutaDesdeEditor();
-                }
-            });
-        }
-
-        function firmarMinutaDesdeEditor() { /* ... (Tu lógica de firma aquí, sin cambios) ... */ }
-        function enviarFeedbackDesdeEditor() { /* ... (Tu lógica de feedback aquí, sin cambios) ... */ }
-        window.enviarParaAprobacion = function(idMinuta) { /* ... (Tu lógica de enviar para aprobación aquí, sin cambios) ... */ }
-
-        // --- SOLUCIÓN: LÓGICA AJAX para 'Guardar Borrador' (el click del botón) ---
-        if (formMinuta && btnGuardarBorrador) {
-            btnGuardarBorrador.addEventListener('click', function(e) {
+        // 2. Lógica del botón VERDE del Modal ("Confirmar y Enviar")
+        // Esto es lo que AHORA llama a 'enviar_aprobacion.php'
+        if (btnConfirmarEnvioDefinitivo) {
+            btnConfirmarEnvioDefinitivo.addEventListener('click', async (e) => {
                 e.preventDefault();
 
-                Swal.fire({
-                    title: 'Guardando Borrador... 💾',
-                    text: 'Por favor, espere mientras se guardan los datos, incluyendo la asistencia.',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
+                // Mostrar estado de carga en el botón
+                btnConfirmarEnvioDefinitivo.disabled = true;
+                btnConfirmarEnvioDefinitivo.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...';
 
-                        // 1. RECOLECCIÓN DE ASISTENCIA
-                        const asistenciaIDs = [];
-                        document.querySelectorAll('.asistencia-checkbox:checked').forEach(checkbox => {
-                            asistenciaIDs.push(checkbox.value);
-                        });
+                try {
+                    // Esta es la lógica que faltaba 
+                    const response = await fetch('../controllers/enviar_aprobacion.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        // El idMinuta ya lo teníamos definido al inicio del script
+                        body: JSON.stringify({ idMinuta: idMinuta }) 
+                    });
 
-                        // 2. Asignar JSON al campo oculto
-                        document.getElementById('asistenciaJson').value = JSON.stringify(asistenciaIDs);
+                    const data = await response.json();
 
-                        // 3. Crear objeto FormData 
-                        const formData = new FormData(formMinuta);
-
-                        // 4. ENVÍO AL CONTROLADOR CORRECTO
-                        fetch('../controllers/guardar_minuta_completa.php', {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(response => {
-                                // Siempre intentamos leer el JSON para obtener el mensaje de error del servidor
-                                return response.json().then(data => {
-                                    if (!response.ok || data.status === 'error') {
-                                        let message = data.message || 'Error de red o desconocido.';
-                                        if (data.debug) { 
-                                            // Si usamos la versión de debug del controlador, mostramos la info.
-                                            message += ` (Debug: ID Recibido: ${data.debug.idMinuta_recibido}, Keys: ${data.debug.post_keys_received.join(',')})`;
-                                        }
-                                        throw new Error(message);
-                                    }
-                                    return data;
-                                });
-                            })
-                            .then(data => {
-                                Swal.fire('¡Guardado! ✅', data.message, 'success');
-                            })
-                            .catch(error => {
-                                Swal.fire('Error al Guardar ❌', error.message, 'error');
-                            });
+                    if (!response.ok || data.status === 'error') {
+                        // Si falla el envío, mostramos el error
+                        throw new Error(data.message || 'Ocurrió un error inesperado al enviar.');
                     }
-                });
+
+                    // Si todo sale bien
+                    Swal.fire({
+                        title: '¡Enviada!',
+                        text: data.message || 'Minuta enviada para aprobación.',
+                        icon: 'success',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        // Redirigir al listado de minutas
+                        window.location.href = 'index.php?page=minutas_dashboard';
+                    });
+                    
+                } catch (error) {
+                    Swal.fire('Error de Envío', error.message, 'error');
+                } finally {
+                    // Ocultar el modal y reactivar el botón
+                    modalConfirmar.hide();
+                    btnConfirmarEnvioDefinitivo.disabled = false;
+                    btnConfirmarEnvioDefinitivo.innerHTML = '<i class="fas fa-check"></i> Confirmar y Enviar';
+                }
             });
         }
-    });
+
+    } else {
+         console.error("Error: Bootstrap JS no está cargado o el elemento #modalConfirmarAsistencia no se encontró.");
+    }
+
+
+    // --- Lógica de Feedback del Presidente (Sin cambios) ---
+    if (checkFeedback) {
+        checkFeedback.addEventListener('change', function() {
+            if (this.checked) {
+                feedbackBox.style.display = 'block';
+                btnAccion.classList.remove('btn-success');
+                btnAccion.classList.add('btn-warning');
+                btnAccion.innerHTML = '<i class="fas fa-comment-dots"></i> Enviar Feedback';
+            } else {
+                feedbackBox.style.display = 'none';
+                btnAccion.classList.remove('btn-warning');
+                btnAccion.classList.add('btn-success');
+                btnAccion.innerHTML = '<i class="fas fa-check"></i> Firmar Minuta';
+            }
+        });
+    }
+
+    if (btnAccion) {
+        btnAccion.addEventListener('click', function() {
+            if (checkFeedback.checked) {
+                enviarFeedbackDesdeEditor();
+            } else {
+                firmarMinutaDesdeEditor();
+            }
+        });
+    }
+
+    function firmarMinutaDesdeEditor() { /* ... (Tu lógica de firma aquí, sin cambios) ... */ }
+    function enviarFeedbackDesdeEditor() { /* ... (Tu lógica de feedback aquí, sin cambios) ... */ }
+
+
+    // --- LÓGICA AJAX para 'Guardar Borrador' (Sin cambios) ---
+    if (formMinuta && btnGuardarBorrador) {
+        btnGuardarBorrador.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            Swal.fire({
+                title: 'Guardando Borrador... 💾',
+                text: 'Por favor, espere mientras se guardan los datos, incluyendo la asistencia.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+
+                    const asistenciaIDs = [];
+                    document.querySelectorAll('.asistencia-checkbox:checked').forEach(checkbox => {
+                        asistenciaIDs.push(checkbox.value);
+                    });
+
+                    document.getElementById('asistenciaJson').value = JSON.stringify(asistenciaIDs);
+                    const formData = new FormData(formMinuta);
+
+                    fetch('../controllers/guardar_minuta_completa.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => {
+                            return response.json().then(data => {
+                                if (!response.ok || data.status === 'error') {
+                                    let message = data.message || 'Error de red o desconocido.';
+                                    if (data.debug) { 
+                                        message += ` (Debug: ID Recibido: ${data.debug.idMinuta_recibido}, Keys: ${data.debug.post_keys_received.join(',')})`;
+                                    }
+                                    throw new Error(message);
+                                }
+                                return data;
+                            });
+                        })
+                        .then(data => {
+                            Swal.fire('¡Guardado! ✅', data.message, 'success');
+                        })
+                        .catch(error => {
+                            Swal.fire('Error al Guardar ❌', error.message, 'error');
+                        });
+                }
+            });
+        });
+    }
 </script>

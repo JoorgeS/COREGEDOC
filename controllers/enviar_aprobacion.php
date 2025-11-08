@@ -2,16 +2,9 @@
 // controllers/enviar_aprobacion.php
 // Este script se llama con el botón rojo "Enviar para Aprobación"
 
-// ==================
-// INICIO DE LA CORRECCIÓN
-// ==================
 // Forzar que los errores se muestren en la respuesta JSON
-// Tu 'ini_set('display_errors', 0);' estaba escondiendo el error.
 ini_set('display_errors', 1); 
 ini_set('display_startup_errors', 1);
-// ==================
-// FIN DE LA CORRECCIÓN
-// ==================
 error_reporting(E_ALL);
 
 
@@ -93,6 +86,92 @@ class AprobacionSender extends BaseConexion
         }
     }
 
+
+    // ==================================================================
+    // --- INICIO DE LA NUEVA LÓGICA (AJUSTE #3) ---
+    // ==================================================================
+    
+    /**
+     * Envía el PDF de asistencia a un correo fijo ANTES de notificar a presidentes.
+     * Si falla, lanza una excepción para revertir la transacción.
+     */
+    private function notificarEnvioAsistencia(int $idMinuta)
+    {
+        // 1. Encontrar el PDF de asistencia generado al "Guardar Borrador"
+        $sqlPdf = "SELECT pathAdjunto FROM t_adjunto 
+                   WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'
+                   ORDER BY idAdjunto DESC LIMIT 1";
+        $stmtPdf = $this->db->prepare($sqlPdf);
+        $stmtPdf->execute([':idMinuta' => $idMinuta]);
+        $pdfPath = $stmtPdf->fetchColumn();
+
+        if (empty($pdfPath)) {
+            // Si no hay PDF de asistencia, fallamos.
+            throw new Exception("No se encontró el PDF de asistencia para la Minuta N° {$idMinuta}. Por favor, 'Guarde Borrador' primero para generarlo.");
+        }
+
+        // La ruta en la BD es relativa (ej: 'public/docs/asistencia/...')
+        // La ruta física en el servidor es la raíz del proyecto + esa ruta.
+        $fullPathOnServer = __DIR__ . '/../' . $pdfPath;
+
+        if (!file_exists($fullPathOnServer)) {
+            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El PDF de asistencia se encontró en la BD ('{$pdfPath}') pero el archivo no existe en el servidor ('{$fullPathOnServer}').");
+            throw new Exception("Error crítico: El archivo PDF de asistencia ('{$pdfPath}') no existe en el servidor.");
+        }
+
+        // 2. Enviar Correo
+        $mail = new PHPMailer(true);
+        try {
+            // Cargar config.ini para las credenciales
+            $config = parse_ini_file(__DIR__ . '/../cfg/configuracion.ini', true);
+            if ($config === false || !isset($config['smtp'])) {
+                throw new Exception("No se pudo leer el archivo 'configuracion.ini' o la sección [smtp] falta.");
+            }
+
+            // Configuración SMTP
+            $mail->isSMTP();
+            $mail->Host       = $config['smtp']['host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $config['smtp']['user'];
+            $mail->Password   = $config['smtp']['pass'];
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = (int)$config['smtp']['port']; // Asegurar que el puerto sea un entero
+            $mail->CharSet    = 'UTF-8';
+            
+            // Emisor
+            $mail->setFrom($config['smtp']['user'], 'CoreVota - Sistema de Minutas');
+            
+            // Destinatario FIJO (Requerimiento 3)
+            $mail->addAddress('genesis.contreras.vargas@gmail.com');
+
+            // Contenido
+            $mail->isHTML(true);
+            $mail->Subject = "Reporte de Asistencia - Minuta N° {$idMinuta}";
+            $mail->Body    = "<html><body>
+                               <p>Se ha iniciado el proceso de envío a aprobación para la <strong>Minuta N° {$idMinuta}</strong>.</p>
+                               <p>Se adjunta el reporte de asistencia correspondiente generado por el Secretario Técnico.</p>
+                               <p>Este es un correo automático.</p>
+                             </body></html>";
+            
+            // Adjuntar el PDF
+            $mail->addAttachment($fullPathOnServer);
+
+            $mail->send();
+
+            error_log("[LOG MINUTA $idMinuta]: PDF de asistencia enviado exitosamente a genesis.contreras.vargas@gmail.com.");
+
+        } catch (Exception $e) {
+            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El correo de ASISTENCIA (enviar_aprobacion) NO se pudo enviar. Mailer Error: {$mail->ErrorInfo}");
+            // Lanzar la excepción de nuevo para que la transacción principal falle
+            throw new Exception("Error al enviar PDF de asistencia por correo: " . $mail->ErrorInfo);
+        }
+    }
+    
+    // ==================================================================
+    // --- FIN DE LA NUEVA LÓGICA (AJUSTE #3) ---
+    // ==================================================================
+
+
     /**
      * Notifica a todos los presidentes requeridos que la minuta está lista.
      */
@@ -101,14 +180,6 @@ class AprobacionSender extends BaseConexion
         if (empty($listaPresidentes)) {
             return;
         }
-        
-        // ==================
-        // INICIO DE LA CORRECCIÓN
-        // ==================
-        // El envío de correos también debe estar en un try...catch,
-        // pero si falla, DEBE lanzar una excepción para que la función
-        // principal sepa que la notificación falló.
-        // Tu catch original solo hacía error_log() y seguía.
         
         try {
             $placeholders = implode(',', array_fill(0, count($listaPresidentes), '?'));
@@ -127,17 +198,23 @@ class AprobacionSender extends BaseConexion
                          <p>Por favor, ingrese a CoreVota para gestionarla.</p>";
             }
 
+            // Cargar config.ini para las credenciales
+            $config = parse_ini_file(__DIR__ . '/../cfg/configuracion.ini', true);
+            if ($config === false || !isset($config['smtp'])) {
+                throw new Exception("No se pudo leer el archivo 'configuracion.ini' o la sección [smtp] falta.");
+            }
+            
             $mail = new PHPMailer(true); // Instancia única
             // Configuración SMTP (tomada de tus scripts)
             $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
-            $mail->SMTPAuth = true;
-            $mail->Username = 'equiposieteduocuc@gmail.com';
-            $mail->Password = 'ioheaszmlkflucsq';
+            $mail->Host       = $config['smtp']['host'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $config['smtp']['user'];
+            $mail->Password   = $config['smtp']['pass'];
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port = 587;
-            $mail->CharSet = 'UTF-8';
-            $mail->setFrom('equiposieteduocuc@gmail.com', 'CoreVota - Sistema de Minutas');
+            $mail->Port       = (int)$config['smtp']['port'];
+            $mail->CharSet    = 'UTF-8';
+            $mail->setFrom($config['smtp']['user'], 'CoreVota - Sistema de Minutas');
             $mail->isHTML(true);
             $mail->Subject = $asunto;
 
@@ -156,34 +233,33 @@ class AprobacionSender extends BaseConexion
         } catch (Exception $e) {
             error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El correo de APROBACIÓN (enviar_aprobacion) NO se pudo enviar. Mailer Error: {$mail->ErrorInfo}");
             // Lanzar la excepción de nuevo para que la transacción principal falle
-            throw new Exception("Error al enviar notificación por correo: " . $mail->ErrorInfo);
+            throw new Exception("Error al enviar notificación por correo a presidentes: " . $mail->ErrorInfo);
         }
-        // ==================
-        // FIN DE LA CORRECCIÓN
-        // ==================
     }
 
     public function enviarParaAprobacion($idMinuta, $idUsuarioSecretario)
     {
-        // ==================
-        // INICIO DE LA CORRECCIÓN
-        // ==================
-        // La lógica de notificación (enviar correo) debe estar DENTRO
-        // del try...catch de la transacción. Si el correo falla,
-        // la base de datos debe hacer rollback para que la minuta no
-        // quede en "PENDIENTE" si nadie fue notificado.
-        
         try {
             // 1. (NUEVO) Verificar si es una respuesta a Feedback (Punto 7)
             $sqlFeedback = "SELECT COUNT(*) FROM t_aprobacion_minuta 
-                             WHERE t_minuta_idMinuta = :idMinuta 
-                             AND estado_firma = 'REQUIERE_REVISION'";
+                            WHERE t_minuta_idMinuta = :idMinuta 
+                            AND estado_firma = 'REQUIERE_REVISION'";
             $stmtFeedback = $this->db->prepare($sqlFeedback);
             $stmtFeedback->execute([':idMinuta' => $idMinuta]);
             $esRespuestaAFeedback = $stmtFeedback->fetchColumn() > 0;
 
             $this->db->beginTransaction();
             
+            // ==================================================================
+            // --- INICIO DE LA LLAMADA (AJUSTE #3) ---
+            // ==================================================================
+            // Enviar el PDF de asistencia ANTES de cualquier otra cosa.
+            // Si esto falla, revierte la transacción.
+            $this->notificarEnvioAsistencia($idMinuta);
+            // ==================================================================
+            // --- FIN DE LA LLAMADA (AJUSTE #3) ---
+            // ==================================================================
+
             error_log("[LOG MINUTA $idMinuta]: Transacción INICIADA."); // Log 1
 
             // 2. (NUEVO) Gestionar Sello ST si es respuesta a Feedback (Punto 7)
@@ -199,7 +275,7 @@ class AprobacionSender extends BaseConexion
                 ]);
 
                 $sqlFeedbackResuelto = "UPDATE t_minuta_feedback SET resuelto = 1 
-                                        WHERE t_minuta_idMinuta = :idMinuta AND resuelto = 0";
+                                       WHERE t_minuta_idMinuta = :idMinuta AND resuelto = 0";
                 $this->db->prepare($sqlFeedbackResuelto)->execute([':idMinuta' => $idMinuta]);
                 
                 error_log("[LOG MINUTA $idMinuta]: Sello de Feedback guardado."); // Log 2
@@ -250,8 +326,9 @@ class AprobacionSender extends BaseConexion
             // Si esto falla, toda la transacción se revierte.
             $this->notificarPresidentes($idMinuta, $listaPresidentes, $esRespuestaAFeedback);
             
-            error_log("[LOG MINUTA $idMinuta]: Notificaciones por correo ENVIADAS."); // Log 7
+            error_log("[LOG MINUTA $idMinuta]: Notificaciones por correo (a presidentes) ENVIADAS."); // Log 7
 
+            // 8. COMMIT (Solo si la BD y AMBOS Correos funcionaron)
             $this->db->commit();
             
             error_log("[LOG MINUTA $idMinuta]: Transacción COMMIT exitosa."); // Log 8
@@ -288,13 +365,10 @@ class AprobacionSender extends BaseConexion
                 error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log: " . $logException->getMessage());
                 // No detenemos la transacción por un error de log
             }
-
-            // 8. COMMIT (Solo si la BD y los Correos funcionaron)
             
-
-            $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s).";
+            $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s) y se envió el reporte de asistencia.";
             if ($esRespuestaAFeedback) {
-                 $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados.';
+                 $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados. Reporte de asistencia enviado.';
             }
 
             return ['status' => 'success', 'message' => $mensaje];
@@ -309,9 +383,6 @@ class AprobacionSender extends BaseConexion
             // Devolver el error al front-end
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
-        // ==================
-        // FIN DE LA CORRECCIÓN
-        // ==================
     }
 }
 
@@ -325,3 +396,4 @@ if ($resultado['status'] === 'error') {
 
 echo json_encode($resultado);
 exit;
+?>

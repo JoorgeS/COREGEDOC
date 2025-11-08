@@ -668,20 +668,27 @@ class MinutaManager extends BaseConexion
             }
 
             // --- 5. ACTUALIZAR HORA DE TÉRMINO DE LA REUNIÓN (Tu lógica sin cambios) ---
-            $sql_find_reunion = "SELECT idReunion, fechaTerminoReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1";
+            // --- 5. ACTUALIZAR HORA DE TÉRMINO DE LA REUNIÓN (AJUSTE #1) ---
+            $sql_find_reunion = "SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1";
             $stmt_find = $this->db->prepare($sql_find_reunion);
             $stmt_find->execute([':idMinuta' => $idMinuta]);
             $reunion = $stmt_find->fetch(PDO::FETCH_ASSOC);
-            $mensajeExito = 'Borrador guardado con éxito.';
+            $mensajeExito = 'Borrador guardado con éxito.'; // Mensaje por defecto
 
-            if (empty($reunion['fechaTerminoReunion']) && $reunion) {
+            // REQUERIMIENTO 1: Siempre actualizar la hora de término al guardar borrador.
+            if ($reunion) {
                 $idReunion = $reunion['idReunion'];
                 $sql_update_termino = "UPDATE t_reunion SET fechaTerminoReunion = NOW() WHERE idReunion = :idReunion";
                 $stmt_update = $this->db->prepare($sql_update_termino);
                 $stmt_update->execute([':idReunion' => $idReunion]);
-                $mensajeExito = 'Borrador guardado y hora de término de reunión actualizada.';
-            }
 
+                // Actualizamos el mensaje de éxito para reflejar la acción
+                $mensajeExito = 'Borrador guardado y hora de término de reunión actualizada.';
+            } else {
+                // Si no se encuentra la reunión, es un problema, pero la minuta/temas/asistencia ya se guardaron.
+                // Logueamos el error pero no fallamos la transacción por esto.
+                error_log("ADVERTENCIA idMinuta {$idMinuta}: Se guardó el borrador, pero no se encontró la reunión (idReunion) correspondiente para actualizar la hora de término.");
+            }
             // --- 6. ASEGURAR QUE EL ESTADO SEA 'BORRADOR' ---
             $sqlSetBorrador = "UPDATE t_minuta 
                                  SET estadoMinuta = 'BORRADOR' 

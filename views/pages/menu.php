@@ -585,7 +585,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 <?php echo htmlspecialchars($saludo . ' ' . $nombreUsuario, ENT_QUOTES, 'UTF-8'); ?>
                             </h2>
                             <p class="lead text-muted">
-                                Hoy es <?php echo htmlspecialchars($fechaActual, ENT_QUOTES, 'UTF-8'); ?>
+                                Hoy es <?php echo utf8_encode($fechaActual); ?>
                             </p>
                         </div>
                         <div class="col-md-4 text-md-end">
