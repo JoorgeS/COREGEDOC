@@ -64,7 +64,7 @@ class FeedbackManager extends BaseConexion
         $sql = "SELECT u.correo, u.pNombre
                 FROM t_minuta m
                 JOIN t_usuario u ON m.t_usuario_idSecretario = u.idUsuario
-                WHERE m.idMinuta = :idMinuta AND u.tipoUsuario_id = 2"; 
+                WHERE m.idMinuta = :idMinuta"; 
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':idMinuta' => $idMinuta]);

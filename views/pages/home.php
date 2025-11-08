@@ -4,7 +4,6 @@
 // NO necesitas session_start() aquí.
 // NO necesitas verificar la sesión aquí (menu.php ya lo hizo).
 // NO incluyas menu.php aquí.
-
 ?>
 
 <div class="container mt-4">
@@ -20,6 +19,7 @@
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="4" aria-label="Zona 5"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="5" aria-label="Zona 6"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="6" aria-label="Zona 7"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="7" aria-label="Zona 8"></button>
         </div>
 
         <div class="carousel-inner">
@@ -48,25 +48,32 @@
                 </div>
             </div>
             <div class="carousel-item">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_5.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_5.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 5">
                 <div class="carousel-caption d-none d-md-block">
                     <h5>PROVINCIA DE LOS ANDES</h5>
                 </div>
             </div>
-                        <div class="carousel-item">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_6.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+            <div class="carousel-item">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_6.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 6">
                 <div class="carousel-caption d-none d-md-block">
                     <h5>PROVINCIA DE PETORCA</h5>
                 </div>
             </div>
             <div class="carousel-item">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_7.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 4">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_7.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="Descripción Zona 7">
                 <div class="carousel-caption d-none d-md-block">
                     <h5>PROVINCIA SAN FELIPE DE ACONCAGUA</h5>
                 </div>
             </div>
-
-            
+            <div class="carousel-item">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_8.jpg"
+                     class="d-block w-100 carousel-image-transparent"
+                     style="max-height: 400px; object-fit: cover;"
+                     alt="Descripción Zona 8">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5>PROVINCIA DE ISLA DE PASCUA</h5>
+                </div>
+            </div>
         </div>
 
         <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="prev">
@@ -87,27 +94,28 @@ require_once __DIR__ . '/../../class/class.conectorDB.php';
 $db  = new conectorDB();
 $pdo = $db->getDatabase();
 
-$hoy    = date('Y-m-d');
-$hace14 = date('Y-m-d', strtotime('-14 days'));
-$prox14 = date('Y-m-d', strtotime('+14 days'));
-
-// Minutas aprobadas últimos 14 días (incluye pathArchivo para ver PDF)
-$sqlMinutas = "SELECT idMinuta, fechaMinuta, pathArchivo
-               FROM t_minuta 
-               WHERE estadoMinuta = 'APROBADA'
-               AND fechaMinuta BETWEEN :hace14 AND :hoy
-               ORDER BY fechaMinuta DESC";
-$stmt = $pdo->prepare($sqlMinutas);
-$stmt->execute([':hace14' => $hace14, ':hoy' => $hoy]);
+/** MINUTAS: últimos 7 días, máximo 7 filas */
+$sqlMinutas = "
+    SELECT idMinuta, fechaMinuta, pathArchivo
+    FROM t_minuta
+    WHERE estadoMinuta = 'APROBADA'
+      AND fechaMinuta >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      AND fechaMinuta <= CURDATE()
+    ORDER BY fechaMinuta DESC, idMinuta DESC
+    LIMIT 7
+";
+$stmt = $pdo->query($sqlMinutas);
 $minutasRecientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Reuniones próximas próximos 14 días
-$sqlReuniones = "SELECT idReunion, nombreReunion, fechaInicioReunion 
-                 FROM t_reunion 
-                 WHERE fechaInicioReunion BETWEEN :hoy AND :prox14
-                 ORDER BY fechaInicioReunion ASC";
-$stmt = $pdo->prepare($sqlReuniones);
-$stmt->execute([':hoy' => $hoy, ':prox14' => $prox14]);
+/** REUNIONES: próximos 7 días, máximo 7 filas */
+$sqlReuniones = "
+    SELECT idReunion, nombreReunion, fechaInicioReunion
+    FROM t_reunion
+    WHERE DATE(fechaInicioReunion) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    ORDER BY fechaInicioReunion ASC, idReunion ASC
+    LIMIT 7
+";
+$stmt = $pdo->query($sqlReuniones);
 $reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -125,7 +133,7 @@ $reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             <?php if (!empty($minutasRecientes)): ?>
                 <li class="list-group-item active fw-bold d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-file-alt me-2"></i>Minutas Aprobadas (últimos 14 días)</span>
+                    <span><i class="fas fa-file-alt me-2"></i>Minutas Aprobadas (últimos 7 días)</span>
                     <button id="toggleMinutasBtn" class="btn btn-sm btn-outline-light">
                         <i class="fas fa-expand-arrows-alt"></i> Agrandar
                     </button>
@@ -133,8 +141,6 @@ $reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div id="minutasContainer" class="collapse show">
                     <?php foreach ($minutasRecientes as $m): 
                         $path = trim((string)($m['pathArchivo'] ?? ''));
-                        // Si pathArchivo tiene ruta relativa almacenada como "uploads/.../archivo.pdf",
-                        // usamos /corevota/ + path. Si viniera absoluta, se usa tal cual.
                         $urlPdf = $path !== '' 
                             ? (preg_match('~^https?://~i', $path) ? $path : "/corevota/{$path}")
                             : '';
@@ -158,14 +164,15 @@ $reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             <?php endif; ?>
 
-            <?php if (!empty($reunionesProximas)): ?>
-                <li class="list-group-item active fw-bold d-flex justify-content-between align-items-center mt-3">
-                    <span><i class="fas fa-calendar-day me-2"></i>Reuniones Agendadas (próximos 14 días)</span>
-                    <button id="toggleReunionesBtn" class="btn btn-sm btn-outline-light">
-                        <i class="fas fa-expand-arrows-alt"></i> Agrandar
-                    </button>
-                </li>
-                <div id="reunionesContainer" class="collapse show">
+            <!-- Reuniones: título y botón SIEMPRE visibles -->
+            <li class="list-group-item active fw-bold d-flex justify-content-between align-items-center mt-3">
+                <span><i class="fas fa-calendar-day me-2"></i>Reuniones Agendadas (próximos 7 días)</span>
+                <button id="toggleReunionesBtn" class="btn btn-sm btn-outline-light">
+                    <i class="fas fa-expand-arrows-alt"></i> Agrandar
+                </button>
+            </li>
+            <div id="reunionesContainer" class="collapse show">
+                <?php if (!empty($reunionesProximas)): ?>
                     <?php foreach ($reunionesProximas as $r): ?>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>
@@ -175,8 +182,12 @@ $reunionesProximas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <span class="text-muted small"><?= date('d/m/Y', strtotime($r['fechaInicioReunion'])) ?></span>
                         </li>
                     <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+                <?php else: ?>
+                    <li class="list-group-item text-muted small">
+                        No hay reuniones agendadas en los próximos 7 días.
+                    </li>
+                <?php endif; ?>
+            </div>
 
         </ul>
     <?php endif; ?>

@@ -1,9 +1,16 @@
 <?php
 // views/pages/crearMinuta.php
+
+// ===============================================
+// 1. INICIALIZACIÓN Y CONFIGURACIÓN
+// ===============================================
+
+// Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Requerir la clase de conexión a la base de datos
 require_once __DIR__ . '/../../class/class.conectorDB.php';
 // (Tuve que comentar esto, asegúrate que la ruta es correcta si lo necesitas)
 // require_once __DIR__ . '/../../controllers/VotacionController.php'; 
@@ -11,19 +18,22 @@ require_once __DIR__ . '/../../class/class.conectorDB.php';
 $db = new conectorDB();
 $pdo = $db->getDatabase();
 
+// Obtener ID de la minuta (si existe) y datos iniciales
 $idMinutaActual = $_GET['id'] ?? null;
-$minutaData = null;
-$reunionData = null;
+$minutaData     = null;
+$reunionData    = null;
 $temas_de_la_minuta = [];
-$asistencia_guardada_ids = []; // Esta variable ahora solo se usa para la carga inicial
-$existeAsistenciaGuardada = false;
+$asistencia_guardada_ids = []; // Contiene los IDs de los usuarios presentes
 $secretarioNombre = trim(($_SESSION['pNombre'] ?? '') . ' ' . ($_SESSION['aPaterno'] ?? 'N/A'));
+$idTipoUsuario  = $_SESSION['tipoUsuario_id'] ?? null; // ID de tipo de usuario para permisos
 
-// --- Para Votaciones ---
+// Variables de estado y control
+$estadoMinuta   = 'BORRADOR'; // Default para nuevas
+$puedeEnviar   = false;      // Permite enviar a aprobación si no está APROBADA
+
+// --- Variables para encabezado y votaciones ---
 $idReunionActual = null;
 $comisionesDeLaReunion = [];
-
-// --- Variables para encabezado ---
 $nombreComisionPrincipal = 'N/A';
 $nombrePresidentePrincipal = 'N/A';
 $idPresidentePrincipal = null;
@@ -36,16 +46,17 @@ $idPresidenteMixta2 = null;
 $all_commissions = [];
 $all_presidents = [];
 
-$estadoMinuta = 'BORRADOR'; // Default para nuevas
-$puedeEnviar = false; // Default
 
-// --- Solo intentar cargar si el ID es válido ---
+// ===============================================
+// 2. LÓGICA DE CARGA DE DATOS (EDICIÓN)
+// ===============================================
+
 if ($idMinutaActual && is_numeric($idMinutaActual)) {
     try {
         // 1. Cargar datos de t_minuta
         $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta 
-                        FROM t_minuta 
-                        WHERE idMinuta = :idMinutaActual";
+                       FROM t_minuta 
+                       WHERE idMinuta = :idMinutaActual";
         $stmt_minuta = $pdo->prepare($sql_minuta);
         $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
         $minutaData = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
@@ -56,7 +67,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
         $estadoMinuta = $minutaData['estadoMinuta']; // Guardar el estado
 
-        // 2. Cargar datos de t_reunion
+        // 2. Cargar datos de t_reunion (para comisiones mixtas)
         $sql_reunion = "SELECT idReunion, t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2 
                         FROM t_reunion 
                         WHERE t_minuta_idMinuta = :idMinutaActual";
@@ -65,7 +76,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         $reunionData = $stmt_reunion->fetch(PDO::FETCH_ASSOC);
         $idReunionActual = $reunionData['idReunion'] ?? null;
 
-        // 3. Cargar TODAS las comisiones vigentes y TODOS los posibles presidentes (Consejeros)
+        // 3. Cargar listados maestros (Comisiones y Presidentes)
+        // Comisiones Vigentes
         $stmt_all_com = $pdo->query("SELECT idComision, nombreComision, t_usuario_idPresidente FROM t_comision WHERE vigencia = 1");
         if ($stmt_all_com) {
             $all_commissions_raw = $stmt_all_com->fetchAll(PDO::FETCH_ASSOC);
@@ -73,8 +85,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
                 $all_commissions[$com['idComision']] = $com;
             }
         }
-
-        $stmt_all_pres = $pdo->query("SELECT idUsuario, pNombre, aPaterno FROM t_usuario WHERE tipoUsuario_id = 3"); // tipoUsuario_id = 3 (Presidente)
+        // Presidentes (tipoUsuario_id = 3)
+        $stmt_all_pres = $pdo->query("SELECT idUsuario, pNombre, aPaterno FROM t_usuario WHERE tipoUsuario_id = 3");
         if ($stmt_all_pres) {
             $all_presidents_raw = $stmt_all_pres->fetchAll(PDO::FETCH_ASSOC);
             foreach ($all_presidents_raw as $pres) {
@@ -82,12 +94,13 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
             }
         }
 
-        // --- 4. ASIGNAR NOMBRES PARA MOSTRAR EN EL ENCABEZADO ---
+        // 4. ASIGNAR NOMBRES PARA EL ENCABEZADO
         $idComisionPrincipal = $minutaData['t_comision_idComision'];
         $idPresidentePrincipal = $minutaData['t_usuario_idPresidente'];
         $nombreComisionPrincipal = $all_commissions[$idComisionPrincipal]['nombreComision'] ?? 'Comisión No Encontrada/Inválida';
         $nombrePresidentePrincipal = $all_presidents[$idPresidentePrincipal] ?? 'Presidente No Encontrado/Inválido';
 
+        // Llenar listado de comisiones de la reunión (para votaciones)
         if (isset($all_commissions[$idComisionPrincipal])) {
             $comisionesDeLaReunion[$idComisionPrincipal] = $nombreComisionPrincipal;
         }
@@ -117,20 +130,20 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
             }
         }
 
-        // 5. Cargar temas (sin cambios)
+        // 5. Cargar temas
         $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                        FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                        WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
         $stmt_temas = $pdo->prepare($sql_temas);
         $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
         $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
 
-        // 6. Cargar asistencia (SOLO PARA LA CARGA INICIAL)
+        // 6. Cargar asistencia (SOLO para la carga inicial en JS)
         $sql_asistencia = "SELECT t_usuario_idUsuario FROM t_asistencia WHERE t_minuta_idMinuta = :idMinutaActual";
         $stmt_asistencia = $pdo->prepare($sql_asistencia);
         $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
         $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
-        $existeAsistenciaGuardada = !empty($asistencia_guardada_ids);
+
     } catch (Exception $e) {
         error_log("Error cargando datos para edición (Minuta ID: {$idMinutaActual}): " . $e->getMessage());
         die("❌ Error al cargar los datos de la minuta: " . htmlspecialchars($e->getMessage()) . "<br><a href='menu.php?pagina=minutas_pendientes'>Volver al listado</a>");
@@ -138,11 +151,39 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         $pdo = null; // Cerrar conexión
     }
 } else {
+    // Si no hay ID o el ID es inválido, salimos (Esto debería ser manejado antes, pero es un buen guardrail)
     die("❌ Error: No se especificó un ID de minuta válido para editar. <a href='menu.php?pagina=minutas_pendientes'>Volver al listado</a>");
 }
 
+// ===============================================
+// 3. LÓGICA DE PERMISOS Y ESTADO
+// ===============================================
+
+// El botón "Enviar para Aprobación" solo está habilitado si el estado NO es APROBADA
 $puedeEnviar = ($estadoMinuta !== 'APROBADA');
 
+// Lógica de Permisos (Habilitar edición al ST, bloquear si está APROBADA)
+$esSecretarioTecnico = ($idTipoUsuario === 2);
+$esSoloLectura = true; // Valor por defecto
+
+if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+    // REGLA 1: Si es ST Y la minuta no está APROBADA, SIEMPRE puede editar.
+    $esSoloLectura = false;
+} elseif ($estadoMinuta === 'APROBADA') {
+    // REGLA 2: Si está APROBADA, nadie edita.
+    $esSoloLectura = true;
+} else {
+    // Para Presidentes, u otros estados, se mantiene solo lectura.
+    $esSoloLectura = true;
+}
+
+// Atributo readonly o vacío para usar en el HTML/PHP
+$readonlyAttr = $esSoloLectura ? 'readonly' : '';
+
+
+// ===============================================
+// 4. INICIO DEL HTML
+// ===============================================
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -155,7 +196,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
     <link href="/corevota/public/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
+        /* Estilos CSS (Sin cambios, pero bien ubicados) */
         .card-header.bg-primary {
             background-color: #0d6efd !important;
         }
@@ -244,7 +287,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             <div id="feedback-display-texto" style="white-space: pre-wrap; font-family: monospace; max-height: 200px; overflow-y: auto; background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
             </div>
         </div>
-
         <div class="row g-3">
 
             <div class="col-12 mb-3">
@@ -321,7 +363,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     </div>
                 </div>
             </div>
-
             <div class="col-md-12 mt-2">
                 <div class="dropdown-form-block mb-3">
                     <button class="btn btn-secondary dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#asistenciaForm" aria-expanded="false" aria-controls="asistenciaForm">
@@ -339,7 +380,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btn-refrescar-asistencia" onclick="cargarTablaAsistencia()">
                                     <i class="fas fa-sync me-1"></i> Refrescar
                                 </button>
-                                <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()">
+                                <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
                                     <i class="fas fa-save me-1"></i> Guardar Asistencia
                                 </button>
                             </div>
@@ -347,7 +388,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     </div>
                 </div>
             </div>
-
             <div class="col-md-12 mt-2">
                 <div class="dropdown-form-block mb-3">
                     <button class="btn btn-info dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#votacionForm" aria-expanded="false" aria-controls="votacionForm">
@@ -391,7 +431,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     </div>
                 </div>
             </div>
-
             <div class="col-md-12 mt-2">
                 <div class="card shadow-sm">
                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
@@ -442,7 +481,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         </ul>
                     </div>
                 </div>
-
                 <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
                     <div class="text-end">
 
@@ -463,7 +501,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
 
                     </div>
                 </div>
-            </div>
+                </div>
         </div>
     </div>
 
@@ -494,7 +532,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
                 <div class="collapse" id="acuerdos_ID_">
                     <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i</button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
                         <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
                     </div>
                 </div>
@@ -520,9 +558,10 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
         </div>
     </template>
-
     <script>
-        // --- Variables Globales (Tu JS) ---
+        // ==================================================================
+        // --- VARIABLES GLOBALES JAVASCRIPT ---
+        // ==================================================================
         let contadorTemas = 0;
         const contenedorTemasGlobal = document.getElementById("contenedorTemas");
         const idMinutaGlobal = <?php echo json_encode($idMinutaActual); ?>;
@@ -530,56 +569,64 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
         const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
         const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
+        let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // Se actualiza con cada fetch
+        const ES_ST_EDITABLE = <?php echo json_encode(!$esSoloLectura); ?>; // Nuevo control de edición ST/APROBADA
+        let REGLAS_FEEDBACK = null; // Para control de Feedback
+
+        // Elementos de UI
         const formSubirArchivo = document.getElementById('formSubirArchivo');
         const inputArchivo = document.getElementById('inputArchivo');
         const formAgregarLink = document.getElementById('formAgregarLink');
         const inputUrlLink = document.getElementById('inputUrlLink');
         const fileStatus = document.getElementById('file-upload-status');
 
-        // 1. Manejo de Subida de Archivos: Se dispara automáticamente al seleccionar un archivo (change).
-        if (inputArchivo) {
-            inputArchivo.addEventListener('change', function(e) {
-                if (this.files.length > 0) {
-                    // Usamos dispatchEvent para invocar el evento 'submit' al que está suscrito handleSubirArchivo
-                    formSubirArchivo.dispatchEvent(new Event('submit', {
-                        cancelable: true
-                    }));
-                }
-            });
-        }
-
-        // 2. Manejo de Adición de Enlaces: Se dispara automáticamente al presionar Enter o perder el foco (change).
-        if (inputUrlLink) {
-            inputUrlLink.addEventListener('change', function() {
-                const url = this.value.trim();
-                // Solo intentar subir si el campo no está vacío y parece una URL
-                if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
-                    // Usamos dispatchEvent para invocar el evento 'submit' al que está suscrito handleAgregarLink
-                    formAgregarLink.dispatchEvent(new Event('submit', {
-                        cancelable: true
-                    }));
-                } else if (url !== '') {
-                    Swal.fire('Formato Inválido', 'Asegúrese de que el enlace sea una URL completa y válida (ej: https://ejemplo.com).', 'warning');
-                }
-            });
-        }
-
-        // ¡MODIFICADO! Esta variable AHORA se actualizará con cada fetch
-        let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>;
-
-        // --- Evento Principal de Carga (Tu JS) ---
+        // ==================================================================
+        // --- EVENTOS PRINCIPALES ---
+        // ==================================================================
         document.addEventListener("DOMContentLoaded", () => {
-            cargarTablaAsistencia(); // Esta función ahora refresca la lista de IDs
+            cargarTablaAsistencia();
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
             cargarVotacionesDeLaMinuta();
             cargarResultadosVotacion();
+            // Solo intentar cargar feedback si la minuta NO está Aprobada
+            if (ESTADO_MINUTA_ACTUAL !== 'APROBADA') {
+                cargarYAplicarFeedback();
+            }
+
+            // Eventos automáticos para archivos y enlaces
+            if (inputArchivo) {
+                // Al seleccionar un archivo, se dispara la subida
+                inputArchivo.addEventListener('change', function(e) {
+                    if (this.files.length > 0) {
+                        formSubirArchivo.dispatchEvent(new Event('submit', { cancelable: true }));
+                    }
+                });
+            }
+            if (inputUrlLink) {
+                // Al perder el foco o presionar Enter, se dispara la adición de link
+                inputUrlLink.addEventListener('change', function() {
+                    const url = this.value.trim();
+                    if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
+                        formAgregarLink.dispatchEvent(new Event('submit', { cancelable: true }));
+                    } else if (url !== '') {
+                        Swal.fire('Formato Inválido', 'Asegúrese de que el enlace sea una URL completa y válida (ej: https://ejemplo.com).', 'warning');
+                    }
+                });
+            }
+
+            // Bind de los submits a las funciones (por si no se disparan por change/focus)
+            document.getElementById('formSubirArchivo').addEventListener('submit', handleSubirArchivo);
+            document.getElementById('formAgregarLink').addEventListener('submit', handleAgregarLink);
         });
 
         // ==================================================================
-        // --- INICIO: SECCIÓN DE ASISTENCIA MODIFICADA ---
+        // --- SECCIÓN: ASISTENCIA (CORREGIDA/REFACTORIZADA) ---
         // ==================================================================
 
+        /**
+         * Carga la lista maestra de consejeros y la asistencia guardada.
+         */
         function cargarTablaAsistencia() {
             const cont = document.getElementById("contenedorTablaAsistenciaEstado");
             const btnRefresh = document.getElementById("btn-refrescar-asistencia");
@@ -591,36 +638,39 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             const fetchConsejeros = fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Error fetch_data.php')));
 
-            // 2. Cargar la lista ACTUAL de asistencia (NUEVA API)
+            // 2. Cargar la lista ACTUAL de asistencia
             const fetchAsistenciaActual = fetch(`/corevota/controllers/obtener_asistencia_actual.php?idMinuta=${idMinutaGlobal}`)
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Error obtener_asistencia_actual.php')));
 
-            // 3. Esperar ambas
+            // 3. Esperar ambas y renderizar
             Promise.all([fetchConsejeros, fetchAsistenciaActual])
                 .then(([responseConsejeros, responseAsistencia]) => {
 
-                    if (responseConsejeros.status !== 'success') {
-                        throw new Error('No se pudo cargar la lista de consejeros.');
-                    }
-                    if (responseAsistencia.status !== 'success') {
-                        throw new Error('No se pudo cargar la asistencia actual.');
+                    if (responseConsejeros.status !== 'success' || responseAsistencia.status !== 'success') {
+                        throw new Error('No se pudo cargar la información necesaria.');
                     }
 
                     const data = responseConsejeros.data; // Lista de usuarios
-
                     // ¡ACTUALIZAMOS LA VARIABLE GLOBAL!
-                    ASISTENCIA_GUARDADA_IDS = responseAsistencia.data; // Array de IDs [15, 37, 40]
+                    ASISTENCIA_GUARDADA_IDS = responseAsistencia.data.map(String); // Array de IDs como strings ['15', '37', '40']
+
+                    // Determinar si los checkboxes deben estar deshabilitados
+                    const disabledAttr = ES_ST_EDITABLE ? '' : 'disabled';
+                    const titleAttr = ES_ST_EDITABLE ? '' : 'title="Edición bloqueada por el estado de la minuta o su rol."';
 
                     if (data && data.length > 0) {
-                        const asistenciaGuardadaStrings = ASISTENCIA_GUARDADA_IDS.map(String);
-
                         let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
                         data.forEach(c => {
                             const userIdString = String(c.idUsuario);
-                            // Usamos la lista NUEVA (asistenciaGuardadaStrings)
-                            const isPresent = asistenciaGuardadaStrings.includes(userIdString);
+                            const isPresent = ASISTENCIA_GUARDADA_IDS.includes(userIdString);
                             const isAbsent = !isPresent;
-                            tabla += `<tr data-userid="${c.idUsuario}"><td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td><td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''}></td><td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''}></td></tr>`;
+                            
+                            // Aplicar el atributo disabled/title a los checkboxes
+                            tabla += `<tr data-userid="${c.idUsuario}">
+                                <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
+                                <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${disabledAttr} ${titleAttr}></td>
+                                <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${disabledAttr} ${titleAttr}></td>
+                                </tr>`;
                         });
                         tabla += `</tbody></table>`;
                         cont.innerHTML = tabla;
@@ -634,9 +684,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 })
                 .finally(() => {
                     if (btnRefresh) btnRefresh.disabled = false;
+                    // Llamar a la lógica de feedback por si estaba en REQUERIDO_REVISION y debe bloquear la sección
+                    if (REGLAS_FEEDBACK) deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
                 });
         }
 
+        /**
+         * Maneja el cambio de estado de un checkbox (presente/ausente).
+         */
         function handleAsistenciaChange(userId, changedType) {
             const present = document.getElementById(`present_${userId}`);
             const absent = document.getElementById(`absent_${userId}`);
@@ -647,25 +702,36 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             }
         }
 
+        /**
+         * Recolecta los IDs de los usuarios marcados como 'Presente'.
+         * @returns {Array<string>} Array de IDs de usuario.
+         */
         function recolectarAsistencia() {
             const ids = [];
             const presentes = document.querySelectorAll("#tablaAsistenciaEstado .present-check:checked");
             presentes.forEach(chk => ids.push(chk.value));
-            return {
-                asistenciaIDs: ids
-            };
+            return ids;
         }
 
+        /**
+         * Envía los IDs de asistencia recolectados al servidor.
+         */
         function guardarAsistencia() {
-            const {
-                asistenciaIDs
-            } = recolectarAsistencia();
+            const asistenciaIDs = recolectarAsistencia();
+
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede guardar la asistencia en este estado.', 'error');
+                return;
+            }
+            
             const status = document.getElementById('guardarAsistenciaStatus');
             const btn = document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]');
+            
             let datos = {
                 idMinuta: idMinutaGlobal,
                 asistencia: asistenciaIDs
             };
+            
             btn.disabled = true;
             status.textContent = 'Guardando...';
             status.className = 'me-auto small text-muted';
@@ -684,11 +750,8 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         status.textContent = "✅ Guardado";
                         status.className = 'me-auto small text-success fw-bold';
 
-                        // ¡MODIFICACIÓN!
-                        // Volvemos a cargar la tabla para asegurar que el estado (local y servidor)
-                        // estén sincronizados.
+                        // Actualizar la lista global de IDs y la tabla visual
                         cargarTablaAsistencia();
-                        // ¡FIN MODIFICACIÓN!
 
                         setTimeout(() => {
                             status.textContent = '';
@@ -710,10 +773,12 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         }
 
         // ==================================================================
-        // --- FIN: SECCIÓN DE ASISTENCIA MODIFICADA ---
+        // --- SECCIÓN: EDICIÓN DE TEMAS ---
         // ==================================================================
 
-
+        /**
+         * Aplica un comando de formato al contenido editable.
+         */
         function format(command) {
             try {
                 document.execCommand(command, false, null);
@@ -722,6 +787,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             }
         }
 
+        /**
+         * Carga los temas existentes o prepara un bloque vacío.
+         */
         function cargarOPrepararTemas() {
             if (DATOS_TEMAS_CARGADOS && DATOS_TEMAS_CARGADOS.length > 0) {
                 DATOS_TEMAS_CARGADOS.forEach(t => crearBloqueTema(t));
@@ -730,10 +798,17 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             }
         }
 
+        /**
+         * Agrega un nuevo tema vacío.
+         */
         function agregarTema() {
             crearBloqueTema();
         }
 
+        /**
+         * Crea y añade un bloque de tema al DOM.
+         * @param {Object} [tema=null] - Datos del tema a cargar (opcional).
+         */
         function crearBloqueTema(tema = null) {
             contadorTemas++;
             const plantilla = document.getElementById("plantilla-tema");
@@ -743,6 +818,8 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             if (!div) return;
             const h6 = nuevo.querySelector('h6');
             if (h6) h6.innerText = `Tema ${contadorTemas}`;
+
+            // Actualizar IDs y data-bs-target para Bootstrap Collapse
             nuevo.querySelectorAll('[data-bs-target]').forEach(el => {
                 let target = el.getAttribute('data-bs-target').replace('_ID_', `_${contadorTemas}_`);
                 el.setAttribute('data-bs-target', target);
@@ -753,19 +830,40 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             });
 
             const areas = nuevo.querySelectorAll('.editable-area');
+            // Cargar datos si se proporcionan
             if (tema) {
                 if (areas[0]) areas[0].innerHTML = tema.nombreTema || '';
                 if (areas[1]) areas[1].innerHTML = tema.objetivo || '';
                 if (areas[2]) areas[2].innerHTML = tema.descAcuerdo || '';
                 if (areas[3]) areas[3].innerHTML = tema.compromiso || '';
                 if (areas[4]) areas[4].innerHTML = tema.observacion || '';
-                div.dataset.idTema = tema.idTema;
+                div.dataset.idTema = tema.idTema; // Guardar ID de tema existente
             }
+            
+            // Mostrar botón de eliminar si hay más de 1 tema
             const btnEliminar = nuevo.querySelector('.eliminar-tema');
             if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
             contenedorTemasGlobal.appendChild(nuevo);
+
+            // Si no es editable, deshabilitar áreas
+            if (!ES_ST_EDITABLE) {
+                div.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
+                    el.disabled = true;
+                    el.contentEditable = false;
+                    el.style.cursor = 'not-allowed';
+                    el.style.backgroundColor = '#e9ecef';
+                });
+                div.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
+                    toolbar.style.display = 'none';
+                });
+                if (btnEliminar) btnEliminar.style.display = 'none'; // Ocultar el botón de eliminar si no es editable
+            }
         }
 
+        /**
+         * Elimina un bloque de tema del DOM y actualiza la numeración.
+         * @param {HTMLElement} btn - Botón de eliminar presionado.
+         */
         function eliminarTema(btn) {
             const temaBlock = btn.closest('.tema-block');
             if (temaBlock) {
@@ -774,6 +872,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             }
         }
 
+        /**
+         * Re-numera los títulos de los bloques de tema.
+         */
         function actualizarNumerosDeTema() {
             const bloques = contenedorTemasGlobal.querySelectorAll('.tema-block');
             contadorTemas = 0;
@@ -782,32 +883,37 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 const h6 = b.querySelector('h6');
                 if (h6) h6.innerText = `Tema ${contadorTemas}`;
                 const btnEliminar = b.querySelector('.eliminar-tema');
-                if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
+                if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1 && ES_ST_EDITABLE) ? 'inline-block' : 'none';
             });
         }
 
-        // --- (CORREGIDO) ---
-        document.getElementById('formSubirArchivo').addEventListener('submit', handleSubirArchivo);
-        document.getElementById('formAgregarLink').addEventListener('submit', handleAgregarLink);
+        // ==================================================================
+        // --- SECCIÓN: ADJUNTOS (Archivos y Enlaces) ---
+        // ==================================================================
 
+        /**
+         * Maneja la subida de archivos (disparado por el evento 'change' del input file).
+         */
         function handleSubirArchivo(e) {
             e.preventDefault();
             const input = document.getElementById('inputArchivo');
-            // El botón ha sido eliminado, ya no se referencia 'btn'
             if (!input.files || input.files.length === 0) {
                 Swal.fire('Error', 'Debe seleccionar un archivo.', 'warning');
                 return;
             }
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede subir archivos en este estado.', 'error');
+                return;
+            }
+
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('archivo', input.files[0]);
 
-            // Actualizamos el estado de la UI
             fileStatus.textContent = 'Subiendo...';
             fileStatus.className = 'badge bg-warning text-dark';
-            input.disabled = true; // Deshabilitar input mientras sube
+            input.disabled = true;
 
-            // (CORREGIDO) Usar ruta absoluta
             fetch('/corevota/controllers/agregar_adjunto.php?action=upload', {
                     method: 'POST',
                     body: formData
@@ -827,90 +933,44 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         agregarAdjuntoALista(data.data);
                         input.value = ''; // Limpiar el input
 
-                        // Actualizamos el estado de la UI
                         fileStatus.textContent = '✅ Subido con éxito';
                         fileStatus.className = 'badge bg-success';
                     } else {
                         Swal.fire('Error', data.message || 'No se pudo subir el archivo.', 'error');
-                        // Actualizamos el estado de la UI
                         fileStatus.textContent = '❌ Error de subida';
                         fileStatus.className = 'badge bg-danger';
                     }
                 })
                 .catch(err => {
                     Swal.fire('Error', 'Error de conexión al subir: ' + err.message, 'error');
-                    // Actualizamos el estado de la UI
                     fileStatus.textContent = '❌ Error de conexión';
                     fileStatus.className = 'badge bg-danger';
                 })
                 .finally(() => {
-                    input.disabled = false; // Habilitar input
+                    input.disabled = false;
                     setTimeout(() => {
-                        fileStatus.textContent = ''; // Limpiar estado
+                        fileStatus.textContent = '';
                     }, 3000);
                 });
         }
-        // --- (NUEVA FUNCIÓN AUXILIAR) ---
-        // Esta función añade un solo adjunto a la lista en el DOM
-        function agregarAdjuntoALista(adj) {
-            const listaUl = document.getElementById('listaAdjuntosExistentes');
-            if (!listaUl) return;
 
-            // 1. Revisa si está el mensaje "Cargando..." o "No hay adjuntos..."
-            const placeholder = listaUl.querySelector('.text-muted');
-            if (placeholder) {
-                placeholder.remove(); // Lo borra para añadir el primer item
-            }
-
-            // 2. Crea el nuevo elemento <li> (copiado de tu función mostrarAdjuntosExistentes)
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-
-            const link = document.createElement('a');
-
-            // Usa la misma lógica de ruta que ya tenías
-            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
-            link.href = url;
-            link.target = '_blank';
-
-            let icon = (adj.tipoAdjunto === 'link') ? '🔗' : '📄'; // (No aplica 'asistencia' aquí)
-            let nombreArchivo = adj.pathAdjunto.split('/').pop();
-            if (adj.tipoAdjunto === 'link') {
-                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
-            }
-
-            link.textContent = ` ${icon} ${nombreArchivo}`;
-            link.title = adj.pathAdjunto;
-            li.appendChild(link);
-
-            // 3. Añade el botón de eliminar
-            if (adj.tipoAdjunto !== 'asistencia') {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
-                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                // Importante: Pasa el elemento 'li' para que la función eliminar sepa qué borrar
-                deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li);
-                li.appendChild(deleteBtn);
-            }
-
-            // 4. Añade el <li> a la lista <ul>
-            listaUl.appendChild(li);
-        }
-
+        /**
+         * Maneja la adición de enlaces (disparado por el evento 'change' del input url).
+         */
         function handleAgregarLink(e) {
             e.preventDefault();
             const input = document.getElementById('inputUrlLink');
             const url = input.value.trim();
 
-            // El botón ha sido eliminado, ya no se referencia 'btn'
-
-            // Validación duplicada pero necesaria si el evento 'change' dispara esto
             if (!url || !filterUrl(url)) {
                 Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
                 return;
             }
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
+                return;
+            }
 
-            // Deshabilitar input mientras procesa
             input.disabled = true;
             input.placeholder = 'Añadiendo...';
 
@@ -918,7 +978,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('urlLink', url);
 
-            // (CORREGIDO) Usar ruta absoluta
             fetch('/corevota/controllers/agregar_adjunto.php?action=link', {
                     method: 'POST',
                     body: formData
@@ -943,12 +1002,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 })
                 .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
                 .finally(() => {
-                    input.disabled = false; // Habilitar input
+                    input.disabled = false;
                     input.placeholder = 'https://ejemplo.com';
                 });
         }
 
-        // Función de validación de URL (necesaria en el cliente si no queremos depender del servidor)
+        /**
+         * Valida que una cadena sea una URL con formato correcto.
+         */
         function filterUrl(str) {
             const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
                 '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
@@ -959,6 +1020,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             return !!pattern.test(str);
         }
 
+        /**
+         * Carga la lista de adjuntos existentes desde el servidor.
+         */
         function cargarYMostrarAdjuntosExistentes() {
             if (!idMinutaGlobal) return;
 
@@ -978,6 +1042,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 });
         }
 
+        /**
+         * Renderiza la lista de adjuntos en el DOM.
+         */
         function mostrarAdjuntosExistentes(adjuntos) {
             const listaUl = document.getElementById('listaAdjuntosExistentes');
             if (!listaUl) return;
@@ -986,39 +1053,59 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 listaUl.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>';
                 return;
             }
-            adjuntos.forEach(adj => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                const link = document.createElement('a');
-
-                // (CORREGIDO) Ruta absoluta para el link
-                // Esto asume que la BD guarda "public/docs/DocumentosAdjuntos/..."
-                const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
-
-                link.href = url;
-                link.target = '_blank';
-                let icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');
-
-                let nombreArchivo = adj.pathAdjunto.split('/').pop();
-                if (adj.tipoAdjunto === 'link') {
-                    nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
-                }
-
-                link.textContent = ` ${icon} ${nombreArchivo}`;
-                link.title = adj.pathAdjunto;
-                li.appendChild(link);
-                if (adj.tipoAdjunto !== 'asistencia') {
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
-                    deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                    deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li);
-                    li.appendChild(deleteBtn);
-                }
-                listaUl.appendChild(li);
-            });
+            adjuntos.forEach(adj => agregarAdjuntoALista(adj));
         }
 
+        /**
+         * Crea y añade un único elemento <li> de adjunto a la lista.
+         */
+        function agregarAdjuntoALista(adj) {
+            const listaUl = document.getElementById('listaAdjuntosExistentes');
+            if (!listaUl) return;
+
+            // Borra el placeholder si es el primer item
+            const placeholder = listaUl.querySelector('.text-muted');
+            if (placeholder) placeholder.remove();
+
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+            const link = document.createElement('a');
+            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
+            link.href = url;
+            link.target = '_blank';
+
+            let icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');
+            let nombreArchivo = adj.pathAdjunto.split('/').pop();
+            if (adj.tipoAdjunto === 'link') {
+                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
+            }
+
+            link.textContent = ` ${icon} ${nombreArchivo}`;
+            link.title = adj.pathAdjunto;
+            li.appendChild(link);
+
+            // Añade el botón de eliminar si no es asistencia
+            if (adj.tipoAdjunto !== 'asistencia' && ES_ST_EDITABLE) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li);
+                li.appendChild(deleteBtn);
+            }
+
+            listaUl.appendChild(li);
+        }
+
+        /**
+         * Elimina un adjunto de la base de datos y del DOM.
+         */
         function eliminarAdjunto(idAdjunto, listItemElement) {
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede eliminar adjuntos en este estado.', 'error');
+                return;
+            }
+
             Swal.fire({
                 title: '¿Eliminar Adjunto?',
                 text: "Esta acción no se puede deshacer.",
@@ -1029,7 +1116,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 cancelButtonText: 'Cancelar'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // (CORREGIDO) Usar ruta absoluta
                     fetch(`/corevota/controllers/eliminar_adjunto.php?idAdjunto=${idAdjunto}`)
                         .then(res => res.json())
                         .then(data => {
@@ -1045,18 +1131,28 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             });
         }
 
-        // --- ⭐ ================== INICIO BLOQUE ACCIONES (CORREGIDO) ================== ⭐ ---
+        // ==================================================================
+        // --- SECCIÓN: ACCIONES DE MINUTA (Guardar/Enviar) ---
+        // ==================================================================
 
+        /**
+         * Recolecta todos los datos del formulario (temas, acuerdos, etc.) y los envía al servidor.
+         * @param {boolean} guardarYSalir - Si es true, redirige después de guardar.
+         * @param {Function} [callback=null] - Función a llamar después de guardar (usado por confirmarEnvioAprobacion).
+         */
         function guardarBorrador(guardarYSalir, callback = null) {
             if (!idMinutaGlobal) {
                 alert("Error Crítico: No hay ID de Minuta.");
                 if (callback) callback(false);
                 return;
             }
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede guardar la minuta en este estado.', 'error');
+                if (callback) callback(false);
+                return;
+            }
 
-            const {
-                asistenciaIDs
-            } = recolectarAsistencia();
+            const asistenciaIDs = recolectarAsistencia();
             const bloques = document.querySelectorAll("#contenedorTemas .tema-block");
             const temasData = [];
 
@@ -1087,7 +1183,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
             }
 
-            // (CORREGIDO) Usar ruta absoluta
             fetch("/corevota/controllers/guardar_minuta_completa.php", {
                     method: "POST",
                     body: formData
@@ -1108,10 +1203,8 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         } else {
                             Swal.fire('Guardado', 'Borrador guardado con éxito.', 'success');
                             if (guardarYSalir) {
-                                // ===== INICIO DE MODIFICACIÓN (Redirección 1) =====
-                                // (Apunta a menu.php y al listado general del ST con la pestaña correcta)
+                                // Redirección al listado de borradores
                                 window.location.href = 'menu.php?pagina=minutas_listado_general&tab=borradores';
-                                // ===== FIN DE MODIFICACIÓN =====
                             }
                         }
                     } else {
@@ -1131,6 +1224,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                             btnGuardar.disabled = false;
                             btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Borrador';
                         }
+                        // Solo re-habilita el botón de envío si el estado lo permite (lógica PHP)
                         if (btnEnviar && <?php echo json_encode($puedeEnviar); ?>) {
                             btnEnviar.disabled = false;
                         }
@@ -1138,10 +1232,18 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 });
         }
 
+        /**
+         * Pide confirmación y llama a la secuencia Guardar -> Enviar Aprobación.
+         */
         function confirmarEnvioAprobacion() {
             const idMinuta = idMinutaGlobal;
             const btnGuardar = document.getElementById('btnGuardarBorrador');
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
+            
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede enviar la minuta en este estado.', 'error');
+                return;
+            }
 
             Swal.fire({
                 title: '¿Enviar Minuta para Aprobación?',
@@ -1173,7 +1275,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         // 2. SEGUNDO, llamar a 'enviar_aprobacion.php'
                         btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 2/2 Enviando...';
 
-                        // (CORREGIDO) Usar ruta absoluta
                         fetch('/corevota/controllers/enviar_aprobacion.php', {
                                 method: 'POST',
                                 headers: {
@@ -1196,13 +1297,11 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                                 if (data.status === 'success') {
                                     Swal.fire({
                                         title: '¡Enviada!',
-                                        text: data.message, // 'Minuta enviada con éxito...'
+                                        text: data.message,
                                         icon: 'success'
                                     }).then(() => {
-                                        // ===== INICIO DE MODIFICACIÓN (Redirección 2) =====
-                                        // (Apunta a la pestaña de pendientes)
+                                        // Redirección al listado de pendientes
                                         window.location.href = 'menu.php?pagina=minutas_listado_general&tab=pendientes_aprobacion';
-                                        // ===== FIN DE MODIFICACIÓN =====
                                     });
                                 } else {
                                     throw new Error(data.message || 'Error desconocido al enviar.');
@@ -1219,223 +1318,14 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             });
         }
 
-        // --- (NUEVO) Lógica Votaciones ---
-        async function guardarNuevaVotacion() {
-            const idComision = document.getElementById('votacionComisionId').value;
-            const nombreVotacion = document.getElementById('votacionNombre').value.trim();
-            const btn = document.querySelector('#formCrearVotacionMinuta button');
-            if (!idComision || !nombreVotacion) {
-                Swal.fire('Campos incompletos', 'Debe seleccionar una comisión y escribir el texto de la votación.', 'warning');
-                return;
-            }
-            if (!idMinutaGlobal || !ID_REUNION_GLOBAL) {
-                Swal.fire('Error de Sistema', 'No se pudo encontrar el ID de la Minuta o Reunión. Recargue la página.', 'error');
-                return;
-            }
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-            const formData = new FormData();
-            formData.append('action', 'create');
-            formData.append('idMinuta', idMinutaGlobal);
-            formData.append('idReunion', ID_REUNION_GLOBAL);
-            formData.append('idComision', idComision);
-            formData.append('nombreVotacion', nombreVotacion);
-            try {
-                // (CORREGIDO) Usar ruta absoluta
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                if (!resp.ok) {
-                    const text = await resp.text();
-                    console.error("Error guardar votacion:", text);
-                    throw new Error(`Error HTTP ${resp.status} (ver consola)`);
-                }
-                const data = await resp.json();
-                if (data.status === 'success') {
-                    Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
-                    document.getElementById('votacionNombre').value = '';
-                    cargarVotacionesDeLaMinuta();
-                    // ===================================
-                    // INICIO: Refrescar Votos en Vivo
-                    // ===================================
-                    cargarResultadosVotacion();
-                    // ===================================
-                    // FIN: Refrescar Votos en Vivo
-                    // ===================================
-                } else {
-                    Swal.fire('Error', 'No se pudo crear la votación: ' + data.message, 'error');
-                }
-            } catch (err) {
-                console.error("Error fetch guardar votacion:", err);
-                Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
-            }
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
-        }
-        async function cargarVotacionesDeLaMinuta() {
-            const cont = document.getElementById('listaVotacionesMinuta');
-            const status = document.getElementById('votacionesStatus');
-            if (!cont || !status) return;
-            cont.innerHTML = '';
-            status.textContent = 'Cargando...';
-            try {
-                // (CORREGIDO) Usar ruta absoluta
-                const resp = await fetch(`/corevota/controllers/gestionar_votacion_minuta.php?action=list&idMinuta=${idMinutaGlobal}`);
-                if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
-                const data = await resp.json();
-                if (data.status === 'success' && data.data.length > 0) {
-                    status.textContent = `Mostrando ${data.data.length} votacion(es).`;
-                    let html = '<ul class="list-group">';
-                    data.data.forEach(v => {
-                        html += `
-                             <li class="list-group-item d-flex justify-content-between align-items-center">
-                                 <div>
-                                     <span class="fw-bold">${v.nombreVotacion}</span>
-                                     <small class="d-block text-muted">
-                                         Comisión: ${v.nombreComision} | Estado: 
-                                         ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
-                                     </small>
-                                 </div>
-                                 <div>
-                                     <button class="btn btn-warning btn-sm" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
-                                         <i class="fas fa-person-booth"></i> Registrar Voto
-                                     </button>
-                                 </div>
-                             </li>`;
-                    });
-                    html += '</ul>';
-                    cont.innerHTML = html;
-                } else {
-                    status.textContent = 'No hay votaciones creadas para esta minuta.';
-                }
-            } catch (err) {
-                console.error("Error cargando votaciones:", err);
-                status.textContent = 'Error al cargar votaciones.';
-                status.className = 'text-danger small';
-            }
-        }
-        async function abrirModalVoto(idVotacion) {
-            if (ASISTENCIA_GUARDADA_IDS.length === 0) {
-                Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
-                return;
-            }
-            Swal.fire({
-                title: 'Cargando Estado de Votación...',
-                text: 'Buscando asistentes y votos...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-            try {
-                const formData = new FormData();
-                formData.append('action', 'get_status');
-                formData.append('idVotacion', idVotacion);
-                formData.append('asistentes_ids', JSON.stringify(ASISTENCIA_GUARDADA_IDS));
-                // (CORREGIDO) Usar ruta absoluta
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await resp.json();
-                if (data.status !== 'success') {
-                    throw new Error(data.message);
-                }
-
-                let modalHtml = '<div class="container-fluid" style="text-align: left;">';
-                modalHtml += '<p class="text-muted">Seleccione el voto para cada asistente que no haya votado.</p>';
-                modalHtml += '<table class="table table-sm table-hover">';
-                modalHtml += '<thead><tr><th>Asistente</th><th class="text-center">Voto Registrado</th><th class="text-center">Registrar Voto</th></tr></thead><tbody>';
-                data.data.asistentes.forEach(asistente => {
-                    const voto = data.data.votos[asistente.idUsuario] || null;
-                    modalHtml += `<tr><td>${asistente.nombreCompleto}</td>`;
-                    if (voto) {
-                        let badge = 'secondary';
-                        if (voto === 'SI') badge = 'success';
-                        if (voto === 'NO') badge = 'danger';
-                        modalHtml += `<td class="text-center"><span class="badge bg-${badge}">${voto}</span></td>`;
-                        modalHtml += `<td></td>`;
-                    } else {
-                        modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
-                        modalHtml += `<td class="text-center" style="white-space: nowrap;">
-                                             <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
-                                             <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
-                                             <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
-                                         </td>`;
-                    }
-                    modalHtml += '</tr>';
-                });
-                modalHtml += '</tbody></table></div>';
-                Swal.fire({
-                    title: 'Registrar Votos Manualmente',
-                    html: modalHtml,
-                    width: '800px',
-                    showConfirmButton: false,
-                    showCloseButton: true
-                });
-            } catch (err) {
-                Swal.fire('Error', 'No se pudo cargar el estado de la votación: ' + err.message, 'error');
-            }
-        }
-        async function registrarVotoSecretario(idVotacion, idUsuario, voto, btn) {
-            const parentTD = btn.parentNode;
-            parentTD.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
-            try {
-                const formData = new FormData();
-                formData.append('action', 'register_vote');
-                formData.append('idVotacion', idVotacion);
-                formData.append('idUsuario', idUsuario);
-                formData.append('voto', voto);
-                formData.append('idSecretario', ID_SECRETARIO_LOGUEADO);
-                // (CORREGIDO) Usar ruta absoluta
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await resp.json();
-                if (data.status === 'success') {
-                    const statusTD = parentTD.previousElementSibling;
-                    let badge = 'secondary';
-                    if (voto === 'SI') badge = 'success';
-                    if (voto === 'NO') badge = 'danger';
-                    statusTD.innerHTML = `<span class="badge bg-${badge}">${voto}</span>`;
-                    parentTD.innerHTML = '✅ Registrado';
-                    // ===================================
-                    // INICIO: Refrescar Votos en Vivo
-                    // ===================================
-                    cargarResultadosVotacion();
-                    // ===================================
-                    // FIN: Refrescar Votos en Vivo
-                    // ===================================
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch (err) {
-                parentTD.innerHTML = '<span class="text-danger">Error</span>';
-                alert('Error al registrar voto: ' + err.message);
-            }
-        }
-        // --- ⭐ ================== FIN BLOQUE ACCIONES ================== ⭐ ---
-
-        let REGLAS_FEEDBACK = null;
-
-        /**
-         * Se ejecuta después de que la página principal (crearMinuta.php)
-         * ha cargado todos sus datos iniciales (asistencia, temas, etc.).
-         */
-        document.addEventListener("DOMContentLoaded", () => {
-            // Solo intentamos cargar feedback si la minuta NO está Aprobada
-            if (ESTADO_MINUTA_ACTUAL !== 'APROBADA') {
-                cargarYAplicarFeedback();
-            }
-        });
+        // ==================================================================
+        // --- SECCIÓN: FEEDBACK / RE-ENVÍO ---
+        // ==================================================================
 
         /**
          * Llama al controlador para ver si existe feedback para esta minuta.
          */
         async function cargarYAplicarFeedback() {
-            console.log("Buscando feedback para Minuta ID:", idMinutaGlobal);
             try {
                 const response = await fetch(`/corevota/controllers/obtener_feedback_json.php?idMinuta=${idMinutaGlobal}`);
                 if (!response.ok) {
@@ -1445,10 +1335,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 const data = await response.json();
 
                 if (data.status === 'success' && data.data) {
-                    console.log("Feedback encontrado:", data.data);
                     REGLAS_FEEDBACK = data.data; // Guardamos las reglas globalmente
 
-                    // --- ¡NUEVO! MOSTRAR EL TEXTO DEL FEEDBACK ---
+                    // Mostrar el texto del feedback en la alerta
                     if (data.textoFeedback) {
                         const container = document.getElementById('feedback-display-container');
                         const textoDiv = document.getElementById('feedback-display-texto');
@@ -1457,21 +1346,18 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                             container.style.display = 'block';
                         }
                     }
-                    // --- FIN NUEVO ---
-
-                    // Si hay feedback, aplicamos las reglas
+                    
+                    // Si hay feedback, aplicamos las reglas de edición
                     deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
                     actualizarBotonesParaFeedback();
 
                 } else if (data.status === 'no_feedback') {
-                    console.log("No hay feedback pendiente para esta minuta.");
-                    // No hacemos nada, la minuta se queda 100% editable
+                    // Si no hay feedback, la minuta queda editable según la lógica del ST
                 } else {
                     throw new Error(data.message || "Error desconocido al cargar feedback.");
                 }
             } catch (error) {
                 console.error("Error al cargar feedback:", error);
-                // No bloqueamos la UI, solo mostramos un aviso sutil
                 Swal.fire({
                     toast: true,
                     position: 'top-end',
@@ -1487,8 +1373,8 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
          * Deshabilita las secciones del formulario según las reglas de feedback.
          */
         function deshabilitarCamposSegunFeedback(reglas) {
-
-            // Regla para Asistencia
+            
+            // Regla para Asistencia (Bloquea si reglas.asistencia es 'false')
             if (reglas.asistencia === false) {
                 deshabilitarSeccion('asistenciaForm', 'Asistencia bloqueada (sin feedback)');
             }
@@ -1519,7 +1405,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
          * Función helper para deshabilitar visualmente una sección.
          */
         function deshabilitarSeccion(idElemento, mensaje) {
-            // Busca el botón que controla el colapso
             const btnCollapse = document.querySelector(`button[data-bs-target="#${idElemento}"]`);
             if (btnCollapse) {
                 btnCollapse.disabled = true;
@@ -1527,81 +1412,60 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 btnCollapse.classList.add('opacity-50');
             }
 
-            // Busca el contenedor de la sección
             const seccion = document.getElementById(idElemento);
             if (seccion) {
-                // Deshabilita todos los inputs, selects, textareas y botones dentro
                 seccion.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
                     el.disabled = true;
                     el.contentEditable = false;
                     el.style.cursor = 'not-allowed';
-                    el.style.backgroundColor = '#e9ecef'; // Color de fondo "disabled"
+                    el.style.backgroundColor = '#e9ecef';
                 });
 
-                // Oculta las barras de herramientas de los editores
                 seccion.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
                     toolbar.style.display = 'none';
                 });
-
-                // Si es un colapso, lo cerramos
-                if (seccion.classList.contains('collapse')) {
-                    const bsCollapse = bootstrap.Collapse.getInstance(seccion);
-                    if (bsCollapse) {
-                        bsCollapse.hide();
-                    }
-                }
             }
 
-            // Caso especial para adjuntos (que no es un colapso)
-            if (idElemento === 'adjuntos-section') {
-                const seccionAdjuntos = document.querySelector('.adjuntos-section');
-                if (seccionAdjuntos) {
-                    seccionAdjuntos.style.opacity = '0.6';
-                    seccionAdjuntos.style.pointerEvents = 'none';
-                    seccionAdjuntos.title = mensaje;
-                }
-            }
-
-            // Caso especial para temas (que no es un colapso)
-            if (idElemento === 'contenedorTemas') {
-                const seccionTemas = document.getElementById('contenedorTemas');
-                if (seccionTemas) {
-                    seccionTemas.style.opacity = '0.6';
-                    seccionTemas.style.pointerEvents = 'none';
-                    seccionTemas.title = mensaje;
+            // Casos especiales para secciones que no son 'collapse' o tienen un manejo de opacidad
+            if (idElemento === 'adjuntos-section' || idElemento === 'contenedorTemas') {
+                const target = document.querySelector(`.${idElemento}`) || document.getElementById(idElemento);
+                if (target) {
+                    target.style.opacity = '0.6';
+                    target.style.pointerEvents = 'none';
+                    target.title = mensaje;
                 }
             }
         }
 
         /**
-         * Cambia los botones de acción al final de la página.
+         * Cambia los botones de acción al final de la página para el modo Feedback.
          */
         function actualizarBotonesParaFeedback() {
             const btnGuardar = document.getElementById('btnGuardarBorrador');
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
 
-            // 1. Modificar el botón de "Guardar"
             if (btnGuardar) {
                 btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Correcciones';
-                // Mantenemos el onclick="guardarBorrador(true)"
             }
 
-            // 2. Modificar el botón de "Enviar"
             if (btnEnviar) {
                 btnEnviar.innerHTML = '<i class="fas fa-check-double"></i> Aplicar y Reenviar p/ Aprobación';
                 btnEnviar.classList.remove('btn-danger');
-                btnEnviar.classList.add('btn-success'); // Cambiamos a color verde
-
-                // ¡IMPORTANTE! Cambiamos la función que llama
+                btnEnviar.classList.add('btn-success'); 
+                // Cambiamos la función que llama al re-envío
                 btnEnviar.setAttribute('onclick', 'if (validarCamposMinuta()) confirmarAplicarFeedback()');
             }
         }
 
         /**
-         * Nueva función de confirmación que llama a aplicar_feedback.php
-         * (Esta se activa SOLO si estábamos en modo feedback)
+         * Secuencia de Guardar Correcciones -> Confirmar Re-envío.
          */
         function confirmarAplicarFeedback() {
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede reenviar la minuta en este estado.', 'error');
+                return;
+            }
+
             // 1. Primero, guardamos los cambios en el borrador
             Swal.fire({
                 title: 'Guardando Correcciones...',
@@ -1619,7 +1483,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     return;
                 }
 
-                // 2. Si el guardado fue exitoso, llamamos a aplicar_feedback.php
+                // 2. Si el guardado fue exitoso, pedimos confirmación de re-envío
                 Swal.fire({
                     title: '¿Confirmar Re-envío?',
                     text: "Sus correcciones fueron guardadas. ¿Desea aplicar el 'Sello Verde' y notificar a los presidentes para que firmen de nuevo?",
@@ -1638,7 +1502,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         }
 
         /**
-         * Función final que llama al controlador aplicar_feedback.php
+         * Función final que llama al controlador aplicar_feedback.php para el re-envío.
          */
         function llamarAplicarFeedback() {
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
@@ -1650,7 +1514,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
 
-            // (CORREGIDO) Usar ruta absoluta
             fetch('/corevota/controllers/aplicar_feedback.php', {
                     method: 'POST',
                     body: formData
@@ -1660,12 +1523,11 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     if (data.status === 'success') {
                         Swal.fire({
                             title: '¡Minuta Reenviada!',
-                            text: data.message, // "Minuta corregida y reenviada..."
+                            text: data.message,
                             icon: 'success'
                         }).then(() => {
-                            // ===== INICIO DE MODIFICACIÓN (Redirección 3) =====
+                            // Redirección al listado de pendientes
                             window.location.href = 'menu.php?pagina=minutas_listado_general&tab=pendientes_aprobacion';
-                            // ===== FIN DE MODIFICACIÓN =====
                         });
                     } else {
                         throw new Error(data.message);
@@ -1680,15 +1542,21 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 });
         }
 
+        /**
+         * Valida que los campos obligatorios de cada tema (Tema y Objetivo) no estén vacíos.
+         * @returns {boolean} True si todos los campos obligatorios están llenos.
+         */
         function validarCamposMinuta() {
             const bloques = document.querySelectorAll('#contenedorTemas .tema-block');
             let valido = true;
 
-            bloques.forEach((bloque, index) => {
+            for (let index = 0; index < bloques.length; index++) {
+                const bloque = bloques[index];
                 const areas = bloque.querySelectorAll('.editable-area');
                 const temaEl = areas[0];
                 const objetivoEl = areas[1];
 
+                // Limpiar etiquetas HTML y espacios en blanco
                 const tema = temaEl ? temaEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
                 const objetivo = objetivoEl ? objetivoEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
 
@@ -1707,27 +1575,245 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                     });
 
                     // Abrir el bloque del tema y enfocar el campo vacío
-                    const collapse = bloque.querySelector('.collapse');
+                    const collapse = bloque.querySelector('#temaTratado_' + (index + 1) + '_');
                     if (collapse && collapse.classList.contains('collapse')) {
-                        const bsCollapse = new bootstrap.Collapse(collapse, {
-                            show: true
-                        });
+                        const bsCollapse = new bootstrap.Collapse(collapse, { show: true });
                     }
 
                     (tema ? objetivoEl : temaEl)?.focus();
-                    return false; // sale del bucle en el primer error
+                    return false; // Sale de la función en el primer error
                 }
-            });
+            }
 
             return valido;
         }
 
         // ==================================================================
-        // --- INICIO: FUNCIONES JS PARA VOTACIÓN EN VIVO (Sin cambios) ---
+        // --- SECCIÓN: GESTIÓN Y RESULTADOS DE VOTACIONES ---
         // ==================================================================
 
         /**
-         * Llama a la API y renderiza los resultados de la votación
+         * Crea una nueva votación y la asocia a la minuta.
+         */
+        async function guardarNuevaVotacion() {
+            const idComision = document.getElementById('votacionComisionId').value;
+            const nombreVotacion = document.getElementById('votacionNombre').value.trim();
+            const btn = document.querySelector('#formCrearVotacionMinuta button');
+            
+            if (!idComision || !nombreVotacion) {
+                Swal.fire('Campos incompletos', 'Debe seleccionar una comisión y escribir el texto de la votación.', 'warning');
+                return;
+            }
+            if (!idMinutaGlobal || !ID_REUNION_GLOBAL) {
+                Swal.fire('Error de Sistema', 'No se pudo encontrar el ID de la Minuta o Reunión. Recargue la página.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            
+            const formData = new FormData();
+            formData.append('action', 'create');
+            formData.append('idMinuta', idMinutaGlobal);
+            formData.append('idReunion', ID_REUNION_GLOBAL);
+            formData.append('idComision', idComision);
+            formData.append('nombreVotacion', nombreVotacion);
+            
+            try {
+                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    console.error("Error guardar votacion:", text);
+                    throw new Error(`Error HTTP ${resp.status} (ver consola)`);
+                }
+                
+                const data = await resp.json();
+                
+                if (data.status === 'success') {
+                    Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
+                    document.getElementById('votacionNombre').value = '';
+                    cargarVotacionesDeLaMinuta();
+                    cargarResultadosVotacion();
+                } else {
+                    Swal.fire('Error', 'No se pudo crear la votación: ' + data.message, 'error');
+                }
+            } catch (err) {
+                console.error("Error fetch guardar votacion:", err);
+                Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
+        }
+
+        /**
+         * Carga la lista de votaciones asociadas a la minuta y las renderiza.
+         */
+        async function cargarVotacionesDeLaMinuta() {
+            const cont = document.getElementById('listaVotacionesMinuta');
+            const status = document.getElementById('votacionesStatus');
+            if (!cont || !status) return;
+            cont.innerHTML = '';
+            status.textContent = 'Cargando...';
+            
+            try {
+                const resp = await fetch(`/corevota/controllers/gestionar_votacion_minuta.php?action=list&idMinuta=${idMinutaGlobal}`);
+                if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
+                const data = await resp.json();
+                
+                if (data.status === 'success' && data.data.length > 0) {
+                    status.textContent = `Mostrando ${data.data.length} votacion(es).`;
+                    let html = '<ul class="list-group">';
+                    data.data.forEach(v => {
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-bold">${v.nombreVotacion}</span>
+                                    <small class="d-block text-muted">
+                                        Comisión: ${v.nombreComision} | Estado: 
+                                        ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
+                                    </small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-warning btn-sm" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
+                                        <i class="fas fa-person-booth"></i> Registrar Voto
+                                    </button>
+                                </div>
+                            </li>`;
+                    });
+                    html += '</ul>';
+                    cont.innerHTML = html;
+                } else {
+                    status.textContent = 'No hay votaciones creadas para esta minuta.';
+                }
+            } catch (err) {
+                console.error("Error cargando votaciones:", err);
+                status.textContent = 'Error al cargar votaciones.';
+                status.className = 'text-danger small';
+            }
+        }
+
+        /**
+         * Abre un modal para registrar o modificar votos de asistentes manualmente.
+         */
+        async function abrirModalVoto(idVotacion) {
+            if (ASISTENCIA_GUARDADA_IDS.length === 0) {
+                Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Cargando Estado de Votación...',
+                text: 'Buscando asistentes y votos...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'get_status');
+                formData.append('idVotacion', idVotacion);
+                formData.append('asistentes_ids', JSON.stringify(ASISTENCIA_GUARDADA_IDS));
+                
+                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                
+                if (data.status !== 'success') {
+                    throw new Error(data.message);
+                }
+
+                let modalHtml = '<div class="container-fluid" style="text-align: left;">';
+                modalHtml += '<p class="text-muted">Seleccione el voto para cada asistente que no haya votado.</p>';
+                modalHtml += '<table class="table table-sm table-hover">';
+                modalHtml += '<thead><tr><th>Asistente</th><th class="text-center">Voto Registrado</th><th class="text-center">Registrar Voto</th></tr></thead><tbody>';
+                
+                data.data.asistentes.forEach(asistente => {
+                    const voto = data.data.votos[asistente.idUsuario] || null;
+                    modalHtml += `<tr><td>${asistente.nombreCompleto}</td>`;
+                    
+                    if (voto) {
+                        let badge = 'secondary';
+                        if (voto === 'SI') badge = 'success';
+                        if (voto === 'NO') badge = 'danger';
+                        modalHtml += `<td class="text-center"><span class="badge bg-${badge}">${voto}</span></td>`;
+                        modalHtml += `<td></td>`;
+                    } else {
+                        modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
+                        modalHtml += `<td class="text-center" style="white-space: nowrap;">
+                                        <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
+                                        <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
+                                    </td>`;
+                    }
+                    modalHtml += '</tr>';
+                });
+                
+                modalHtml += '</tbody></table></div>';
+                
+                Swal.fire({
+                    title: 'Registrar Votos Manualmente',
+                    html: modalHtml,
+                    width: '800px',
+                    showConfirmButton: false,
+                    showCloseButton: true
+                });
+            } catch (err) {
+                Swal.fire('Error', 'No se pudo cargar el estado de la votación: ' + err.message, 'error');
+            }
+        }
+
+        /**
+         * Registra o anula un voto para un usuario específico (usado por el secretario).
+         */
+        async function registrarVotoSecretario(idVotacion, idUsuario, voto, btn) {
+            const parentTD = btn.parentNode;
+            parentTD.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'register_vote');
+                formData.append('idVotacion', idVotacion);
+                formData.append('idUsuario', idUsuario);
+                formData.append('voto', voto);
+                formData.append('idSecretario', ID_SECRETARIO_LOGUEADO);
+                
+                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+                
+                if (data.status === 'success') {
+                    const statusTD = parentTD.previousElementSibling;
+                    let badge = 'secondary';
+                    if (voto === 'SI') badge = 'success';
+                    if (voto === 'NO') badge = 'danger';
+                    
+                    statusTD.innerHTML = `<span class="badge bg-${badge}">${voto}</span>`;
+                    parentTD.innerHTML = '✅ Registrado';
+                    
+                    // Actualizar resultados en vivo
+                    cargarResultadosVotacion();
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (err) {
+                parentTD.innerHTML = '<span class="text-danger">Error</span>';
+                alert('Error al registrar voto: ' + err.message);
+            }
+        }
+
+        /**
+         * Llama a la API y renderiza los resultados en vivo de las votaciones.
          */
         function cargarResultadosVotacion() {
             const container = document.getElementById('votacion-resultados-live');
@@ -1740,11 +1826,9 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 return;
             }
 
-            // Poner en modo "cargando"
             if (refreshButton) refreshButton.disabled = true;
             if (placeholder) placeholder.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Cargando resultados...';
 
-            // Llamar a la nueva API (usando la ruta absoluta)
             fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinutaGlobal}`)
                 .then(response => {
                     if (!response.ok) {
@@ -1764,10 +1848,8 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                         return;
                     }
 
-                    // Limpiar contenedor
-                    container.innerHTML = '';
+                    container.innerHTML = ''; // Limpiar contenedor
 
-                    // Construir el HTML (similar al PDF)
                     data.data.forEach(votacion => {
                         const votosSi = [];
                         const votosNo = [];
@@ -1818,7 +1900,7 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
         }
 
         /**
-         * Helper para evitar inyección XSS
+         * Helper para evitar inyección XSS.
          */
         function escapeHTML(str) {
             if (!str) return '';
@@ -1832,9 +1914,6 @@ $puedeEnviar = ($estadoMinuta !== 'APROBADA');
                 } [m];
             });
         }
-        // ==================================================================
-        // --- FIN: FUNCIONES JS PARA VOTACIÓN EN VIVO ---
-        // ==================================================================
     </script>
 </body>
 

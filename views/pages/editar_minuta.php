@@ -57,42 +57,47 @@ $haEnviadoFeedback = false;
 $estadoMinuta = $minuta['estadoMinuta'] ?? 'BORRADOR';
 
 if ($estadoMinuta === 'PENDIENTE' || $estadoMinuta === 'PARCIAL') {
+    // ... (Lógica de verificación de estado de firma/feedback del Presidente, sin cambios) ...
     // Verificar si el usuario logueado es uno de los firmantes requeridos
     $stmtFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                                WHERE t_minuta_idMinuta = :idMinuta 
-                                AND t_usuario_idPresidente = :idUsuario");
+                WHERE t_minuta_idMinuta = :idMinuta 
+                AND t_usuario_idPresidente = :idUsuario");
     $stmtFirma->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
     $estadoFirma = $stmtFirma->fetchColumn();
 
     if ($estadoFirma !== false) { // ¡Es un firmante!
         $esPresidenteFirmante = true;
-
-        // (Usamos 'EN_ESPERA' basado en tu lógica de minutas_listado_general.php)
         if ($estadoFirma === 'EN_ESPERA') {
-            // 'EN_ESPERA' es el estado que tu 'enviar_feedback.php' busca.
-            // Significa "Aún no ha firmado NI enviado feedback"
+            // Está pendiente de su acción
         } else if ($estadoFirma === 'REQUIERE_REVISION') {
             $haEnviadoFeedback = true; // El presidente ya envió feedback
-        } else {
-            // Cualquier otro estado (como 'FIRMADO' si lo implementas)
-            // O si el estado es 'PENDIENTE' (en tu BD `t_aprobacion_minuta` tiene 'PENDIENTE' y 'EN_ESPERA', 
-            // deberías unificar eso. Asumiré que PENDIENTE y EN_ESPERA significan lo mismo: "en revisión")
-
-            // Revisando tu 'enviar_feedback.php', solo permite feedback si el estado es 'EN_ESPERA'.
-            // Si tu estado por defecto es 'PENDIENTE', debes ajustar la consulta en 'enviar_feedback.php' (línea 87)
-            // a: AND estado_firma IN ('EN_ESPERA', 'PENDIENTE')
         }
+        // ... (otros estados si los tienes) ...
     }
 }
 
 // El rol de ST (editor) tiene prioridad sobre el de Presidente (revisor)
 if ($esSecretarioTecnico) {
     $esPresidenteFirmante = false;
+    // La edición del ST NO debe estar limitada por el feedback recibido,
+    // ya que su trabajo es precisamente corregir los errores.
 }
 
-// Determinar si los campos deben ser de solo lectura
-// El ST puede editar, el Presidente solo puede leer.
-$esSoloLectura = ($esPresidenteFirmante || $estadoMinuta === 'APROBADA' || $haFirmado || $haEnviadoFeedback);
+
+// MODIFICACIÓN CLAVE: Definir la variable de solo lectura
+$esSoloLectura = true; // Valor por defecto: solo lectura
+
+if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+    // REGLA 1: Si es ST Y la minuta no está APROBADA, SIEMPRE puede editar.
+    $esSoloLectura = false;
+} elseif ($esPresidenteFirmante || $estadoMinuta === 'APROBADA') {
+    // REGLA 2: Si es un Presidente o la minuta ya está APROBADA, es solo lectura.
+    $esSoloLectura = true;
+} else {
+    // Caso por defecto (cualquier otro usuario o estado)
+    $esSoloLectura = true;
+}
+
 $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
 $pdo = null; // Cerrar conexión
