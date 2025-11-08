@@ -107,6 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <title>Recuperación de Contraseña</title>
+    <link rel="stylesheet" href="../../public/css/login_style.css">
+    
+
     <style>
         body { font-family: Arial, sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; background-color:#f5f5f5; }
         .recovery-box { background:white; padding:40px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-width:450px; width:90%; text-align:center; }
@@ -127,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
+    <div class="background-overlay"></div>
     <div class="recovery-box">
         <img src="/corevota/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
         <h2>RECUPERACIÓN DE CONTRASEÑA</h2>
