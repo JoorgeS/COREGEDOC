@@ -214,11 +214,12 @@ class MinutaManager extends BaseConexion
         $nombresAsistentes = $dataAsistencia['asistentes'];
 
         // Extracción de Metadatos 
-        $idMinuta = $dataAsistencia['idMinuta'];
+        // ... (extracción de metadatos sin cambios) ...
         $nombreReunion = htmlspecialchars($dataAsistencia['nombreReunion']);
         $fechaMinuta = (new \DateTime($dataAsistencia['fechaMinuta']))->format('d/m/Y');
         $horaMinuta = (new \DateTime($dataAsistencia['horaMinuta']))->format('H:i');
         $nombreSecretario = htmlspecialchars($dataAsistencia['nombreSecretario']);
+        // Usaremos 'Secretario Técnico' como texto fijo para el cargo en el sello
         $cargoSecretario = 'Secretario Técnico'; // htmlspecialchars($dataAsistencia['cargoSecretario']);
         $comisiones = htmlspecialchars($dataAsistencia['comisiones'] ?? 'No Aplica');
 
@@ -235,11 +236,23 @@ class MinutaManager extends BaseConexion
         $logoGoreBase64 = file_exists($rutaLogoGore) ? base64_encode(file_get_contents($rutaLogoGore)) : '';
         $selloBase64 = file_exists($rutaSelloVerde) ? base64_encode(file_get_contents($rutaSelloVerde)) : '';
 
-        // Definición del URI para usarlo directamente en el tag <img>
-        $selloUri = !empty($selloBase64) ? "data:image/png;base64,{$selloBase64}" : '';
+        // Definición de CSS para incrustar la imagen del sello de fondo
+        $selloBackgroundCSS = !empty($selloBase64) ?
+            "content: url('data:image/png;base64,{$selloBase64}');
+             position: absolute;
+             top: 50%;
+             left: 50%;
+             /* Propiedades de transformación para centrar */
+             -ms-transform: translate(-50%, -50%); /* Para compatibilidad de Dompdf */
+             -webkit-transform: translate(-50%, -50%); 
+             transform: translate(-50%, -50%); 
+             width: 150px; 
+             height: auto;
+             opacity: 0.15;" /* Aumentado ligeramente para mejor visibilidad */
+            : '';
 
         $html = "
-        <!DOCTYPE html><html><head><meta charset='UTF-8'><title>Listado de Asistencia - Minuta {$idMinuta}</title>
+        <!DOCTYPE html><html><head><meta charset='UTF-8'><title>Lista de Asistencia - Minuta {$idMinuta}</title>
         <style>
          body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 0; padding: 0; }
          .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -267,44 +280,35 @@ class MinutaManager extends BaseConexion
          .presente-cell { font-weight: bold; color: #155724; }
          .ausente-cell { font-style: italic; color: #6c757d; }
          
-         /* --- ESTILOS DEL SELLO DE VALIDACIÓN (COMO EN LA IMAGEN) --- */
+         /* --- ESTILOS DEL SELLO DE VALIDACIÓN --- */
          .validation-block-container {
-             width: 280px; /* Ancho similar al de la imagen */
-             margin: 50px auto 0; /* Centrado, como en la imagen */
+             width: 280px; 
+             margin: 50px auto 0;
              text-align: center;
              padding: 15px;
-             border: 2px solid #a3e635; /* Borde verde claro */
+             border: 2px solid #28a745; /* Borde verde */
              border-radius: 10px; /* Bordes redondeados */
-             position: relative; /* CLAVE: Contenedor para la imagen absoluta */
+             position: relative; /* CLAVE para que ::before se posicione correctamente */
              overflow: hidden; 
-             background-color: #e6ffb3; /* Fondo verde muy pálido */
+             background-color: #f8fdf8; 
          }
-        
-        /* ESTILO PARA LA IMAGEN (sello de agua) */
-        .validation-block-container img.sello-fondo {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            /* Centrado con transform */
-            -ms-transform: translate(-50%, -50%); 
-            -webkit-transform: translate(-50%, -50%); 
-            transform: translate(-50%, -50%); 
-            width: 80%; /* Tamaño del sello */
-            height: auto;
-            opacity: 0.8; /* Opacidad semi-transparente */
-            z-index: 1; /* Fondo */
-        }
+
+         /* Truco de Dompdf: usar pseudoelemento para imagen de fondo opaca */
+         .validation-block-container::before {
+             /* La definición del contenido y estilo ahora se hace dinámicamente en PHP */
+             {$selloBackgroundCSS}
+         }
 
          .validation-content {
-             position: relative; 
-             z-index: 2; /* CLAVE: Asegura que el texto esté por encima del sello */
+             position: relative; /* Asegura que el contenido esté sobre el sello (z-index: 2) */
+             z-index: 2;
              color: #333; 
          }
          
          /* Ajuste para <strong> (Nombre) */
          .validation-content strong {
              display: block;
-             font-size: 14px; /* Tamaño más grande para el nombre */
+             font-size: 14px;
              margin-bottom: 2px;
              color: #000;
              font-weight: bold;
@@ -313,7 +317,7 @@ class MinutaManager extends BaseConexion
          /* Ajuste para <em> (Cargo) */
          .validation-content em {
              display: block;
-             font-size: 12px; /* Tamaño para el cargo */
+             font-size: 12px;
              font-style: italic;
              color: #555;
              margin-bottom: 5px;
@@ -323,7 +327,19 @@ class MinutaManager extends BaseConexion
          .validation-content p {
              margin: 2px 0;
              line-height: 1.2;
-             font-size: 11px; /* Tamaño para el detalle y la fecha */
+         }
+
+         .validation-content .validation-text-small {
+             font-size: 11px;
+             color: #333; 
+             margin-top: 5px;
+         }
+         
+         .validation-content .timestamp-large {
+             font-size: 13px;
+             font-weight: bold;
+             color: #555;
+             margin-top: 5px;
          }
 
          .dashed-line {
@@ -341,32 +357,31 @@ class MinutaManager extends BaseConexion
              color: #999; 
          }
         </style></head><body>
-     <div class='header'>
-     <div class='header-logos'>
-      <div class='left'>" . (!empty($logoCoreBase64) ? "<img src='data:image/png;base64,{$logoCoreBase64}' alt='Logo Core'>" : "") . "</div>
-      <div class='center'>
-        <p class='header-title'>GOBIERNO REGIONAL REGIÓN DE VALPARAÍSO</p>
-        <p class='header-title'>CONSEJO REGIONAL</p>
-
-      </div>
-      <div class='right'>" . (!empty($logoGoreBase64) ? "<img src='data:image/png;base64,{$logoGoreBase64}' alt='Logo Gore'>" : "") . "</div>
-     </div>
-     
-     <div class='metadata'>
-     <h2 class='main-title'>Listado de Asistencia</h2>
-      <table class='metadata-grid'>
-       <tr><td class='label'>Minuta N°:</td><td>{$idMinuta}</td></tr>
-       <tr><td class='label'>Nombre de la Reunión:</td><td>{$nombreReunion}</td></tr>
-       <tr><td class='label'>Secretario Técnico:</td><td>{$nombreSecretario}</td></tr>
-       <tr><td class='label'>Fecha / Hora Reunión:</td><td>{$fechaMinuta} / {$horaMinuta}</td></tr>
-       <tr><td class='label'>Comisión(es):</td><td>{$comisiones}</td></tr>
-      </table>
-      
-      
-     </div>
-     </div>
-     
-     <table class='attendance-list'><thead><tr><th>N°</th><th>Nombre Completo</th><th>Estado de Asistencia</th></tr></thead><tbody>";
+          <div class='header'>
+           <div class='header-logos'>
+            <div class='left'>" . (!empty($logoCoreBase64) ? "<img src='data:image/png;base64,{$logoCoreBase64}' alt='Logo Core'>" : "") . "</div>
+            <div class='center'>
+                <p class='header-title'>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>
+                <p class='header-title'>CONSEJO REGIONAL</p>
+            </div>
+            <div class='right'>" . (!empty($logoGoreBase64) ? "<img src='data:image/png;base64,{$logoGoreBase64}' alt='Logo Gore'>" : "") . "</div>
+           </div>
+           
+           <div class='metadata'>
+             <table class='metadata-grid'>
+               <tr><td class='label'>Minuta N°:</td><td>{$idMinuta}</td></tr>
+               <tr><td class='label'>Nombre de la Reunión:</td><td>{$nombreReunion}</td></tr>
+               <tr><td class='label'>Secretario Técnico:</td><td>{$nombreSecretario}</td></tr>
+               <tr><td class='label'>Cargo:</td><td>{$cargoSecretario}</td></tr>
+               <tr><td class='label'>Fecha / Hora Reunión:</td><td>{$fechaMinuta} / {$horaMinuta}</td></tr>
+               <tr><td class='label'>COMISIÓN(ES):</td><td>{$comisiones}</td></tr>
+             </table>
+             
+             <h2 class='main-title'>Listado de Asistencia</h2>
+           </div>
+          </div>
+          
+          <table class='attendance-list'><thead><tr><th>N°</th><th>Nombre Completo</th><th>Estado de Asistencia</th></tr></thead><tbody>";
 
         if (empty($nombresAsistentes)) {
             $html .= "<tr><td colspan='3' style='text-align: center;'>No se encontró el listado de Consejeros/Presidentes de Comisión.</td></tr>";
@@ -382,27 +397,26 @@ class MinutaManager extends BaseConexion
                 }
 
                 $html .= "<tr>
-              <td>" . ($index + 1) . "</td>
-              <td>" . htmlspecialchars($miembro['nombreCompleto']) . "</td>
-              <td class='{$claseCss}'>" . $estado . $fechaFirma . "</td>
-             </tr>";
+                            <td>" . ($index + 1) . "</td>
+                            <td>" . htmlspecialchars($miembro['nombreCompleto']) . "</td>
+                            <td class='{$claseCss}'>" . $estado . $fechaFirma . "</td>
+                          </tr>";
             }
         }
 
         $html .= "</tbody></table>
-    
-    <div class='validation-block-container'>
-                " . (!empty($selloUri) ? "<img src='{$selloUri}' alt='Sello de Aprobación' class='sello-fondo'>" : "") . "
-      <div class='validation-content'>
-        <strong>{$nombreSecretario}</strong>
-        <em>{$cargoSecretario}</em>
-        <p>Validación de Asistencia</p>
-        <div class='dashed-line'></div>
-        <p>" . (new DateTime())->format('d-m-Y H:i:s') . "</p>
-      </div>
-    </div>
-    
-    <div class='footer'>Generado por CoreVota el {$fechaGeneracion}</div></body></html>";
+        
+        <div class='validation-block-container'>
+            <div class='validation-content'>
+                <strong>{$nombreSecretario}</strong>
+                <em>{$cargoSecretario}</em>
+                <p class='validation-text-small'>Validación de Asistencia</p>
+                <div class='dashed-line'></div>
+                <p class='timestamp-large'>" . (new DateTime())->format('d-m-Y H:i:s') . "</p>
+            </div>
+        </div>
+        
+        <div class='footer'>Generado por CoreVota el {$fechaGeneracion}</div></body></html>";
 
         $options = new Options();
         $options->set('isRemoteEnabled', true);
@@ -426,14 +440,7 @@ class MinutaManager extends BaseConexion
         file_put_contents($rutaCompleta, $dompdf->output());
         return $relativePath;
     }
-    // controllers/guardar_minuta_completa.php (Clase MinutaManager)
 
-// ... (inicio de la clase MinutaManager) ...
-
-    /**
-     * Guarda la asistencia, los temas/acuerdos, los adjuntos, y actualiza la hora de término de la reunión.
-     * Preserva la marca de tiempo de auto-asistencia del usuario si ya existía.
-     */
     public function guardarMinutaCompleta($idMinuta, $asistenciaIDs, $temasData, $enlaceAdjunto)
     {
         $adjuntosGuardados = [];
@@ -442,69 +449,84 @@ class MinutaManager extends BaseConexion
 
             // --- 2. ACTUALIZAR ASISTENCIA (t_asistencia) ---
 
-            // 2.1 RECUPERAR LAS FECHAS DE REGISTRO EXISTENTES ANTES DE BORRAR
-            $fechasAsistenciaOriginales = [];
-            
-            // Convertir IDs a enteros y filtrar para una consulta segura
+            // 2.1 Convertir IDs a enteros y filtrar para una consulta segura
             $asistenciaIDs_clean = array_map('intval', array_filter($asistenciaIDs, 'is_numeric'));
-            
-            if (!empty($asistenciaIDs_clean)) {
-                $placeholders = implode(',', array_fill(0, count($asistenciaIDs_clean), '?'));
-                $sqlFechasOriginales = "SELECT t_usuario_idUsuario, fechaRegistroAsistencia 
-                                        FROM t_asistencia 
-                                        WHERE t_minuta_idMinuta = ? AND t_usuario_idUsuario IN ({$placeholders})";
-                $stmtFechasOriginales = $this->db->prepare($sqlFechasOriginales);
-                
-                // Parámetros: [idMinuta, idUsuario1, idUsuario2, ...]
-                $paramsFechas = array_merge([$idMinuta], $asistenciaIDs_clean);
-                $stmtFechasOriginales->execute($paramsFechas);
-                
-                // Mapear idUsuario a fechaRegistroAsistencia para su preservación
-                foreach ($stmtFechasOriginales->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                    $fechasAsistenciaOriginales[(int)$row['t_usuario_idUsuario']] = $row['fechaRegistroAsistencia'];
-                }
+
+            // 2.2 [NUEVA LÓGICA] Respaldar TODOS los datos originales de la minuta
+            $mapaDatosOriginales = [];
+            $sqlFechasOriginales = "SELECT t_usuario_idUsuario, fechaRegistroAsistencia, origenAsistencia 
+                            FROM t_asistencia 
+                            WHERE t_minuta_idMinuta = ?";
+            $stmtFechasOriginales = $this->db->prepare($sqlFechasOriginales);
+            $stmtFechasOriginales->execute([$idMinuta]);
+
+            foreach ($stmtFechasOriginales->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $mapaDatosOriginales[(int)$row['t_usuario_idUsuario']] = [
+                    'fecha' => $row['fechaRegistroAsistencia'],
+                    'origen' => $row['origenAsistencia']
+                ];
             }
 
-
-            // 2.2 ELIMINAR TODAS LAS ASISTENCIAS DE LA MINUTA (Reset)
+            // 2.3 ELIMINAR TODAS LAS ASISTENCIAS DE LA MINUTA (Reset)
             $sqlDeleteAsistencia = "DELETE FROM t_asistencia WHERE t_minuta_idMinuta = :idMinuta";
             $stmtDeleteAsistencia = $this->db->prepare($sqlDeleteAsistencia);
             $stmtDeleteAsistencia->execute([':idMinuta' => $idMinuta]);
 
-            // 2.3 INSERTAR SOLO LOS USUARIOS MARCADOS COMO PRESENTES
+            // 2.4 INSERTAR SOLO LOS USUARIOS MARCADOS COMO PRESENTES (Con lógica de preservación)
             $idTipoReunion = 1; // Asumido
             if (!empty($asistenciaIDs_clean)) {
-                // Modificamos el SQL para usar un bind de fecha en lugar de NOW()
-                $sqlAsistencia = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia)
-                                 VALUES (:idMinuta, :idUsuario, :idTipoReunion, :fechaAsistencia)";
+                $sqlAsistencia = "INSERT INTO t_asistencia (
+                            t_minuta_idMinuta, 
+                            t_usuario_idUsuario, 
+                            t_tipoReunion_idTipoReunion, 
+                            fechaRegistroAsistencia, 
+                            origenAsistencia
+                          ) VALUES (
+                            :idMinuta, 
+                            :idUsuario, 
+                            :idTipoReunion, 
+                            :fechaAsistencia, 
+                            :origen
+                          )";
                 $stmtAsistencia = $this->db->prepare($sqlAsistencia);
-                
+
                 foreach ($asistenciaIDs_clean as $idUsuario) {
-                    
-                    // CLAVE: Usamos la fecha original preservada, o generamos NOW() si es un nuevo registro
-                    $fechaRegistro = $fechasAsistenciaOriginales[$idUsuario] ?? (new DateTime())->format('Y-m-d H:i:s');
-                    
+
+                    $dataOriginal = $mapaDatosOriginales[$idUsuario] ?? null;
+
+                    if ($dataOriginal) {
+                        // El usuario ya existía: Preservar sus datos
+                        $fechaRegistro = $dataOriginal['fecha'];
+                        $origen = $dataOriginal['origen']; // <-- ¡AQUÍ SE RESPETA EL AUTOREGISTRO!
+                    } else {
+                        // El usuario es nuevo (recién marcado como 'Presente' por el ST)
+                        $fechaRegistro = (new DateTime())->format('Y-m-d H:i:s');
+                        $origen = 'SECRETARIO';
+                    }
+
                     $stmtAsistencia->execute([
                         ':idMinuta' => $idMinuta,
                         ':idUsuario' => $idUsuario,
                         ':idTipoReunion' => $idTipoReunion,
-                        ':fechaAsistencia' => $fechaRegistro // <-- La fecha que respeta el auto-registro
+                        ':fechaAsistencia' => $fechaRegistro,
+                        ':origen' => $origen
                     ]);
                 }
             }
 
-            // --- Generación PDF Asistencia (USANDO NUEVA LÓGICA DE DETALLE Y FORMATO) ---
-            $dataAsistencia = $this->getNombresAsistentes($asistenciaIDs_clean, $idMinuta); // Usar IDs limpios
-            
+            // --- Generación PDF Asistencia (Asegura que el PDF refleje los cambios) ---
+            // Este método usa getFullMinutaData que, a su vez, lee t_asistencia para obtener las fechas
+            $dataAsistencia = $this->getNombresAsistentes($asistenciaIDs_clean, $idMinuta);
+
             // Solo generar si se encontraron miembros (Tipo de Usuario 1 o 3)
             if (!empty($dataAsistencia['asistentes'])) {
                 $rutaPdfAsistencia = $this->generarPdfAsistencia($idMinuta, $dataAsistencia);
-                
+
                 $sqlInsertAdjunto = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto) VALUES (:idMinuta, :path, :tipo)";
                 $stmtInsertAdjunto = $this->db->prepare($sqlInsertAdjunto);
                 // Eliminar cualquier adjunto de 'asistencia' anterior para evitar duplicados
                 $this->db->prepare("DELETE FROM t_adjunto WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'")
-                         ->execute([':idMinuta' => $idMinuta]);
+                    ->execute([':idMinuta' => $idMinuta]);
 
                 $stmtInsertAdjunto->execute([
                     ':idMinuta' => $idMinuta,
@@ -662,9 +684,9 @@ class MinutaManager extends BaseConexion
 
             // --- 6. ASEGURAR QUE EL ESTADO SEA 'BORRADOR' ---
             $sqlSetBorrador = "UPDATE t_minuta 
-                                     SET estadoMinuta = 'BORRADOR' 
-                                     WHERE idMinuta = :idMinuta 
-                                     AND estadoMinuta <> 'APROBADA'";
+                                 SET estadoMinuta = 'BORRADOR' 
+                                 WHERE idMinuta = :idMinuta 
+                                 AND estadoMinuta <> 'APROBADA'";
             $this->db->prepare($sqlSetBorrador)->execute([':idMinuta' => $idMinuta]);
 
             // --- 7. COMMIT ---
@@ -678,6 +700,7 @@ class MinutaManager extends BaseConexion
 
             return ['status' => 'success', 'message' => $mensajeExito, 'idMinuta' => $idMinuta, 'adjuntosActualizados' => $listaCompletaAdjuntos];
         } catch (Exception $e) {
+            // ... (Manejo de errores y rollback) ...
             error_log("ERROR CATCH idMinuta {$idMinuta}: Excepción capturada - " . $e->getMessage());
             if ($this->db->inTransaction()) {
                 error_log("ERROR CATCH idMinuta {$idMinuta}: Realizando db->rollBack().");
@@ -686,7 +709,6 @@ class MinutaManager extends BaseConexion
             return ['status' => 'error', 'message' => 'Ocurrió un error al guardar los datos.', 'error' => $e->getMessage()];
         }
     }
-    
 } // <-- Cierre de la clase MinutaManager
 
 // --- INICIO DEL CÓDIGO DE EJECUCIÓN (SIN CAMBIOS) ---

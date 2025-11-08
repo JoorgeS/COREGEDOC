@@ -143,7 +143,6 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         $stmt_asistencia = $pdo->prepare($sql_asistencia);
         $stmt_asistencia->execute([':idMinutaActual' => $idMinutaActual]);
         $asistencia_guardada_ids = $stmt_asistencia->fetchAll(PDO::FETCH_COLUMN, 0);
-
     } catch (Exception $e) {
         error_log("Error cargando datos para edición (Minuta ID: {$idMinutaActual}): " . $e->getMessage());
         die("❌ Error al cargar los datos de la minuta: " . htmlspecialchars($e->getMessage()) . "<br><a href='menu.php?pagina=minutas_pendientes'>Volver al listado</a>");
@@ -501,7 +500,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                     </div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
 
@@ -532,7 +531,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
                 <div class="collapse" id="acuerdos_ID_">
                     <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i</button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i< /button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
                         <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
                     </div>
                 </div>
@@ -599,7 +598,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 // Al seleccionar un archivo, se dispara la subida
                 inputArchivo.addEventListener('change', function(e) {
                     if (this.files.length > 0) {
-                        formSubirArchivo.dispatchEvent(new Event('submit', { cancelable: true }));
+                        formSubirArchivo.dispatchEvent(new Event('submit', {
+                            cancelable: true
+                        }));
                     }
                 });
             }
@@ -608,7 +609,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 inputUrlLink.addEventListener('change', function() {
                     const url = this.value.trim();
                     if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
-                        formAgregarLink.dispatchEvent(new Event('submit', { cancelable: true }));
+                        formAgregarLink.dispatchEvent(new Event('submit', {
+                            cancelable: true
+                        }));
                     } else if (url !== '') {
                         Swal.fire('Formato Inválido', 'Asegúrese de que el enlace sea una URL completa y válida (ej: https://ejemplo.com).', 'warning');
                     }
@@ -664,7 +667,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                             const userIdString = String(c.idUsuario);
                             const isPresent = ASISTENCIA_GUARDADA_IDS.includes(userIdString);
                             const isAbsent = !isPresent;
-                            
+
                             // Aplicar el atributo disabled/title a los checkboxes
                             tabla += `<tr data-userid="${c.idUsuario}">
                                 <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
@@ -723,25 +726,33 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 Swal.fire('Prohibido', 'No puede guardar la asistencia en este estado.', 'error');
                 return;
             }
-            
+
             const status = document.getElementById('guardarAsistenciaStatus');
             const btn = document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]');
-            
-            let datos = {
-                idMinuta: idMinutaGlobal,
-                asistencia: asistenciaIDs
-            };
-            
+
+            // --- INICIO DE LA CORRECCIÓN ---
+
+            // 1. Crear un objeto FormData
+            const formData = new FormData();
+
+            // 2. Agregar los datos que el PHP espera en $_POST
+            formData.append('idMinuta', idMinutaGlobal);
+
+            // 3. Convertir el array de asistencia en un *string* JSON.
+            // (Tu otro script, guardar_minuta_completa.php, espera un string,
+            // así que es casi seguro que guardar_asistencia.php también lo espera)
+            formData.append('asistencia', JSON.stringify(asistenciaIDs));
+
+            // --- FIN DE LA CORRECCIÓN ---
+
             btn.disabled = true;
             status.textContent = 'Guardando...';
             status.className = 'me-auto small text-muted';
 
             fetch("/corevota/controllers/guardar_asistencia.php", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(datos)
+                    // 4. NO enviar 'headers', el navegador lo hace solo
+                    body: formData // 5. Enviar el objeto FormData
                 })
                 .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
                 .then(resp => {
@@ -839,7 +850,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 if (areas[4]) areas[4].innerHTML = tema.observacion || '';
                 div.dataset.idTema = tema.idTema; // Guardar ID de tema existente
             }
-            
+
             // Mostrar botón de eliminar si hay más de 1 tema
             const btnEliminar = nuevo.querySelector('.eliminar-tema');
             if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
@@ -1239,7 +1250,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             const idMinuta = idMinutaGlobal;
             const btnGuardar = document.getElementById('btnGuardarBorrador');
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
-            
+
             if (!ES_ST_EDITABLE) {
                 Swal.fire('Prohibido', 'No puede enviar la minuta en este estado.', 'error');
                 return;
@@ -1346,7 +1357,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                             container.style.display = 'block';
                         }
                     }
-                    
+
                     // Si hay feedback, aplicamos las reglas de edición
                     deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
                     actualizarBotonesParaFeedback();
@@ -1373,7 +1384,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
          * Deshabilita las secciones del formulario según las reglas de feedback.
          */
         function deshabilitarCamposSegunFeedback(reglas) {
-            
+
             // Regla para Asistencia (Bloquea si reglas.asistencia es 'false')
             if (reglas.asistencia === false) {
                 deshabilitarSeccion('asistenciaForm', 'Asistencia bloqueada (sin feedback)');
@@ -1451,7 +1462,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             if (btnEnviar) {
                 btnEnviar.innerHTML = '<i class="fas fa-check-double"></i> Aplicar y Reenviar p/ Aprobación';
                 btnEnviar.classList.remove('btn-danger');
-                btnEnviar.classList.add('btn-success'); 
+                btnEnviar.classList.add('btn-success');
                 // Cambiamos la función que llama al re-envío
                 btnEnviar.setAttribute('onclick', 'if (validarCamposMinuta()) confirmarAplicarFeedback()');
             }
@@ -1577,7 +1588,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     // Abrir el bloque del tema y enfocar el campo vacío
                     const collapse = bloque.querySelector('#temaTratado_' + (index + 1) + '_');
                     if (collapse && collapse.classList.contains('collapse')) {
-                        const bsCollapse = new bootstrap.Collapse(collapse, { show: true });
+                        const bsCollapse = new bootstrap.Collapse(collapse, {
+                            show: true
+                        });
                     }
 
                     (tema ? objetivoEl : temaEl)?.focus();
@@ -1599,7 +1612,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             const idComision = document.getElementById('votacionComisionId').value;
             const nombreVotacion = document.getElementById('votacionNombre').value.trim();
             const btn = document.querySelector('#formCrearVotacionMinuta button');
-            
+
             if (!idComision || !nombreVotacion) {
                 Swal.fire('Campos incompletos', 'Debe seleccionar una comisión y escribir el texto de la votación.', 'warning');
                 return;
@@ -1611,28 +1624,28 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-            
+
             const formData = new FormData();
             formData.append('action', 'create');
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('idReunion', ID_REUNION_GLOBAL);
             formData.append('idComision', idComision);
             formData.append('nombreVotacion', nombreVotacion);
-            
+
             try {
                 const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (!resp.ok) {
                     const text = await resp.text();
                     console.error("Error guardar votacion:", text);
                     throw new Error(`Error HTTP ${resp.status} (ver consola)`);
                 }
-                
+
                 const data = await resp.json();
-                
+
                 if (data.status === 'success') {
                     Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
                     document.getElementById('votacionNombre').value = '';
@@ -1645,7 +1658,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 console.error("Error fetch guardar votacion:", err);
                 Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
             }
-            
+
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
         }
@@ -1659,12 +1672,12 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             if (!cont || !status) return;
             cont.innerHTML = '';
             status.textContent = 'Cargando...';
-            
+
             try {
                 const resp = await fetch(`/corevota/controllers/gestionar_votacion_minuta.php?action=list&idMinuta=${idMinutaGlobal}`);
                 if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
                 const data = await resp.json();
-                
+
                 if (data.status === 'success' && data.data.length > 0) {
                     status.textContent = `Mostrando ${data.data.length} votacion(es).`;
                     let html = '<ul class="list-group">';
@@ -1705,7 +1718,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
                 return;
             }
-            
+
             Swal.fire({
                 title: 'Cargando Estado de Votación...',
                 text: 'Buscando asistentes y votos...',
@@ -1714,19 +1727,19 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     Swal.showLoading();
                 }
             });
-            
+
             try {
                 const formData = new FormData();
                 formData.append('action', 'get_status');
                 formData.append('idVotacion', idVotacion);
                 formData.append('asistentes_ids', JSON.stringify(ASISTENCIA_GUARDADA_IDS));
-                
+
                 const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await resp.json();
-                
+
                 if (data.status !== 'success') {
                     throw new Error(data.message);
                 }
@@ -1735,11 +1748,11 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 modalHtml += '<p class="text-muted">Seleccione el voto para cada asistente que no haya votado.</p>';
                 modalHtml += '<table class="table table-sm table-hover">';
                 modalHtml += '<thead><tr><th>Asistente</th><th class="text-center">Voto Registrado</th><th class="text-center">Registrar Voto</th></tr></thead><tbody>';
-                
+
                 data.data.asistentes.forEach(asistente => {
                     const voto = data.data.votos[asistente.idUsuario] || null;
                     modalHtml += `<tr><td>${asistente.nombreCompleto}</td>`;
-                    
+
                     if (voto) {
                         let badge = 'secondary';
                         if (voto === 'SI') badge = 'success';
@@ -1756,9 +1769,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     }
                     modalHtml += '</tr>';
                 });
-                
+
                 modalHtml += '</tbody></table></div>';
-                
+
                 Swal.fire({
                     title: 'Registrar Votos Manualmente',
                     html: modalHtml,
@@ -1777,7 +1790,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         async function registrarVotoSecretario(idVotacion, idUsuario, voto, btn) {
             const parentTD = btn.parentNode;
             parentTD.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
-            
+
             try {
                 const formData = new FormData();
                 formData.append('action', 'register_vote');
@@ -1785,22 +1798,22 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 formData.append('idUsuario', idUsuario);
                 formData.append('voto', voto);
                 formData.append('idSecretario', ID_SECRETARIO_LOGUEADO);
-                
+
                 const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
                     method: 'POST',
                     body: formData
                 });
                 const data = await resp.json();
-                
+
                 if (data.status === 'success') {
                     const statusTD = parentTD.previousElementSibling;
                     let badge = 'secondary';
                     if (voto === 'SI') badge = 'success';
                     if (voto === 'NO') badge = 'danger';
-                    
+
                     statusTD.innerHTML = `<span class="badge bg-${badge}">${voto}</span>`;
                     parentTD.innerHTML = '✅ Registrado';
-                    
+
                     // Actualizar resultados en vivo
                     cargarResultadosVotacion();
                 } else {
