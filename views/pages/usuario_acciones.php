@@ -58,7 +58,7 @@ try {
             }
             if (correo_existe($usuarioObj, $correoPost, null)) {
                 $resultado = false;
-                $mensaje   = 'El correo "' . htmlspecialchars($correoPost) . '" ya está registrado. Usa otro.';
+                $mensaje   = 'El correo "' . $correoPost . '" ya está registrado. Usa otro.';
                 $destino   = $menuBase . '?pagina=usuario_crear';
                 break; // no continuamos con el insert
             }
@@ -87,12 +87,10 @@ try {
             $mensaje   = $resultado
                 ? "Usuario registrado exitosamente."
                 : "Error al registrar usuario. Verifique si el correo ya existe o si las listas (Perfil, Tipo Usuario, etc.) no están vacías.";
-            // en create, al terminar, volvemos al listado (por tu flujo actual)
             $destino   = $menuBase . '?pagina=usuarios_listado';
             break;
 
         case 'edit':
-            // --- VALIDACIÓN DUPLICIDAD CORREO (SERVER-SIDE) ---
             $idUsuario  = (int) (get_post_data('idUsuario') ?? 0);
             $correoPost = get_post_data('correo');
 
@@ -110,12 +108,11 @@ try {
             }
             if (correo_existe($usuarioObj, $correoPost, $idUsuario)) {
                 $resultado = false;
-                $mensaje   = 'El correo "' . htmlspecialchars($correoPost) . '" ya está registrado en otro usuario.';
+                $mensaje   = 'El correo "' . $correoPost . '" ya está registrado en otro usuario.';
                 $destino   = $menuBase . '?pagina=usuario_editar&id=' . $idUsuario;
-                break; // no continuamos con el update
+                break;
             }
 
-            // --- MODIFICAR USUARIO ---
             $contrasena_nueva = filter_input(INPUT_POST, 'contrasena', FILTER_DEFAULT);
 
             $datos = [
@@ -131,25 +128,32 @@ try {
                 'comuna_id'      => get_post_data('comuna_id'),
             ];
 
-            // Solo actualizar contraseña si el usuario ingresó una nueva
             if (!empty($contrasena_nueva)) {
                 $datos['contrasena'] = password_hash($contrasena_nueva, PASSWORD_DEFAULT);
             }
 
             $resultado = $usuarioObj->modificarUsuario($datos);
             $mensaje   = $resultado ? "Usuario modificado exitosamente." : "Error al modificar usuario.";
-            // en edit, al terminar, volvemos al listado
             $destino   = $menuBase . '?pagina=usuarios_listado';
             break;
 
         case 'delete':
-            // --- ELIMINAR USUARIO ---
-            $idUsuario = get_post_data('idUsuario');
+            // --- BORRADO LÓGICO (Desactivación) ---
+            $idUsuario = (int) (get_post_data('idUsuario') ?? 0);
+
+            if ($idUsuario <= 0) {
+                $resultado = false;
+                $mensaje   = "ID de usuario inválido para dar de baja.";
+                break;
+            }
+
+           // Usamos directamente eliminarUsuario, que ya realiza el borrado lógico (estado = 0)
             $resultado = $usuarioObj->eliminarUsuario($idUsuario);
-            $mensaje   = $resultado
-                ? "Usuario eliminado exitosamente."
-                : "Error al eliminar. Verifique si tiene registros asociados.";
-            $destino   = $menuBase . '?pagina=usuarios_listado';
+
+            $mensaje = $resultado
+                ? "Usuario dado de baja (desactivado) exitosamente."
+                : "Error al dar de baja el usuario. Verifique la conexión o si el ID existe.";
+            $destino = $menuBase . '?pagina=usuarios_listado';
             break;
 
         default:
@@ -158,10 +162,9 @@ try {
             break;
     }
 } catch (Throwable $e) {
-    // error_log($e->getMessage()); // opcional
+    error_log("Error en usuario_acciones.php: " . $e->getMessage());
     $resultado = false;
     $mensaje   = "Ocurrió un error al procesar la solicitud.";
-    // Mantén el destino que haya quedado según el flujo (create/edit/listado)
 }
 
 // Redirección final SIEMPRE por menu.php para mantener el sidebar

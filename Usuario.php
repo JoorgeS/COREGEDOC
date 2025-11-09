@@ -32,66 +32,68 @@ class Usuario
     // READ (Listar TODOS los usuarios con Joins)
     // Orden alfabético A→Z por primer nombre y luego apellido paterno
     public function listarUsuarios()
-    {
-        $consulta = "SELECT 
-                        u.idUsuario,
-                        u.pNombre, u.sNombre, u.aPaterno, u.aMaterno,
-                        u.correo, 
-                        p.descPerfil AS perfil_desc, u.perfil_id,
-                        tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
-                        pa.nombrePartido AS partido_desc, u.partido_id,
-                        c.nombreComuna AS comuna_desc, u.comuna_id
-                    FROM t_usuario u
-                    INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
-                    INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
-                    LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
-                    LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
-                    ORDER BY 
-                        u.pNombre ASC,
-                        u.aPaterno ASC";
+{
+    $consulta = "SELECT 
+                    u.idUsuario,
+                    u.pNombre, u.sNombre, u.aPaterno, u.aMaterno,
+                    u.correo, 
+                    p.descPerfil AS perfil_desc, u.perfil_id,
+                    tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
+                    pa.nombrePartido AS partido_desc, u.partido_id,
+                    c.nombreComuna AS comuna_desc, u.comuna_id
+                FROM t_usuario u
+                INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
+                INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
+                LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
+                LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
+                WHERE u.estado = 1
+                ORDER BY 
+                    u.pNombre ASC,
+                    u.aPaterno ASC";
 
-        return $this->db->consultarBD($consulta);
-    }
+    return $this->db->consultarBD($consulta);
+}
+
 
     // READ filtrado por nombre/apellido/correo (para el buscador)
     // IMPORTANTE: acá ya NO usamos parámetros con :busqueda
     // porque tu consultarBD() probablemente no los está bindeando.
-    public function listarUsuariosPorNombre($busqueda)
-    {
-        // Sanitizamos lo mínimo: escapamos comillas simples para que no rompan el SQL.
-        // Esto NO es tan seguro como un prepared statement real, pero evita que la query falle.
-        $busqueda = trim($busqueda);
-        $busqueda = '%' . $busqueda . '%';
-        $busquedaEsc = str_replace("'", "''", $busqueda);
+   public function listarUsuariosPorNombre($busqueda)
+{
+    $busqueda = trim($busqueda);
+    $busqueda = '%' . $busqueda . '%';
+    $busquedaEsc = str_replace("'", "''", $busqueda);
 
-        $consulta = "SELECT 
-                        u.idUsuario,
-                        u.pNombre, u.sNombre, u.aPaterno, u.aMaterno,
-                        u.correo, 
-                        p.descPerfil AS perfil_desc, u.perfil_id,
-                        tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
-                        pa.nombrePartido AS partido_desc, u.partido_id,
-                        c.nombreComuna AS comuna_desc, u.comuna_id
-                    FROM t_usuario u
-                    INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
-                    INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
-                    LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
-                    LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
-                    WHERE 
-                        (
-                            CONCAT(u.pNombre, ' ', u.aPaterno) LIKE '{$busquedaEsc}'
-                            OR u.pNombre LIKE '{$busquedaEsc}'
-                            OR u.sNombre LIKE '{$busquedaEsc}'
-                            OR u.aPaterno LIKE '{$busquedaEsc}'
-                            OR u.aMaterno LIKE '{$busquedaEsc}'
-                            OR u.correo LIKE '{$busquedaEsc}'
-                        )
-                    ORDER BY 
-                        u.pNombre ASC,
-                        u.aPaterno ASC";
+    $consulta = "SELECT 
+                    u.idUsuario,
+                    u.pNombre, u.sNombre, u.aPaterno, u.aMaterno,
+                    u.correo, 
+                    p.descPerfil AS perfil_desc, u.perfil_id,
+                    tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
+                    pa.nombrePartido AS partido_desc, u.partido_id,
+                    c.nombreComuna AS comuna_desc, u.comuna_id
+                FROM t_usuario u
+                INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
+                INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
+                LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
+                LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
+                WHERE 
+                    u.estado = 1
+                    AND (
+                        CONCAT(u.pNombre, ' ', u.aPaterno) LIKE '{$busquedaEsc}'
+                        OR u.pNombre LIKE '{$busquedaEsc}'
+                        OR u.sNombre LIKE '{$busquedaEsc}'
+                        OR u.aPaterno LIKE '{$busquedaEsc}'
+                        OR u.aMaterno LIKE '{$busquedaEsc}'
+                        OR u.correo LIKE '{$busquedaEsc}'
+                    )
+                ORDER BY 
+                    u.pNombre ASC,
+                    u.aPaterno ASC";
 
-        return $this->db->consultarBD($consulta);
-    }
+    return $this->db->consultarBD($consulta);
+}
+
 
     // READ (Obtener un solo Usuario por ID)
     public function obtenerUsuario($idUsuario)
@@ -147,11 +149,35 @@ class Usuario
     }
 
     // DELETE (Eliminar Usuario)
-    public function eliminarUsuario($idUsuario)
-    {
-        $consulta = "DELETE FROM t_usuario WHERE idUsuario = :id";
-        return $this->db->consultarBD($consulta, ['id' => $idUsuario]);
+   public function eliminarUsuario($idUsuario)
+{
+    $idUsuario = (int)$idUsuario;
+    if ($idUsuario <= 0) {
+        return false;
     }
+
+    // Usamos la conexión PDO real
+    $pdo = $this->db->getDatabase();
+    if (!$pdo) {
+        error_log("Error al obtener conexión en Usuario::eliminarUsuario");
+        return false;
+    }
+
+    $sql = "UPDATE t_usuario 
+            SET estado = 0 
+            WHERE idUsuario = :id";
+
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':id', $idUsuario, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
+    } catch (Exception $e) {
+        error_log("Error SQL (eliminarUsuario - borrado lógico): " . $e->getMessage());
+        return false;
+    }
+}
+
 
     // Combos / selects auxiliares
     public function obtenerPerfiles()

@@ -57,7 +57,7 @@ usort($usuarios, function($a, $b) {
 });
 
 // Totales y slice
-$totalReg   = count($usuarios);
+$totalReg     = count($usuarios);
 $totalPages = max(1, (int)ceil($totalReg / $pageSize));
 $page       = min($page, $totalPages);
 $offset     = ($page - 1) * $pageSize;
@@ -99,7 +99,9 @@ function renderTablaUsuarios(array $usuarios): void { ?>
                             ($user['aPaterno'] ?? '') . ' ' .
                             ($user['aMaterno'] ?? '')
                         );
-                        echo htmlspecialchars(preg_replace('/\s+/', ' ', $nombreCompleto));
+                        // Limpieza de espacios múltiples para mejor visualización
+                        $nombreCompleto = htmlspecialchars(preg_replace('/\s+/', ' ', $nombreCompleto));
+                        echo $nombreCompleto;
                         ?>
                     </td>
                     <td><?php echo htmlspecialchars($user['correo'] ?? ''); ?></td>
@@ -108,12 +110,23 @@ function renderTablaUsuarios(array $usuarios): void { ?>
                     <td class="text-nowrap">
                         <a href="menu.php?pagina=usuario_editar&id=<?php echo (int)($user['idUsuario'] ?? 0); ?>"
                            class="btn btn-sm btn-primary me-1" title="Editar">Editar</a>
+                        
+                        <button type="button" 
+                            class="btn btn-sm btn-danger btn-eliminar" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#confirmDeleteModal"
+                            data-id="<?php echo (int)($user['idUsuario'] ?? 0); ?>"
+                            data-nombre="<?php echo $nombreCompleto; ?>">
+                            Eliminar
+                        </button>
+                        <?php /* CÓDIGO ORIGINAL ELIMINADO:
                         <form action="usuario_acciones.php" method="POST" class="d-inline"
                               onsubmit="return confirm('¿Está seguro de que desea eliminar a este usuario?');">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="idUsuario" value="<?php echo (int)($user['idUsuario'] ?? 0); ?>">
                             <button type="submit" class="btn btn-sm btn-danger" title="Eliminar">Eliminar</button>
                         </form>
+                        */ ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -148,7 +161,8 @@ function renderPaginacion(int $page, int $totalPages, int $totalReg, int $pageSi
                 <ul class="pagination pagination-sm mb-0">
                     <?php
                     $makeLink = function(int $p) use ($base) {
-                        $q = $base . '&page=' . $p;
+                        // Enlaces de paginación deben apuntar al archivo base
+                        $q = $base . '&page=' . $p; 
                         return 'usuarios_listado.php?' . $q;
                     };
                     $disabled = function(bool $cond) { return $cond ? ' disabled' : ''; };
@@ -233,7 +247,6 @@ $msg    = $_GET['msg'] ?? '';
         </a>
     </div>
 
-    <!-- Buscador -->
     <div class="mb-3 p-3 border rounded bg-light" role="search">
         <div class="row g-3 align-items-end">
             <div class="col-md-6">
@@ -257,18 +270,39 @@ $msg    = $_GET['msg'] ?? '';
         </div>
     <?php endif; ?>
 
-    <!-- Contenedor dinámico (tabla + paginación) -->
     <div id="listado-ajax">
         <?php renderListado($usuariosPagina, $page, $totalPages, $totalReg, $pageSize); ?>
     </div>
 </div>
 
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="confirmDeleteModalLabel"><i class="fas fa-exclamation-triangle me-2"></i> Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está **ABSOLUTAMENTE SEGURO** de que desea eliminar al siguiente usuario?</p>
+                <h4 class="text-danger" id="nombreUsuarioModal"></h4>
+                <p class="mt-3"><strong>Esta acción no se puede deshacer.</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete">Sí, Eliminar Permanentemente</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
 (function () {
     const input  = document.getElementById('nombre');
     const estado = document.getElementById('estado-busqueda');
     const cont   = document.getElementById('listado-ajax');
+
+    // Funciones de Paginación y Filtrado (Originales, con pequeños ajustes para la carga)
+    // ----------------------------------------------------------------------------------
 
     // Lee valor actual de pageSize del DOM (si existe)
     function currentPageSize() {
@@ -280,6 +314,16 @@ $msg    = $_GET['msg'] ?? '';
         const p = new URLSearchParams(params);
         p.set('ajax','1');
         return 'usuarios_listado.php?' + p.toString();
+    }
+
+    // Carga la tabla y paginación por AJAX
+    function cargarListado({ nombre, page, pageSize }) {
+        estado.style.display = 'inline';
+        const url = buildAjaxUrl({ nombre, page, pageSize });
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+            .then(r => r.text())
+            .then(html => { cont.innerHTML = html; estado.style.display = 'none'; })
+            .catch(() => { estado.style.display = 'none'; });
     }
 
     // Delegación para paginación (clicks)
@@ -319,14 +363,60 @@ $msg    = $_GET['msg'] ?? '';
     input.addEventListener('input', actualizarBusqueda);
     input.addEventListener('change', actualizarBusqueda);
 
-    function cargarListado({ nombre, page, pageSize }) {
-        estado.style.display = 'inline';
-        const url = buildAjaxUrl({ nombre, page, pageSize });
-        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
-            .then(r => r.text())
-            .then(html => { cont.innerHTML = html; estado.style.display = 'none'; })
-            .catch(() => { estado.style.display = 'none'; });
+
+    // LÓGICA DEL MODAL DE ELIMINACIÓN
+    // ----------------------------------------------------------------------------------
+
+    const modalElement = document.getElementById('confirmDeleteModal');
+    const modalTitle = document.getElementById('nombreUsuarioModal');
+    const confirmButton = document.getElementById('btnConfirmDelete');
+    let idUsuarioToDelete = null;
+
+    if (modalElement) {
+        // 1. Manejar la apertura del modal (copiar datos del botón al modal)
+        modalElement.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget; // Botón que disparó el modal
+            
+            // Extraer información de los atributos data-*
+            idUsuarioToDelete = button.getAttribute('data-id');
+            const nombreUsuario = button.getAttribute('data-nombre');
+
+            // Actualizar contenido del modal
+            modalTitle.textContent = nombreUsuario;
+        });
+
+        // 2. Manejar la acción de Eliminación (al hacer clic en el botón de confirmación)
+        confirmButton.addEventListener('click', () => {
+            if (!idUsuarioToDelete) return;
+
+            // Simular el envío del formulario que tenías originalmente
+            // Se puede usar fetch/AJAX o crear un formulario y enviarlo
+            const deleteUrl = `usuario_acciones.php`; 
+            
+            // Usamos un formulario dinámico para simular el POST, si es necesario
+            const tempForm = document.createElement('form');
+            tempForm.method = 'POST';
+            tempForm.action = deleteUrl;
+
+            // Agregar campos ocultos
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'idUsuario';
+            idInput.value = idUsuarioToDelete;
+            tempForm.appendChild(idInput);
+
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete';
+            tempForm.appendChild(actionInput);
+
+            // Adjuntar al cuerpo y enviar (esto hará una recarga completa, como el submit original)
+            document.body.appendChild(tempForm);
+            tempForm.submit();
+        });
     }
+
 })();
 </script>
 </body>
