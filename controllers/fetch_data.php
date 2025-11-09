@@ -35,7 +35,7 @@ try {
         case 'presidentes':
             $sql_pres = "SELECT idUsuario, pNombre, aPaterno, aMaterno
                          FROM t_usuario
-                         WHERE tipoUsuario_id = 1
+                         WHERE tipoUsuario_id IN (1, 3, 7)
                          ORDER BY aPaterno ASC, pNombre ASC";
             $stmt_pres = $pdo->query($sql_pres);
             $usuarios = $stmt_pres->fetchAll(PDO::FETCH_ASSOC);
@@ -46,6 +46,25 @@ try {
                 ];
             }
             break;
+
+        // Caso para dropdowns de Vicepresidente (Consejeros tipo 1)
+        case 'vicepresidentes':
+            $sql_vice = "SELECT idUsuario, pNombre, aPaterno, aMaterno
+                        FROM t_usuario
+                        WHERE tipoUsuario_id IN (1, 3, 7)
+                        ORDER BY aPaterno ASC, pNombre ASC";
+            $stmt_vice = $pdo->query($sql_vice);
+            $usuarios_vice = $stmt_vice->fetchAll(PDO::FETCH_ASSOC);
+
+            $data = [];
+            foreach ($usuarios_vice as $u) {
+                $data[] = [
+                    'idUsuario' => $u['idUsuario'],
+                    'nombreCompleto' => trim($u['pNombre'] . ' ' . $u['aPaterno'] . ' ' . $u['aMaterno'])
+                ];
+            }
+            break;
+
 
         // Caso para la tabla de Asistencia (Consejeros tipo 1 y 3)
         case 'asistencia_all':

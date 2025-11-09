@@ -133,6 +133,7 @@ function renderPaginationComisiones($current, $pages)
                     <tr>
                         <th>Nombre Comisión</th>
                         <th>Presidente</th>
+                        <th>Vicepresidente</th>
                         <th>Vigencia</th>
                         <th>Acciones</th>
                     </tr>
@@ -147,6 +148,7 @@ function renderPaginationComisiones($current, $pages)
                             <tr>
                                 <td><?php echo htmlspecialchars($c['nombreComision']); ?></td>
                                 <td><?php echo htmlspecialchars($c['presidenteNombre'] ?? 'No asignado'); ?></td>
+                                <td><?php echo htmlspecialchars($c['vicepresidenteNombre'] ?? 'No asignado'); ?></td>
                                 <td>
                                     <span class="badge <?php echo ($c['vigencia'] == 1 ? 'bg-success' : 'bg-danger'); ?>">
                                         <?php echo ($c['vigencia'] == 1 ? 'Activa' : 'Inactiva'); ?>

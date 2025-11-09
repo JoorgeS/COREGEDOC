@@ -283,13 +283,13 @@ $msg    = $_GET['msg'] ?? '';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>¿Está **ABSOLUTAMENTE SEGURO** de que desea eliminar al siguiente usuario?</p>
+                <p>¿Está seguro de eliminar al siguiente usuario?</p>
                 <h4 class="text-danger" id="nombreUsuarioModal"></h4>
-                <p class="mt-3"><strong>Esta acción no se puede deshacer.</strong></p>
+                <p class="mt-3"><strong>Esta acción es irreversible.</strong></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" id="btnConfirmDelete">Sí, Eliminar Permanentemente</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete">Sí, eliminar definitivamente</button>
             </div>
         </div>
     </div>

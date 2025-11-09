@@ -73,7 +73,15 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
                 <div class="mb-3">
                     <label for="presidenteComision" class="form-label">Presidente de Comisión</label>
                     <select class="form-select" id="presidenteComision" name="t_usuario_idPresidente">
-                        <option value="">Cargando presidentes...</option>
+                        <option value="">Cargando Presidentes...</option>
+                    </select>
+                </div>
+
+                <!-- Vicepresidente de Comisión -->
+                <div class="mb-3">
+                    <label for="vicepresidenteComision" class="form-label">Vicepresidente de Comisión</label>
+                    <select class="form-select" id="vicepresidenteComision" name="t_usuario_idVicepresidente">
+                        <option value="">Cargando Viceppresidentes...</option>
                     </select>
                 </div>
 
@@ -101,8 +109,9 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
 </div>
 
 <script>
-    // Pasar el ID del presidente actual desde PHP a JS
-    const currentPresidenteId = <?php echo json_encode($current_presidente_id); ?>;
+    // IDs actuales (desde PHP). Si no existen, quedan en null y no rompen.
+    const currentPresidenteId = <?php echo json_encode($current_presidente_id ?? null); ?>;
+    const currentVicepresidenteId = <?php echo json_encode($current_vicepresidente_id ?? null); ?>;
 
     // Mostrar alerta de éxito (si existe en sesión)
     const successMessage = <?php 
@@ -113,39 +122,76 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
             echo 'null';
         }
     ?>;
+    if (successMessage) alert(successMessage);
 
-    if (successMessage) {
-        alert(successMessage);
-    }
-
-    // Cargar lista de presidentes (usuarios) vía fetch
     document.addEventListener("DOMContentLoaded", () => {
         const presidenteSelect = document.getElementById('presidenteComision');
+        const vicepresidenteSelect = document.getElementById('vicepresidenteComision');
 
-        fetch("/corevota/controllers/fetch_data.php?action=presidentes")
-            .then(res => res.ok ? res.json() : Promise.reject('Error al cargar datos'))
-            .then(response => {
-                if (response.status === 'success' && Array.isArray(response.data)) {
-                    presidenteSelect.innerHTML = '<option value="">Seleccione un presidente...</option>';
-                    response.data.forEach(user => {
-                        const isSelected = (currentPresidenteId != null && String(user.idUsuario) === String(currentPresidenteId)) 
-                            ? 'selected' : '';
-                        presidenteSelect.innerHTML += `<option value="${user.idUsuario}" ${isSelected}>${user.nombreCompleto}</option>`;
-                    });
-
-                    // Refuerzo de selección
-                    if (currentPresidenteId) {
-                        presidenteSelect.value = currentPresidenteId;
+        // === PRESIDENTES (tu bloque original, intacto) ===
+        if (presidenteSelect) {
+            fetch("/corevota/controllers/fetch_data.php?action=presidentes")
+                .then(res => res.ok ? res.json() : Promise.reject('Error al cargar datos'))
+                .then(response => {
+                    if (response.status === 'success' && Array.isArray(response.data)) {
+                        presidenteSelect.innerHTML = '<option value="">Seleccione un presidente...</option>';
+                        response.data.forEach(user => {
+                            const isSelected =
+                                (currentPresidenteId != null &&
+                                 String(user.idUsuario) === String(currentPresidenteId))
+                                ? 'selected' : '';
+                            presidenteSelect.innerHTML +=
+                                `<option value="${user.idUsuario}" ${isSelected}>${user.nombreCompleto}</option>`;
+                        });
+                        // Refuerzo de selección
+                        if (currentPresidenteId != null) {
+                            presidenteSelect.value = String(currentPresidenteId);
+                        }
+                    } else {
+                        presidenteSelect.innerHTML = '<option value="">Error al cargar presidentes</option>';
+                        console.error("Respuesta inválida presidentes:", response);
                     }
-                } else {
-                    presidenteSelect.innerHTML = '<option value="">Error al cargar presidentes</option>';
-                    console.error("Respuesta inválida:", response);
-                }
-            })
-            .catch(error => {
-                presidenteSelect.innerHTML = '<option value="">Error de conexión</option>';
-                console.error("Error fetch presidentes:", error);
-            });
+                })
+                .catch(error => {
+                    presidenteSelect.innerHTML = '<option value="">Error de conexión</option>';
+                    console.error("Error fetch presidentes:", error);
+                });
+        } else {
+            console.warn('#presidenteComision no existe en el DOM');
+        }
+
+        // === VICEPRESIDENTES (trae TODOS los consejeros igual que presidentes) ===
+        // Requiere que hayas agregado el <select id="vicepresidenteComision"> en el formulario.
+        if (vicepresidenteSelect) {
+            fetch("/corevota/controllers/fetch_data.php?action=vicepresidentes")
+                .then(res => res.ok ? res.json() : Promise.reject('Error al cargar datos'))
+                .then(response => {
+                    if (response.status === 'success' && Array.isArray(response.data)) {
+                        vicepresidenteSelect.innerHTML = '<option value="">Seleccione un vicepresidente...</option>';
+                        response.data.forEach(user => {
+                            const isSelected =
+                                (currentVicepresidenteId != null &&
+                                 String(user.idUsuario) === String(currentVicepresidenteId))
+                                ? 'selected' : '';
+                            vicepresidenteSelect.innerHTML +=
+                                `<option value="${user.idUsuario}" ${isSelected}>${user.nombreCompleto}</option>`;
+                        });
+                        // Refuerzo de selección
+                        if (currentVicepresidenteId != null) {
+                            vicepresidenteSelect.value = String(currentVicepresidenteId);
+                        }
+                    } else {
+                        vicepresidenteSelect.innerHTML = '<option value="">Error al cargar vicepresidentes</option>';
+                        console.error("Respuesta inválida vicepresidentes:", response);
+                    }
+                })
+                .catch(error => {
+                    vicepresidenteSelect.innerHTML = '<option value="">Error de conexión</option>';
+                    console.error("Error fetch vicepresidentes:", error);
+                });
+        } else {
+            console.warn('#vicepresidenteComision no existe en el DOM');
+        }
     });
 </script>
 
