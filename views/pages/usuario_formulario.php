@@ -112,7 +112,7 @@ if ($action === 'edit' && $idUsuario > 0) {
 $perfiles = $usuarioObj->obtenerPerfiles();
 $tiposUsuario = $usuarioObj->obtenerTiposUsuario();
 $partidos = $usuarioObj->obtenerPartidos();
-$comunas = $usuarioObj->obtenerComunas();
+$provincias = $usuarioObj->obtenerProvincias();
 
 // ---------------------------------------------------------------------------
 // 🔹 CABECERA HTML (solo si no está embebido en menu.php)
@@ -249,16 +249,16 @@ if (!$EMBED): ?>
             </div>
 
             <div class="col-md-3">
-                <label for="comuna_id" class="form-label">Comuna</label>
-                <select class="form-select" id="comuna_id" name="comuna_id">
-                    <option value="">Seleccione Comuna</option>
+                <label for="provincia_id" class="form-label">Provincia</label>
+                <select class="form-select" id="provincia_id" name="provincia_id">
+                    <option value="">Seleccione Provincia</option>
                     <?php 
-                    $selectedComuna = $userData['comuna_id'] ?? '';
-                    foreach ($comunas as $comuna): 
-                        $sel = ((string)$selectedComuna === (string)$comuna['idComuna']) ? 'selected' : '';
+                    $selectedprovincia = $userData['provincia_id'] ?? '';
+                    foreach ($provincias as $provincia): 
+                        $sel = ((string)$selectedprovincia === (string)$provincia['idprovincia']) ? 'selected' : '';
                     ?>
-                        <option value="<?php echo htmlspecialchars($comuna['idComuna']); ?>" <?php echo $sel; ?>>
-                            <?php echo htmlspecialchars($comuna['nombreComuna']); ?>
+                        <option value="<?php echo htmlspecialchars($provincia['idprovincia']); ?>" <?php echo $sel; ?>>
+                            <?php echo htmlspecialchars($provincia['nombreprovincia']); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

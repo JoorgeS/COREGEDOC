@@ -16,10 +16,10 @@ class Usuario
     {
         $consulta = "INSERT INTO t_usuario (
                         pNombre, sNombre, aPaterno, aMaterno, correo, contrasena,
-                        perfil_id, tipoUsuario_id, partido_id, comuna_id
+                        perfil_id, tipoUsuario_id, partido_id, provincia_id
                     ) VALUES (
                         :pNombre, :sNombre, :aPaterno, :aMaterno, :correo, :contrasena,
-                        :perfil_id, :tipoUsuario_id, :partido_id, :comuna_id
+                        :perfil_id, :tipoUsuario_id, :partido_id, :provincia_id
                     )";
         try {
             return $this->db->crear($consulta, $datos);
@@ -40,12 +40,12 @@ class Usuario
                     p.descPerfil AS perfil_desc, u.perfil_id,
                     tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
                     pa.nombrePartido AS partido_desc, u.partido_id,
-                    c.nombreComuna AS comuna_desc, u.comuna_id
+                    c.nombreprovincia AS provincia_desc, u.provincia_id
                 FROM t_usuario u
                 INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
                 INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
                 LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
-                LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
+                LEFT JOIN t_provincia c ON u.provincia_id = c.idprovincia
                 WHERE u.estado = 1
                 ORDER BY 
                     u.pNombre ASC,
@@ -71,12 +71,12 @@ class Usuario
                     p.descPerfil AS perfil_desc, u.perfil_id,
                     tu.descTipoUsuario AS tipoUsuario_desc, u.tipoUsuario_id,
                     pa.nombrePartido AS partido_desc, u.partido_id,
-                    c.nombreComuna AS comuna_desc, u.comuna_id
+                    c.nombreprovincia AS provincia_desc, u.provincia_id
                 FROM t_usuario u
                 INNER JOIN t_perfil p ON u.perfil_id = p.idPerfil
                 INNER JOIN t_tipousuario tu ON u.tipoUsuario_id = tu.idTipoUsuario
                 LEFT JOIN t_partido pa ON u.partido_id = pa.idPartido
-                LEFT JOIN t_comuna c ON u.comuna_id = c.idComuna
+                LEFT JOIN t_provincia c ON u.provincia_id = c.idprovincia
                 WHERE 
                     u.estado = 1
                     AND (
@@ -103,7 +103,7 @@ class Usuario
                         pNombre, sNombre, aPaterno, aMaterno,
                         correo, contrasena,
                         perfil_id, tipoUsuario_id,
-                        partido_id, comuna_id 
+                        partido_id, provincia_id 
                     FROM t_usuario 
                     WHERE idUsuario = :idUsuario";
 
@@ -128,7 +128,7 @@ class Usuario
                             perfil_id = :perfil_id,
                             tipoUsuario_id = :tipoUsuario_id,
                             partido_id = :partido_id,
-                            comuna_id = :comuna_id
+                            provincia_id = :provincia_id
                         WHERE idUsuario = :idUsuario";
         } else {
             $consulta = "UPDATE t_usuario 
@@ -141,7 +141,7 @@ class Usuario
                             perfil_id = :perfil_id,
                             tipoUsuario_id = :tipoUsuario_id,
                             partido_id = :partido_id,
-                            comuna_id = :comuna_id
+                            provincia_id = :provincia_id
                         WHERE idUsuario = :idUsuario";
         }
 
@@ -195,9 +195,9 @@ class Usuario
         return $this->db->consultarBD("SELECT idPartido, nombrePartido FROM t_partido");
     }
 
-    public function obtenerComunas()
+    public function obtenerProvincias()
     {
-        return $this->db->consultarBD("SELECT idComuna, nombreComuna FROM t_comuna");
+        return $this->db->consultarBD("SELECT idprovincia, nombreprovincia FROM t_provincia");
     }
 
     /**

@@ -77,7 +77,7 @@ if ($idUsuario > 0) {
         $perfiles = $usuarioObj->obtenerPerfiles();
         $tiposUsuario = $usuarioObj->obtenerTiposUsuario();
         $partidos = $usuarioObj->obtenerPartidos();
-        $comunas = $usuarioObj->obtenerComunas();
+        $provincias = $usuarioObj->obtenerProvincias();
     } catch (Exception $e) {
         if (empty($mensaje)) { // Solo mostrar si no hay otro mensaje
             $mensaje = "Error al cargar los datos del perfil: " . $e->getMessage();

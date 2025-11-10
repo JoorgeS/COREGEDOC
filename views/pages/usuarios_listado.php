@@ -294,7 +294,7 @@ $msg    = $_GET['msg'] ?? '';
         </div>
     </div>
 </div>
-<script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
 <script>
 (function () {
     const input  = document.getElementById('nombre');

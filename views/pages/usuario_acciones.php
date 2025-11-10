@@ -80,7 +80,7 @@ try {
                 'perfil_id'      => get_post_data('perfil_id'),
                 'tipoUsuario_id' => get_post_data('tipoUsuario_id'),
                 'partido_id'     => get_post_data('partido_id'),
-                'comuna_id'      => get_post_data('comuna_id'),
+                'provincia_id'      => get_post_data('provincia_id'),
             ];
 
             $resultado = $usuarioObj->crearUsuario($datos);
@@ -125,7 +125,7 @@ try {
                 'perfil_id'      => get_post_data('perfil_id'),
                 'tipoUsuario_id' => get_post_data('tipoUsuario_id'),
                 'partido_id'     => get_post_data('partido_id'),
-                'comuna_id'      => get_post_data('comuna_id'),
+                'provincia_id'      => get_post_data('provincia_id'),
             ];
 
             if (!empty($contrasena_nueva)) {
