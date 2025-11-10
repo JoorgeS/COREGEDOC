@@ -161,6 +161,8 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="/corevota/public/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+
 
     <style>
         :root {
@@ -170,6 +172,8 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             --core-blue: #1C88BF;
             /* Este es un azul oscuro profesional, ajústalo al HEX exacto si lo tienes */
         }
+        
+        
 
         html,
         body {
@@ -520,6 +524,26 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 Gestión Documental de Consejo Regional de Valparaíso
             </h6>
             <div class="d-flex align-items-center gap-3">
+
+                <div class="rrss-header-links d-flex align-items-center gap-3">
+
+                    <a href="https://www.youtube.com/@core.valparaiso" target="_blank" title="YouTube Core Valparaíso" class="rrss-icon-link">
+                        <i class="fab fa-youtube"></i>
+                    </a>
+
+                    <a href="https://x.com/Core_Valparaiso" target="_blank" title="X (Twitter) Core Valparaíso" class="rrss-icon-link">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+
+                    <a href="https://www.facebook.com/GOREValparaiso/" target="_blank" title="Facebook GORE Valparaíso" class="rrss-icon-link">
+                        <i class="fab fa-facebook-f"></i>
+                    </a>
+
+                    <a href="https://www.instagram.com/gorevalparaiso/?hl=en" target="_blank" title="Instagram GORE Valparaíso" class="rrss-icon-link">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+
+                </div>
                 <div class="dropdown">
                     <span class="usuario dropdown-toggle fw-semibold" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
                         <i class="fas fa-user-circle me-1"></i>
@@ -533,7 +557,6 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         ?>
                     </span>
                     <ul class="dropdown-menu dropdown-menu-end">
-
                         <li><a class="dropdown-item" href="menu.php?pagina=perfil_usuario"><i class="fas fa-id-card fa-fw me-2"></i>Mi perfil</a></li>
                         <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
                             <li><a class="dropdown-item" href="menu.php?pagina=configuracion_vista"><i class="fas fa-cog fa-fw me-2"></i>Configuración</a></li>

@@ -324,3 +324,64 @@
             transition: opacity 5s ease-in-out;
             /* Ajusta 1.5s a la duración deseada (ej. 2s, 2.5s) */
         }
+
+        /* --- Estilos para los Íconos de Redes Sociales en el Header --- */
+
+        .rrss-icon-link {
+            color: #6c757d;
+            /* Color gris por defecto, similar al texto */
+            transition: color 0.2s ease, transform 0.2s ease;
+            font-size: 1.2rem;
+            /* Tamaño del ícono */
+            text-decoration: none;
+            /* Asegura que no haya subrayado */
+        }
+
+        .rrss-icon-link:hover {
+            transform: scale(1.15);
+            /* Efecto al pasar el ratón */
+        }
+
+        /* --- Estilos para los Íconos de Redes Sociales en el Header --- */
+
+        .rrss-header-links {
+            /* Asegura que haya un pequeño espacio a la derecha si no lo da el gap-3 de Bootstrap */
+            margin-right: 10px;
+        }
+
+        .rrss-icon-link {
+            /* Cambiado de #6c757d a BLANCO */
+            color: #FFFFFF !important;
+            /* Asegura el color blanco, el !important es por si Bootstrap lo sobrescribe */
+            transition: color 0.2s ease, transform 0.2s ease;
+            font-size: 1.2rem;
+            text-decoration: none;
+            /* Eliminar cualquier padding o margin si es necesario */
+        }
+
+        .rrss-icon-link:hover {
+            transform: scale(1.15);
+            /* Efecto al pasar el ratón */
+        }
+
+        /* Colores de las marcas (Al pasar el ratón, para dar contraste) */
+        .rrss-icon-link .fa-youtube:hover {
+            color: #FF0000 !important;
+            /* Rojo YouTube */
+        }
+
+        .rrss-icon-link .fa-twitter:hover,
+        .rrss-icon-link .fa-x-twitter:hover {
+            color: #1DA1F2 !important;
+            /* Azul Twitter */
+        }
+
+        .rrss-icon-link .fa-facebook-f:hover {
+            color: #1877F2 !important;
+            /* Azul Facebook */
+        }
+
+        .rrss-icon-link .fa-instagram:hover {
+            color: #E1306C !important;
+            /* Rosa/Púrpura Instagram */
+        }
