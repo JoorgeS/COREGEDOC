@@ -3,7 +3,7 @@
 // Este script se llama con el botón rojo "Enviar para Aprobación"
 
 // Forzar que los errores se muestren en la respuesta JSON
-ini_set('display_errors', 1); 
+ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
@@ -37,6 +37,8 @@ if (empty($idMinuta) || empty($idUsuarioSecretario)) {
 class AprobacionSender extends BaseConexion
 {
     private $db;
+    // Nueva constante para la imagen de firma
+    private const FIRMA_PATH_RELATIVE = 'public/img/firma.jpeg';
 
     public function __construct()
     {
@@ -50,6 +52,7 @@ class AprobacionSender extends BaseConexion
     private function getListaPresidentesRequeridos(int $idMinuta): array
     {
         try {
+            // ... (Tu lógica para obtener presidentes, se mantiene igual) ...
             // 1. Obtener Presidente 1 (guardado en t_minuta)
             $sqlMinuta = "SELECT t_usuario_idPresidente FROM t_minuta WHERE idMinuta = ?";
             $stmtMinuta = $this->db->prepare($sqlMinuta);
@@ -59,7 +62,7 @@ class AprobacionSender extends BaseConexion
 
             // 2. Obtener Presidentes 2 y 3 (de comisiones mixtas en t_reunion)
             $sqlReunion = "SELECT r.t_comision_idComision_mixta, r.t_comision_idComision_mixta2 
-                           FROM t_reunion r WHERE r.t_minuta_idMinuta = ?";
+                             FROM t_reunion r WHERE r.t_minuta_idMinuta = ?";
             $stmtReunion = $this->db->prepare($sqlReunion);
             $stmtReunion->execute([$idMinuta]);
             $comisionesMixtas = $stmtReunion->fetch(PDO::FETCH_ASSOC);
@@ -90,7 +93,7 @@ class AprobacionSender extends BaseConexion
     // ==================================================================
     // --- INICIO DE LA NUEVA LÓGICA (AJUSTE #3) ---
     // ==================================================================
-    
+
     /**
      * Envía el PDF de asistencia a un correo fijo ANTES de notificar a presidentes.
      * Si falla, lanza una excepción para revertir la transacción.
@@ -99,8 +102,8 @@ class AprobacionSender extends BaseConexion
     {
         // 1. Encontrar el PDF de asistencia generado al "Guardar Borrador"
         $sqlPdf = "SELECT pathAdjunto FROM t_adjunto 
-                   WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'
-                   ORDER BY idAdjunto DESC LIMIT 1";
+                    WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'
+                    ORDER BY idAdjunto DESC LIMIT 1";
         $stmtPdf = $this->db->prepare($sqlPdf);
         $stmtPdf->execute([':idMinuta' => $idMinuta]);
         $pdfPath = $stmtPdf->fetchColumn();
@@ -110,13 +113,18 @@ class AprobacionSender extends BaseConexion
             throw new Exception("No se encontró el PDF de asistencia para la Minuta N° {$idMinuta}. Por favor, 'Guarde Borrador' primero para generarlo.");
         }
 
-        // La ruta en la BD es relativa (ej: 'public/docs/asistencia/...')
-        // La ruta física en el servidor es la raíz del proyecto + esa ruta.
-        $fullPathOnServer = __DIR__ . '/../' . $pdfPath;
+        // Rutas
+        $fullPathPdf = __DIR__ . '/../' . $pdfPath;
+        $fullPathFirma = __DIR__ . '/../' . self::FIRMA_PATH_RELATIVE; // Ruta de la nueva firma
 
-        if (!file_exists($fullPathOnServer)) {
-            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El PDF de asistencia se encontró en la BD ('{$pdfPath}') pero el archivo no existe en el servidor ('{$fullPathOnServer}').");
+        if (!file_exists($fullPathPdf)) {
+            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El PDF de asistencia se encontró en la BD ('{$pdfPath}') pero el archivo no existe en el servidor ('{$fullPathPdf}').");
             throw new Exception("Error crítico: El archivo PDF de asistencia ('{$pdfPath}') no existe en el servidor.");
+        }
+
+        if (!file_exists($fullPathFirma)) {
+            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El archivo de firma ('" . self::FIRMA_PATH_RELATIVE . "') no existe en el servidor.");
+            throw new Exception("Error crítico: El archivo de firma institucional no existe en el servidor.");
         }
 
         // 2. Enviar Correo
@@ -137,10 +145,10 @@ class AprobacionSender extends BaseConexion
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = (int)$config['smtp']['port']; // Asegurar que el puerto sea un entero
             $mail->CharSet    = 'UTF-8';
-            
+
             // Emisor
             $mail->setFrom($config['smtp']['user'], 'CoreVota - Sistema de Minutas');
-            
+
             // Destinatario FIJO (Requerimiento 3)
             $mail->addAddress('genesis.contreras.vargas@gmail.com');
 
@@ -148,25 +156,30 @@ class AprobacionSender extends BaseConexion
             $mail->isHTML(true);
             $mail->Subject = "Reporte de Asistencia - Minuta N° {$idMinuta}";
             $mail->Body    = "<html><body>
-                               <p>Se ha iniciado el proceso de envío a aprobación para la <strong>Minuta N° {$idMinuta}</strong>.</p>
-                               <p>Se adjunta el reporte de asistencia correspondiente generado por el Secretario Técnico.</p>
-                               <p>Este es un correo automático.</p>
-                             </body></html>";
-            
+                                <p>Se ha iniciado el proceso de envío a aprobación para la <strong>Minuta N° {$idMinuta}</strong>.</p>
+                                <p>Se adjunta el reporte de asistencia correspondiente generado por el Secretario Técnico.</p>
+                                <p>Este es un correo automático.</p>
+                                <br>
+                                <img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">
+                              </body></html>";
+
             // Adjuntar el PDF
-            $mail->addAttachment($fullPathOnServer);
+            $mail->addAttachment($fullPathPdf);
+
+            // Adjuntar la imagen de la firma como contenido incrustado (Inline)
+            $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg');
+
 
             $mail->send();
 
-            error_log("[LOG MINUTA $idMinuta]: PDF de asistencia enviado exitosamente a genesis.contreras.vargas@gmail.com.");
-
+            error_log("[LOG MINUTA $idMinuta]: PDF de asistencia y Firma enviados exitosamente a genesis.contreras.vargas@gmail.com.");
         } catch (Exception $e) {
             error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El correo de ASISTENCIA (enviar_aprobacion) NO se pudo enviar. Mailer Error: {$mail->ErrorInfo}");
             // Lanzar la excepción de nuevo para que la transacción principal falle
             throw new Exception("Error al enviar PDF de asistencia por correo: " . $mail->ErrorInfo);
         }
     }
-    
+
     // ==================================================================
     // --- FIN DE LA NUEVA LÓGICA (AJUSTE #3) ---
     // ==================================================================
@@ -180,22 +193,23 @@ class AprobacionSender extends BaseConexion
         if (empty($listaPresidentes)) {
             return;
         }
-        
+
         try {
+            // ... (Tu lógica de obtención de destinatarios, se mantiene igual) ...
             $placeholders = implode(',', array_fill(0, count($listaPresidentes), '?'));
             $sql = "SELECT correo, pNombre, aPaterno FROM t_usuario WHERE idUsuario IN ($placeholders)";
             $stmt = $this->db->prepare($sql);
             $stmt->execute($listaPresidentes);
             $destinatarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             if ($esReenvioFeedback) {
                 $asunto = "Minuta N° {$idMinuta} ACTUALIZADA - Requiere su firma";
                 $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} ha sido actualizada por el Secretario Técnico en base al feedback recibido.</p>
-                         <p>Su aprobación ha sido reiniciada. Por favor, ingrese a CoreVota para revisar la nueva versión y registrar su firma.</p>";
+                           <p>Su aprobación ha sido reiniciada. Por favor, ingrese a CoreVota para revisar la nueva versión y registrar su firma.</p>";
             } else {
                 $asunto = "Minuta N° {$idMinuta} lista para su firma";
                 $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} se encuentra disponible para su revisión y firma.</p>
-                         <p>Por favor, ingrese a CoreVota para gestionarla.</p>";
+                           <p>Por favor, ingrese a CoreVota para gestionarla.</p>";
             }
 
             // Cargar config.ini para las credenciales
@@ -203,7 +217,7 @@ class AprobacionSender extends BaseConexion
             if ($config === false || !isset($config['smtp'])) {
                 throw new Exception("No se pudo leer el archivo 'configuracion.ini' o la sección [smtp] falta.");
             }
-            
+
             $mail = new PHPMailer(true); // Instancia única
             // Configuración SMTP (tomada de tus scripts)
             $mail->isSMTP();
@@ -218,16 +232,31 @@ class AprobacionSender extends BaseConexion
             $mail->isHTML(true);
             $mail->Subject = $asunto;
 
+            // Ruta de la firma
+            $fullPathFirma = __DIR__ . '/../' . self::FIRMA_PATH_RELATIVE;
+            if (!file_exists($fullPathFirma)) {
+                error_log("ERROR CRÍTICO: El archivo de firma ('" . self::FIRMA_PATH_RELATIVE . "') no existe en el servidor para notificar presidentes.");
+                // NO lanzo una excepción fatal para no detener el envío de notificaciones de la minuta, solo el log.
+            } else {
+                // Adjuntar la imagen de la firma como contenido incrustado (Inline)
+                $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg');
+            }
+
+            // Cuerpo común para la firma
+            $firmaHTML = "<br><img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">";
+
             foreach ($destinatarios as $destinatario) {
                 // Asegurarse de no enviar a emails nulos o vacíos
-                if(empty($destinatario['correo'])) {
+                if (empty($destinatario['correo'])) {
                     error_log("ADVERTENCIA idMinuta {$idMinuta}: No se envió correo al presidente {$destinatario['pNombre']} por email vacío.");
                     continue; // Salta a este usuario, pero no detiene el bucle
                 }
-                
+
                 $mail->clearAddresses(); // Limpiar destinatario anterior
                 $mail->addAddress($destinatario['correo'], $destinatario['pNombre'] . ' ' . $destinatario['aPaterno']);
-                $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema CoreVota</p></body></html>";
+
+                // Construir el cuerpo final con la firma
+                $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema CoreVota</p>{$firmaHTML}</body></html>";
                 $mail->send();
             }
         } catch (Exception $e) {
@@ -237,19 +266,21 @@ class AprobacionSender extends BaseConexion
         }
     }
 
+    // ... (El resto de la clase y la ejecución se mantienen iguales) ...
+
     public function enviarParaAprobacion($idMinuta, $idUsuarioSecretario)
     {
         try {
             // 1. (NUEVO) Verificar si es una respuesta a Feedback (Punto 7)
             $sqlFeedback = "SELECT COUNT(*) FROM t_aprobacion_minuta 
-                            WHERE t_minuta_idMinuta = :idMinuta 
-                            AND estado_firma = 'REQUIERE_REVISION'";
+                             WHERE t_minuta_idMinuta = :idMinuta 
+                             AND estado_firma = 'REQUIERE_REVISION'";
             $stmtFeedback = $this->db->prepare($sqlFeedback);
             $stmtFeedback->execute([':idMinuta' => $idMinuta]);
             $esRespuestaAFeedback = $stmtFeedback->fetchColumn() > 0;
 
             $this->db->beginTransaction();
-            
+
             // ==================================================================
             // --- INICIO DE LA LLAMADA (AJUSTE #3) ---
             // ==================================================================
@@ -264,8 +295,8 @@ class AprobacionSender extends BaseConexion
 
             // 2. (NUEVO) Gestionar Sello ST si es respuesta a Feedback (Punto 7)
             if ($esRespuestaAFeedback) {
-                $pathSello = 'public/img/sello_verde.png'; 
-                
+                $pathSello = 'public/img/sello_verde.png';
+
                 $sqlSello = "INSERT INTO t_validacion_st (t_minuta_idMinuta, t_usuario_idSecretario, path_sello)
                              VALUES (:idMinuta, :idSecretario, :pathSello)";
                 $this->db->prepare($sqlSello)->execute([
@@ -275,9 +306,9 @@ class AprobacionSender extends BaseConexion
                 ]);
 
                 $sqlFeedbackResuelto = "UPDATE t_minuta_feedback SET resuelto = 1 
-                                       WHERE t_minuta_idMinuta = :idMinuta AND resuelto = 0";
+                                        WHERE t_minuta_idMinuta = :idMinuta AND resuelto = 0";
                 $this->db->prepare($sqlFeedbackResuelto)->execute([':idMinuta' => $idMinuta]);
-                
+
                 error_log("[LOG MINUTA $idMinuta]: Sello de Feedback guardado."); // Log 2
             }
 
@@ -285,33 +316,33 @@ class AprobacionSender extends BaseConexion
             $listaPresidentes = $this->getListaPresidentesRequeridos($idMinuta);
             $totalRequeridos = count($listaPresidentes);
             $totalRequeridos = max(1, $totalRequeridos); // Asegurar al menos 1
-            
+
             if (empty($listaPresidentes)) {
-                 throw new Exception('No se encontraron presidentes para esta minuta. Revise la configuración de la comisión.');
+                throw new Exception('No se encontraron presidentes para esta minuta. Revise la configuración de la comisión.');
             }
-            
+
             error_log("[LOG MINUTA $idMinuta]: Presidentes requeridos: " . implode(',', $listaPresidentes) . " (Total: $totalRequeridos)"); // Log 3
 
             // 4. Actualizar conteo en t_minuta y ponerla PENDIENTE
             $sqlUpdateMinuta = "UPDATE t_minuta 
-                                SET presidentesRequeridos = :conteo, estadoMinuta = 'PENDIENTE' 
-                                WHERE idMinuta = :idMinuta";
+                                 SET presidentesRequeridos = :conteo, estadoMinuta = 'PENDIENTE' 
+                                 WHERE idMinuta = :idMinuta";
             $this->db->prepare($sqlUpdateMinuta)->execute([
                 ':conteo' => $totalRequeridos,
                 ':idMinuta' => $idMinuta
             ]);
-            
+
             error_log("[LOG MINUTA $idMinuta]: t_minuta actualizada a PENDIENTE con $totalRequeridos requeridos."); // Log 4
 
             // 5. BORRAR todas las aprobaciones/revisiones anteriores (CRÍTICO)
             $sqlDeleteAprobaciones = "DELETE FROM t_aprobacion_minuta WHERE t_minuta_idMinuta = :idMinuta";
             $this->db->prepare($sqlDeleteAprobaciones)->execute([':idMinuta' => $idMinuta]);
-            
+
             error_log("[LOG MINUTA $idMinuta]: Registros antiguos de t_aprobacion_minuta BORRADOS."); // Log 5
 
             // 6. (RE)CREAR los registros de aprobación para todos los presidentes
             $sqlInsertAprobacion = "INSERT INTO t_aprobacion_minuta (t_minuta_idMinuta, t_usuario_idPresidente, estado_firma, fechaAprobacion) 
-                                    VALUES (:idMinuta, :idPresidente, 'EN_ESPERA', NOW())";
+                                     VALUES (:idMinuta, :idPresidente, 'EN_ESPERA', NOW())";
             $stmtInsertAprobacion = $this->db->prepare($sqlInsertAprobacion);
             foreach ($listaPresidentes as $idPresidente) {
                 $stmtInsertAprobacion->execute([
@@ -319,23 +350,23 @@ class AprobacionSender extends BaseConexion
                     ':idPresidente' => $idPresidente
                 ]);
             }
-            
+
             error_log("[LOG MINUTA $idMinuta]: Nuevos registros insertados en t_aprobacion_minuta."); // Log 6
-            
+
             // 7. ENVIAR NOTIFICACIONES (DENTRO de la transacción)
             // Si esto falla, toda la transacción se revierte.
             $this->notificarPresidentes($idMinuta, $listaPresidentes, $esRespuestaAFeedback);
-            
+
             error_log("[LOG MINUTA $idMinuta]: Notificaciones por correo (a presidentes) ENVIADAS."); // Log 7
 
             // 8. COMMIT (Solo si la BD y AMBOS Correos funcionaron)
             $this->db->commit();
-            
+
             error_log("[LOG MINUTA $idMinuta]: Transacción COMMIT exitosa."); // Log 8
-            
+
             try {
                 $minutaModel = new MinutaModel($this->db);
-                
+
                 if ($esRespuestaAFeedback) {
                     // Log 1: El ST aplicó el feedback (ya que este script guarda el sello)
                     $minutaModel->logAccion(
@@ -365,14 +396,13 @@ class AprobacionSender extends BaseConexion
                 error_log("ADVERTENCIA idMinuta {$idMinuta}: No se pudo registrar el log: " . $logException->getMessage());
                 // No detenemos la transacción por un error de log
             }
-            
+
             $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s) y se envió el reporte de asistencia.";
             if ($esRespuestaAFeedback) {
-                 $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados. Reporte de asistencia enviado.';
+                $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados. Reporte de asistencia enviado.';
             }
 
             return ['status' => 'success', 'message' => $mensaje];
-
         } catch (Exception $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -396,4 +426,3 @@ if ($resultado['status'] === 'error') {
 
 echo json_encode($resultado);
 exit;
-?>
