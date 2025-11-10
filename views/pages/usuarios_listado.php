@@ -301,7 +301,7 @@ $msg    = $_GET['msg'] ?? '';
     const estado = document.getElementById('estado-busqueda');
     const cont   = document.getElementById('listado-ajax');
 
-    // Funciones de Paginación y Filtrado (Originales, con pequeños ajustes para la carga)
+    // Funciones de Paginación y Filtrado (Originales, con pequeños ajustes para la carga) 
     // ----------------------------------------------------------------------------------
 
     // Lee valor actual de pageSize del DOM (si existe)
