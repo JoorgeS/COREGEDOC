@@ -229,8 +229,9 @@ class MinutaModel extends BaseConexion
     public function getSeguimiento($minuta_id)
     {
         // ---- INICIO DE LA CORRECCIÓN ----
-        // Se cambió 'u.nombreCompleto' por CONCAT(u.pNombre, ' ', u.aPaterno)
+        // Cambiamos 's.id_seguimiento' por el nombre correcto: 's.idMinutaSeguimiento'
         $sql = "SELECT 
+                    s.idMinutaSeguimiento, -- <-- CAMPO CORREGIDO
                     s.fecha_hora, 
                     s.accion, 
                     s.detalle, 
@@ -252,6 +253,7 @@ class MinutaModel extends BaseConexion
             $stmt->execute($valores);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
+            // Este es el error que estás viendo en los logs
             error_log("Error SQL (getSeguimiento): No se pudo obtener el seguimiento para idMinuta " . $minuta_id . ". Error: " . $e->getMessage());
             return []; // Devuelve array vacío en caso de error
         }
@@ -307,44 +309,48 @@ class MinutaModel extends BaseConexion
      * FUNCIÓN ACTUALIZADA: Obtiene la última acción de seguimiento
      * con filtros de comisión y fecha.
      */
+    /**
+     * FUNCIÓN ACTUALIZADA: Obtiene la última acción de seguimiento
+     * con filtros de comisión, fecha, ID y palabra clave.
+     */
     public function getUltimoSeguimientoParaPendientes($filters = [])
     {
         // Esta consulta busca el último seguimiento (rn = 1)
         $sql = "
-            WITH RankedSeguimiento AS (
-                SELECT
-                    s.t_minuta_idMinuta,
-                    s.detalle,
-                    s.fecha_hora,
-                    COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as usuario_nombre,
-                    ROW_NUMBER() OVER(
-                        PARTITION BY s.t_minuta_idMinuta 
-                        ORDER BY s.fecha_hora DESC
-                    ) as rn
-                FROM
-                    t_minuta_seguimiento s
-                LEFT JOIN
-                    t_usuario u ON s.t_usuario_idUsuario = u.idUsuario
-            )
-            SELECT
-                m.idMinuta,
-                m.fechaMinuta,
-                c.nombreComision,
-                IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
-                COALESCE(rs.detalle, 'Sin acciones registradas') as ultimo_detalle,
-                rs.fecha_hora as ultima_fecha,
-                COALESCE(rs.usuario_nombre, 'N/A') as ultimo_usuario
-            FROM
-                t_minuta m
-            LEFT JOIN
-                t_comision c ON m.t_comision_idComision = c.idComision
-            LEFT JOIN
-                t_tema t ON m.idMinuta = t.t_minuta_idMinuta
-            LEFT JOIN
-                RankedSeguimiento rs ON m.idMinuta = rs.t_minuta_idMinuta AND rs.rn = 1
-            WHERE
-                m.estadoMinuta <> 'APROBADA'
-        ";
+      WITH RankedSeguimiento AS (
+        SELECT
+          s.t_minuta_idMinuta,
+          s.detalle,
+          s.fecha_hora,
+          COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as usuario_nombre,
+          ROW_NUMBER() OVER(
+            PARTITION BY s.t_minuta_idMinuta 
+            ORDER BY s.fecha_hora DESC
+          ) as rn
+        FROM
+          t_minuta_seguimiento s
+        LEFT JOIN
+          t_usuario u ON s.t_usuario_idUsuario = u.idUsuario
+      )
+      SELECT
+        m.idMinuta,
+        m.fechaMinuta,
+        c.nombreComision,
+        IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
+        COALESCE(rs.detalle, 'Sin acciones registradas') as ultimo_detalle,
+        rs.fecha_hora as ultima_fecha,
+        COALESCE(rs.usuario_nombre, 'N/A') as ultimo_usuario
+      FROM
+        t_minuta m
+      LEFT JOIN
+        t_comision c ON m.t_comision_idComision = c.idComision
+      LEFT JOIN
+        t_tema t ON m.idMinuta = t.t_minuta_idMinuta
+      LEFT JOIN
+        RankedSeguimiento rs ON m.idMinuta = rs.t_minuta_idMinuta AND rs.rn = 1
+      WHERE
+        m.estadoMinuta <> 'APROBADA'
+    ";
 
         $params = [];
 
@@ -356,25 +362,38 @@ class MinutaModel extends BaseConexion
             $params['comisionId'] = $filters['comisionId'];
         }
 
-        // 2. Filtro de Rango de Fechas (basado en la FECHA DE CREACIÓN)
+        // 2. Filtro de Rango de Fechas
         if (!empty($filters['startDate'])) {
             $sql .= " AND m.fechaMinuta >= :startDate";
             $params['startDate'] = $filters['startDate'];
         }
         if (!empty($filters['endDate'])) {
             $sql .= " AND m.fechaMinuta <= :endDate";
-            // Añadimos la hora final para incluir todo el día
             $params['endDate'] = $filters['endDate'] . ' 23:59:59';
         }
 
-        // --- Fin de Filtros ---
+        // --- INICIO DE NUEVOS FILTROS ---
+        // 3. Filtro por ID Minuta
+        if (!empty($filters['idMinuta'])) {
+            $sql .= " AND m.idMinuta = :idMinuta";
+            $params['idMinuta'] = $filters['idMinuta'];
+        }
+
+        // 4. Filtro por Palabra Clave (Tema y Objetivo)
+        if (!empty($filters['keyword'])) {
+            // Usamos HAVING porque 'nombreTemas' es un campo agrupado
+            // (Nota: t.objetivo ya está en el JOIN, así que podemos usarlo)
+            $sql .= " AND (t.nombreTema LIKE :keyword OR t.objetivo LIKE :keyword)";
+            $params['keyword'] = '%' . $filters['keyword'] . '%';
+        }
+        // --- FIN DE NUEVOS FILTROS ---
 
         $sql .= "
-            GROUP BY 
-                m.idMinuta, c.nombreComision, rs.detalle, rs.fecha_hora, rs.usuario_nombre
-            ORDER BY
-                rs.fecha_hora DESC, m.idMinuta DESC;
-        ";
+      GROUP BY 
+        m.idMinuta, c.nombreComision, rs.detalle, rs.fecha_hora, rs.usuario_nombre, m.fechaMinuta
+      ORDER BY
+        rs.fecha_hora DESC, m.idMinuta DESC;
+    ";
 
         try {
             $stmt = $this->db->prepare($sql);
@@ -418,30 +437,32 @@ class MinutaModel extends BaseConexion
      */
     public function getFeedbackDeMinuta($idMinuta)
     {
-        // Asumo que la tabla de feedback es 't_aprobacion_minuta'
-        // y que el comentario está en la columna 'feedback'.
-        // ¡Ajusta el nombre de las columnas si es necesario!
+        // Las tablas correctas son: t_minuta_feedback (para el texto) y t_aprobacion_minuta (para el estado).
         $sql = "SELECT 
-                    f.feedback, 
-                    f.fecha_feedback, 
-                    COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Usuario') as nombreUsuario
-                FROM 
-                    t_aprobacion_minuta f
-                LEFT JOIN 
-                    t_usuario u ON f.t_usuario_idPresidente = u.idUsuario
-                WHERE 
-                    f.t_minuta_idMinuta = :idMinuta
-                    AND f.estado_firma = 'REQUIERE_REVISION'
-                    AND f.feedback IS NOT NULL 
-                    AND f.feedback <> ''
-                ORDER BY 
-                    f.fecha_feedback DESC";
+                mf.textoFeedback AS feedback,          /* Columna corregida */
+                mf.fechaFeedback AS fecha_feedback,    /* Columna corregida */
+                COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Usuario') AS nombreUsuario
+            FROM 
+                t_minuta_feedback mf                   /* Tabla de feedback correcta */
+            INNER JOIN
+                t_aprobacion_minuta ap ON mf.t_minuta_idMinuta = ap.t_minuta_idMinuta 
+                                        AND mf.t_usuario_idPresidente = ap.t_usuario_idPresidente /* Unimos para filtrar por estado */
+            LEFT JOIN 
+                t_usuario u ON ap.t_usuario_idPresidente = u.idUsuario
+            WHERE 
+                mf.t_minuta_idMinuta = :idMinuta       /* Usamos el alias correcto para la tabla de feedback */
+                AND ap.estado_firma = 'REQUIERE_REVISION'
+                AND mf.textoFeedback IS NOT NULL       /* Usamos el alias y la columna correcta */
+                AND mf.textoFeedback <> ''             /* Usamos el alias y la columna correcta */
+            ORDER BY 
+                mf.fechaFeedback DESC";
 
         try {
             $stmt = $this->db->prepare($sql);
             $stmt->execute(['idMinuta' => (int)$idMinuta]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
+            // En tu log aparecerá la consulta corregida
             error_log("Error SQL (getFeedbackDeMinuta): " . $e->getMessage());
             return []; // Devuelve array vacío en caso de error
         }
