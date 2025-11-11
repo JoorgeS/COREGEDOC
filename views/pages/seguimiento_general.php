@@ -12,7 +12,9 @@ try {
     $comisiones = $model->getComisiones();
     
     // REQ 1: La página no carga nada hasta que se activa el filtro
-    $filtroActivo = isset($_GET['filtro_activo']);
+    // 💡 AJUSTE: Mantenemos el chequeo de 'filtro_activo' solo para saber si se usó la barra de filtros,
+    // pero forzamos la carga de datos si no hay parámetros específicos.
+    $filtroActivo = isset($_GET['filtro_activo']); 
     
     $filtroComision = $_GET['comisionId'] ?? null;
     $filtroIdMinuta = $_GET['idMinuta'] ?? null;
@@ -20,16 +22,19 @@ try {
     $filtroStartDate = $_GET['startDate'] ?? '';
     $filtroEndDate = $_GET['endDate'] ?? '';
 
-    if ($filtroActivo) {
-        $filters = [
-            'comisionId' => $filtroComision,
-            'startDate'  => $filtroStartDate,
-            'endDate'    => $filtroEndDate,
-            'idMinuta'   => $filtroIdMinuta,
-            'keyword'    => $filtroKeyword
-        ];
-        $minutasEnSeguimiento = $model->getUltimoSeguimientoParaPendientes($filters);
-    }
+    // 🚀 NUEVO: Ejecutar la consulta en la carga inicial y siempre
+    $filters = [
+        'comisionId' => $filtroComision,
+        'startDate'  => $filtroStartDate,
+        'endDate'    => $filtroEndDate,
+        'idMinuta'   => $filtroIdMinuta,
+        'keyword'    => $filtroKeyword,
+        // 💡 Nuevo parámetro para el modelo: indica que queremos todos los estados
+        'all_status' => true 
+    ];
+    
+    // Asumimos un nuevo método más genérico en MinutaModel para que devuelva TODAS las minutas
+    $minutasEnSeguimiento = $model->getSeguimientoGeneral($filters);
     
 } catch (Exception $e) {
     echo "<div class='alert alert-danger'>Error al conectar con el modelo: " . $e->getMessage() . "</div>";
@@ -42,7 +47,7 @@ try {
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-tasks"></i> Seguimiento General de Minutas en Proceso
+                <i class="fas fa-tasks"></i> Seguimiento General de Minutas (Todas)
             </h6>
         </div>
         <div class="card-body">
@@ -88,7 +93,7 @@ try {
                         </button>
                     </div>
                     <div class="col-md-2 d-grid">
-                         <label class="form-label">&nbsp;</label>
+                        <label class="form-label">&nbsp;</label>
                         <a href="menu.php?pagina=seguimiento_general" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-undo"></i> Limpiar
                         </a>
@@ -111,16 +116,10 @@ try {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (!$filtroActivo): ?>
+                        <?php if (empty($minutasEnSeguimiento)): ?>
                             <tr>
                                 <td colspan="8" class="text-center text-muted py-4">
-                                    <strong><i class="fas fa-search"></i> Por favor, utilice los filtros para buscar una minuta.</strong>
-                                </td>
-                            </tr>
-                        <?php elseif (empty($minutasEnSeguimiento)): ?>
-                            <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
-                                    No se encontraron minutas en proceso con los filtros seleccionados.
+                                    <strong><i class="fas fa-info-circle"></i> No hay minutas registradas o no se encontraron resultados con los filtros.</strong>
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -128,11 +127,11 @@ try {
                                 <tr>
                                     <td class="text-center">
                                         <button type="button" 
-                                                class="btn btn-primary btn-sm btn-ver-seguimiento" 
-                                                title="Ver Seguimiento"
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#modalSeguimiento" 
-                                                data-id="<?php echo $minuta['idMinuta']; ?>">
+                                                    class="btn btn-primary btn-sm btn-ver-seguimiento" 
+                                                    title="Ver Seguimiento"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#modalSeguimiento" 
+                                                    data-id="<?php echo $minuta['idMinuta']; ?>">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </td>

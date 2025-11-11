@@ -313,16 +313,16 @@ class MinutaModel extends BaseConexion
      * FUNCIÓN ACTUALIZADA: Obtiene la última acción de seguimiento
      * con filtros de comisión, fecha, ID y palabra clave.
      */
-    public function getUltimoSeguimientoParaPendientes($filters = [])
+    public function getSeguimientoGeneral($filters = []) // ⬅️ FUNCIÓN REQUERIDA
     {
         // Esta consulta busca el último seguimiento (rn = 1)
         $sql = "
-      WITH RankedSeguimiento AS (
+     WITH RankedSeguimiento AS (
         SELECT
           s.t_minuta_idMinuta,
-          s.detalle,
-          s.fecha_hora,
-          COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as usuario_nombre,
+          s.detalle as ultimo_detalle,
+          s.fecha_hora as ultima_fecha,
+          COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as ultimo_usuario,
           ROW_NUMBER() OVER(
             PARTITION BY s.t_minuta_idMinuta 
             ORDER BY s.fecha_hora DESC
@@ -335,11 +335,12 @@ class MinutaModel extends BaseConexion
       SELECT
         m.idMinuta,
         m.fechaMinuta,
+        m.estadoMinuta, -- Incluimos el estadoMinuta para verlo en la tabla
         c.nombreComision,
         IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema SEPARATOR '<br>'), 'N/A') AS nombreTemas,
-        COALESCE(rs.detalle, 'Sin acciones registradas') as ultimo_detalle,
-        rs.fecha_hora as ultima_fecha,
-        COALESCE(rs.usuario_nombre, 'N/A') as ultimo_usuario
+        COALESCE(rs.ultimo_detalle, 'Sin acciones registradas') as ultimo_detalle,
+        rs.ultima_fecha as ultima_fecha,
+        COALESCE(rs.ultimo_usuario, 'N/A') as ultimo_usuario
       FROM
         t_minuta m
       LEFT JOIN
@@ -349,7 +350,7 @@ class MinutaModel extends BaseConexion
       LEFT JOIN
         RankedSeguimiento rs ON m.idMinuta = rs.t_minuta_idMinuta AND rs.rn = 1
       WHERE
-        m.estadoMinuta <> 'APROBADA'
+        1=1 -- ⬅️ CLÁUSULA REMOVIDA: Ya no filtra por m.estadoMinuta <> 'APROBADA'
     ";
 
         $params = [];
@@ -381,8 +382,8 @@ class MinutaModel extends BaseConexion
 
         // 4. Filtro por Palabra Clave (Tema y Objetivo)
         if (!empty($filters['keyword'])) {
-            // Usamos HAVING porque 'nombreTemas' es un campo agrupado
-            // (Nota: t.objetivo ya está en el JOIN, así que podemos usarlo)
+            // Se debe re-evaluar si el keyword es NULL después del LEFT JOIN si no se encuentra t.nombreTema.
+            // Para simplificar y funcionar con GROUP BY, dejamos los OR en la parte LEFT JOIN.
             $sql .= " AND (t.nombreTema LIKE :keyword OR t.objetivo LIKE :keyword)";
             $params['keyword'] = '%' . $filters['keyword'] . '%';
         }
@@ -390,9 +391,9 @@ class MinutaModel extends BaseConexion
 
         $sql .= "
       GROUP BY 
-        m.idMinuta, c.nombreComision, rs.detalle, rs.fecha_hora, rs.usuario_nombre, m.fechaMinuta
+        m.idMinuta, m.fechaMinuta, m.estadoMinuta, c.nombreComision, rs.ultimo_detalle, rs.ultima_fecha, rs.ultimo_usuario
       ORDER BY
-        rs.fecha_hora DESC, m.idMinuta DESC;
+        m.fechaMinuta DESC, m.idMinuta DESC;
     ";
 
         try {
@@ -400,7 +401,7 @@ class MinutaModel extends BaseConexion
             $stmt->execute($params); // Pasamos los parámetros de los filtros
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            error_log("Error SQL (getUltimoSeguimientoParaPendientes): " . $e->getMessage());
+            error_log("Error SQL (getSeguimientoGeneral): " . $e->getMessage());
             return []; // Devuelve array vacío en caso de error
         }
     }
