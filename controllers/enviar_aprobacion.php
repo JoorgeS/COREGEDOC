@@ -98,87 +98,7 @@ class AprobacionSender extends BaseConexion
      * Envía el PDF de asistencia a un correo fijo ANTES de notificar a presidentes.
      * Si falla, lanza una excepción para revertir la transacción.
      */
-    private function notificarEnvioAsistencia(int $idMinuta)
-    {
-        // 1. Encontrar el PDF de asistencia generado al "Guardar Borrador"
-        $sqlPdf = "SELECT pathAdjunto FROM t_adjunto 
-                    WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'
-                    ORDER BY idAdjunto DESC LIMIT 1";
-        $stmtPdf = $this->db->prepare($sqlPdf);
-        $stmtPdf->execute([':idMinuta' => $idMinuta]);
-        $pdfPath = $stmtPdf->fetchColumn();
-
-        if (empty($pdfPath)) {
-            // Si no hay PDF de asistencia, fallamos.
-            throw new Exception("No se encontró el PDF de asistencia para la Minuta N° {$idMinuta}. Por favor, 'Guarde Borrador' primero para generarlo.");
-        }
-
-        // Rutas
-        $fullPathPdf = __DIR__ . '/../' . $pdfPath;
-        $fullPathFirma = __DIR__ . '/../' . self::FIRMA_PATH_RELATIVE; // Ruta de la nueva firma
-
-        if (!file_exists($fullPathPdf)) {
-            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El PDF de asistencia se encontró en la BD ('{$pdfPath}') pero el archivo no existe en el servidor ('{$fullPathPdf}').");
-            throw new Exception("Error crítico: El archivo PDF de asistencia ('{$pdfPath}') no existe en el servidor.");
-        }
-
-        if (!file_exists($fullPathFirma)) {
-            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El archivo de firma ('" . self::FIRMA_PATH_RELATIVE . "') no existe en el servidor.");
-            throw new Exception("Error crítico: El archivo de firma institucional no existe en el servidor.");
-        }
-
-        // 2. Enviar Correo
-        $mail = new PHPMailer(true);
-        try {
-            // Cargar config.ini para las credenciales
-            $config = parse_ini_file(__DIR__ . '/../cfg/configuracion.ini', true);
-            if ($config === false || !isset($config['smtp'])) {
-                throw new Exception("No se pudo leer el archivo 'configuracion.ini' o la sección [smtp] falta.");
-            }
-
-            // Configuración SMTP
-            $mail->isSMTP();
-            $mail->Host       = $config['smtp']['host'];
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $config['smtp']['user'];
-            $mail->Password   = $config['smtp']['pass'];
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = (int)$config['smtp']['port']; // Asegurar que el puerto sea un entero
-            $mail->CharSet    = 'UTF-8';
-
-            // Emisor
-            $mail->setFrom($config['smtp']['user'], 'CoreVota - Sistema de Minutas');
-
-            // Destinatario FIJO (Requerimiento 3)
-            $mail->addAddress('genesis.contreras.vargas@gmail.com');
-
-            // Contenido
-            $mail->isHTML(true);
-            $mail->Subject = "Reporte de Asistencia - Minuta N° {$idMinuta}";
-            $mail->Body    = "<html><body>
-                                <p>Se ha iniciado el proceso de envío a aprobación para la <strong>Minuta N° {$idMinuta}</strong>.</p>
-                                <p>Se adjunta el reporte de asistencia correspondiente generado por el Secretario Técnico.</p>
-                                <p>Este es un correo automático.</p>
-                                <br>
-                                <img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">
-                              </body></html>";
-
-            // Adjuntar el PDF
-            $mail->addAttachment($fullPathPdf);
-
-            // Adjuntar la imagen de la firma como contenido incrustado (Inline)
-            $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg');
-
-
-            $mail->send();
-
-            error_log("[LOG MINUTA $idMinuta]: PDF de asistencia y Firma enviados exitosamente a genesis.contreras.vargas@gmail.com.");
-        } catch (Exception $e) {
-            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El correo de ASISTENCIA (enviar_aprobacion) NO se pudo enviar. Mailer Error: {$mail->ErrorInfo}");
-            // Lanzar la excepción de nuevo para que la transacción principal falle
-            throw new Exception("Error al enviar PDF de asistencia por correo: " . $mail->ErrorInfo);
-        }
-    }
+   
 
     // ==================================================================
     // --- FIN DE LA NUEVA LÓGICA (AJUSTE #3) ---
@@ -281,15 +201,7 @@ class AprobacionSender extends BaseConexion
 
             $this->db->beginTransaction();
 
-            // ==================================================================
-            // --- INICIO DE LA LLAMADA (AJUSTE #3) ---
-            // ==================================================================
-            // Enviar el PDF de asistencia ANTES de cualquier otra cosa.
-            // Si esto falla, revierte la transacción.
-            $this->notificarEnvioAsistencia($idMinuta);
-            // ==================================================================
-            // --- FIN DE LA LLAMADA (AJUSTE #3) ---
-            // ==================================================================
+
 
             error_log("[LOG MINUTA $idMinuta]: Transacción INICIADA."); // Log 1
 
@@ -397,9 +309,9 @@ class AprobacionSender extends BaseConexion
                 // No detenemos la transacción por un error de log
             }
 
-            $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s) y se envió el reporte de asistencia.";
+            $mensaje = "Minuta enviada con éxito. Se ha notificado a {$totalRequeridos} presidente(s) para que la firme(n)";
             if ($esRespuestaAFeedback) {
-                $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados. Reporte de asistencia enviado.';
+                $mensaje = 'Minuta actualizada (feedback resuelto), sello verde guardado y presidentes notificados.';
             }
 
             return ['status' => 'success', 'message' => $mensaje];

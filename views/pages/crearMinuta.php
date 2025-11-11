@@ -54,12 +54,13 @@ $all_presidents = [];
 if ($idMinutaActual && is_numeric($idMinutaActual)) {
     try {
         // 1. Cargar datos de t_minuta
-        $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta 
+        $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta, asistencia_validada 
                        FROM t_minuta 
                        WHERE idMinuta = :idMinutaActual";
         $stmt_minuta = $pdo->prepare($sql_minuta);
         $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
         $minutaData = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
+        $asistenciaValidada = $minutaData['asistencia_validada'] ?? 0;
 
         if (!$minutaData) {
             throw new Exception("Minuta con ID $idMinutaActual no encontrada.");
@@ -483,20 +484,47 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
                     <div class="text-end">
 
-                        <button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
-                            onclick="if (validarCamposMinuta()) guardarBorrador(true);">
-                            <i class="fas fa-save"></i> Guardar Borrador
-                        </button>
+                        <?php
+                        // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
 
-                        <button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
-                            onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();"
-                            <?php echo !$puedeEnviar ? 'disabled' : ''; ?>>
-                            <i class="fas fa-paper-plane"></i> Enviar para Aprobación
-                        </button>
+                        // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
+                        if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+                            echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
+                        onclick="if (validarCamposMinuta()) guardarBorrador(true);">
+                    <i class="fas fa-save"></i> Guardar Borrador
+                </button>';
+                        }
 
-                        <?php if (!$puedeEnviar) : ?>
-                            <small class="d-block text-danger mt-2">Esta minuta ya fue APROBADA y no puede volver a enviarse.</small>
-                        <?php endif; ?>
+                        // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
+                        if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                            // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
+                            echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
+                onclick="iniciarValidacionAsistencia()">
+            <i class="fas fa-users-check"></i> Revisar y Validar Asistencia
+        </button>';
+                        }
+
+                        // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
+                        // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
+                        if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
+                            echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
+                        onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();">
+                    <i class="fas fa-paper-plane"></i> Enviar para Aprobación
+                </button>';
+                        }
+
+                        // Mensaje si ya está Aprobada
+                        if ($estadoMinuta === 'APROBADA') {
+                            echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
+                        }
+
+                        // Mensaje si falta validar asistencia
+                        if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                            echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
+                        }
+
+                        // --- FIN DE LA LÓGICA DE BOTONES ---
+                        ?>
 
                     </div>
                 </div>
@@ -557,6 +585,29 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
         </div>
     </template>
+
+
+    <div class="modal fade" id="modalValidarAsistencia" tabindex="-1" aria-labelledby="modalValidarAsistenciaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalValidarAsistenciaLabel">Validar Asistencia de Minuta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="contenidoModalAsistencia">
+                    <p>Cargando asistencia...</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" id="btnModificarAsistencia">
+                        <i class="fas fa-edit"></i> Modificar Asistencia
+                    </button>
+                    <button type="button" class="btn btn-success" id="btnConfirmarEnviarAsistencia">
+                        <i class="fas fa-check"></i> Confirmar y Enviar Correo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script>
         // ==================================================================
         // --- VARIABLES GLOBALES JAVASCRIPT ---
@@ -566,6 +617,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         const idMinutaGlobal = <?php echo json_encode($idMinutaActual); ?>;
         const ID_REUNION_GLOBAL = <?php echo json_encode($idReunionActual); ?>;
         const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
+        let bsModalValidarAsistencia = null;
         const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
         const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
         let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // Se actualiza con cada fetch
@@ -622,6 +674,159 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             document.getElementById('formSubirArchivo').addEventListener('submit', handleSubirArchivo);
             document.getElementById('formAgregarLink').addEventListener('submit', handleAgregarLink);
         });
+
+
+        // --- INICIO: JAVASCRIPT PARA EL MODAL DE VALIDACIÓN (CORREGIDO v2) ---
+        document.addEventListener('DOMContentLoaded', (event) => {
+
+            const modalValidarAsistencia = document.getElementById('modalValidarAsistencia');
+            if (modalValidarAsistencia) {
+
+                // 1. INICIALIZAR LA INSTANCIA DEL MODAL en nuestra variable global
+                bsModalValidarAsistencia = new bootstrap.Modal(modalValidarAsistencia);
+
+                // 2. Cargar el PREVIEW cuando el modal se muestra
+                modalValidarAsistencia.addEventListener('show.bs.modal', function(event) {
+
+                    if (!idMinutaGlobal) {
+                        console.error("idMinutaGlobal no está definido.");
+                        return;
+                    }
+
+                    const modalTitle = modalValidarAsistencia.querySelector('.modal-title');
+                    const modalBody = modalValidarAsistencia.querySelector('#contenidoModalAsistencia');
+
+                    modalTitle.textContent = 'Validar Asistencia de Minuta N° ' + idMinutaGlobal;
+                    modalBody.innerHTML = '<p>Cargando...</p>';
+
+                    fetch(`/COREVOTA/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                            method: 'GET'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success' && data.asistencia) {
+                                let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
+                                data.asistencia.forEach(item => {
+                                    html += `<tr>
+                                    <td>${item.nombreCompleto}</td>
+                                    <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
+                                 </tr>`;
+                                });
+                                html += '</tbody></table>';
+                                modalBody.innerHTML = html;
+                            } else {
+                                throw new Error(data.message || 'No se pudo cargar la asistencia.');
+                            }
+                        })
+                        .catch(err => {
+                            modalBody.innerHTML = `<p class="text-danger">Error al cargar la asistencia: ${err.message}</p>`;
+                            console.error("Error fetch preview asistencia:", err);
+                        });
+                });
+
+                // 3. Acción del botón "Modificar Asistencia" (Sin cambios)
+                const btnModificar = document.getElementById('btnModificarAsistencia');
+                if (btnModificar) {
+                    btnModificar.addEventListener('click', function() {
+                        if (idMinutaGlobal) {
+                            window.location.href = 'menu.php?pagina=asistencia_autogestion&idMinuta=' + idMinutaGlobal + '&edit=st';
+                        }
+                    });
+                }
+
+                // 4. Acción del botón "Confirmar y Enviar Correo" (Sin cambios)
+                const btnConfirmar = document.getElementById('btnConfirmarEnviarAsistencia');
+                if (btnConfirmar) {
+                    btnConfirmar.addEventListener('click', function() {
+
+                        if (!idMinutaGlobal) {
+                            Swal.fire('Error', 'Error de Javascript: No se pudo encontrar el ID de la minuta.', 'error');
+                            return;
+                        }
+
+                        const $this = this;
+                        $this.disabled = true;
+                        $this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+                        const formData = new FormData();
+                        formData.append('idMinuta', idMinutaGlobal);
+
+                        fetch('/COREVOTA/controllers/enviar_asistencia_validada.php', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => response.json())
+                            .then(response => {
+                                if (response.success || response.status === 'success') {
+                                    Swal.fire('Éxito', 'Asistencia validada y correo enviado con éxito.', 'success')
+                                        .then(() => {
+                                            window.location.reload();
+                                        });
+                                } else {
+                                    Swal.fire('Error', 'Error: ' + response.message, 'error');
+                                }
+                            })
+                            .catch(err => {
+                                Swal.fire('Error', 'Error de conexión al intentar enviar el correo.', 'error');
+                                console.error("Error fetch enviar_asistencia_validada:", err);
+                            })
+                            .finally(() => {
+                                $this.disabled = false;
+                                $this.innerHTML = '<i class="fas fa-check"></i> Confirmar y Enviar Correo';
+                            });
+                    });
+                }
+            }
+        });
+
+
+        function iniciarValidacionAsistencia() {
+            const btn = document.getElementById('btnRevisarAsistencia');
+            if (!btn) return;
+
+            // 1. Validar campos (como el Guardar Borrador)
+            // (Esta función ya existe en tu script, línea 973)
+            if (!validarCamposMinuta()) {
+                return; // Detiene si falta un tema/objetivo
+            }
+
+            // 2. Mostrar estado de carga
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando cambios...';
+
+            // 3. Llamar a guardarBorrador (que genera el PDF)
+            // (Esta función ya existe en tu script, línea 796)
+            guardarBorrador(false, function(guardadoExitoso) {
+
+                // 4. Resetear el botón
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-users-check"></i> Revisar y Validar Asistencia';
+
+                if (guardadoExitoso) {
+                    // 5. Si se guardó (y generó el PDF), ABRIR EL MODAL
+                    // (Usamos la instancia global que inicializamos en el DOMContentLoaded)
+                    if (bsModalValidarAsistencia) {
+                        bsModalValidarAsistencia.show();
+                    } else {
+                        Swal.fire('Error JS', 'No se pudo instanciar el modal de validación.', 'error');
+                    }
+                } else {
+                    // 6. Si falló el guardado, mostrar error
+                    Swal.fire('Error al Guardar', 'No se pudieron guardar los cambios. El PDF de asistencia no se pudo generar.', 'error');
+                }
+            });
+        }
+        // --- FIN: JAVASCRIPT MODAL ---
+
+
+
+
+
+
+
+
+
+
 
         // ==================================================================
         // --- SECCIÓN: ASISTENCIA (CORREGIDA/REFACTORIZADA) ---
