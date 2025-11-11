@@ -1298,6 +1298,14 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
          * Crea y añade un único elemento <li> de adjunto a la lista.
          */
         function agregarAdjuntoALista(adj) {
+
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Si el adjunto es de tipo 'asistencia', no lo dibujes y termina la función.
+            if (adj.tipoAdjunto === 'asistencia') {
+                return;
+            }
+            // --- FIN DE LA CORRECCIÓN ---
+
             const listaUl = document.getElementById('listaAdjuntosExistentes');
             if (!listaUl) return;
 

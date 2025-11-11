@@ -27,7 +27,7 @@ if (is_null($idMinuta)) {
 
 if (!$idMinuta || !is_numeric($idMinuta) || !$idUsuarioLogueado) {
     // Usamos 400 Bad Request si faltan datos
-    http_response_code(400); 
+    http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado o datos incompletos.', 'adjuntos' => []]);
     exit;
 }
@@ -38,13 +38,14 @@ try {
     $pdo = $db->getDatabase();
 
     // 3. CONSULTA SQL
-    $sql = "SELECT 
-                idAdjunto, 
-                pathAdjunto,
-                tipoAdjunto 
-            FROM t_adjunto
-            WHERE t_minuta_idMinuta = :idMinuta
-            ORDER BY tipoAdjunto ASC, idAdjunto DESC";
+    $sql = "SELECT idAdjunto, pathAdjunto, tipoAdjunto 
+        FROM t_adjunto 
+        WHERE t_minuta_idMinuta = :idMinuta
+        AND tipoAdjunto <> 'asistencia'"; //aqui añadimos la excepcion para que no se muestre la asistencia en el pdf adjuunto. si quisieran verlo, aqui esta la sql comentada
+    
+    //$sql = "SELECT idAdjunto, pathAdjunto, tipoAdjunto 
+      //  FROM t_adjunto 
+       // WHERE t_minuta_idMinuta = :idMinuta";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':idMinuta' => $idMinuta]);
@@ -65,7 +66,7 @@ try {
             // Asumimos que la BD guarda la ruta relativa (e.g., 'public/docs/...')
             // Si el path ya tiene 'public/', lo usamos; si no, lo prefijamos.
             $pathCorregido = (strpos($pathOriginal, 'public/') === 0) ? $pathOriginal : ('public/docs/' . $pathOriginal);
-            
+
             // Construir la URL absoluta para el navegador
             $pathWebFinal = '/corevota/' . $pathCorregido;
             $nombreArchivo = basename($pathOriginal);
@@ -84,7 +85,7 @@ try {
     echo json_encode(['status' => 'success', 'adjuntos' => $adjuntosProcesados]);
 } catch (Exception $e) {
     error_log("Error en obtener_adjuntos.php (Minuta ID: $idMinuta): " . $e->getMessage());
-    http_response_code(500); 
+    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Error al consultar la base de datos.', 'adjuntos' => []]);
 } finally {
     $pdo = null;

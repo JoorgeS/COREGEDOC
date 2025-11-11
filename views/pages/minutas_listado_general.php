@@ -458,13 +458,15 @@ function renderPaginationListado($current, $pages)
                                 <?php else: // Si NO está APROBADA 
                                 ?>
 
-                                    <?php // --- INICIO DE LA LÓGICA DE ACCIONES --- 
+
+
+                                    <?php // --- INICIO DE LA LÓGICA DE ACCIONES CORREGIDA --- 
                                     ?>
 
                                     <?php if ($estado === 'BORRADOR'): ?>
-                                        <?php // Caso 1: Es un BORRADOR (Solo visible para el ST dueño) 
+                                        <?php // Caso 1: Es un BORRADOR 
                                         ?>
-                                        <?php if ($rol == 2): // Verificamos que el usuario logueado es ST (con la variable corregida) 
+                                        <?php if ($rol == 2): // Verificamos que el usuario logueado es ST 
                                         ?>
                                             <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-primary btn-sm">
                                                 <i class="fas fa-edit"></i> Continuar con la edición
@@ -487,24 +489,20 @@ function renderPaginationListado($current, $pages)
                                         <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <?php if ($rol == 2): // El ST siempre puede editar una minuta PENDIENTE 
+                                        <?php // ¡EL BOTÓN DE EDITAR (LÁPIZ) SE HA ELIMINADO DE AQUÍ! 
                                         ?>
-                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                        <?php endif; ?>
                                     <?php endif; ?>
 
                                     <?php // --- FIN DE LA LÓGICA DE ACCIONES --- 
                                     ?>
 
                                 <?php endif; ?>
+
+                                <?php // El botón de seguimiento es visible para todos 
+                                ?>
                                 <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Seguimiento de Aprobación">
-
-
-                                    <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Seguimiento de Aprobación">
-                                        <i class="fas fa-route"></i>
-                                    </a>
+                                    <i class="fas fa-route"></i>
+                                </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -572,7 +570,15 @@ function renderPaginationListado($current, $pages)
                 // Verificar el formato de la respuesta del controlador
                 if (data.status === 'success' && data.adjuntos && data.adjuntos.length > 0) { // <-- Usar data.adjuntos
                     modalList.innerHTML = '';
-                    data.adjuntos.forEach(adj => { // <-- Iterar sobre data.adjuntos
+                    data.adjuntos.forEach(adj => {
+
+                        // --- INICIO DE LA CORRECCIÓN ---
+                        // Si el adjunto es de tipo 'asistencia', sáltalo.
+                        if (adj.tipoAdjunto === 'asistencia') {
+                            return; // Salta esta iteración del bucle
+                        }
+
+                        // <-- Iterar sobre data.adjuntos
                         const li = document.createElement('li');
                         li.className = 'list-group-item d-flex justify-content-between align-items-center';
                         const link = document.createElement('a');

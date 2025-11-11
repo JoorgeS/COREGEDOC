@@ -123,7 +123,7 @@ class MinutaPendiente extends BaseConexion
                 -- Conteo de adjuntos
                 (SELECT COUNT(*)
                  FROM t_adjunto a
-                 WHERE a.t_minuta_idMinuta = m.idMinuta) AS totalAdjuntos
+                 WHERE a.t_minuta_idMinuta = m.idMinuta AND a.tipoAdjunto <> 'asistencia') AS totalAdjuntos
                  
             FROM t_minuta m
             
@@ -293,7 +293,7 @@ function renderPagination($current, $pages)
           <?php if ($tieneFeedback) : ?>
             <!-- Caso 1: Minuta bloqueada por feedback de alguien -->
             <span class="text-danger fw-bold ms-2">
-              <i class="fas fa-clock"></i> Minuta en revisión por ST.
+              <i class="fas fa-clock"></i> Minuta en revisión por Secretario Técnico
             </span>
           <?php elseif ($usuarioHaFirmado) : ?>
             <!-- Caso 2: El usuario actual YA firmó -->

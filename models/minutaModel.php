@@ -56,7 +56,7 @@ class MinutaModel extends BaseConexion
                 m.presidentesRequeridos
             FROM t_minuta m
             LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
-            LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+            LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta AND adj.tipoAdjunto <> 'asistencia'
             LEFT JOIN t_comision c  ON m.t_comision_idComision = c.idComision
             LEFT JOIN t_usuario u   ON c.t_usuario_idPresidente = u.idUsuario
             LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
