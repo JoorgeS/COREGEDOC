@@ -95,7 +95,7 @@
     <div class="card mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                Línea de Tiempo de Minuta: #<?php echo htmlspecialchars($minuta['idMinuta']); ?>
+                Trazabilidad de la Minuta: #<?php echo htmlspecialchars($minuta['idMinuta']); ?>
                 (Estado: <?php echo htmlspecialchars($minuta['estadoMinuta'] ?? 'N/A'); ?>)
             </h6>
         </div>

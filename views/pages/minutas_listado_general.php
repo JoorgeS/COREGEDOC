@@ -451,14 +451,13 @@ function renderPaginationListado($current, $pages)
                                 <?php endif; ?>
                             </td>
                             <td class="text-center" style="white-space: nowrap;">
+
                                 <?php if ($estado === 'APROBADA'): ?>
                                     <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
                                         <i class="fas fa-file-pdf"></i> Ver PDF Final
                                     </a>
                                 <?php else: // Si NO está APROBADA 
                                 ?>
-
-
 
                                     <?php // --- INICIO DE LA LÓGICA DE ACCIONES CORREGIDA --- 
                                     ?>
@@ -486,11 +485,10 @@ function renderPaginationListado($current, $pages)
                                     <?php else: ?>
                                         <?php // Caso 3: Está PENDIENTE o PARCIAL (esperando firmas) 
                                         ?>
-                                        <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <?php // ¡EL BOTÓN DE EDITAR (LÁPIZ) SE HA ELIMINADO DE AQUÍ! 
-                                        ?>
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.85rem;">
+                                            <i class="fas fa-hourglass-half me-1"></i>
+                                            A la espera de firma (<?php echo $firmasActuales; ?>/<?php echo $requeridos; ?>)
+                                        </span>
                                     <?php endif; ?>
 
                                     <?php // --- FIN DE LA LÓGICA DE ACCIONES --- 
