@@ -724,12 +724,34 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         });
                 });
 
-                // 3. Acción del botón "Modificar Asistencia" (Sin cambios)
+                // 3. Acción del botón "Modificar Asistencia" (CORREGIDO)
                 const btnModificar = document.getElementById('btnModificarAsistencia');
                 if (btnModificar) {
                     btnModificar.addEventListener('click', function() {
-                        if (idMinutaGlobal) {
-                            window.location.href = 'menu.php?pagina=asistencia_autogestion&idMinuta=' + idMinutaGlobal + '&edit=st';
+                        // 1. Ocultar el modal
+                        // (Usamos la instancia global 'bsModalValidarAsistencia' que definimos al inicio)
+                        if (bsModalValidarAsistencia) {
+                            bsModalValidarAsistencia.hide();
+                        }
+
+                        // 2. Encontrar el botón del acordeón de Asistencia
+                        const accordionButton = document.querySelector('button[data-bs-target="#asistenciaForm"]');
+                        // 3. Encontrar el contenido del acordeón
+                        const accordionContent = document.getElementById('asistenciaForm');
+
+                        if (accordionContent && accordionButton) {
+                            // 4. Crear una instancia de Bootstrap Collapse y mostrarla
+                            // (Esto asegura que el acordeón se abra)
+                            const collapseInstance = bootstrap.Collapse.getOrCreateInstance(accordionContent);
+                            collapseInstance.show();
+
+                            // 5. (Opcional) Hacer scroll hasta el acordeón para que el ST lo vea
+                            accordionButton.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        } else {
+                            console.error('No se pudo encontrar el acordeón de asistencia #asistenciaForm');
                         }
                     });
                 }
