@@ -44,8 +44,6 @@ try {
     $nombreComision = $minutaData['nombreComision'] ?? 'Comisión no especificada';
 
 
-    // --- INICIO DE LA MODIFICACIÓN ---
-
     // 3. Encontrar el PDF de asistencia "bonito" existente
     // (Esta es la lógica que tomamos de tu script 'enviar_aprobacion.php')
     $sqlPdf = "SELECT pathAdjunto FROM t_adjunto 
@@ -82,7 +80,7 @@ try {
     $mail->CharSet    = 'UTF-8';
 
     // Email DE (Desde)
-    $mail->setFrom('no-responder@corevota.cl', 'CORE Vota'); //
+    $mail->setFrom('equiposieteduocuc@gmail.com', 'CORE Vota'); //
 
     // Email PARA (Para)
     $mail->addAddress('genesis.contreras.vargas@gmail.com', 'Genesis Contreras');
@@ -92,6 +90,29 @@ try {
     $mail->Subject = "Validación de Asistencia - Minuta N° {$idMinuta} ({$nombreComision})";
     $mail->Body    = "El Secretario Técnico ha validado la asistencia de la minuta N° {$idMinuta}.<br>Se adjunta el documento PDF con el detalle.<br><br>Atte,<br>Sistema CoreVota.";
 
+
+    // 1. Definir la ruta de la firma
+    $firmaPathRelativa = 'public/img/firma.jpeg'; //
+    $fullPathFirma = __DIR__ . '/../' . $firmaPathRelativa;
+
+    // 2. Definir el HTML de la firma
+    $firmaHTML = ""; // Inicia vacío
+    if (file_exists($fullPathFirma)) {
+        // 3. Adjuntar la imagen si existe
+        $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg'); //
+        $firmaHTML = "<br><br><img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">"; //
+    } else {
+        error_log("ADVERTENCIA (enviar_asistencia_validada.php): No se encontró el archivo de firma en: " . $fullPathFirma);
+    }
+    
+    // 4. Construir el Body final
+    $mail->Body = "<html><body>
+                    <p>El Secretario Técnico ha validado la asistencia de la <strong>Minuta N° {$idMinuta}</strong>.</p>
+                    <p>Se adjunta el documento PDF con el detalle.</p>
+                    <p>Atte,<br>Sistema CoreVota</p>
+                    {$firmaHTML}
+                   </body></html>";
+    // --- FIN: LÓGICA DE LA FIRMA ---
     // Adjuntar el PDF "bonito" (encontrado en el disco)
     $mail->addAttachment($fullPathPdf, "Asistencia_Minuta_{$idMinuta}.pdf");
 
