@@ -75,14 +75,14 @@ try {
                        WHERE idAsistencia = :idAsistencia";
         $stmt_update = $pdo->prepare($sql_update);
         $stmt_update->execute([':idAsistencia' => $existe['idAsistencia']]);
-        $response = ['status' => 'success', 'message' => 'Asistencia re-confirmada. (AUTOREGISTRO)'];
+        $response = ['status' => 'success', 'message' => 'Asistencia re-confirmada.'];
     } else {
         // Si no existe, la insertamos y AÑADIMOS el campo de trazabilidad
         $sql_insert = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia, origenAsistencia)
                        VALUES (:idMinuta, :idUsuario, 1, NOW(), 'AUTOREGISTRO')";
         $stmt_insert = $pdo->prepare($sql_insert);
         $stmt_insert->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
-        $response = ['status' => 'success', 'message' => 'Asistencia registrada con éxito. (AUTOREGISTRO)'];
+        $response = ['status' => 'success', 'message' => 'Asistencia registrada con éxito.'];
     }
 } catch (Exception $e) {
     error_log("Error en AsistenciaController: " . $e->getMessage());

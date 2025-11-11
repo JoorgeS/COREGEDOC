@@ -47,7 +47,7 @@ try {
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-tasks"></i> Seguimiento General de Minutas (Todas)
+                <i class="fas fa-tasks"></i> Seguimiento General Histórico de Minutas
             </h6>
         </div>
         <div class="card-body">
@@ -61,7 +61,7 @@ try {
                         <input type="number" class="form-control form-control-sm" id="idMinuta" name="idMinuta" value="<?php echo htmlspecialchars($filtroIdMinuta ?? ''); ?>">
                     </div>
                     <div class="col-md-3">
-                        <label for="keyword" class="form-label">Palabra Clave (Tema/Obj):</label>
+                        <label for="keyword" class="form-label">Palabra Clave (Tema u Objetivo):</label>
                         <input type="text" class="form-control form-control-sm" id="keyword" name="keyword" value="<?php echo htmlspecialchars($filtroKeyword ?? ''); ?>">
                     </div>
                     <div class="col-md-3">
@@ -105,10 +105,10 @@ try {
                 <table id="tablaSeguimiento" class="table table-bordered table-striped table-hover">
                     <thead class="thead-dark">
                         <tr>
-                            <th class="text-center">Acciones</th>
+                            <th class="text-center">Ver Detalle</th>
                             <th>ID Minuta</th>
                             <th>Comisión</th>
-                            <th>Temas Principales</th>
+                            <th>Temas</th>
                             <th>Fecha Creación</th>
                             <th>Última Acción Registrada</th>
                             <th>Fecha Última Acción</th>

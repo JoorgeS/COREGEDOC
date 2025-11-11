@@ -58,7 +58,7 @@ $ahora = new DateTime();
 ?>
 
 <div class="container mt-4">
-    <h3 class="mb-4">Registro de Asistencia (Consejeros)</h3>
+    <h3 class="mb-4">Registro de Asistencia</h3>
     <p>Aquí puede registrar su asistencia a las reuniones activas. El botón solo estará disponible durante los **primeros 30 minutos** contados desde la hora de inicio de la sesión.</p>
 
     <div class="list-group shadow-sm">

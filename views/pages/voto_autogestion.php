@@ -1,4 +1,6 @@
 <?php
+// views/pages/voto_autogestion.php
+
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
@@ -8,138 +10,201 @@ if (!isset($_SESSION['idUsuario'])) {
 }
 
 require_once __DIR__ . '/../../class/class.conectorDB.php';
+// Asegúrate de que VotacionController y VotoController son clases válidas
 require_once __DIR__ . '/../../controllers/VotacionController.php';
-require_once __DIR__ . '/../../controllers/VotoController.php'; // ruta correcta
+require_once __DIR__ . '/../../controllers/VotoController.php';
 
 $db = new conectorDB();
 $pdo = $db->getDatabase();
+
+$idUsuario = $_SESSION['idUsuario'];
 $votacionCtrl = new VotacionController();
 $votoCtrl = new VotoController();
 
-$idUsuario = $_SESSION['idUsuario'];
-
-// --- REGISTRO DE VOTO (vía fetch POST) ---
+// --- 1. LÓGICA DE PROCESAMIENTO POST (VOTO DE AUTOGESTIÓN) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST['opcionVoto'])) {
   header('Content-Type: application/json');
   $idVotacion = $_POST['idVotacion'];
   $opcionVoto = $_POST['opcionVoto'];
+  $response = ['status' => 'error', 'message' => 'Error al registrar voto.'];
 
-  // 1️⃣ Verificar si ya votó
-  $sqlCheck = "SELECT COUNT(*) FROM t_voto 
-              WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
-  $stmt = $pdo->prepare($sqlCheck);
-  $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
-  if ($stmt->fetchColumn() > 0) {
-    echo json_encode(['status' => 'duplicate', 'message' => 'Ya registraste tu voto.']);
+  try {
+    // A. Verificar si ya votó (aunque el JS lo previene, lo verificamos en el backend)
+    $sqlCheck = "SELECT COUNT(*) FROM t_voto 
+                     WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+    $stmt = $pdo->prepare($sqlCheck);
+    $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
+    if ($stmt->fetchColumn() > 0) {
+      echo json_encode(['status' => 'duplicate', 'message' => 'Ya registraste tu voto.']);
+      exit;
+    }
+
+    // B. Obtener el idMinuta asociado a la votación para verificar asistencia
+    $sqlMinuta = "SELECT t_minuta_idMinuta FROM t_votacion WHERE idVotacion = :idVotacion";
+    $stmtMinuta = $pdo->prepare($sqlMinuta);
+    $stmtMinuta->execute([':idVotacion' => $idVotacion]);
+    $idMinuta = $stmtMinuta->fetchColumn();
+
+    if (!$idMinuta) {
+      throw new Exception('Votación no asociada a ninguna minuta para verificar asistencia.');
+    }
+
+    // C. Verificar si el usuario está presente en la minuta (t_asistencia)
+    $sqlAsistencia = "SELECT COUNT(*) FROM t_asistencia 
+                          WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
+    $stmtAsistencia = $pdo->prepare($sqlAsistencia);
+    $stmtAsistencia->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
+
+    if ($stmtAsistencia->fetchColumn() == 0) {
+      echo json_encode([
+        'status' => 'unauthorized',
+        'message' => 'No puede votar. Debe registrar su asistencia a la reunión correspondiente.'
+      ]);
+      exit;
+    }
+
+    // D. Registrar voto (Llamada al método correcto para t_votacion)
+    $response = $votoCtrl->registrarVotoVotacion(
+      (int)$idVotacion,
+      (int)$idUsuario,
+      (string)$opcionVoto,
+      null // Voto de autogestión, no hay Secretario registrando
+    );
+    echo json_encode($response);
+    exit;
+  } catch (Exception $e) {
+    error_log("Error en voto_autogestion (POST): " . $e->getMessage());
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     exit;
   }
-
-  // --- INICIO: NUEVA VALIDACIÓN DE ASISTENCIA ---
-  // A. Obtener el idMinuta asociado a la votación (asumiendo FK t_minuta_idMinuta en t_votacion)
-  $sqlMinuta = "SELECT t_minuta_idMinuta FROM t_votacion WHERE idVotacion = :idVotacion";
-  $stmtMinuta = $pdo->prepare($sqlMinuta);
-  $stmtMinuta->execute([':idVotacion' => $idVotacion]);
-  $idMinuta = $stmtMinuta->fetchColumn();
-
-  if (!$idMinuta) {
-    // Si no hay minuta asociada, lo bloqueamos para evitar votos inválidos.
-    echo json_encode(['status' => 'error', 'message' => 'Votación no asociada a ninguna minuta para verificar asistencia.']);
-    exit;
-  }
-
-  // B. Verificar si el usuario está presente en la minuta (t_asistencia)
-  $sqlAsistencia = "SELECT COUNT(*) FROM t_asistencia 
-                    WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
-  $stmtAsistencia = $pdo->prepare($sqlAsistencia);
-  $stmtAsistencia->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
-
-  if ($stmtAsistencia->fetchColumn() == 0) {
-    echo json_encode([
-      'status' => 'unauthorized',
-      'message' => 'No puede votar. Debe registrar su asistencia a la reunión correspondiente.'
-    ]);
-    exit;
-  }
-
-  $response = $votoCtrl->registrarVotoVotacion(
-    (int)$idVotacion,
-    (int)$idUsuario,
-    (string)$opcionVoto,
-    null
-  );
-  echo json_encode($response);
-  exit;
 }
 
+// --- 2. LÓGICA DE CARGA DE DATOS (VISTA) ---
 $votaciones = $votacionCtrl->listar()['data'] ?? [];
+$votacionesHabilitadas = array_filter($votaciones, fn($v) => (int)$v['habilitada'] === 1);
+$votacionVigente = reset($votacionesHabilitadas); // Tomamos la primera votación habilitada
+
+$votoPrevio = null;
+$yaVoto = false;
+
+if ($votacionVigente) {
+  $sqlCheck = "SELECT opcionVoto FROM t_voto 
+                 WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+  $stmt = $pdo->prepare($sqlCheck);
+  $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $votacionVigente['idVotacion']]);
+  $votoPrevio = $stmt->fetchColumn();
+  $yaVoto = !empty($votoPrevio);
+}
 ?>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <div class="container mt-5">
-  <h3 class="fw-bold text-success mb-4">
-    <i class="fa-solid fa-square-check me-2"></i>Registrar Votación
+  <h3 class="fw-bold text-primary mb-4">
+    <i class="fa-solid fa-person-booth me-2"></i> Sala de Votaciones
   </h3>
 
-  <?php
-  $habilitadas = array_filter($votaciones, fn($v) => (int)$v['habilitada'] === 1);
-  if (empty($habilitadas)): ?>
-    <div class="alert alert-info shadow-sm">
-      <i class="fa-solid fa-info-circle me-2"></i>
-      No hay votaciones habilitadas en este momento.
-    </div>
-  <?php else: ?>
-    <div class="row g-4">
-      <?php foreach ($habilitadas as $v):
-        // verificar si el usuario ya votó esta votación
-        $sqlCheck = "SELECT opcionVoto FROM t_voto 
-                     WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
-        $stmt = $pdo->prepare($sqlCheck);
-        $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $v['idVotacion']]);
-        $votoPrevio = $stmt->fetchColumn();
-        $yaVoto = !empty($votoPrevio);
-      ?>
-        <div class="col-md-6">
-          <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-body text-center">
-              <h4 class="fw-bold mb-1"><?= htmlspecialchars($v['nombreVotacion']) ?></h4>
-              <p class="mb-3 text-muted">
-                <i class="fa-solid fa-landmark me-2 text-success"></i>
-                Comisión: <strong><?= htmlspecialchars($v['nombreComision'] ?? 'No definida') ?></strong>
-              </p>
+  <div class="row g-4">
 
-              <?php if ($yaVoto): ?>
-                <div class="alert alert-success fw-semibold py-2">
-                  <i class="fa-solid fa-check-circle me-2"></i>
-                  Ya emitiste tu voto: <strong><?= strtoupper($votoPrevio) ?></strong>
-                </div>
-              <?php else: ?>
-                <form method="post" class="form-voto" data-nombre="<?= htmlspecialchars($v['nombreVotacion']) ?>">
-                  <input type="hidden" name="idVotacion" value="<?= $v['idVotacion'] ?>">
-                  <input type="hidden" name="opcionVoto" value="">
-                  <div class="d-flex justify-content-center gap-4">
-                    <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI">SÍ</button>
-                    <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO">NO</button>
-                    <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION">ABS</button>
-                  </div>
-                </form>
-              <?php endif; ?>
-              <div class="mt-3">
-                <a href="menu.php?pagina=tabla_votacion&idVotacion=<?= $v['idVotacion'] ?>"
-                  class="btn btn-outline-success btn-sm fw-semibold js-resumen-url">
-                  <i class="fa-solid fa-chart-simple me-1"></i> Ver resultados
+    <div class="col-12">
+      <div class="card shadow-lg border-0 rounded-4">
+        <div class="card-header bg-primary text-white fw-bold fs-5">
+          <i class="fas fa-bullhorn me-2"></i> Votación Abierta
+        </div>
+        <div class="card-body py-4" id="tarjetaVotacionVigente">
+          <?php if (empty($votacionVigente)): ?>
+            <div class="alert alert-info text-center mb-0">
+              No hay votaciones habilitadas en este momento.
+            </div>
+          <?php else: ?>
+            <h4 class="fw-bold mb-2 text-dark"><?= htmlspecialchars($votacionVigente['nombreVotacion']) ?></h4>
+            <p class="mb-4 text-muted">Comisión: <strong><?= htmlspecialchars($votacionVigente['nombreComision'] ?? 'No definida') ?></strong></p>
+
+            <?php if ($yaVoto): ?>
+              <div class="alert alert-success fw-semibold py-3 text-center">
+                <i class="fa-solid fa-check-circle me-2"></i>
+                Ya emitiste tu voto:
+                <span class="badge bg-success fs-6 ms-2"><?= strtoupper($votoPrevio) ?></span>
+
+                <a href="menu.php?pagina=tablaVotacion&idVotacion=<?= $votacionVigente['idVotacion'] ?>" class="btn btn-sm btn-outline-success ms-3 fw-bold">
+                  Revisar Resumen
                 </a>
               </div>
-            </div>
-          </div>
+            <?php else: ?>
+              <form method="post" class="form-voto text-center" data-nombre="<?= htmlspecialchars($votacionVigente['nombreVotacion']) ?>">
+                <input type="hidden" name="idVotacion" value="<?= $votacionVigente['idVotacion'] ?>">
+                <input type="hidden" name="opcionVoto" value="">
+                <h5 class="mb-4">¿Cuál es tu voto?</h5>
+                <div class="d-flex justify-content-center gap-4">
+                  <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI">SÍ</button>
+                  <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO">NO</button>
+                  <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION">ABS</button>
+                </div>
+              </form>
+            <?php endif; ?>
+          <?php endif; ?>
         </div>
-      <?php endforeach; ?>
+      </div>
     </div>
-  <?php endif; ?>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-light fw-bold">
+          <i class="fas fa-chart-bar me-2 text-info"></i> 2. Resultados de Votaciones
+        </div>
+        <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+          <p class="text-muted">Consulta el dashboard restringido con los resultados consolidados de todas las votaciones cerradas.</p>
+          <a href="menu.php?pagina=votacion_listado&filtro_estado=CERRADA" class="btn btn-info btn-lg mt-auto" style="min-width: 250px;">
+            <i class="fas fa-lock me-2"></i> Ver Resultados Consolidados
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-light fw-bold">
+          <i class="fas fa-history me-2 text-dark"></i> 3. Mi Historial
+        </div>
+        <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
+          <p class="text-muted">Revisa un listado de todas las votaciones en las que has participado y la opción que elegiste en cada una.</p>
+          <a href="menu.php?pagina=historial_votacion&idUsuario=<?= $idUsuario ?>" class="btn btn-outline-dark btn-lg mt-auto" style="min-width: 250px;">
+            <i class="fas fa-user-check me-2"></i> Ver Mi Historial de Votos
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
+<style>
+  .voto-btn {
+    width: 100px;
+    border-radius: 10px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .voto-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  }
+
+  .card {
+    border-radius: 0.5rem;
+  }
+
+  .card-body.py-4 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+
+  .card-header.bg-primary {
+    background-color: #0d6efd !important;
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  // Enviar voto con validación visual
+  // La función que maneja el evento click en los botones
   document.querySelectorAll('.voto-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const form = this.closest('.form-voto');
@@ -157,23 +222,23 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
         cancelButtonText: 'Cancelar'
       }).then(result => {
         if (result.isConfirmed) {
+          // Preparamos los datos
           const formData = new FormData();
           formData.append('idVotacion', form.querySelector('input[name="idVotacion"]').value);
           formData.append('opcionVoto', opcion);
 
-          // La vista se llama a sí misma para procesar el POST
+          // Enviamos el voto al mismo archivo (voto_autogestion.php)
           fetch('voto_autogestion.php', {
               method: 'POST',
               body: formData
             })
             .then(response => {
+              // Manejo de errores HTTP, intenta leer JSON
               if (!response.ok) {
-                // Si el servidor devuelve un error HTTP (400, 500, etc.)
-                // Intenta leerlo como JSON, o usa un mensaje genérico.
                 return response.json().catch(() => ({
                   status: 'error',
                   message: `Error de red: HTTP ${response.status}`,
-                  error: 'Respuesta inválida del servidor'
+                  error: 'Respuesta inválida'
                 }));
               }
               return response.json();
@@ -187,7 +252,7 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                   confirmButtonColor: '#198754'
                 });
               } else if (resp.status === 'unauthorized') {
-                // Manejar error de asistencia
+                // Error de asistencia o acceso
                 Swal.fire({
                   icon: 'error',
                   title: '❌ Voto no permitido',
@@ -198,29 +263,25 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                 Swal.fire({
                   icon: 'success',
                   title: '✅ Voto registrado correctamente',
-                  text: 'Redirigiendo al resumen...',
+                  text: 'Redirigiendo a su resumen...', // Mensaje cambiado
                   showConfirmButton: false,
                   timer: 1600
                 });
+
+                // 🚀 LÓGICA CORREGIDA: Redirección automática al resumen de la votación
                 setTimeout(() => {
+                  // Obtenemos el ID de la votación del formulario
                   const id = form.querySelector('input[name="idVotacion"]').value;
 
-                  // 1) Intentar usar el mismo destino del botón "Ver resultados"
-                  const contenedor = form.closest('.card-body') || document;
-                  const linkResumen = contenedor.querySelector('.js-resumen-url');
-                  const hrefResumen = linkResumen ? linkResumen.getAttribute('href') : null;
-
-                  // 2) Fallback confiable al router que ya funciona
-                  const destino = hrefResumen || `menu.php?pagina=tabla_votacion&idVotacion=${id}`;
-
-                  window.location.href = destino;
+                  // Redirección directa al dashboard restringido
+                  window.location.href = `menu.php?pagina=tablaVotacion&idVotacion=${id}`;
                 }, 1600);
+
               } else {
                 Swal.fire({
                   icon: 'error',
                   title: 'Error al registrar voto',
-                  // Esto capturará el mensaje de error de la DB si es que falló
-                  text: resp.message || 'Inténtalo nuevamente. (Error: ' + (resp.error || 'Desconocido') + ')',
+                  text: resp.message || 'Inténtalo nuevamente.',
                   confirmButtonColor: '#198754'
                 });
               }
@@ -239,43 +300,3 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
     });
   });
 </script>
-
-<style>
-  /* ... (Estilos CSS sin cambios) ... */
-  .voto-btn {
-    width: 100px;
-    border-radius: 10px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .voto-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  }
-
-  .card {
-    background-color: #fff;
-    transition: transform 0.2s ease;
-  }
-
-  .card:hover {
-    transform: translateY(-4px);
-  }
-
-  .alert-success {
-    background-color: #e6f7ec;
-    border: 1px solid #198754;
-    color: #155d2d;
-  }
-
-  .btn-outline-success {
-    border-width: 2px;
-    border-color: #198754;
-    color: #198754;
-  }
-
-  .btn-outline-success:hover {
-    background-color: #198754;
-    color: #fff;
-  }
-</style>

@@ -493,15 +493,10 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         <li class="nav-item">
                             <a href="menu.php?pagina=voto_autogestion" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-vote-yea fa-fw"></i>
-                                Votar ahora
+                                Sala de Votaciones
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a href="menu.php?pagina=historial_votacion" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                                <i class="fas fa-history fa-fw"></i>
-                                Historial Votación
-                            </a>
-                        </li>
+
 
                     <?php endif; ?>
 

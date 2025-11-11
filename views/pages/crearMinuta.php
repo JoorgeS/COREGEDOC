@@ -1901,6 +1901,8 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         /**
          * Carga la lista de votaciones asociadas a la minuta y las renderiza.
          */
+        // views/pages/crearMinuta.php (Reemplazar la función cargarVotacionesDeLaMinuta)
+
         async function cargarVotacionesDeLaMinuta() {
             const cont = document.getElementById('listaVotacionesMinuta');
             const status = document.getElementById('votacionesStatus');
@@ -1917,21 +1919,51 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     status.textContent = `Mostrando ${data.data.length} votacion(es).`;
                     let html = '<ul class="list-group">';
                     data.data.forEach(v => {
+                        const isHabilitada = v.habilitada == 1;
+                        // Asumimos que ES_ST_EDITABLE es una variable global
+                        const isEditable = ES_ST_EDITABLE;
+                        let botonesAccion = '';
+
+                        if (isHabilitada && isEditable) {
+                            // Botón para registrar voto manual
+                            botonesAccion += `
+                        <button class="btn btn-warning btn-sm me-2" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
+                            <i class="fas fa-person-booth"></i> Registrar Voto
+                        </button>`;
+
+                            // 🚀 BOTÓN UNIFICADO: Cerrar y Generar PDF
+                            botonesAccion += `
+                        <button class="btn btn-danger btn-sm" title="Cerrar votación y generar reporte PDF" onclick="cambiarEstadoVotacion(${v.idVotacion}, 0, '${escapeHTML(v.nombreVotacion)}')">
+                            <i class="fas fa-file-pdf"></i> Cerrar y Reportar
+                        </button>`;
+
+                        } else if (!isHabilitada) {
+                            // Botón para RE-GENERAR PDF (si ya está cerrada)
+                            botonesAccion += `
+                        <button class="btn btn-primary btn-sm me-2" title="Generar PDF de resultados nuevamente" onclick="generarPdfVotacion(${v.idVotacion})">
+                            <i class="fas fa-file-pdf"></i> PDF Resultados
+                        </button>`;
+
+                            // Botón para RE-ABRIR VOTACIÓN (Opcional, si el ST está editando)
+                            if (isEditable) {
+                                botonesAccion += `
+                            <button class="btn btn-outline-success btn-sm" title="Re-abrir votación para nuevos votos" onclick="cambiarEstadoVotacion(${v.idVotacion}, 1, '${escapeHTML(v.nombreVotacion)}')">
+                                <i class="fas fa-lock-open"></i> Re-abrir
+                            </button>`;
+                            }
+                        }
+
                         html += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div>
-                                    <span class="fw-bold">${v.nombreVotacion}</span>
-                                    <small class="d-block text-muted">
-                                        Comisión: ${v.nombreComision} | Estado: 
-                                        ${v.habilitada == 1 ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
-                                    </small>
-                                </div>
-                                <div>
-                                    <button class="btn btn-warning btn-sm" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
-                                        <i class="fas fa-person-booth"></i> Registrar Voto
-                                    </button>
-                                </div>
-                            </li>`;
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold">${v.nombreVotacion}</span>
+                            <small class="d-block text-muted">
+                                Comisión: ${v.nombreComision} | Estado: 
+                                ${isHabilitada ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
+                            </small>
+                        </div>
+                        <div>${botonesAccion}</div>
+                    </li>`;
                     });
                     html += '</ul>';
                     cont.innerHTML = html;
@@ -1943,6 +1975,99 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 status.textContent = 'Error al cargar votaciones.';
                 status.className = 'text-danger small';
             }
+        }
+
+        // views/pages/crearMinuta.php (Añadir al final del <script> o reemplazar la versión existente)
+
+        /**
+         * Llama al controlador para cambiar el estado de la votación (Cerrar/Re-abrir).
+         * Si se cierra (estado 0), genera el PDF automáticamente.
+         * @param {number} idVotacion 
+         * @param {number} nuevoEstado 0 para Cerrar, 1 para Habilitar.
+         * @param {string} nombreVotacion 
+         */
+        async function cambiarEstadoVotacion(idVotacion, nuevoEstado, nombreVotacion) {
+            const accion = nuevoEstado === 0 ? 'Cerrar' : 'Re-abrir';
+            const icono = nuevoEstado === 0 ? 'warning' : 'info';
+
+            // Cambiamos el mensaje para reflejar la generación del PDF
+            const mensaje = nuevoEstado === 0 ?
+                `Al cerrar, se bloquean los votos y se generará el reporte final en PDF. ¿Desea continuar y cerrar "${nombreVotacion}"?` :
+                `¿Desea re-abrir "${nombreVotacion}"? Esto permitirá a los usuarios volver a votar.`;
+
+            Swal.fire({
+                title: `${accion} Votación`,
+                text: mensaje,
+                icon: icono,
+                showCancelButton: true,
+                confirmButtonText: nuevoEstado === 0 ? 'Sí, Cerrar y Reportar' : `Sí, ${accion}`,
+                showLoaderOnConfirm: true,
+                preConfirm: async () => {
+                    const formData = new FormData();
+                    formData.append('action', 'change_status');
+                    formData.append('idVotacion', idVotacion);
+                    formData.append('nuevoEstado', nuevoEstado);
+
+                    try {
+                        const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (!resp.ok) {
+                            throw new Error(`Error HTTP ${resp.status}`);
+                        }
+                        const data = await resp.json();
+                        if (data.status !== 'success') {
+                            throw new Error(data.message || 'Error desconocido al cambiar estado.');
+                        }
+                        return data;
+                    } catch (error) {
+                        Swal.showValidationMessage(`Falló la operación: ${error.message}`);
+                        return false;
+                    }
+                },
+                allowOutsideClick: () => !Swal.isLoading()
+            }).then((result) => {
+                if (result.isConfirmed) {
+
+                    // 🚀 LÓGICA CLAVE: DISPARA EL PDF AL CERRAR
+                    if (nuevoEstado === 0) {
+                        Swal.fire('¡Cerrada!', `Votación cerrada. Generando reporte PDF...`, 'success');
+                        generarPdfVotacion(idVotacion);
+                    } else {
+                        Swal.fire('¡Éxito!', `Votación re-abierta correctamente.`, 'success');
+                    }
+
+                    // Refrescar ambas secciones después de la acción
+                    cargarVotacionesDeLaMinuta();
+                    cargarResultadosVotacion();
+                }
+            });
+        }
+
+        /**
+         * Llama al script PHP para generar y descargar el PDF de resultados.
+         * (Debe ser una función separada en el script)
+         * @param {number} idVotacion 
+         */
+        function generarPdfVotacion(idVotacion) {
+            // Usamos window.open para que el script PHP pueda manejar la descarga del archivo
+            const url = `/corevota/controllers/generar_pdf_votacion.php?idVotacion=${idVotacion}`;
+            window.open(url, '_blank');
+        }
+
+        // Asegúrate de que esta función auxiliar exista en tu script:
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                } [m];
+            });
         }
 
         /**

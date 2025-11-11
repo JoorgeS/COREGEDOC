@@ -10,14 +10,18 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../class/class.conectorDB.php';
 
-// Seguridad: Solo usuarios logueados (Secretarios o Admin) pueden ver esto
-if (!isset($_SESSION['idUsuario']) || ($_SESSION['tipoUsuario_id'] != 2 && $_SESSION['tipoUsuario_id'] != 6)) {
+// Seguridad: Solo usuarios logueados pueden ver el dashboard de resultados.
+if (!isset($_SESSION['idUsuario'])) {
     http_response_code(403); // Forbidden
-    echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado.']);
+    echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado. Debe iniciar sesión.']);
     exit;
 }
 
 $idMinuta = $_GET['idMinuta'] ?? null;
+// 💡 NUEVAS VARIABLES DE CONTROL
+$idUsuarioLogueado = $_SESSION['idUsuario'];
+$idTipoUsuario = $_SESSION['tipoUsuario_id'];
+$esSecretarioTecnico = ($idTipoUsuario == 2); // 2 es ST
 
 if (!$idMinuta) {
     http_response_code(400); // Bad Request
@@ -36,7 +40,7 @@ try {
     $idReunion = $reunion ? $reunion['idReunion'] : null;
 
     // 2. OBTENER VOTACIONES (de la minuta O de la reunión)
-    $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion 
+    $sqlVotaciones = $pdo->prepare("SELECT idVotacion, nombreVotacion, idComision, habilitada FROM t_votacion 
                                    WHERE t_minuta_idMinuta = :idMinuta 
                                    OR t_reunion_idReunion = :idReunion
                                    ORDER BY idVotacion ASC");
@@ -51,25 +55,73 @@ try {
         exit;
     }
 
-    // 3. OBTENER LOS VOTOS PARA CADA VOTACIÓN
-    // (Usamos los nombres correctos de tu BBDD: t_votacion_idVotacion, t_usuario_idUsuario)
-    $sqlVotos = $pdo->prepare("
-         SELECT v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
-         FROM t_voto v
-         JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
-         WHERE v.t_votacion_idVotacion = :idVotacion
-         ORDER BY nombreVotante ASC
-    ");
+    // 3. OBTENER TOTAL DE CONSEJEROS ASISTENTES (para calcular Faltan Votar)
+    $sqlAsistentes = $pdo->prepare("SELECT t_usuario_idUsuario FROM t_asistencia 
+                                   WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario IN (SELECT idUsuario FROM t_usuario WHERE tipoUsuario_id = 1 OR tipoUsuario_id = 3)");
+    $sqlAsistentes->execute([':idMinuta' => $idMinuta]);
+    $asistentesIDs = $sqlAsistentes->fetchAll(PDO::FETCH_COLUMN, 0);
+    $totalAsistentes = count($asistentesIDs);
 
-    foreach ($votaciones as $i => $votacion) {
-        $sqlVotos->execute([':idVotacion' => $votacion['idVotacion']]);
-        $votaciones[$i]['votos'] = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
+    $resultadosFinales = [];
+
+    // 4. OBTENER VOTOS Y CONTEO PARA CADA VOTACIÓN
+    foreach ($votaciones as $votacion) {
+        $idVotacion = $votacion['idVotacion'];
+        $resultado = [
+            'idVotacion' => $idVotacion,
+            'nombreVotacion' => $votacion['nombreVotacion'],
+            'totalSi' => 0,
+            'totalNo' => 0,
+            'totalAbstencion' => 0,
+            'votoPersonal' => null, // Voto del usuario logueado
+            'votos' => [],          // Detalle de nombres (SOLO para ST)
+        ];
+
+        $sqlVotos = $pdo->prepare("
+            SELECT v.opcionVoto, 
+                   v.t_usuario_idUsuario,
+                   CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+            FROM t_voto v
+            JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
+            WHERE v.t_votacion_idVotacion = :idVotacion
+        ");
+        $sqlVotos->execute([':idVotacion' => $idVotacion]);
+        $votosData = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
+
+        $votosEmitidos = 0;
+        
+        foreach ($votosData as $voto) {
+            $votosEmitidos++;
+            $opcion = strtoupper($voto['opcionVoto']);
+
+            // 4a. Cargar totales
+            if ($opcion === 'SI') $resultado['totalSi']++;
+            elseif ($opcion === 'NO') $resultado['totalNo']++;
+            elseif ($opcion === 'ABSTENCION') $resultado['totalAbstencion']++;
+
+            // 4b. Cargar voto personal
+            if ($voto['t_usuario_idUsuario'] == $idUsuarioLogueado) {
+                $resultado['votoPersonal'] = $opcion;
+            }
+
+            // 4c. Cargar detalle de nombres (SOLO si es ST)
+            if ($esSecretarioTecnico) {
+                $resultado['votos'][] = [
+                    'nombreVotante' => $voto['nombreVotante'],
+                    'opcionVoto' => $opcion
+                ];
+            }
+        }
+
+        // 4d. Calcular faltan votar
+        $resultado['faltanVotar'] = $totalAsistentes - $votosEmitidos;
+        $resultadosFinales[] = $resultado;
     }
 
-    // 4. DEVOLVER TODO
-    echo json_encode(['status' => 'success', 'data' => $votaciones]);
+    echo json_encode(['status' => 'success', 'data' => $resultadosFinales, 'esSecretarioTecnico' => $esSecretarioTecnico]);
+
 } catch (Exception $e) {
     http_response_code(500); // Internal Server Error
     error_log("Error en obtener_resultados_votacion.php: " . $e->getMessage());
-    echo json_encode(['status' => 'error', 'message' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'Error de base de datos.']);
 }

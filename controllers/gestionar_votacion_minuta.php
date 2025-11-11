@@ -141,6 +141,21 @@ try {
             echo json_encode(['status' => 'success', 'data' => $data]);
             break;
 
+
+        case 'change_status':
+            $idVotacion = $_POST['idVotacion'] ?? 0;
+            $nuevoEstado = $_POST['nuevoEstado'] ?? null;
+
+            if (empty($idVotacion) || !in_array($nuevoEstado, [0, 1])) {
+                throw new Exception("Datos de estado incompletos o inválidos.");
+            }
+            
+            $votacionCtrl = new VotacionController();
+            $response = $votacionCtrl->cambiarEstado((int)$idVotacion, (int)$nuevoEstado);
+
+            echo json_encode($response);
+            break;
+
         // JS: registrarVotoSecretario()
         // controllers/gestionar_votacion_minuta.php (Líneas 142-152, aproximadamente)
 
@@ -156,6 +171,7 @@ try {
             );
             echo json_encode($response);
             break;
+            
 
         default:
             echo json_encode(['status' => 'error', 'message' => 'Acción no válida.']);
