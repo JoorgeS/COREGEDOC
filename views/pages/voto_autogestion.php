@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
 
   // 1️⃣ Verificar si ya votó
   $sqlCheck = "SELECT COUNT(*) FROM t_voto 
-             WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+              WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
   $stmt = $pdo->prepare($sqlCheck);
   $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
   if ($stmt->fetchColumn() > 0) {
@@ -60,10 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
     ]);
     exit;
   }
-  // --- FIN: NUEVA VALIDACIÓN DE ASISTENCIA ---
 
-  // 3️⃣ Registrar voto
-  $response = $votoCtrl->registrarVoto((int)$idVotacion, (int)$idUsuario, (string)$opcionVoto);
+  $response = $votoCtrl->registrarVotoVotacion(
+    (int)$idVotacion,
+    (int)$idUsuario,
+    (string)$opcionVoto,
+    null
+  );
   echo json_encode($response);
   exit;
 }
@@ -158,11 +161,23 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
           formData.append('idVotacion', form.querySelector('input[name="idVotacion"]').value);
           formData.append('opcionVoto', opcion);
 
+          // La vista se llama a sí misma para procesar el POST
           fetch('voto_autogestion.php', {
               method: 'POST',
               body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+              if (!response.ok) {
+                // Si el servidor devuelve un error HTTP (400, 500, etc.)
+                // Intenta leerlo como JSON, o usa un mensaje genérico.
+                return response.json().catch(() => ({
+                  status: 'error',
+                  message: `Error de red: HTTP ${response.status}`,
+                  error: 'Respuesta inválida del servidor'
+                }));
+              }
+              return response.json();
+            })
             .then(resp => {
               if (resp.status === 'duplicate') {
                 Swal.fire({
@@ -204,12 +219,14 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
                 Swal.fire({
                   icon: 'error',
                   title: 'Error al registrar voto',
-                  text: resp.message || 'Inténtalo nuevamente.',
+                  // Esto capturará el mensaje de error de la DB si es que falló
+                  text: resp.message || 'Inténtalo nuevamente. (Error: ' + (resp.error || 'Desconocido') + ')',
                   confirmButtonColor: '#198754'
                 });
               }
             })
-            .catch(() => {
+            .catch(error => {
+              console.error("Error en la promesa fetch:", error);
               Swal.fire({
                 icon: 'error',
                 title: 'Error de conexión',
@@ -224,6 +241,7 @@ $votaciones = $votacionCtrl->listar()['data'] ?? [];
 </script>
 
 <style>
+  /* ... (Estilos CSS sin cambios) ... */
   .voto-btn {
     width: 100px;
     border-radius: 10px;

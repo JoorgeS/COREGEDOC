@@ -142,13 +142,17 @@ try {
             break;
 
         // JS: registrarVotoSecretario()
+        // controllers/gestionar_votacion_minuta.php (Líneas 142-152, aproximadamente)
+
+        // JS: registrarVotoSecretario()
         case 'register_vote':
+            // ✅ CORRECCIÓN DE LA INSTANCIACIÓN DE CLASE
             $votoCtrl = new VotoController();
-            $response = $votoCtrl->registrarVoto(
+            $response = $votoCtrl->registrarVotoVotacion( // ⬅️ Llamamos al método correcto para t_votacion
                 $_POST['idVotacion'] ?? 0,
-                $_POST['idUsuario'] ?? 0,           // ID del asistente
-                $_POST['opcionVoto'] ?? '',
-                $_POST['idUsuarioRegistra'] ?? null // ID del secretario
+                $_POST['idUsuario'] ?? 0, 	        // ID del asistente
+                $_POST['voto'] ?? '',               // El JS envía 'voto', no 'opcionVoto'
+                $_POST['idSecretario'] ?? null      // ✅ CORRECCIÓN: Ahora lee 'idSecretario' que envía el JS
             );
             echo json_encode($response);
             break;
