@@ -17,7 +17,7 @@ try {
 // Variables esperadas del Controlador:
 // $minutas (array), $estadoActual (string)
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-$rol = $_SESSION['idRol'] ?? null;
+$rol = $_SESSION['tipoUsuario_id'] ?? null;
 
 $estadoActual = $estadoActual ?? 'PENDIENTE';
 $pageTitle    = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
@@ -129,7 +129,18 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
         if ($estadoActual === 'APROBADA') {
             $where[] = "COALESCE(m.pathArchivo,'') <> ''";
         } else {
-            $where[] = "COALESCE(m.pathArchivo,'') = ''";
+            // El usuario logueado (definido en la línea 11)
+            $params[':idStLogueado'] = (int)$idUsuarioLogueado;
+
+            // Estados para "Pendientes":
+            // 1. PENDIENTE (para firma) - Visible para todos los roles
+            // 2. REQUIERE_REVISION (feedback) - Visible para todos los roles
+            // 3. BORRADOR (solo visible para el ST que lo creó)
+            $where[] = "(
+        m.estadoMinuta IN ('PENDIENTE', 'REQUIERE_REVISION') 
+        OR 
+        (m.estadoMinuta = 'BORRADOR' AND r.t_usuario_idSecretario = :idStLogueado)
+      )";
         }
 
         // Fechas
@@ -165,33 +176,36 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
         }
 
         $sql = "
-            SELECT
-                m.idMinuta,
-                m.fechaMinuta,
-                m.nombreReunion,
-                m.pathArchivo,
-                m.t_comision_idComision AS comisionId,
-                c.nombreComision,
-                IFNULL(GROUP_CONCAT(DISTINCT tt.nombreTema ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS nombreTemas,
-                IFNULL(GROUP_CONCAT(DISTINCT tt.objetivo   ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS objetivos,
-                COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos,
-                (SELECT COUNT(DISTINCT am1.t_usuario_idPresidente)
-                   FROM t_aprobacion_minuta am1
-                  WHERE am1.t_minuta_idMinuta = m.idMinuta
-                    AND am1.estado_firma = 'FIRMADO') AS firmasActuales,
-                (SELECT COUNT(*)
-                   FROM t_aprobacion_minuta am2
-                  WHERE am2.t_minuta_idMinuta = m.idMinuta
-                    AND am2.estado_firma = 'REQUIERE_REVISION') AS tieneFeedback,
-                COALESCE(m.presidentesRequeridos,1) AS presidentesRequeridos
-            FROM t_minuta m
-            LEFT JOIN t_comision c  ON c.idComision = m.t_comision_idComision
-            LEFT JOIN t_tema    tt ON tt.t_minuta_idMinuta = m.idMinuta
-            LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
-            $whereSql
-            GROUP BY
-                m.idMinuta, m.fechaMinuta, m.pathArchivo, m.t_comision_idComision,
-                c.nombreComision, m.presidentesRequeridos,m.nombreReunion
+      SELECT
+        m.idMinuta,
+        m.fechaMinuta,
+        m.nombreReunion,
+        m.pathArchivo,
+        m.estadoMinuta, -- <-- 1. AÑADIDO
+        m.t_comision_idComision AS comisionId,
+        r.t_usuario_idSecretario, -- <-- 2. AÑADIDO
+        c.nombreComision,
+        IFNULL(GROUP_CONCAT(DISTINCT tt.nombreTema ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS nombreTemas,
+        IFNULL(GROUP_CONCAT(DISTINCT tt.objetivo  ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS objetivos,
+        COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos,
+        (SELECT COUNT(DISTINCT am1.t_usuario_idPresidente)
+          FROM t_aprobacion_minuta am1
+         WHERE am1.t_minuta_idMinuta = m.idMinuta
+          AND am1.estado_firma = 'FIRMADO') AS firmasActuales,
+        (SELECT COUNT(*)
+          FROM t_aprobacion_minuta am2
+         WHERE am2.t_minuta_idMinuta = m.idMinuta
+          AND am2.estado_firma = 'REQUIERE_REVISION') AS tieneFeedback,
+        COALESCE(m.presidentesRequeridos,1) AS presidentesRequeridos
+      FROM t_minuta m
+      LEFT JOIN t_comision c  ON c.idComision = m.t_comision_idComision
+      LEFT JOIN t_tema   tt ON tt.t_minuta_idMinuta = m.idMinuta
+      LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+      LEFT JOIN t_reunion r  ON r.t_minuta_idMinuta = m.idMinuta -- <-- 3. AÑADIDO
+      $whereSql
+      GROUP BY
+        m.idMinuta, m.fechaMinuta, m.pathArchivo, m.estadoMinuta, m.t_comision_idComision,
+        r.t_usuario_idSecretario, c.nombreComision, m.presidentesRequeridos, m.nombreReunion
             $having
             ORDER BY m.fechaMinuta DESC, m.idMinuta DESC
             LIMIT 1000
@@ -396,7 +410,7 @@ function renderPaginationListado($current, $pages)
                         <tr>
                             <?php
                             $minutaId        = $minuta['idMinuta'];
-                            $estado          = $minuta['estadoMinuta'] ?? ((isset($minuta['pathArchivo']) && $minuta['pathArchivo']) ? 'APROBADA' : 'PENDIENTE');
+                            $estado          = $minuta['estadoMinuta'] ?? 'PENDIENTE';
                             $fechaCreacion   = $minuta['fechaMinuta'] ?? 'N/A';
                             $totalAdjuntos   = (int)($minuta['totalAdjuntos'] ?? 0);
                             $firmasActuales  = (int)($minuta['firmasActuales'] ?? 0);
@@ -441,28 +455,56 @@ function renderPaginationListado($current, $pages)
                                     <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
                                         <i class="fas fa-file-pdf"></i> Ver PDF Final
                                     </a>
-                                <?php else: ?>
-                                    <?php if ($tieneFeedback): ?>
-                                        <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="Primero debe editar la minuta y guardar los cambios. El botón de reenvío aparecerá en la página de edición.">
+                                <?php else: // Si NO está APROBADA 
+                                ?>
+
+                                    <?php // --- INICIO DE LA LÓGICA DE ACCIONES --- 
+                                    ?>
+
+                                    <?php if ($estado === 'BORRADOR'): ?>
+                                        <?php // Caso 1: Es un BORRADOR (Solo visible para el ST dueño) 
+                                        ?>
+                                        <?php if ($rol == 2): // Verificamos que el usuario logueado es ST (con la variable corregida) 
+                                        ?>
+                                            <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-edit"></i> Continuar con la edición
+                                            </a>
+                                        <?php endif; ?>
+
+                                    <?php elseif ($tieneFeedback): ?>
+                                        <?php // Caso 2: Tiene FEEDBACK (REQUIERE_REVISION) 
+                                        ?>
+                                        <?php if ($rol == 2): // Solo el ST puede revisar el feedback 
+                                        ?>
                                             <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-danger btn-sm">
                                                 <i class="fas fa-edit"></i> Revisar Feedback
                                             </a>
-                                        </span>
+                                        <?php endif; ?>
+
                                     <?php else: ?>
+                                        <?php // Caso 3: Está PENDIENTE o PARCIAL (esperando firmas) 
+                                        ?>
                                         <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?php echo $minuta['idMinuta']; ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <?php if ($rol == 2): ?>
+                                        <?php if ($rol == 2): // El ST siempre puede editar una minuta PENDIENTE 
+                                        ?>
                                             <a href="menu.php?pagina=editar_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-outline-primary btn-sm" title="Editar Minuta">
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                         <?php endif; ?>
                                     <?php endif; ?>
-                                <?php endif; ?>
 
+                                    <?php // --- FIN DE LA LÓGICA DE ACCIONES --- 
+                                    ?>
+
+                                <?php endif; ?>
                                 <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Seguimiento de Aprobación">
-                                    <i class="fas fa-route"></i>
-                                </a>
+
+
+                                    <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Seguimiento de Aprobación">
+                                        <i class="fas fa-route"></i>
+                                    </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

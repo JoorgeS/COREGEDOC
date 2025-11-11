@@ -22,7 +22,7 @@ class MinutaModel extends BaseConexion
      * Esta es tu función original, pero actualizada para usar $this->db (PDO)
      * en lugar de $this->db_connector->consultarBD().
      */
-    public function getMinutasByEstado($estado, $startDate = null, $endDate = null, $themeName = null)
+    public function getMinutasByEstado($estado, $startDate = null, $endDate = null, $themeName = null, $idUsuarioSt = null)
     {
         // Normalizamos estado
         $estado = strtoupper(trim((string)$estado)) === 'APROBADA' ? 'APROBADA' : 'PENDIENTE';
@@ -37,7 +37,8 @@ class MinutaModel extends BaseConexion
                 CASE 
                     WHEN COALESCE(m.pathArchivo,'') <> '' THEN 'APROBADA'
                     ELSE 'PENDIENTE'
-                END AS estadoMinuta,
+                END AS estadoCalculado, -- Renombramos esta
+                m.estadoMinuta, -- Esta es la que queremos
                 m.pathArchivo,
                 r.nombreReunion,
                 m.fechaMinuta,
@@ -65,10 +66,12 @@ class MinutaModel extends BaseConexion
         $valores = [];
 
         // Filtro por estado
+        // Filtro por estado
         if ($estado === 'APROBADA') {
-            $sql .= " AND COALESCE(m.pathArchivo,'') <> '' ";
+            $sql .= " AND m.estadoMinuta = 'APROBADA' ";
         } else { // PENDIENTE
-            $sql .= " AND COALESCE(m.pathArchivo,'') = '' ";
+            // Incluimos BORRADOR, PENDIENTE, y REQUIERE_REVISION
+            $sql .= " AND m.estadoMinuta IN ('PENDIENTE', 'REQUIERE_REVISION', 'BORRADOR', 'PARCIAL') ";
         }
 
         // Filtros de fecha
@@ -98,7 +101,7 @@ class MinutaModel extends BaseConexion
         }
 
         $sql .= "
-            GROUP BY m.idMinuta, c.nombreComision, u.pNombre, u.aPaterno, m.pathArchivo, m.fechaMinuta, m.presidentesRequeridos
+            GROUP BY m.idMinuta, c.nombreComision, u.pNombre, u.aPaterno, m.pathArchivo, m.fechaMinuta, m.presidentesRequeridos, m.estadoMinuta, r.nombreReunion
             ORDER BY m.fechaMinuta DESC, m.idMinuta DESC
         ";
 
@@ -511,5 +514,4 @@ class MinutaModel extends BaseConexion
      * Guarda o actualiza el hash de validación de una minuta.
      * Si ya existe, lo reemplaza.
      */
-
 }
