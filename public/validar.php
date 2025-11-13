@@ -92,7 +92,7 @@ $hash = $_GET['hash'] ?? '';
         ?>
 
         <div class="footer">
-            © <?php echo date('Y'); ?> Consejo Regional de Valparaíso · Sistema CoreVota
+            © <?php echo date('Y'); ?> Consejo Regional de Valparaíso · Sistema COREGEDOC
         </div>
     </div>
 </div>

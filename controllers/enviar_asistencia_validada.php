@@ -88,7 +88,7 @@ try {
     // Contenido
     $mail->isHTML(true);
     $mail->Subject = "Validación de Asistencia - Minuta N° {$idMinuta} ({$nombreComision})";
-    $mail->Body    = "El Secretario Técnico ha validado la asistencia de la minuta N° {$idMinuta}.<br>Se adjunta el documento PDF con el detalle.<br><br>Atte,<br>Sistema CoreVota.";
+    $mail->Body    = "El Secretario Técnico ha validado la asistencia de la minuta N° {$idMinuta}.<br>Se adjunta el documento PDF con el detalle.<br><br>Atte,<br>Sistema COREGEDOC.";
 
 
     // 1. Definir la ruta de la firma
@@ -109,7 +109,7 @@ try {
     $mail->Body = "<html><body>
                     <p>El Secretario Técnico ha validado la asistencia de la <strong>Minuta N° {$idMinuta}</strong>.</p>
                     <p>Se adjunta el documento PDF con el detalle.</p>
-                    <p>Atte,<br>Sistema CoreVota</p>
+                    <p>Atte,<br>Sistema COREGEDOC</p>
                     {$firmaHTML}
                    </body></html>";
     // --- FIN: LÓGICA DE LA FIRMA ---

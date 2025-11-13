@@ -380,21 +380,24 @@ class MinutaModel extends BaseConexion
             $params['idMinuta'] = $filters['idMinuta'];
         }
 
-        // 4. Filtro por Palabra Clave (Tema y Objetivo)
+        // 4. Filtro por Palabra Clave (Tema, Objetivo y Reunión)
         if (!empty($filters['keyword'])) {
-            // Se debe re-evaluar si el keyword es NULL después del LEFT JOIN si no se encuentra t.nombreTema.
-            // Para simplificar y funcionar con GROUP BY, dejamos los OR en la parte LEFT JOIN.
-            $sql .= " AND (t.nombreTema LIKE :keyword OR t.objetivo LIKE :keyword)";
-            $params['keyword'] = '%' . $filters['keyword'] . '%';
+            $keywordLike = '%' . $filters['keyword'] . '%';
+            $sql .= " AND (
+                        t.nombreTema LIKE :keyword 
+                        OR t.objetivo LIKE :keyword 
+                        OR r.nombreReunion LIKE :keyword
+                    )";
+            $params['keyword'] = $keywordLike;
         }
         // --- FIN DE NUEVOS FILTROS ---
 
         $sql .= "
-      GROUP BY 
-        m.idMinuta, m.fechaMinuta, m.estadoMinuta, c.nombreComision, rs.ultimo_detalle, rs.ultima_fecha, rs.ultimo_usuario
-      ORDER BY
-        m.fechaMinuta DESC, m.idMinuta DESC;
-    ";
+   GROUP BY 
+    m.idMinuta, m.fechaMinuta, m.estadoMinuta, c.nombreComision, rs.ultimo_detalle, rs.ultima_fecha, rs.ultimo_usuario
+   ORDER BY
+    m.fechaMinuta DESC, m.idMinuta DESC;
+  ";
 
         try {
             $stmt = $this->db->prepare($sql);

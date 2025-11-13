@@ -119,7 +119,7 @@ function notificarPresidentes(PDO $db, int $idMinuta, array $listaPresidentes)
 
             $mail->clearAddresses(); // Limpiar destinatario anterior
             $mail->addAddress($destinatario['correo'], $destinatario['pNombre'] . ' ' . $destinatario['aPaterno']);
-            $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema CoreVota</p></body></html>";
+            $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema COREGEDOC</p></body></html>";
             $mail->send();
         }
     } catch (Exception $e) {
