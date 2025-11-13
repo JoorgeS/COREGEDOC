@@ -1042,6 +1042,34 @@ Función helper para verificar si un enlace del menú debe estar activo.Compara 
         })();
     </script>
 
+    <script>
+        (function() {
+            let inactivityTimer;
+            // Tiempo en milisegundos (60 minutos * 60 segundos * 1000 ms)
+            const timeoutDuration = 60 * 60 * 1000;
+
+            function logoutUser() {
+                // Redirigir a la página de logout. 
+                // Asegúrate que la ruta a logout.php sea correcta desde la raíz.
+                window.location.href = '<?php echo $url_base; ?>/logout.php';
+            }
+
+            function resetTimer() {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(logoutUser, timeoutDuration);
+            }
+
+            // Eventos que indican actividad del usuario
+            document.addEventListener('mousemove', resetTimer, false);
+            document.addEventListener('mousedown', resetTimer, false);
+            document.addEventListener('keypress', resetTimer, false);
+            document.addEventListener('touchmove', resetTimer, false);
+            document.addEventListener('scroll', resetTimer, false);
+
+            // Iniciar el temporizador
+            resetTimer();
+        })();
+    </script>
 </body>
 
 </html>
