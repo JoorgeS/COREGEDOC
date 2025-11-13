@@ -10,6 +10,14 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 ?>
 
 <div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Módulo de Minutas</li>
+        </ol>
+    </nav>
+
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Módulo de Minutas</h2>
     </div>

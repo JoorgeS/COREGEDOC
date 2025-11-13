@@ -1,5 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
+if (session_status() === PHP_SESSION_NONE) {
+  session_start();
+}
 if (!isset($_SESSION['idUsuario'])) {
   header("Location: /corevota/views/pages/login.php");
   exit;
@@ -21,11 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $response = $controller->storeVotacion($_POST);
 
   if ($response['status'] === 'success') {
-  echo "<script>
+    echo "<script>
           window.location.href = 'menu.php?pagina=crearVotacion&success=1';
         </script>";
-  exit;
-
+    exit;
   } else {
     $error = $response['message'];
   }
@@ -33,6 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <div class="container mt-4">
+
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+      <li class="breadcrumb-item"><a href="menu.php?pagina=votaciones_dashboard">Gestión de Votaciones</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Crear Votación</li>
+    </ol>
+  </nav>
   <h3 class="mb-4">Crear Nueva Votación</h3>
 
   <?php if ($mensaje): ?>
@@ -59,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mb-3">
           <label for="nombreVotacion" class="form-label fw-semibold">Nombre de la Adenda *</label>
           <input type="text" class="form-control" id="nombreVotacion" name="nombreVotacion"
-                 placeholder="Ej: Aprobación de proyecto regional" required>
+            placeholder="Ej: Aprobación de proyecto regional" required>
         </div>
 
         <!-- Estado -->
@@ -87,24 +96,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
-  const selComision = document.getElementById("idComision");
-  selComision.disabled = true;
+  document.addEventListener("DOMContentLoaded", async () => {
+    const selComision = document.getElementById("idComision");
+    selComision.disabled = true;
 
-  try {
-    const r = await fetch("../../controllers/fetch_data.php?action=comisiones");
-    const json = await r.json();
+    try {
+      const r = await fetch("../../controllers/fetch_data.php?action=comisiones");
+      const json = await r.json();
 
-    if (json.status === "success" && Array.isArray(json.data)) {
-      selComision.innerHTML = '<option value="">Seleccione una comisión...</option>' +
-        json.data.map(c => `<option value="${c.idComision}">${c.nombreComision}</option>`).join('');
-      selComision.disabled = false;
-    } else {
-      selComision.innerHTML = '<option value="">(No hay comisiones activas)</option>';
+      if (json.status === "success" && Array.isArray(json.data)) {
+        selComision.innerHTML = '<option value="">Seleccione una comisión...</option>' +
+          json.data.map(c => `<option value="${c.idComision}">${c.nombreComision}</option>`).join('');
+        selComision.disabled = false;
+      } else {
+        selComision.innerHTML = '<option value="">(No hay comisiones activas)</option>';
+      }
+    } catch (error) {
+      console.error("Error cargando comisiones:", error);
+      selComision.innerHTML = '<option value="">Error al cargar comisiones</option>';
     }
-  } catch (error) {
-    console.error("Error cargando comisiones:", error);
-    selComision.innerHTML = '<option value="">Error al cargar comisiones</option>';
-  }
-});
+  });
 </script>

@@ -19,9 +19,16 @@ try {
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
 $rol = $_SESSION['tipoUsuario_id'] ?? null;
 
-$estadoActual = $estadoActual ?? 'PENDIENTE';
-$pageTitle    = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
-$paginaForm   = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
+// --- INICIO CORRECCIÓN DE ESTADO ---
+// Detectar el estado basado en la 'pagina' de la URL, si '$estadoActual' no viene seteado
+if (!isset($estadoActual)) {
+  $paginaGet = $_GET['pagina'] ?? 'minutas_pendientes';
+  $estadoActual = ($paginaGet === 'minutas_aprobadas') ? 'APROBADA' : 'PENDIENTE';
+}
+
+$pageTitle  = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
+$paginaForm  = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
+// --- FIN CORRECCIÓN DE ESTADO ---
 
 // -------- Filtros de UI (SIEMPRE ACTIVOS) --------
 // -------- Filtros de UI (SIEMPRE ACTIVOS) --------
@@ -335,6 +342,16 @@ function renderPaginationListado($current, $pages)
 </style>
 
 <div class="container-fluid mt-4">
+
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+            <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><?php echo htmlspecialchars($tituloPagina); ?></li>
+        </ol>
+    </nav>
+
+
     <h3 class="mb-3"><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></h3>
 
     <form id="filtrosForm" method="GET" class="mb-4 p-3 border rounded bg-light filters-card">

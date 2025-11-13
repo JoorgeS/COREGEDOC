@@ -3,9 +3,18 @@
 ?>
 
 <div class="container-fluid">
+
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Gestión de Votaciones</li>
+        </ol>
+    </nav>
+
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Módulo de Votaciones</h2>
-        </div>
+    </div>
 
     <p class="lead text-muted mb-4">Selecciona una acción para gestionar las votaciones.</p>
 

@@ -182,6 +182,13 @@ try {
 </head>
 <body class="bg-light">
 
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Mi Historial de Votación</li>
+    </ol>
+</nav>
+
 <div class="card card-narrow">
   <div class="card-body">
     <h4 class="mb-3">Historial de votación</h4>

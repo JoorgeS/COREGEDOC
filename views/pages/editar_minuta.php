@@ -119,6 +119,17 @@ $pdo = null; // Cerrar conexión
 ?>
 
 <div class="container-fluid mt-4">
+
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+            <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
+            <li class="breadcrumb-item"><a href="<?php echo $linkListado; ?>"><?php echo $textoListado; ?></a></li>
+            <li class="breadcrumb-item active" aria-current="page"><?php echo $tituloBreadcrumb; ?></li>
+        </ol>
+    </nav>
+
+
     <h3 class="mb-3">
         <?php echo $esSecretarioTecnico ? 'Editar' : 'Revisar'; ?> Minuta N° <?php echo $idMinuta; ?>
         <span class="badge bg-secondary ms-2"><?php echo htmlspecialchars($estadoMinuta); ?></span>
@@ -292,10 +303,10 @@ $pdo = null; // Cerrar conexión
     const idMinuta = document.getElementById('idMinuta').value;
     const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
     const formMinuta = document.getElementById('form-crear-minuta');
-    
+
     // --- Variables del Modal ---
     const modalConfirmarElement = document.getElementById('modalConfirmarAsistencia');
-    
+
     // Validamos que el JS de Bootstrap se haya cargado
     if (typeof bootstrap !== 'undefined' && modalConfirmarElement) {
 
@@ -308,8 +319,8 @@ $pdo = null; // Cerrar conexión
         // Esto ahora ABRE EL MODAL
         if (btnAbrirModalAprobacion) {
             btnAbrirModalAprobacion.addEventListener('click', async (e) => {
-                e.preventDefault(); 
-                
+                e.preventDefault();
+
                 // Mostrar estado de carga en el modal
                 asistenciaPreviewList.innerHTML = `<div class="text-center">
                     <div class="spinner-border text-primary" role="status">
@@ -317,7 +328,7 @@ $pdo = null; // Cerrar conexión
                     </div>
                     <p>Cargando asistencia guardada...</p>
                 </div>`;
-                
+
                 // Abrir el modal
                 modalConfirmar.show();
 
@@ -335,9 +346,9 @@ $pdo = null; // Cerrar conexión
                         // Construir la lista HTML
                         let html = '<ul class="list-group">';
                         if (data.asistencia.length === 0) {
-                             html += '<li class="list-group-item text-muted">No hay miembros de comisión (Tipo 1 o 3) para listar.</li>';
+                            html += '<li class="list-group-item text-muted">No hay miembros de comisión (Tipo 1 o 3) para listar.</li>';
                         }
-                        
+
                         data.asistencia.forEach(miembro => {
                             if (miembro.presente) {
                                 html += `<li class="list-group-item d-flex justify-content-between align-items-center">
@@ -382,7 +393,9 @@ $pdo = null; // Cerrar conexión
                             'Accept': 'application/json'
                         },
                         // El idMinuta ya lo teníamos definido al inicio del script
-                        body: JSON.stringify({ idMinuta: idMinuta }) 
+                        body: JSON.stringify({
+                            idMinuta: idMinuta
+                        })
                     });
 
                     const data = await response.json();
@@ -402,7 +415,7 @@ $pdo = null; // Cerrar conexión
                         // Redirigir al listado de minutas
                         window.location.href = 'index.php?page=minutas_dashboard';
                     });
-                    
+
                 } catch (error) {
                     Swal.fire('Error de Envío', error.message, 'error');
                 } finally {
@@ -415,7 +428,7 @@ $pdo = null; // Cerrar conexión
         }
 
     } else {
-         console.error("Error: Bootstrap JS no está cargado o el elemento #modalConfirmarAsistencia no se encontró.");
+        console.error("Error: Bootstrap JS no está cargado o el elemento #modalConfirmarAsistencia no se encontró.");
     }
 
 
@@ -446,8 +459,11 @@ $pdo = null; // Cerrar conexión
         });
     }
 
-    function firmarMinutaDesdeEditor() { /* ... (Tu lógica de firma aquí, sin cambios) ... */ }
-    function enviarFeedbackDesdeEditor() { /* ... (Tu lógica de feedback aquí, sin cambios) ... */ }
+    function firmarMinutaDesdeEditor() {
+        /* ... (Tu lógica de firma aquí, sin cambios) ... */ }
+
+    function enviarFeedbackDesdeEditor() {
+        /* ... (Tu lógica de feedback aquí, sin cambios) ... */ }
 
 
     // --- LÓGICA AJAX para 'Guardar Borrador' (Sin cambios) ---
@@ -478,7 +494,7 @@ $pdo = null; // Cerrar conexión
                             return response.json().then(data => {
                                 if (!response.ok || data.status === 'error') {
                                     let message = data.message || 'Error de red o desconocido.';
-                                    if (data.debug) { 
+                                    if (data.debug) {
                                         message += ` (Debug: ID Recibido: ${data.debug.idMinuta_recibido}, Keys: ${data.debug.post_keys_received.join(',')})`;
                                     }
                                     throw new Error(message);

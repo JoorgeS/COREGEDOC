@@ -195,6 +195,14 @@ function renderPagination($current, $pages)
 ?>
 
 <div class="container mt-4">
+
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+        <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Minutas Pendientes de Aprobación</li>
+    </ol>
+</nav>
   <h4 class="fw-bold mb-4">Minutas Pendientes de Aprobación</h4>
 
   <?php if (!empty($minutas)) : ?>

@@ -115,17 +115,23 @@ class VotacionController
     // ======================================================
     // 3️⃣ CAMBIAR ESTADO HABILITADA/DESHABILITADA
     // ======================================================
+// CAMBIAR ESTADO HABILITADA/DESHABILITADA
     public function cambiarEstado($idVotacion, $nuevoEstado)
     {
         try {
+            // Corregido: Usando el nombre de tabla 't_votacion' de tu imagen
             $sql = "UPDATE t_votacion SET habilitada = :estado WHERE idVotacion = :id";
+
+            // Corregido: Usando la variable $sql
             $stmt = $this->pdo->prepare($sql);
+            
             $stmt->execute([':estado' => $nuevoEstado, ':id' => $idVotacion]);
+            
             return ['status' => 'success', 'message' => 'Estado actualizado correctamente.'];
         } catch (Exception $e) {
             return ['status' => 'error', 'message' => 'Error al cambiar el estado: ' . $e->getMessage()];
         }
     }
 }
-// ⬅️ ⬅️ Llave '}' extra eliminada
+
 ?>

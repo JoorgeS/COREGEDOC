@@ -10,12 +10,12 @@ $model = null;
 try {
     $model = new MinutaModel();
     $comisiones = $model->getComisiones();
-    
+
     // REQ 1: La página no carga nada hasta que se activa el filtro
     // 💡 AJUSTE: Mantenemos el chequeo de 'filtro_activo' solo para saber si se usó la barra de filtros,
     // pero forzamos la carga de datos si no hay parámetros específicos.
-    $filtroActivo = isset($_GET['filtro_activo']); 
-    
+    $filtroActivo = isset($_GET['filtro_activo']);
+
     $filtroComision = $_GET['comisionId'] ?? null;
     $filtroIdMinuta = $_GET['idMinuta'] ?? null;
     $filtroKeyword = $_GET['keyword'] ?? null;
@@ -30,12 +30,11 @@ try {
         'idMinuta'   => $filtroIdMinuta,
         'keyword'    => $filtroKeyword,
         // 💡 Nuevo parámetro para el modelo: indica que queremos todos los estados
-        'all_status' => true 
+        'all_status' => true
     ];
-    
+
     // Asumimos un nuevo método más genérico en MinutaModel para que devuelva TODAS las minutas
     $minutasEnSeguimiento = $model->getSeguimientoGeneral($filters);
-    
 } catch (Exception $e) {
     echo "<div class='alert alert-danger'>Error al conectar con el modelo: " . $e->getMessage() . "</div>";
     $minutasEnSeguimiento = [];
@@ -44,6 +43,16 @@ try {
 ?>
 
 <div class="container-fluid">
+
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+            <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Seguimiento General</li>
+        </ol>
+    </nav>
+
+
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
@@ -126,12 +135,12 @@ try {
                             <?php foreach ($minutasEnSeguimiento as $minuta): ?>
                                 <tr>
                                     <td class="text-center">
-                                        <button type="button" 
-                                                    class="btn btn-primary btn-sm btn-ver-seguimiento" 
-                                                    title="Ver Seguimiento"
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#modalSeguimiento" 
-                                                    data-id="<?php echo $minuta['idMinuta']; ?>">
+                                        <button type="button"
+                                            class="btn btn-primary btn-sm btn-ver-seguimiento"
+                                            title="Ver Seguimiento"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalSeguimiento"
+                                            data-id="<?php echo $minuta['idMinuta']; ?>">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </td>
@@ -175,7 +184,7 @@ try {
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="modalSeguimientoContenido">
-                </div>
+            </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
             </div>
@@ -184,49 +193,49 @@ try {
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    
-    const modalElement = document.getElementById('modalSeguimiento');
-    
-    if (modalElement) {
-        const modalTitle = document.getElementById('modalSeguimientoLabel');
-        const modalBody = document.getElementById('modalSeguimientoContenido');
+    document.addEventListener('DOMContentLoaded', function() {
 
-        // 1. Escuchamos el evento que Bootstrap dispara ANTES de mostrar el modal
-        modalElement.addEventListener('show.bs.modal', function(event) {
-            
-            // 2. Obtenemos el botón que fue clickeado
-            const button = event.relatedTarget; 
-            
-            if (button) {
-                // 3. Sacamos el ID del atributo 'data-id' del botón
-                const minutaId = button.getAttribute('data-id');
+        const modalElement = document.getElementById('modalSeguimiento');
 
-                if (minutaId) {
-                    // 4. Actualizamos el título y ponemos un "Cargando..."
-                    modalTitle.textContent = 'Seguimiento Minuta N° ' + minutaId;
-                    modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
+        if (modalElement) {
+            const modalTitle = document.getElementById('modalSeguimientoLabel');
+            const modalBody = document.getElementById('modalSeguimientoContenido');
 
-                    // 5. Usamos fetch() (JavaScript puro) para llamar al controlador
-                    fetch('/corevota/controllers/obtener_preview_seguimiento.php?id=' + minutaId)
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Error en la red: ' + response.statusText);
-                            }
-                            return response.text(); // La respuesta es el HTML
-                        })
-                        .then(html => {
-                            // 6. Cargamos el HTML en el cuerpo del modal
-                            modalBody.innerHTML = html;
-                        })
-                        .catch(error => {
-                            // 7. Manejamos cualquier error
-                            console.error("Error en fetch:", error);
-                            modalBody.innerHTML = '<p class="alert alert-danger"><strong>Error al cargar los datos.</strong></p><pre>' + error.message + '</pre>';
-                        });
+            // 1. Escuchamos el evento que Bootstrap dispara ANTES de mostrar el modal
+            modalElement.addEventListener('show.bs.modal', function(event) {
+
+                // 2. Obtenemos el botón que fue clickeado
+                const button = event.relatedTarget;
+
+                if (button) {
+                    // 3. Sacamos el ID del atributo 'data-id' del botón
+                    const minutaId = button.getAttribute('data-id');
+
+                    if (minutaId) {
+                        // 4. Actualizamos el título y ponemos un "Cargando..."
+                        modalTitle.textContent = 'Seguimiento Minuta N° ' + minutaId;
+                        modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
+
+                        // 5. Usamos fetch() (JavaScript puro) para llamar al controlador
+                        fetch('/corevota/controllers/obtener_preview_seguimiento.php?id=' + minutaId)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Error en la red: ' + response.statusText);
+                                }
+                                return response.text(); // La respuesta es el HTML
+                            })
+                            .then(html => {
+                                // 6. Cargamos el HTML en el cuerpo del modal
+                                modalBody.innerHTML = html;
+                            })
+                            .catch(error => {
+                                // 7. Manejamos cualquier error
+                                console.error("Error en fetch:", error);
+                                modalBody.innerHTML = '<p class="alert alert-danger"><strong>Error al cargar los datos.</strong></p><pre>' + error.message + '</pre>';
+                            });
+                    }
                 }
-            }
-        });
-    }
-});
+            });
+        }
+    });
 </script>
