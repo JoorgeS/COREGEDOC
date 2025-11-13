@@ -1,182 +1,193 @@
 <?php
-// /controllers/gestionar_votacion_minuta.php
+// /corevota/controllers/gestionar_votacion_minuta.php
+// --- VERSIÓN CORREGIDA (sin PDF) ---
+
 header('Content-Type: application/json');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Dependencias
+// Incluimos los controladores que necesitamos
 require_once __DIR__ . '/../class/class.conectorDB.php';
-require_once __DIR__ . '/VotacionController.php'; // Para crear
-require_once __DIR__ . '/VotoController.php';     // Para registrar
-require_once __DIR__ . '/../cfg/config.php';       // Para BaseConexion
+require_once __DIR__ . '/VotacionController.php'; // Para habilitar/deshabilitar
+require_once __DIR__ . '/VotoController.php';     // Para registrar voto ST
 
-class VotacionMinutaManager extends BaseConexion
-{
-    private $pdo;
-
-
-
-    public function __construct()
-    {
-        $this->pdo = $this->conectar();
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    }
-
-    public function getPDO()
-    {
-        return $this->pdo;
-    }
-
-    // Acción 1: Listar votaciones para la minuta
-    public function listVotaciones($idMinuta)
-    {
-        $sql = "SELECT v.idVotacion, v.nombreVotacion, v.habilitada, c.nombreComision
-                FROM t_votacion v
-                JOIN t_comision c ON v.idComision = c.idComision
-                WHERE v.t_minuta_idMinuta = :idMinuta
-                ORDER BY v.idVotacion ASC";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':idMinuta' => $idMinuta]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    // Acción 2: Obtener estado de votos (para el modal del secretario)
-    public function getVotacionStatus($idVotacion, $asistentes_ids)
-    {
-        if (empty($asistentes_ids)) {
-            return ['asistentes' => [], 'votos' => []];
-        }
-
-        // 1. Nombres de los asistentes
-        $placeholders = implode(',', array_fill(0, count($asistentes_ids), '?'));
-        $sqlAsistentes = "SELECT idUsuario, CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
-                          FROM t_usuario 
-                          WHERE idUsuario IN ($placeholders)
-                          ORDER BY aPaterno, pNombre";
-        $stmtA = $this->pdo->prepare($sqlAsistentes);
-        $stmtA->execute($asistentes_ids);
-        $asistentes = $stmtA->fetchAll(PDO::FETCH_ASSOC);
-
-        // 2. Votos ya registrados (CORREGIDO)
-        // 🟨 CORRECCIÓN: Usar las columnas con prefijo 't_'
-        $sqlVotos = "SELECT t_usuario_idUsuario, opcionVoto 
-                     FROM t_voto 
-                     WHERE t_votacion_idVotacion = :idVotacion";
-        $stmtV = $this->pdo->prepare($sqlVotos);
-        $stmtV->execute([':idVotacion' => $idVotacion]);
-        // Indexar por idUsuario para fácil acceso en JS
-        $votos = $stmtV->fetchAll(PDO::FETCH_KEY_PAIR);
-
-        return ['asistentes' => $asistentes, 'votos' => $votos];
-    }
-}
-
-
-// --- ENRUTADOR DE ACCIONES ---
-$action = $_POST['action'] ?? $_GET['action'] ?? null;
-$idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-
-if (!$idUsuarioLogueado) {
-    echo json_encode(['status' => 'error', 'message' => 'Sesión expirada.']);
+// Seguridad: Solo Secretarios Técnicos
+if (!isset($_SESSION['idUsuario']) || $_SESSION['tipoUsuario_id'] != 2) { // 2 = ST
+    http_response_code(403);
+    echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado.']);
     exit;
 }
 
+$action = $_POST['action'] ?? $_GET['action'] ?? null;
+$idMinuta = $_POST['idMinuta'] ?? $_GET['idMinuta'] ?? null;
+$idUsuarioLogueado = $_SESSION['idUsuario'];
+
+$db = new conectorDB();
+$pdo = $db->getDatabase();
+
 try {
-    $manager = new VotacionMinutaManager();
-
     switch ($action) {
-        // JS: guardarNuevaVotacion()
-        // JS: guardarNuevaVotacion()
-        case 'create':
-            // Usamos la conexión del $manager que ya está abierta
-            $pdo = $manager->getPDO(); // Necesitarás añadir esta función (ver abajo)
+        // ==========================================================
+        // --- 🚀 INICIO: BLOQUE CORREGIDO ---
+        // ==========================================================
+        case 'change_status':
+            $idVotacion = $_POST['idVotacion'] ?? null;
+            $nuevoEstado = $_POST['nuevoEstado'] ?? null; // 0 para cerrar, 1 para abrir
 
-            $idMinuta = $_POST['idMinuta'] ?? 0;
-            $idReunion = $_POST['idReunion'] ?? 0;
-            $idComision = $_POST['idComision'] ?? 0;
-            $nombreVotacion = $_POST['nombreVotacion'] ?? '';
-
-            if (empty($idMinuta) || empty($idReunion) || empty($idComision) || empty($nombreVotacion)) {
-                throw new Exception("Datos incompletos para crear la votación.");
+            if (!$idVotacion || $nuevoEstado === null || !is_numeric($nuevoEstado)) {
+                throw new Exception('Faltan parámetros (idVotacion, nuevoEstado).');
             }
 
-            $pdo->beginTransaction();
+            $votacionCtrl = new VotacionController();
 
-            // 1. Insertar la votación (en lugar de usar VotacionController)
-            $sql_insert = "INSERT INTO t_votacion 
-                                (nombreVotacion, idComision, habilitada, t_minuta_idMinuta, t_reunion_idReunion)
-                           VALUES 
-                                (:nombre, :idComision, 1, :idMinuta, :idReunion)";
+            // CORRECCIÓN: El método se llama "cambiarEstado", no "habilitar"
+            $resultado = $votacionCtrl->cambiarEstado($idVotacion, $nuevoEstado);
 
-            $stmt_insert = $pdo->prepare($sql_insert);
-            $stmt_insert->execute([
-                ':nombre' => $nombreVotacion,
-                ':idComision' => $idComision,
-                ':idMinuta' => $idMinuta,
-                ':idReunion' => $idReunion
+            if ($resultado['status'] === 'success') {
+                echo json_encode(['status' => 'success', 'message' => 'Estado de la votación actualizado.']);
+            } else {
+                throw new Exception($resultado['message'] ?? 'Error desconocido desde VotacionController.');
+            }
+            break;
+        // ==========================================================
+        // --- 🚀 FIN: BLOQUE CORREGIDO ---
+        // ==========================================================
+
+        case 'create':
+            $idReunion = $_POST['idReunion'] ?? null;
+            $idComision = $_POST['idComision'] ?? null;
+            $nombreVotacion = $_POST['nombreVotacion'] ?? null;
+
+            if (!$idMinuta || !$idReunion || !$idComision || !$nombreVotacion) {
+                throw new Exception('Faltan parámetros para crear la votación.');
+            }
+
+            $votacionCtrl = new VotacionController();
+            // Usamos la función storeVotacion() de tu VotacionController
+            $resultado = $votacionCtrl->storeVotacion([
+                'nombreVotacion' => $nombreVotacion,
+                't_comision_idComision' => $idComision, // Ajustado al nombre esperado por el controller
+                'habilitada' => 1 // Habilitada por defecto
             ]);
 
-            // NOTA: No necesitamos lastInsertId() ni UPDATE,
-            // porque insertamos la vinculación (idMinuta, idReunion) directamente.
+            // Esta lógica de SQL la mantenemos por si storeVotacion no guarda la relación
+            if ($resultado['status'] === 'success') {
+                try {
+                    // Intentamos obtener el ID de la votación recién creada
+                    $lastId = $pdo->lastInsertId();
 
-            $pdo->commit();
-            echo json_encode(['status' => 'success', 'message' => 'Votación creada y vinculada.']);
+                    if (empty($lastId) && !empty($resultado['id'])) {
+                        $lastId = $resultado['id'];
+                    } elseif (empty($lastId)) {
+                        // Fallback si lastInsertId falla (ej. triggers)
+                        $stmtLast = $pdo->prepare("SELECT idVotacion FROM t_votacion WHERE nombreVotacion = :nombre ORDER BY idVotacion DESC LIMIT 1");
+                        $stmtLast->execute([':nombre' => $nombreVotacion]);
+                        $lastId = $stmtLast->fetchColumn();
+                    }
 
+                    if ($lastId) {
+                        // Actualizamos la votación con los IDs de minuta y reunión
+                        $sql = "UPDATE t_votacion SET t_minuta_idMinuta = :idMinuta, t_reunion_idReunion = :idReunion 
+                                WHERE idVotacion = :idVotacion";
+                        $stmtUpdate = $pdo->prepare($sql);
+                        $stmtUpdate->execute([
+                            ':idMinuta' => $idMinuta,
+                            ':idReunion' => $idReunion,
+                            ':idVotacion' => $lastId
+                        ]);
+                    }
+                } catch (Exception $e) {
+                    // No es fatal, pero lo registramos
+                    error_log("Error al vincular votación a minuta: " . $e->getMessage());
+                }
+            }
+
+            echo json_encode($resultado);
             break;
 
-        // JS: cargarVotacionesDeLaMinuta()
         case 'list':
-            $idMinuta = $_GET['idMinuta'] ?? 0;
-            $votaciones = $manager->listVotaciones($idMinuta);
+            if (!$idMinuta) {
+                throw new Exception('ID de Minuta no proporcionado.');
+            }
+
+            $sqlReunion = $pdo->prepare("SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1");
+            $sqlReunion->execute([':idMinuta' => $idMinuta]);
+            $idReunion = $sqlReunion->fetchColumn();
+
+            $sqlVotaciones = $pdo->prepare("
+                SELECT v.idVotacion, v.nombreVotacion, v.habilitada, c.nombreComision 
+                FROM t_votacion v
+                LEFT JOIN t_comision c ON v.idComision = c.idComision
+                WHERE v.t_minuta_idMinuta = :idMinuta OR v.t_reunion_idReunion = :idReunion
+                ORDER BY v.idVotacion DESC
+            ");
+            $sqlVotaciones->execute([':idMinuta' => $idMinuta, ':idReunion' => $idReunion]);
+            $votaciones = $sqlVotaciones->fetchAll(PDO::FETCH_ASSOC);
+
             echo json_encode(['status' => 'success', 'data' => $votaciones]);
             break;
 
-        // JS: abrirModalVoto()
         case 'get_status':
-            $idVotacion = $_POST['idVotacion'] ?? 0;
-            $asistentes_json = $_POST['asistentes_ids'] ?? '[]';
-            $asistentes_ids = json_decode($asistentes_json, true);
-            $data = $manager->getVotacionStatus($idVotacion, $asistentes_ids);
-            echo json_encode(['status' => 'success', 'data' => $data]);
-            break;
+            $idVotacion = $_POST['idVotacion'] ?? null;
+            $asistentes_ids_json = $_POST['asistentes_ids'] ?? '[]';
+            $asistentes_ids = json_decode($asistentes_ids_json);
 
-
-        case 'change_status':
-            $idVotacion = $_POST['idVotacion'] ?? 0;
-            $nuevoEstado = $_POST['nuevoEstado'] ?? null;
-
-            if (empty($idVotacion) || !in_array($nuevoEstado, [0, 1])) {
-                throw new Exception("Datos de estado incompletos o inválidos.");
+            if (!$idVotacion || empty($asistentes_ids)) {
+                throw new Exception('ID de Votación o lista de asistentes no proporcionada.');
             }
-            
-            $votacionCtrl = new VotacionController();
-            $response = $votacionCtrl->cambiarEstado((int)$idVotacion, (int)$nuevoEstado);
 
-            echo json_encode($response);
+            $placeholders = implode(',', array_fill(0, count($asistentes_ids), '?'));
+
+            // 1. Obtener nombres de asistentes
+            $sqlAsistentes = $pdo->prepare("
+                SELECT idUsuario, CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
+                FROM t_usuario 
+                WHERE idUsuario IN ($placeholders)
+                ORDER BY aPaterno, pNombre
+            ");
+            $sqlAsistentes->execute($asistentes_ids);
+            $asistentes = $sqlAsistentes->fetchAll(PDO::FETCH_ASSOC);
+
+            // 2. Obtener votos ya emitidos
+            $sqlVotos = $pdo->prepare("
+                SELECT t_usuario_idUsuario, opcionVoto 
+                FROM t_voto 
+                WHERE t_votacion_idVotacion = :idVotacion AND t_usuario_idUsuario IN ($placeholders)
+            ");
+            $params = array_merge([":idVotacion" => $idVotacion], $asistentes_ids);
+            $sqlVotos->execute($params);
+            $votos = $sqlVotos->fetchAll(PDO::FETCH_KEY_PAIR); // Mapea idUsuario => opcionVoto
+
+            echo json_encode(['status' => 'success', 'data' => ['asistentes' => $asistentes, 'votos' => $votos]]);
             break;
 
-        // JS: registrarVotoSecretario()
-        // controllers/gestionar_votacion_minuta.php (Líneas 142-152, aproximadamente)
-
-        // JS: registrarVotoSecretario()
         case 'register_vote':
-            // ✅ CORRECCIÓN DE LA INSTANCIACIÓN DE CLASE
+            $idVotacion = $_POST['idVotacion'] ?? null;
+            $idUsuario = $_POST['idUsuario'] ?? null; // El ID del consejero que vota
+            $voto = $_POST['voto'] ?? null;
+            $idSecretario = $_POST['idSecretario'] ?? null; // El ST que registra
+
+            if (!$idVotacion || !$idUsuario || !$voto || !$idSecretario) {
+                throw new Exception('Faltan parámetros para registrar el voto.');
+            }
+
             $votoCtrl = new VotoController();
-            $response = $votoCtrl->registrarVotoVotacion( // ⬅️ Llamamos al método correcto para t_votacion
-                $_POST['idVotacion'] ?? 0,
-                $_POST['idUsuario'] ?? 0, 	        // ID del asistente
-                $_POST['voto'] ?? '',               // El JS envía 'voto', no 'opcionVoto'
-                $_POST['idSecretario'] ?? null      // ✅ CORRECCIÓN: Ahora lee 'idSecretario' que envía el JS
+            $resultado = $votoCtrl->registrarVotoVotacion(
+                (int)$idVotacion,
+                (int)$idUsuario,
+                (string)$voto,
+                (int)$idSecretario // ID del ST que registra
             );
-            echo json_encode($response);
+
+            echo json_encode($resultado);
             break;
-            
 
         default:
-            echo json_encode(['status' => 'error', 'message' => 'Acción no válida.']);
+            throw new Exception('Acción no válida.');
     }
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Error fatal del controlador: ' . $e->getMessage()]);
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
 }

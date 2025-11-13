@@ -1,156 +1,157 @@
-<?php
-// views/pages/menu.php
+Función helper para verificar si un enlace del menú debe estar activo.Compara la página actual con los grupos definidos.<?php
+                                                                                                                        // views/pages/menu.php
 
-// SEGURIDAD: Iniciar la sesión de forma segura
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-    date_default_timezone_set('America/Santiago');
-}
+                                                                                                                        // SEGURIDAD: Iniciar la sesión de forma segura
+                                                                                                                        if (session_status() === PHP_SESSION_NONE) {
+                                                                                                                            session_start();
+                                                                                                                            date_default_timezone_set('America/Santiago');
+                                                                                                                        }
 
-// SEGURIDAD: Redirigir si el usuario no está logueado
-if (!isset($_SESSION['idUsuario'])) {
-    header("Location: /corevota/views/pages/login.php");
-    exit;
-}
+                                                                                                                        // SEGURIDAD: Redirigir si el usuario no está logueado
+                                                                                                                        if (!isset($_SESSION['idUsuario'])) {
+                                                                                                                            header("Location: /corevota/views/pages/login.php");
+                                                                                                                            exit;
+                                                                                                                        }
 
-// --- ¡NUEVO! CAPTURAR ROL DE USUARIO ---
-// Asegúrate de que loginController.php esté guardando 'tipoUsuario_id' en la sesión
-$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0; // 0 = default/invitado
+                                                                                                                        // --- ¡NUEVO! CAPTURAR ROL DE USUARIO ---
+                                                                                                                        // Asegúrate de que loginController.php esté guardando 'tipoUsuario_id' en la sesión
+                                                                                                                        $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0; // 0 = default/invitado
 
-// --- ¡NUEVO! DEFINIR CONSTANTES DE ROL (según tu BBDD t_tipousuario) ---
-define('ROL_CONSEJERO', 1);
-define('ROL_SECRETARIO_TECNICO', 2);
-define('ROL_PRESIDENTE_COMISION', 3);
-define('ROL_ADMINISTRADOR', 6);
-// (Puedes añadir los otros roles si los necesitas)
+                                                                                                                        // --- ¡NUEVO! DEFINIR CONSTANTES DE ROL (según tu BBDD t_tipousuario) ---
+                                                                                                                        define('ROL_CONSEJERO', 1);
+                                                                                                                        define('ROL_SECRETARIO_TECNICO', 2);
+                                                                                                                        define('ROL_PRESIDENTE_COMISION', 3);
+                                                                                                                        define('ROL_ADMINISTRADOR', 6);
+                                                                                                                        // (Puedes añadir los otros roles si los necesitas)
 
-// --- Lógica para Saludo y Fecha ---
-$nombreUsuario = 'Invitado'; // .
+                                                                                                                        // --- Lógica para Saludo y Fecha ---
+                                                                                                                        $nombreUsuario = 'Invitado'; // .
 
-// Capturar la página a cargar
-$paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
-$id_param = $_GET['id'] ?? null; // Capturamos el ID también
+                                                                                                                        // Capturar la página a cargar
+                                                                                                                        $paginaActual = $_GET['pagina'] ?? 'home'; // Usar 'home' como default
+                                                                                                                        $id_param = $_GET['id'] ?? null; // Capturamos el ID también
 
-// --- Lógica para Saludo, Nombre y Fecha ---
-$nombreUsuario = trim(($_SESSION['pNombre'] ?? 'Invitado') . ' ' . ($_SESSION['aPaterno'] ?? ''));
-$nombreUsuario = trim($nombreUsuario); // por si falta aPaterno
+                                                                                                                        // --- Lógica para Saludo, Nombre y Fecha ---
+                                                                                                                        $nombreUsuario = trim(($_SESSION['pNombre'] ?? 'Invitado') . ' ' . ($_SESSION['aPaterno'] ?? ''));
+                                                                                                                        $nombreUsuario = trim($nombreUsuario); // por si falta aPaterno
 
-// Hora 0-23
-$horaActual = (int)date('G');
+                                                                                                                        // Hora 0-23
+                                                                                                                        $horaActual = (int)date('G');
 
-// Mañana: 05:00–11:59 | Tarde: 12:00–19:59 | Noche: 20:00–04:59
-if ($horaActual >= 5 && $horaActual < 12) {
-    $saludo = 'Buenos días';
-} elseif ($horaActual >= 12 && $horaActual < 20) {
-    $saludo = 'Buenas tardes';
-} else {
-    $saludo = 'Buenas noches';
-}
+                                                                                                                        // Mañana: 05:00–11:59 | Tarde: 12:00–19:59 | Noche: 20:00–04:59
+                                                                                                                        if ($horaActual >= 5 && $horaActual < 12) {
+                                                                                                                            $saludo = 'Buenos días';
+                                                                                                                        } elseif ($horaActual >= 12 && $horaActual < 20) {
+                                                                                                                            $saludo = 'Buenas tardes';
+                                                                                                                        } else {
+                                                                                                                            $saludo = 'Buenas noches';
+                                                                                                                        }
 
-// Fecha en español (usa Intl si está disponible)
-if (class_exists('IntlDateFormatter')) {
-    $fmt = new IntlDateFormatter('es_CL', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'America/Santiago');
-    $fechaActual = $fmt->format(time()); // p.ej: martes, 4 de noviembre de 2025
-    // Capitaliza la primera letra
-    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
-} else {
-    setlocale(LC_TIME, 'es_CL.UTF-8', 'es_ES.UTF-8', 'Spanish_Spain.1252');
-    $fechaActual = strftime('%A, %d de %B de %Y');
-    // Capitaliza la primera letra
-    $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
-}
-// --- Fin Lógica Saludo y Fecha ---
+                                                                                                                        // Fecha en español (usa Intl si está disponible)
+                                                                                                                        if (class_exists('IntlDateFormatter')) {
+                                                                                                                            $fmt = new IntlDateFormatter('es_CL', IntlDateFormatter::FULL, IntlDateFormatter::NONE, 'America/Santiago');
+                                                                                                                            $fechaActual = $fmt->format(time()); // p.ej: martes, 4 de noviembre de 2025
+                                                                                                                            // Capitaliza la primera letra
+                                                                                                                            $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+                                                                                                                        } else {
+                                                                                                                            setlocale(LC_TIME, 'es_CL.UTF-8', 'es_ES.UTF-8', 'Spanish_Spain.1252');
+                                                                                                                            $fechaActual = strftime('%A, %d de %B de %Y');
+                                                                                                                            // Capitaliza la primera letra
+                                                                                                                            $fechaActual = mb_convert_case(mb_substr($fechaActual, 0, 1, 'UTF-8'), MB_CASE_TITLE, 'UTF-8') . mb_substr($fechaActual, 1, null, 'UTF-8');
+                                                                                                                        }
+                                                                                                                        // --- Fin Lógica Saludo y Fecha ---
 
-// Determina el saludo según la hora del servidor
-$horaActual = date('H'); // Obtiene la hora en formato 24h (00-23)
-$saludo = '';
-if ($horaActual < 12) {
-    $saludo = 'Buenos días';
-} elseif ($horaActual < 19) { // Puedes ajustar este límite para "Buenas tardes"
-    $saludo = 'Buenas tardes';
-} else {
-    $saludo = 'Buenas noches';
-}
+                                                                                                                        // Determina el saludo según la hora del servidor
+                                                                                                                        $horaActual = date('H'); // Obtiene la hora en formato 24h (00-23)
+                                                                                                                        $saludo = '';
+                                                                                                                        if ($horaActual < 12) {
+                                                                                                                            $saludo = 'Buenos días';
+                                                                                                                        } elseif ($horaActual < 19) { // Puedes ajustar este límite para "Buenas tardes"
+                                                                                                                            $saludo = 'Buenas tardes';
+                                                                                                                        } else {
+                                                                                                                            $saludo = 'Buenas noches';
+                                                                                                                        }
 
-// Obtiene la fecha actual en español
-setlocale(LC_TIME, 'es_ES.UTF-8', 'Spanish_Spain.1252');
-$fechaActual = strftime('%A, %d de %B de %Y');
-// --- Fin Lógica Saludo y Fecha ---
+                                                                                                                        // Obtiene la fecha actual en español
+                                                                                                                        setlocale(LC_TIME, 'es_ES.UTF-8', 'Spanish_Spain.1252');
+                                                                                                                        $fechaActual = strftime('%A, %d de %B de %Y');
+                                                                                                                        // --- Fin Lógica Saludo y Fecha ---
 
 
-/*
+                                                                                                                        /*
 ============================================================
 /   MODIFICADO: LÓGICA PARA EL SIDEBAR ACTIVO
 ============================================================
 */
-// Define los grupos de páginas para el estado 'activo'
-$gruposPaginas = [
-    // La página principal 'home'
-    'home' => ['home'],
+                                                                                                                        // Define los grupos de páginas para el estado 'activo'
+                                                                                                                        $gruposPaginas = [
+                                                                                                                            // La página principal 'home'
+                                                                                                                            'home' => ['home'],
 
-    // Todas las páginas que activarán el enlace 'Minutas'
-    'minutas' => [
-        'minutas_dashboard',
-        'minutas_pendientes',
-        'minutas_aprobadas',
-        'crear_minuta',
-        'editar_minuta',
-        'seguimiento_minuta',
-        'seguimiento_general'
-    ],
+                                                                                                                            // Todas las páginas que activarán el enlace 'Minutas'
+                                                                                                                            'minutas' => [
+                                                                                                                                'minutas_dashboard',
+                                                                                                                                'minutas_pendientes',
+                                                                                                                                'minutas_aprobadas',
+                                                                                                                                'crear_minuta',
+                                                                                                                                'editar_minuta',
+                                                                                                                                'seguimiento_minuta',
+                                                                                                                                'seguimiento_general'
+                                                                                                                            ],
 
-    // Todas las páginas que activarán el enlace 'Usuarios'
-    'usuarios' => [
-        'usuarios_dashboard',
-        'usuarios_listado',
-        'usuario_crear'
-    ],
+                                                                                                                            // Todas las páginas que activarán el enlace 'Usuarios'
+                                                                                                                            'usuarios' => [
+                                                                                                                                'usuarios_dashboard',
+                                                                                                                                'usuarios_listado',
+                                                                                                                                'usuario_crear'
+                                                                                                                            ],
 
-    // Todas las páginas que activarán el enlace 'Comisiones'
-    'comisiones' => [
-        'comisiones_dashboard',
-        'comision_listado',
-        'comision_crear',
-        'comision_editar'
-    ],
+                                                                                                                            // Todas las páginas que activarán el enlace 'Comisiones'
+                                                                                                                            'comisiones' => [
+                                                                                                                                'comisiones_dashboard',
+                                                                                                                                'comision_listado',
+                                                                                                                                'comision_crear',
+                                                                                                                                'comision_editar'
+                                                                                                                            ],
 
-    // Todas las páginas que activarán el enlace 'Reuniones'
-    'reuniones' => [
-        'reuniones_dashboard',
-        'reunion_listado',
-        'reunion_calendario',
-        'reunion_autogestion_asistencia',
-        'historial_asistencia',
-        'reunion_crear',
-        'reunion_editar'
-    ],
+                                                                                                                            // Todas las páginas que activarán el enlace 'Reuniones'
+                                                                                                                            'reuniones' => [
+                                                                                                                                'sala_reuniones', // ⬅️ 1. CAMBIO AÑADIDO
+                                                                                                                                'reuniones_dashboard',
+                                                                                                                                'reunion_listado',
+                                                                                                                                'reunion_calendario',
+                                                                                                                                'reunion_autogestion_asistencia',
+                                                                                                                                'historial_asistencia',
+                                                                                                                                'reunion_crear',
+                                                                                                                                'reunion_editar'
+                                                                                                                            ],
 
-    // Todas las páginas que activarán el enlace 'Votaciones'
-    'votaciones' => [
-        'votaciones_dashboard',
-        'votacion_listado',
-        'historial_votacion',
-        'voto_autogestion',
-        'crearVotacion',
-        'votacion_crear',
-        'tabla_votacion'
-    ]
-];
+                                                                                                                            // Todas las páginas que activarán el enlace 'Votaciones'
+                                                                                                                            'votaciones' => [
+                                                                                                                                'votaciones_dashboard',
+                                                                                                                                'votacion_listado',
+                                                                                                                                'historial_votacion',
+                                                                                                                                'voto_autogestion',
+                                                                                                                                'crearVotacion',
+                                                                                                                                'votacion_crear',
+                                                                                                                                'tabla_votacion'
+                                                                                                                            ]
+                                                                                                                        ];
 
-/**
- * Función helper para verificar si un enlace del menú debe estar activo.
- * Compara la página actual con los grupos definidos.
- */
-function esActivo($grupo, $paginaActual, $gruposPaginas)
-{
-    if (isset($gruposPaginas[$grupo])) {
-        return in_array($paginaActual, $gruposPaginas[$grupo]);
-    }
-    return false;
-}
-// --- FIN LÓGICA SIDEBAR ---
+                                                                                                                        /**
+                                                                                                                         * Función helper para verificar si un enlace del menú debe estar activo.
+                                                                                                                         * Compara la página actual con los grupos definidos.
+                                                                                                                         */
+                                                                                                                        function esActivo($grupo, $paginaActual, $gruposPaginas)
+                                                                                                                        {
+                                                                                                                            if (isset($gruposPaginas[$grupo])) {
+                                                                                                                                return in_array($paginaActual, $gruposPaginas[$grupo]);
+                                                                                                                            }
+                                                                                                                            return false;
+                                                                                                                        }
+                                                                                                                        // --- FIN LÓGICA SIDEBAR ---
 
-?>
+                                                                                                                        ?>
 <!DOCTYPE html>
 <html lang="es">
 
@@ -161,7 +162,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="/corevota/public/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    
+
 
 
     <style>
@@ -172,8 +173,8 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             --core-blue: #1C88BF;
             /* Este es un azul oscuro profesional, ajústalo al HEX exacto si lo tienes */
         }
-        
-        
+
+
 
         html,
         body {
@@ -463,21 +464,13 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
                     <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
-                            <a href="menu.php?pagina=reunion_autogestion_asistencia" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                                <i class="fas fa-hand-paper fa-fw"></i>
-                                Registrar Asistencia
+                            <a href="menu.php?pagina=sala_reuniones" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
+                                <i class="fa-solid fa-chalkboard-user fa-fw"></i>
+                                Sala de Reuniones
                             </a>
                         </li>
                     <?php endif; ?>
 
-                    <?php if ($tipoUsuario != ROL_SECRETARIO_TECNICO) : ?>
-                        <li class="nav-item">
-                            <a href="menu.php?pagina=reunion_calendario" class="nav-link <?php echo esActivo('reuniones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                                <i class="fas fa-calendar-alt fa-fw"></i>
-                                Calendario Reuniones
-                            </a>
-                        </li>
-                    <?php endif; ?>
 
 
                     <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO) : ?>
@@ -642,9 +635,9 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 
             /* ============================================================
-        /   MODIFICADO: RUTAS DEL ROUTER (VERSIÓN FINAL)
-        ============================================================
-        */
+            /   MODIFICADO: RUTAS DEL ROUTER (VERSIÓN FINAL)
+            ============================================================
+            */
             // ¡ESTE BLOQUE HA SIDO ACTUALIZADO!
             $routes = [
                 // --- VISTAS PRINCIPALES / DASHBOARDS (Ahora apuntan a las nuevas vistas) ---
@@ -687,6 +680,10 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 'reunion_editar' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'edit']],
                 'reunion_listado' => ['type' => 'controller', 'file' => $controllers_path . '/ReunionController.php', 'params' => ['action' => 'list']],
                 'reunion_calendario' => ['type' => 'view', 'file' => $base_path . '/reunion_calendario.php'],
+
+                // ⬇️ 3. RUTA AÑADIDA ⬇️
+                'sala_reuniones' => ['type' => 'view', 'file' => $base_path . '/sala_reuniones.php'],
+
                 'reunion_autogestion_asistencia' => ['type' => 'view', 'file' => $base_path . '/asistencia_autogestion.php'],
                 'historial_asistencia' => ['type' => 'view', 'file' => $base_path . '/historial_asistencia.php'],
                 'crearVotacion' => ['type' => 'view', 'file' => $base_path . '/crearVotacion.php'],
@@ -710,7 +707,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 // Comprueba si el $tipoUsuario NO está en el array de roles permitidos
                 if (!in_array($tipoUsuario, $route['roles'])) {
                     // Si no tiene permiso, muestra un error y carga la vista 'home' en su lugar.
-                    echo "<div class='alert alert-danger m-3'>Acceso denegado. No tiene permiso para ver esta página.</div>";
+                    echo "<div class'alert alert-danger m-3'>Acceso denegado. No tiene permiso para ver esta página.</div>";
                     $route = $routes['home']; // Sobrescribe la ruta para forzar el home
                     $paginaActual = 'home'; // Asegura que el saludo de 'home' se muestre
                 }

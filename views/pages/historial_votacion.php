@@ -267,16 +267,20 @@ try {
               <td><?= htmlspecialchars($fecha) ?></td>
               <td><?= htmlspecialchars($hora) ?></td>
               <td>
-                <?php if ($mi === 'APRUEBO'): ?>
-                  <span class="badge-voto badge-apruebo">Apruebo</span>
-                <?php elseif ($mi === 'RECHAZO'): ?>
-                  <span class="badge-voto badge-rechazo">Rechazo</span>
-                <?php elseif ($mi === 'ABSTENCION'): ?>
-                  <span class="badge-voto badge-abstencion">Abstención</span>
-                <?php else: ?>
-                  <span class="badge-voto badge-no-voto">No Votó</span>
+                
+                <?php if ($mi === 'SI'): // <-- CAMBIADO DE 'APRUEBO' ?>
+                    <span class="badge-voto badge-apruebo">Sí</span>
+                
+                <?php elseif ($mi === 'NO'): // <-- CAMBIADO DE 'RECHAZO' ?>
+                    <span class="badge-voto badge-rechazo">No</span>
+                
+                <?php elseif ($mi === 'ABSTENCION'): // <-- Este estaba correcto ?>
+                    <span class="badge-voto badge-abstencion">Abstención</span>
+                
+                <?php else: // Muestra "No Votó" para NULL o cualquier otro valor ?>
+                    <span class="badge-voto badge-no-voto">No Votó</span>
                 <?php endif; ?>
-              </td>
+                </td>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>

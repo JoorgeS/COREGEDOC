@@ -285,7 +285,7 @@ class ReunionManager extends BaseConexion
             }
             // --- FIN DE CÓDIGO DE LOG ---
 
-           
+
 
             return [
                 // ...
@@ -443,6 +443,11 @@ try {
             exit;
         }
 
+
+
+
+
+
         // --- ACCIONES GET (Enlaces y Carga de Vistas) ---
     } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
@@ -474,6 +479,17 @@ try {
                 header('Location: ' . $listRedirectUrl);
                 exit;
             }
+        } elseif ($action === 'delete' && isset($_GET['id'])) {
+            $reunionId = (int)$_GET['id'];
+            $response = $manager->deleteReunion($reunionId);
+
+            if ($response['status'] === 'success') {
+                $_SESSION['success'] = $response['message'];
+            } else {
+                $_SESSION['error'] = $response['message'];
+            }
+            header('Location: ' . $listRedirectUrl);
+            exit;
             // No hay 'exit' ni 'header' aquí si tiene éxito
 
         } elseif ($action === 'iniciarMinuta' && isset($_GET['idReunion'])) {

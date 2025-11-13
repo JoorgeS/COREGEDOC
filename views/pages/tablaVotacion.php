@@ -1,5 +1,5 @@
 <?php
-// views/pages/voto_autogestion.php
+// /corevota/views/pages/tablaVotacion.php
 
 if (session_status() === PHP_SESSION_NONE) {
       session_start();
@@ -10,286 +10,265 @@ if (!isset($_SESSION['idUsuario'])) {
 }
 
 require_once __DIR__ . '/../../class/class.conectorDB.php';
-// Asegúrate de que VotacionController y VotoController son clases válidas y existen
-require_once __DIR__ . '/../../controllers/VotacionController.php';
-require_once __DIR__ . '/../../controllers/VotoController.php';
 
 $db = new conectorDB();
 $pdo = $db->getDatabase();
 
-$idUsuario = $_SESSION['idUsuario'];
-$votacionCtrl = new VotacionController();
-$votoCtrl = new VotoController();
+$idVotacion = $_GET['idVotacion'] ?? null;
+$idUsuarioLogueado = $_SESSION['idUsuario'];
+$esSecretarioTecnico = ($_SESSION['tipoUsuario_id'] == 2); // 2 es ST
+$error = "";
 
-// --- 1. LÓGICA DE PROCESAMIENTO POST (VOTO DE AUTOGESTIÓN) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST['opcionVoto'])) {
-      header('Content-Type: application/json');
-      $idVotacion = $_POST['idVotacion'];
-      $opcionVoto = $_POST['opcionVoto'];
-      $response = ['status' => 'error', 'message' => 'Error al registrar voto.'];
-
-      try {
-            // A. Verificar si ya votó (Backend check)
-            $sqlCheck = "SELECT COUNT(*) FROM t_voto 
-                     WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
-            $stmt = $pdo->prepare($sqlCheck);
-            $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
-            if ($stmt->fetchColumn() > 0) {
-                  echo json_encode(['status' => 'duplicate', 'message' => 'Ya registraste tu voto.']);
-                  exit;
-            }
-
-            // B. Obtener el idMinuta asociado a la votación para verificar asistencia
-            $sqlMinuta = "SELECT t_minuta_idMinuta FROM t_votacion WHERE idVotacion = :idVotacion";
-            $stmtMinuta = $pdo->prepare($sqlMinuta);
-            $stmtMinuta->execute([':idVotacion' => $idVotacion]);
-            $idMinuta = $stmtMinuta->fetchColumn();
-
-            if (!$idMinuta) {
-                  throw new Exception('Votación no asociada a ninguna minuta para verificar asistencia.');
-            }
-
-            // C. Verificar si el usuario está presente en la minuta (t_asistencia)
-            $sqlAsistencia = "SELECT COUNT(*) FROM t_asistencia 
-                          WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
-            $stmtAsistencia = $pdo->prepare($sqlAsistencia);
-            $stmtAsistencia->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
-
-            if ($stmtAsistencia->fetchColumn() == 0) {
-                  echo json_encode([
-                        'status' => 'unauthorized',
-                        'message' => 'No puede votar. Debe registrar su asistencia a la reunión correspondiente.'
-                  ]);
-                  exit;
-            }
-
-            // D. Registrar voto (Llamada al método correcto para t_votacion)
-            $response = $votoCtrl->registrarVotoVotacion(
-                  (int)$idVotacion,
-                  (int)$idUsuario,
-                  (string)$opcionVoto,
-                  null // Voto de autogestión, no hay Secretario registrando
-            );
-            echo json_encode($response);
-            exit;
-      } catch (Exception $e) {
-            error_log("Error en voto_autogestion (POST): " . $e->getMessage());
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            exit;
-      }
+if (!$idVotacion || !is_numeric($idVotacion)) {
+      $error = "<div class='alert alert-warning text-center m-4'>No se seleccionó ninguna votación.</div>";
 }
 
-// --- 2. LÓGICA DE CARGA DE DATOS (VISTA) ---
-$votaciones = $votacionCtrl->listar()['data'] ?? [];
-$votacionesHabilitadas = array_filter($votaciones, fn($v) => (int)$v['habilitada'] === 1);
-$votacionVigente = reset($votacionesHabilitadas); // Tomamos la primera votación habilitada
+// 🔹 1. Obtener Info de Votación y (MUY IMPORTANTE) el idMinuta
+$sqlInfo = "SELECT v.nombreVotacion, v.t_minuta_idMinuta, c.nombreComision
+            FROM t_votacion v
+            LEFT JOIN t_comision c ON v.idComision = c.idComision
+            WHERE v.idVotacion = :id";
+$stmtInfo = $pdo->prepare($sqlInfo);
+$stmtInfo->execute([':id' => $idVotacion]);
+$votacion = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
-$votoPrevio = null;
-$yaVoto = false;
+$idMinuta = $votacion['t_minuta_idMinuta'] ?? null;
+$nombreVotacion = $votacion['nombreVotacion'] ?? 'Votación desconocida';
+$nombreComision = $votacion['nombreComision'] ?? 'No definida';
 
-if ($votacionVigente) {
-      // 💡 REVISIÓN DE VOTO PREVIO: Consulta directa y robusta
-      $sqlCheck = "SELECT opcionVoto FROM t_voto 
-                 WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion
-                 LIMIT 1"; // Aseguramos que solo tome un valor
-      $stmt = $pdo->prepare($sqlCheck);
-      $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $votacionVigente['idVotacion']]);
-      $votoPrevio = $stmt->fetchColumn();
-      $yaVoto = !empty($votoPrevio);
+if (!$idMinuta && !$error) {
+      $error = "<div class='alert alert-danger text-center m-4'>Error: Esta votación no está vinculada a ninguna minuta. No se pueden mostrar resultados.</div>";
+}
+
+// 🔹 2. Obtener la lista de ASISTENTES (El "padrón" de votación)
+// Esta es la lista base que SIEMPRE se mostrará en la tabla.
+$asistentes = [];
+if (!$error) {
+      try {
+            $sqlAsistentes = "SELECT u.idUsuario, u.pNombre, u.aPaterno
+            FROM t_asistencia a
+            JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+            WHERE a.t_minuta_idMinuta = :idMinuta
+            AND (u.tipoUsuario_id = 1 OR u.tipoUsuario_id = 3) -- Consejeros y Presidentes de Comisión
+            ORDER BY u.aPaterno ASC, u.pNombre ASC";
+
+            $stmtCons = $pdo->prepare($sqlAsistentes);
+            $stmtCons->execute([':idMinuta' => $idMinuta]);
+            $asistentes = $stmtCons->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($asistentes)) {
+                  $error = "<div class='alert alert-info text-center m-4'>Aún no hay consejeros asistentes registrados para esta minuta.</div>";
+            }
+      } catch (Exception $e) {
+            $error = "<div class='alert alert-danger text-center m-4'>Error al cargar la lista de asistentes.</div>";
+            error_log("Error en tablaVotacion.php (Asistentes): " . $e->getMessage());
+      }
 }
 ?>
 
-<div class="container mt-5">
-      <h3 class="fw-bold text-primary mb-4">
-            <i class="fa-solid fa-person-booth me-2"></i> Sala de Votaciones
-      </h3>
+<div class="container mt-4">
 
-      <div class="row g-4">
-
-            <div class="col-12">
-                  <div class="card shadow-lg border-0 rounded-4">
-                        <div class="card-header bg-primary text-white fw-bold fs-5">
-                              <i class="fas fa-bullhorn me-2"></i> Votación Abierta
-                        </div>
-                        <div class="card-body py-4" id="tarjetaVotacionVigente">
-                              <?php if (empty($votacionVigente)): ?>
-                                    <div class="alert alert-info text-center mb-0">
-                                          No hay votaciones habilitadas en este momento.
-                                    </div>
-                              <?php else: ?>
-                                    <h4 class="fw-bold mb-2 text-dark"><?= htmlspecialchars($votacionVigente['nombreVotacion']) ?></h4>
-                                    <p class="mb-4 text-muted">Comisión: <strong><?= htmlspecialchars($votacionVigente['nombreComision'] ?? 'No definida') ?></strong></p>
-
-                                    <?php if ($yaVoto): ?>
-                                          <div class="alert alert-success fw-semibold py-3 text-center">
-                                                <i class="fa-solid fa-check-circle me-2"></i>
-                                                Ya emitiste tu voto:
-                                                <span class="badge bg-success fs-6 ms-2"><?= strtoupper($votoPrevio) ?></span>
-
-                                                <a href="menu.php?pagina=tablaVotacion&idVotacion=<?= $votacionVigente['idVotacion'] ?>" class="btn btn-sm btn-outline-success ms-3 fw-bold">
-                                                      Revisar Resumen
-                                                </a>
-                                          </div>
-                                    <?php else: ?>
-                                          <form method="post" class="form-voto text-center" data-nombre="<?= htmlspecialchars($votacionVigente['nombreVotacion']) ?>">
-                                                <input type="hidden" name="idVotacion" value="<?= $votacionVigente['idVotacion'] ?>">
-                                                <input type="hidden" name="opcionVoto" value="">
-                                                <h5 class="mb-4">¿Cuál es tu voto?</h5>
-                                                <div class="d-flex justify-content-center gap-4">
-                                                      <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI">SÍ</button>
-                                                      <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO">NO</button>
-                                                      <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION">ABS</button>
-                                                </div>
-                                          </form>
-                                    <?php endif; ?>
-                              <?php endif; ?>
-                        </div>
-                  </div>
-            </div>
-
-            <div class="col-md-6">
-                  <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light fw-bold">
-                              <i class="fas fa-chart-bar me-2 text-info"></i> 2. Resultados de Votaciones
-                        </div>
-                        <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                              <p class="text-muted">Consulta el dashboard restringido con los resultados consolidados de todas las votaciones cerradas.</p>
-                              <a href="menu.php?pagina=votacion_listado&filtro_estado=CERRADA" class="btn btn-info btn-lg mt-auto" style="min-width: 250px;">
-                                    <i class="fas fa-lock me-2"></i> Ver Resultados Consolidados
-                              </a>
-                        </div>
-                  </div>
-            </div>
-
-            <div class="col-md-6">
-                  <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light fw-bold">
-                              <i class="fas fa-history me-2 text-dark"></i> 3. Mi Historial
-                        </div>
-                        <div class="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                              <p class="text-muted">Revisa un listado de todas las votaciones en las que has participado y la opción que elegiste en cada una.</p>
-                              <a href="menu.php?pagina=historial_votacion&idUsuario=<?= $idUsuario ?>" class="btn btn-outline-dark btn-lg mt-auto" style="min-width: 250px;">
-                                    <i class="fas fa-user-check me-2"></i> Ver Mi Historial de Votos
-                              </a>
-                        </div>
-                  </div>
-            </div>
-
+      <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="fw-bold text-success" id="nombre-votacion">
+                  <i class="fa-solid fa-chart-simple me-2"></i>
+                  <?= htmlspecialchars($nombreVotacion) ?>
+            </h3>
+            <a href="menu.php?pagina=voto_autogestion" class="btn btn-outline-secondary">
+                  <i class="fa-solid fa-arrow-left me-2"></i>Volver
+            </a>
       </div>
+
+      <p class="text-muted mb-4">
+            <i class="fa-solid fa-landmark me-2 text-success"></i>
+            Comisión: <strong><?= htmlspecialchars($nombreComision) ?></strong>
+      </p>
+
+      <?php if ($error): ?>
+            <?= $error // Muestra el error si ocurrió alguno 
+            ?>
+      <?php else: ?>
+
+            <div class="d-flex justify-content-center gap-4 mb-4 text-center fw-bold fs-5" id="resumen-votos">
+                  <div class="text-success">SÍ: <span id="total-si">0</span></div>
+                  <div class="text-danger">NO: <span id="total-no">0</span></div>
+                  <div class="text-secondary">ABSTENCIÓN: <span id="total-abstencion">0</span></div>
+                  <div class="text-dark">SIN VOTAR: <span id="total-sin-votar">...</span></div>
+                  <div class="text-info">MI VOTO: <span id="mi-voto" class="badge bg-light text-dark">...</span></div>
+            </div>
+
+            <?php if ($esSecretarioTecnico): ?>
+            <div class="row">
+                  <?php
+                  $mitad = ceil(count($asistentes) / 2);
+                  $col1 = array_slice($asistentes, 0, $mitad);
+                  $col2 = array_slice($asistentes, $mitad);
+                  $columnas = [$col1, $col2];
+                  ?>
+
+                  <?php foreach ($columnas as $colIndex => $grupo): ?>
+                        <div class="col-md-6">
+                              <table class="table table-bordered text-center mb-4">
+                                    <thead class="table-success">
+                                          <tr>
+                                                <th>#</th>
+                                                <th>Consejero Asistente</th>
+                                                <th>Voto</th>
+                                          </tr>
+                                    </thead>
+                                    <tbody>
+                                          <?php foreach ($grupo as $i => $asistente): ?>
+                                                <tr>
+                                                      <td><?= $i + 1 + ($colIndex * $mitad) ?></td>
+                                                      <td class="text-start ps-4"><?= htmlspecialchars($asistente['pNombre'] . ' ' . $asistente['aPaterno']) ?></td>
+
+                                                      <td id="voto-user-<?= $asistente['idUsuario'] ?>" data-votante-id="<?= $asistente['idUsuario'] ?>" class="text-muted">
+                                                            Cargando...
+                                                      </td>
+                                                </tr>
+                                          <?php endforeach; ?>
+                                    </tbody>
+                              </table>
+                        </div>
+                  <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <div class="card-footer text-muted text-center bg-light">
+                  <i class="fa-solid fa-clock-rotate-left me-1"></i>
+                  Actualizado automáticamente. Última recarga: <span id="hora-actualizacion">--:--:--</span>
+            </div>
+      <?php endif; ?>
 </div>
 
 <style>
-      .voto-btn {
-            width: 100px;
-            border-radius: 10px;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+      .table th,
+      .table td {
+            vertical-align: middle;
+            font-size: 0.95rem;
       }
 
-      .voto-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-      }
-
-      .card {
-            border-radius: 0.5rem;
-      }
-
-      .card-body.py-4 {
-            padding-top: 1.5rem !important;
-            padding-bottom: 1.5rem !important;
-      }
-
-      .card-header.bg-primary {
-            background-color: #0d6efd !important;
+      .text-muted {
+            color: #999 !important;
       }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-      document.querySelectorAll('.voto-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                  const form = this.closest('.form-voto');
-                  const nombre = form.dataset.nombre;
-                  const opcion = this.dataset.value;
-                  const idVotacion = form.querySelector('input[name="idVotacion"]').value;
+      document.addEventListener('DOMContentLoaded', function() {
 
-                  Swal.fire({
-                        title: `¿Confirmas tu voto "${opcion}"?`,
-                        text: `Votación: ${nombre}`,
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonColor: '#198754',
-                        cancelButtonColor: '#6c757d',
-                        confirmButtonText: 'Sí, votar',
-                        cancelButtonText: 'Cancelar'
-                  }).then(result => {
-                        if (result.isConfirmed) {
-                              const formData = new FormData();
-                              formData.append('idVotacion', idVotacion);
-                              formData.append('opcionVoto', opcion);
+            // IDs pasados desde PHP.
+            const idMinuta = <?= json_encode($idMinuta); ?>;
+            const idVotacionActual = <?= json_encode($idVotacion); ?>;
+            // La variable esSecretarioTecnico de PHP no se usa directamente aquí,
+            // se usa la que devuelve el API (resultadoAPI.esSecretarioTecnico)
 
-                              fetch('voto_autogestion.php', {
-                                          method: 'POST',
-                                          body: formData
-                                    })
-                                    .then(response => {
-                                          if (!response.ok) {
-                                                return response.json().catch(() => ({
-                                                      status: 'error',
-                                                      message: `Error de red: HTTP ${response.status}`
-                                                }));
-                                          }
-                                          return response.json();
-                                    })
-                                    .then(resp => {
-                                          if (resp.status === 'success') {
-                                                Swal.fire({
-                                                      icon: 'success',
-                                                      title: '✅ Voto registrado correctamente',
-                                                      text: 'Redirigiendo a su resumen...',
-                                                      showConfirmButton: false,
-                                                      timer: 1600
-                                                });
+            // Si no hay minuta, no podemos hacer nada.
+            if (!idMinuta) return;
 
-                                                // 🚀 REDIRECCIÓN AUTOMÁTICA A LA PÁGINA DE RESULTADOS
-                                                setTimeout(() => {
-                                                      window.location.href = `menu.php?pagina=tablaVotacion&idVotacion=${idVotacion}`;
-                                                }, 1600);
+            // Referencias a todos los elementos que actualizaremos
+            const elTotalSi = document.getElementById('total-si');
+            const elTotalNo = document.getElementById('total-no');
+            const elTotalAbs = document.getElementById('total-abstencion');
+            const elTotalSinVotar = document.getElementById('total-sin-votar');
+            const elMiVoto = document.getElementById('mi-voto');
+            const elHoraActualizacion = document.getElementById('hora-actualizacion');
 
-                                          } else if (resp.status === 'unauthorized') {
-                                                Swal.fire({
-                                                      icon: 'error',
-                                                      title: '❌ Voto no permitido',
-                                                      text: resp.message || 'Debe registrar su asistencia para poder votar.',
-                                                      confirmButtonColor: '#dc3545'
-                                                });
-                                          } else if (resp.status === 'duplicate') {
-                                                Swal.fire({
-                                                      icon: 'warning',
-                                                      title: '⚠️ Ya registraste tu voto',
-                                                      text: 'No puedes votar nuevamente en esta votación.',
-                                                      confirmButtonColor: '#198754'
-                                                });
-                                          } else {
-                                                Swal.fire({
-                                                      icon: 'error',
-                                                      title: 'Error al registrar voto',
-                                                      text: resp.message || 'Inténtalo nuevamente.',
-                                                      confirmButtonColor: '#198754'
-                                                });
-                                          }
-                                    })
-                                    .catch(error => {
-                                          console.error("Error en la promesa fetch:", error);
-                                          Swal.fire({
-                                                icon: 'error',
-                                                title: 'Error de conexión',
-                                                text: 'No se pudo comunicar con el servidor.',
-                                                confirmButtonColor: '#198754'
-                                          });
-                                    });
-                        }
-                  });
+            // Obtenemos TODAS las celdas de voto en un objeto para acceso rápido
+            const celdasVotos = {};
+            document.querySelectorAll('[data-votante-id]').forEach(celda => {
+                  celdasVotos[celda.dataset.votanteId] = celda;
             });
+
+            // Función principal que llama al API
+            async function actualizarResultados() {
+                  try {
+                        // 1. Llamamos al API (¡mucho más ligero que recargar todo el HTML!)
+                        const response = await fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinuta}`);
+                        if (!response.ok) throw new Error('Error de red al consultar API');
+
+                        const resultadoAPI = await response.json();
+                        if (resultadoAPI.status !== 'success') throw new Error(resultadoAPI.message);
+
+                        // 2. Buscamos la votación actual dentro de los datos (la API devuelve todas las de la minuta)
+                        const votacion = resultadoAPI.data.find(v => v.idVotacion == idVotacionActual);
+
+                        if (!votacion) {
+                              console.warn("No se encontraron datos de votación para el ID " + idVotacionActual);
+                              return;
+                        }
+
+                        // 3. Actualizamos los contadores
+                        elTotalSi.textContent = votacion.totalSi;
+                        elTotalNo.textContent = votacion.totalNo;
+                        elTotalAbs.textContent = votacion.totalAbstencion;
+
+                        // Usamos el "faltanVotar" que SÍ calcula bien el API (Asistentes - Votos)
+                        elTotalSinVotar.textContent = votacion.faltanVotar;
+
+                        // 4. Actualizamos "Mi Voto"
+                        const miId = <?= json_encode($idUsuarioLogueado); ?>;
+                        if (votacion.votoPersonal) {
+                              elMiVoto.textContent = votacion.votoPersonal;
+                              // Asignamos colores
+                              if (votacion.votoPersonal === 'SI') elMiVoto.className = 'badge bg-success';
+                              else if (votacion.votoPersonal === 'NO') elMiVoto.className = 'badge bg-danger';
+                              else elMiVoto.className = 'badge bg-secondary';
+
+                              // Actualizar la celda de mi voto en la tabla para todos los usuarios
+                              if (celdasVotos[miId]) {
+                                    celdasVotos[miId].textContent = votacion.votoPersonal;
+                                    // Quitar 'badge' y usar 'text-...' para la celda
+                                    celdasVotos[miId].className = elMiVoto.className.replace('badge ', 'fw-bold ').replace('bg-', 'text-');
+                              }
+
+                        } else {
+                              elMiVoto.textContent = 'PENDIENTE';
+                              elMiVoto.className = 'badge bg-warning text-dark';
+                              // Resetear la celda de mi voto si no he votado
+                              if (celdasVotos[miId]) {
+                                    celdasVotos[miId].textContent = 'Sin Votar';
+                                    celdasVotos[miId].className = 'text-muted';
+                              }
+                        }
+
+                        // 5. Actualizamos la TABLA
+                        // Primero, reseteamos todas las celdas a "Sin Votar" (excepto el voto personal, que se maneja arriba)
+                        for (const idUsuario in celdasVotos) {
+                              if (idUsuario != miId) {
+                                    celdasVotos[idUsuario].textContent = 'Sin Votar';
+                                    celdasVotos[idUsuario].className = 'text-muted';
+                              }
+                        }
+
+                        // Segundo, si eres Secretario Técnico, llenamos la tabla con todos los votos
+                        if (resultadoAPI.esSecretarioTecnico && votacion.votos) {
+                              votacion.votos.forEach(voto => {
+                                    const idVotante = voto.t_usuario_idUsuario; // (Asumiendo que el API lo envía)
+
+                                    if (idVotante && celdasVotos[idVotante]) {
+                                          const celda = celdasVotos[idVotante];
+                                          celda.textContent = voto.opcionVoto;
+
+                                          if (voto.opcionVoto === 'SI') celda.className = 'text-success fw-bold';
+                                          else if (voto.opcionVoto === 'NO') celda.className = 'text-danger fw-bold';
+                                          else if (voto.opcionVoto === 'ABSTENCION') celda.className = 'text-secondary fw-bold';
+                                    }
+                              });
+                        }
+
+
+                        // 6. Actualizamos la hora
+                        elHoraActualizacion.textContent = new Date().toLocaleTimeString();
+
+                  } catch (error) {
+                        console.error('Error al actualizar dashboard:', error);
+                        elTotalSinVotar.textContent = 'Error';
+                  }
+            }
+
+            // Carga inicial inmediata
+            actualizarResultados();
+
+            // Actualización automática cada 3 segundos (3000 ms)
+            setInterval(actualizarResultados, 3000);
       });
 </script>

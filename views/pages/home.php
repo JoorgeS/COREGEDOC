@@ -7,7 +7,7 @@
 ?>
 
 <div class="container mt-4">
-    <h4>Nuestra querida Región</h4>
+    <h4>Nuestra querida región</h4>
 
     <div id="carouselZonasRegion" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="5000">
 

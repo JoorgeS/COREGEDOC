@@ -67,15 +67,18 @@ try {
     // 4. OBTENER VOTOS Y CONTEO PARA CADA VOTACIÓN
     foreach ($votaciones as $votacion) {
         $idVotacion = $votacion['idVotacion'];
+        // ... (dentro del foreach)
         $resultado = [
             'idVotacion' => $idVotacion,
             'nombreVotacion' => $votacion['nombreVotacion'],
+            'habilitada' => (int)$votacion['habilitada'], // ⬅️ AÑADE ESTA LÍNEA
             'totalSi' => 0,
             'totalNo' => 0,
             'totalAbstencion' => 0,
-            'votoPersonal' => null, // Voto del usuario logueado
-            'votos' => [],          // Detalle de nombres (SOLO para ST)
+            'votoPersonal' => null,
+            'votos' => [],
         ];
+        // ... (el resto de la función sigue igual)
 
         $sqlVotos = $pdo->prepare("
             SELECT v.opcionVoto, 
@@ -89,7 +92,7 @@ try {
         $votosData = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
 
         $votosEmitidos = 0;
-        
+
         foreach ($votosData as $voto) {
             $votosEmitidos++;
             $opcion = strtoupper($voto['opcionVoto']);
@@ -108,7 +111,8 @@ try {
             if ($esSecretarioTecnico) {
                 $resultado['votos'][] = [
                     'nombreVotante' => $voto['nombreVotante'],
-                    'opcionVoto' => $opcion
+                    'opcionVoto' => $opcion,
+                    't_usuario_idUsuario' => (int)$voto['t_usuario_idUsuario']
                 ];
             }
         }
@@ -119,7 +123,6 @@ try {
     }
 
     echo json_encode(['status' => 'success', 'data' => $resultadosFinales, 'esSecretarioTecnico' => $esSecretarioTecnico]);
-
 } catch (Exception $e) {
     http_response_code(500); // Internal Server Error
     error_log("Error en obtener_resultados_votacion.php: " . $e->getMessage());

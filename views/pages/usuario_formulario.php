@@ -333,7 +333,8 @@ document.addEventListener('DOMContentLoaded', () => {
             idActual: idActual || 0
         });
         // Importante: ruta relativa al archivo actual (la vista)
-        fetch('usuario_form.php?' + params.toString(), {
+        
+        fetch('usuario_formulario.php?' + params.toString(), {
             method: 'GET',
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })

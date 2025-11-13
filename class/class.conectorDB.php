@@ -39,7 +39,7 @@ class conectorDB extends BaseConexion
                     ":perfil_id"      => $datos['perfil_id'],
                     ":tipoUsuario_id" => $datos['tipoUsuario_id'],
                     ":partido_id"     => $datos['partido_id'],
-                    ":comuna_id"      => $datos['comuna_id']
+                    ":provincia_id"      => $datos['provincia_id']
                 ]);
             } catch (PDOException $e) {
                 echo "Error al crear usuario: " . $e->getMessage();
@@ -70,7 +70,7 @@ class conectorDB extends BaseConexion
                         ":perfil_id"      => $datos['perfil_id'],
                         ":tipoUsuario_id" => $datos['tipoUsuario_id'],
                         ":partido_id"     => $datos['partido_id'],
-                        ":comuna_id"      => $datos['comuna_id'],
+                        ":provincia_id"      => $datos['provincia_id'],
                         ":idUsuario"      => $datos['idUsuario'],
                     ]);
                 } else {
@@ -83,7 +83,7 @@ class conectorDB extends BaseConexion
                         ":perfil_id"      => $datos['perfil_id'],
                         ":tipoUsuario_id" => $datos['tipoUsuario_id'],
                         ":partido_id"     => $datos['partido_id'],
-                        ":comuna_id"      => $datos['comuna_id'],
+                        ":provincia_id"      => $datos['provincia_id'],
                         ":idUsuario"      => $datos['idUsuario'],
                     ]);
                 }
