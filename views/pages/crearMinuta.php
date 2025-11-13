@@ -1481,6 +1481,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         /**
          * Pide confirmación y llama a la secuencia Guardar -> Enviar Aprobación.
          */
+        /**
+         * Pide confirmación y llama a la secuencia Guardar -> Enviar Aprobación.
+         * (MODIFICADA CON EL POP-UP DE "CARGANDO")
+         */
         function confirmarEnvioAprobacion() {
             const idMinuta = idMinutaGlobal;
             const btnGuardar = document.getElementById('btnGuardarBorrador');
@@ -1503,24 +1507,33 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }).then((result) => {
                 if (result.isConfirmed) {
 
+                    // 1. Deshabilitar botones (para evitar doble clic)
                     if (btnGuardar) btnGuardar.disabled = true;
                     if (btnEnviar) btnEnviar.disabled = true;
-                    btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 1/2 Guardando...';
 
-                    // 1. PRIMERO, guardar el borrador
+                    // 2. Mostrar el pop-up de "Cargando"
+                    Swal.fire({
+                        title: 'Enviando para Aprobación',
+                        text: 'Se está notificando a el o los presidentes. Espere un momento...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // 3. PRIMERO, guardar el borrador
                     guardarBorrador(false, function(guardadoExitoso) {
 
                         if (!guardadoExitoso) {
+                            // Si falla el guardado, SÍ cerramos el "cargando" y mostramos error
                             Swal.fire('Error al Guardar', 'No se pudo guardar el borrador antes de enviar. Por favor, intente de nuevo.', 'error');
                             if (btnGuardar) btnGuardar.disabled = false;
                             if (btnEnviar) btnEnviar.disabled = false;
-                            btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar para Aprobación';
+                            if (btnEnviar) btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar para Aprobación';
                             return;
                         }
 
-                        // 2. SEGUNDO, llamar a 'enviar_aprobacion.php'
-                        btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 2/2 Enviando...';
-
+                        // 4. SEGUNDO, llamar a 'enviar_aprobacion.php'
                         fetch('/corevota/controllers/enviar_aprobacion.php', {
                                 method: 'POST',
                                 headers: {
@@ -1541,23 +1554,29 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                             })
                             .then(data => {
                                 if (data.status === 'success') {
+                                    // 5. Mostrar resultado (esto reemplaza el modal "Cargando")
                                     Swal.fire({
                                         title: '¡Enviada!',
-                                        text: data.message,
+                                        text: data.message, // Debería decir "Minuta enviada a aprobacion"
                                         icon: 'success'
                                     }).then(() => {
-                                        // Redirección al listado de pendientes
-                                        window.location.href = 'menu.php?pagina=minutas_listado_general&tab=pendientes_aprobacion';
+                                        // ✅ CORRECCIÓN DE REDIRECCIÓN
+                                        // Redirección al listado de minutas pendientes del ST
+                                        window.location.href = 'menu.php?pagina=minutas_pendientes';
                                     });
                                 } else {
                                     throw new Error(data.message || 'Error desconocido al enviar.');
                                 }
                             })
                             .catch(error => {
+                                // 6. Mostrar error (esto reemplaza el modal "Cargando")
                                 Swal.fire('Error en el Envío', error.message, 'error');
+
+                                // Reactivar botones si falla el envío
                                 if (btnGuardar) btnGuardar.disabled = false;
                                 if (btnEnviar) btnEnviar.disabled = false;
-                                btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar para Aprobación';
+                                // Restaurar texto original del botón de enviar
+                                if (btnEnviar) btnEnviar.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar para Aprobación';
                             });
                     });
                 }

@@ -69,14 +69,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mail->Port       = 587;
                 $mail->CharSet    = 'UTF-8';
 
-                $mail->setFrom('no-responder@corevota.cl', 'CORE Vota');
+                $mail->setFrom('no-responder@corevota.cl', 'COREGEDOC');
                 $mail->addAddress($user_data['correo']);
 
                 // URL del link de restablecimiento
                 $reset_link = "http://localhost/corevota/views/pages/restablecer_contrasena.php?token=" . urlencode($token);
 
                 $mail->isHTML(true);
-                $mail->Subject = 'Recuperación de Contraseña CORE Vota';
+                $mail->Subject = 'Recuperación de Contraseña COREGEDOC';
                 $mail->Body    = "
                     <h2>Recuperación de Contraseña</h2>
                     <p>Has solicitado restablecer tu contraseña.</p>

@@ -80,7 +80,7 @@ try {
     $mail->CharSet    = 'UTF-8';
 
     // Email DE (Desde)
-    $mail->setFrom('equiposieteduocuc@gmail.com', 'CORE Vota'); //
+    $mail->setFrom('equiposieteduocuc@gmail.com', 'COREGEDOC'); //
 
     // Email PARA (Para)
     $mail->addAddress('genesis.contreras.vargas@gmail.com', 'Genesis Contreras');
