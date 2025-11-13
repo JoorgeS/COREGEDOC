@@ -107,7 +107,7 @@ function notificarPresidentes(PDO $db, int $idMinuta, array $listaPresidentes)
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = 587;
         $mail->CharSet = 'UTF-8';
-        $mail->setFrom('equiposieteduocuc@gmail.com', 'CoreVota - Sistema de Minutas');
+        $mail->setFrom('equiposieteduocuc@gmail.com', 'Gestor Documental del CORE');
         $mail->isHTML(true);
         $mail->Subject = $asunto;
 

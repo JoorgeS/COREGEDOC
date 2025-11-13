@@ -139,7 +139,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
 <head>
     <meta charset="UTF-8">
-    <title>GDOCORE - Menú Principal</title>
+    <title>COREGEDOC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="/corevota/public/css/style.css" rel="stylesheet">
@@ -483,7 +483,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         </li>
                     <?php endif; ?>
 
-                    
+
                     <li class="nav-item">
                         <a class="nav-link" href="http://mail.gorevalparaiso.gob.cl/" target="_blank" rel="noopener noreferrer">
                             <i class="fas fa-envelope fa-fw"></i>
@@ -871,7 +871,18 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 cancelButtonColor: '#6c757d'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    fetch('/corevota/controllers/aprobar_minuta.php', {
+
+                    // 1. MOSTRAR POP-UP DE "CARGANDO"
+                    Swal.fire({
+                        title: 'Cargando...',
+                        text: 'Por favor espere mientras se registra su firma.',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    fetch('/corevota/controllers/aprobar_minuta.php', { //
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -882,30 +893,36 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         })
                         .then(response => response.json())
                         .then(data => {
-                            let titulo = '¡Minuta aprobada!';
+                            // 2. MOSTRAR RESPUESTA (ÉXITO O ERROR)
+                            let titulo = '¡Minuta Firmada!';
                             let icono = 'success';
 
                             if (data.status === 'success_partial') {
-                                titulo = 'Firma registrada';
+                                titulo = '¡Firma Registrada!';
                             } else if (data.status === 'success_final') {
-                                titulo = '¡Minuta aprobada y PDF generado!';
+                                titulo = '¡Minuta Aprobada!';
                             } else if (data.status !== 'success') {
-                                // Si no coincide con ninguno de los casos válidos, tratamos como error
                                 titulo = 'Error';
                                 icono = 'error';
                             }
+
                             Swal.fire({
                                 title: titulo,
                                 text: data.message || 'Operación completada correctamente.',
                                 icon: icono,
                                 confirmButtonColor: '#28a745'
                             }).then(() => {
+                                // --- ✅ INICIO DE LA MODIFICACIÓN ---
+                                // Si la operación fue exitosa, redirigir a minutas aprobadas.
                                 if (icono === 'success') {
-                                    window.location.reload();
+                                    // Redirige a la página de minutas aprobadas
+                                    window.location.href = 'menu.php?pagina=minutas_aprobadas';
                                 }
+                                // --- ✅ FIN DE LA MODIFICACIÓN ---
                             });
                         })
                         .catch(error => {
+                            // 3. MOSTRAR ERROR DE RED
                             console.error('Error en fetch al aprobar:', error);
                             Swal.fire('Error', 'Error de conexión al intentar aprobar la minuta.', 'error');
                         });

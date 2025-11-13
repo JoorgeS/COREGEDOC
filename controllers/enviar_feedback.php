@@ -101,7 +101,7 @@ class FeedbackManager extends BaseConexion
             $mail->Port = 587;
             $mail->CharSet = 'UTF-8';
 
-            $mail->setFrom('equiposieteduocuc@gmail.com', 'CoreVota - Sistema de Minutas');
+            $mail->setFrom('equiposieteduocuc@gmail.com', 'Gestor Documental del CORE');
             $mail->addAddress($emailST, $nombreST);
 
             $mail->isHTML(true);
@@ -115,8 +115,8 @@ class FeedbackManager extends BaseConexion
                 <p><b>Comentario del Presidente:</b></p>
                 <p><i>" . nl2br(htmlspecialchars($feedbackTexto)) . "</i></p>
                 <hr>
-                <p>Por favor, ingrese a CoreVota para revisar las observaciones, editar la minuta y volver a enviarla para su aprobación.</p>
-                <p>Saludos,<br>Sistema CoreVota</p>
+                <p>Por favor, ingrese a COREGEDOC para revisar las observaciones, editar la minuta y volver a enviarla para su aprobación.</p>
+                <p>Saludos,<br>Sistema COREGEDOC</p>
                 </body></html>
             ";
 

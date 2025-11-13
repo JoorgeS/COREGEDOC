@@ -412,7 +412,7 @@ try {
 
 
         $faltan = $totalRequeridos - $totalAprobaciones;
-        $mensaje = "Firma registrada. Faltan {$faltan} aprobación(es) más.";
+        $mensaje = "Firma registrada. Falta(n) {$faltan} firma(s) más.";
         echo json_encode([
             'status' => 'success_partial',
             'message' => $mensaje,
@@ -684,7 +684,7 @@ try {
     }
 
 
-    echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y PDF generado con todas las firmas.', 'pdf_path' => $pathParaBD]);
+    echo json_encode(['status' => 'success_final', 'message' => 'Minuta aprobada y generada con todas las firmas.', 'pdf_path' => $pathParaBD]);
 } catch (Exception $e) {
     // --- 14. ROLLBACK Y RESPUESTA DE ERROR ---
     if (isset($pdo) && $pdo->inTransaction()) {

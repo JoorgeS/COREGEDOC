@@ -290,7 +290,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
 
 
 /* =============================================================================
- 🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT 🔽
+ 🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT 🔽
 =============================================================================
 */
 
@@ -315,10 +315,26 @@ try {
     // --- 2. CARGAR DATOS PARA EL PDF (Asistentes, Temas, Votos, Comisiones) ---
     // (Esta lógica es copiada de aprobar_minuta.php)
 
+    // =========================================================================
+    // --- ✅ INICIO DE LA CORRECCIÓN DEFINITIVA ---
+    // =========================================================================
     // 2a. CARGAR INFO SECRETARIO
-    $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto FROM t_usuario WHERE tipoUsuario_id IN (2, 6) LIMIT 1");
+    // Se busca explícitamente el tipoUsuario_id = 2 (Secretario Técnico)
+    $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
+                             FROM t_usuario 
+                             WHERE tipoUsuario_id = 2 
+                             LIMIT 1");
     $sqlSec->execute();
-    $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC) ?: ['nombreCompleto' => 'Secretario Técnico'];
+    $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
+
+    // Si sigue sin encontrar a nadie, pone un texto por defecto.
+    if (!$data_pdf['secretario_info']) {
+         $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (No Asignado)'];
+    }
+    // =========================================================================
+    // --- ✅ FIN DE LA CORRECCIÓN DEFINITIVA ---
+    // =========================================================================
+
 
     // 2b. CARGAR COMISIONES Y PRESIDENTES
     $getDatosComision = function ($idComision) use ($pdo) {
@@ -350,65 +366,51 @@ try {
 
     // 2c. ASISTENTES
     $sqlAsis = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
-                 FROM t_asistencia a
-                 JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                 WHERE a.t_minuta_idMinuta = :id
-                 ORDER BY u.aPaterno, u.pNombre";
+                FROM t_asistencia a
+                JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                WHERE a.t_minuta_idMinuta = :id
+                ORDER BY u.aPaterno, u.pNombre";
     $stmtAsis = $pdo->prepare($sqlAsis);
     $stmtAsis->execute([':id' => $idMinuta]);
     $data_pdf['asistentes'] = $stmtAsis->fetchAll(PDO::FETCH_ASSOC);
 
     // 2d. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                  FROM t_tema t 
-                  LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                  WHERE t.t_minuta_idMinuta = :id
-                  ORDER BY t.idTema ASC";
+                 FROM t_tema t 
+                 LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                 WHERE t.t_minuta_idMinuta = :id
+                 ORDER BY t.idTema ASC";
     $stmtTemas = $pdo->prepare($sqlTemas);
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
-    // =========================================================================
-    // --- INICIO DE LA MODIFICACIÓN 1 (Añadir búsqueda de idReunion) ---
-    // =========================================================================
     // 2d-bis. OBTENER IDREUNION (para buscar votaciones asociadas a la reunión)
     $sqlReunion = $pdo->prepare("SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1");
     $sqlReunion->execute([':idMinuta' => $idMinuta]);
     $reunion = $sqlReunion->fetch(PDO::FETCH_ASSOC);
     $idReunion = $reunion ? $reunion['idReunion'] : null;
-    // =========================================================================
-    // --- FIN DE LA MODIFICACIÓN 1 ---
-    // =========================================================================
 
 
-    // =========================================================================
-    // --- INICIO DE LA MODIFICACIÓN 2 (Corregir consulta de votaciones) ---
-    // =========================================================================
     // 2e. VOTACIONES
     // Buscamos votaciones ligadas a la minuta DIRECTAMENTE o a través de la REUNIÓN
     $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion 
-                                   WHERE t_minuta_idMinuta = :idMinuta 
-                                   OR t_reunion_idReunion = :idReunion");
+                                  WHERE t_minuta_idMinuta = :idMinuta 
+                                  OR t_reunion_idReunion = :idReunion");
     $sqlVotaciones->execute([
         ':idMinuta' => $idMinuta,
         ':idReunion' => $idReunion // Usamos el $idReunion que obtuvimos
     ]);
     $data_pdf['votaciones'] = $sqlVotaciones->fetchAll(PDO::FETCH_ASSOC);
-    // =========================================================================
-    // --- FIN DE LA MODIFICACIÓN 2 ---
-    // =========================================================================
 
 
     if (!empty($data_pdf['votaciones'])) {
         $sqlVotos = $pdo->prepare("
-             SELECT v.t_votacion_idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
-             FROM t_voto v
-             JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
-             WHERE v.t_votacion_idVotacion = :idVotacion
-        ");
+              SELECT v.t_votacion_idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+              FROM t_voto v
+              JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
+              WHERE v.t_votacion_idVotacion = :idVotacion
+         ");
         foreach ($data_pdf['votaciones'] as $i => $votacion) {
-            // CORRECCIÓN: El idVotacion está en la key 'idVotacion' no en 'idVotacion'
-            // (Tu código original estaba correcto, pero lo ajusto para que coincida con el SELECT de t_voto)
             $sqlVotos->execute([':idVotacion' => $votacion['idVotacion']]);
             $data_pdf['votaciones'][$i]['votos'] = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
         }
@@ -416,12 +418,12 @@ try {
 
     // 2f. (INTEGRADO) Cargar SELLOS del ST
     $sqlSellos = $pdo->prepare("SELECT 
-                                     CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
-                                     v.fechaValidacion
-                                     FROM t_validacion_st v
-                                     JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
-                                     WHERE v.t_minuta_idMinuta = :idMinuta
-                                     ORDER BY v.fechaValidacion ASC");
+                                    CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
+                                    v.fechaValidacion
+                                    FROM t_validacion_st v
+                                    JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
+                                    WHERE v.t_minuta_idMinuta = :idMinuta
+                                    ORDER BY v.fechaValidacion ASC");
     $sqlSellos->execute([':idMinuta' => $idMinuta]);
     $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
 

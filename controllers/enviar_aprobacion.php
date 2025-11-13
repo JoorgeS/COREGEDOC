@@ -125,11 +125,11 @@ class AprobacionSender extends BaseConexion
             if ($esReenvioFeedback) {
                 $asunto = "Minuta N° {$idMinuta} ACTUALIZADA - Requiere su firma";
                 $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} ha sido actualizada por el Secretario Técnico en base al feedback recibido.</p>
-                           <p>Su aprobación ha sido reiniciada. Por favor, ingrese a CoreVota para revisar la nueva versión y registrar su firma.</p>";
+                           <p>Su aprobación ha sido reiniciada. Por favor, ingrese a COREGEDOC para revisar la nueva versión y registrar su firma.</p>";
             } else {
                 $asunto = "Minuta N° {$idMinuta} lista para su firma";
                 $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} se encuentra disponible para su revisión y firma.</p>
-                           <p>Por favor, ingrese a CoreVota para gestionarla.</p>";
+                           <p>Por favor, ingrese a COREGEDOC para gestionarla.</p>";
             }
 
             // Cargar config.ini para las credenciales
@@ -148,7 +148,7 @@ class AprobacionSender extends BaseConexion
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = (int)$config['smtp']['port'];
             $mail->CharSet    = 'UTF-8';
-            $mail->setFrom($config['smtp']['user'], 'CoreVota - Sistema de Minutas');
+            $mail->setFrom($config['smtp']['user'], 'Gestor Documental del CORE');
             $mail->isHTML(true);
             $mail->Subject = $asunto;
 
