@@ -521,6 +521,32 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni�
             });
         }
     </script>
+
+    <script>
+        // ✅ Pone en mayúscula la primera letra del nombre de la reunión
+        document.addEventListener('DOMContentLoaded', () => {
+
+            /**
+             * Convierte un string a "Sentence Case" (Ej: "reunión de prueba" -> "Reunión de prueba")
+             */
+            function toSentenceCase(str) {
+                if (!str || typeof str !== 'string') return "";
+                let trimmedStr = str.trim();
+                // Capitaliza solo la primera letra y concatena el resto.
+                return trimmedStr.charAt(0).toUpperCase() + trimmedStr.slice(1);
+            }
+
+            // ID del campo a capitalizar
+            const fieldToCapitalize = document.getElementById('nombreReunion');
+
+            if (fieldToCapitalize) {
+                // Se aplica cuando el usuario sale del campo (evento 'blur')
+                fieldToCapitalize.addEventListener('blur', (e) => {
+                    e.target.value = toSentenceCase(e.target.value);
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

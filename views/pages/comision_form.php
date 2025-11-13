@@ -195,5 +195,34 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
     });
 </script>
 
+<script>
+// ✅ Pone en mayúscula la primera letra de los campos de comisión
+document.addEventListener('DOMContentLoaded', () => {
+    
+    /**
+     * Convierte un string a "Sentence Case" (Ej: "comisión de finanzas" -> "Comisión de finanzas")
+     */
+    function toSentenceCase(str) {
+        if (!str || typeof str !== 'string') return "";
+        let trimmedStr = str.trim();
+        // Capitaliza solo la primera letra y concatena el resto.
+        return trimmedStr.charAt(0).toUpperCase() + trimmedStr.slice(1);
+    }
+
+    // Lista de IDs de los campos que queremos capitalizar
+    const fieldsToCapitalize = ['nombreComision', 'descripcionComision'];
+
+    fieldsToCapitalize.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            // Se aplica cuando el usuario sale del campo (evento 'blur')
+            input.addEventListener('blur', (e) => {
+                e.target.value = toSentenceCase(e.target.value);
+            });
+        }
+    });
+});
+</script>
+
 </body>
 </html>

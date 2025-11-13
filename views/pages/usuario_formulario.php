@@ -90,8 +90,14 @@ $usuarioObj = new Usuario();
 $action = $_GET['action'] ?? 'create';
 $idUsuario = (int)($_GET['id'] ?? 0);
 $userData = [];
-$titulo = "Registrar Nuevo Usuario";
+$titulo = "Registrar nuevo usuario";
 $contrasenaPlaceholder = "Contraseña (obligatoria)";
+
+// ✅ INICIO DE LA MODIFICACIÓN: Poner email por defecto en modo "crear"
+if ($action === 'create') {
+    $userData['correo'] = '@gobiernovalparaiso.cl';
+}
+// ✅ FIN DE LA MODIFICACIÓN
 
 // Si es edición, obtener datos del usuario
 if ($action === 'edit' && $idUsuario > 0) {
@@ -133,7 +139,6 @@ if (!$EMBED): ?>
 <div class="container py-4">
 <?php endif; ?>
 
-<!-- Breadcrumb y título -->
 <?php if ($EMBED): ?>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb mb-1">
@@ -184,7 +189,6 @@ if (!$EMBED): ?>
                 <label for="correo" class="form-label">Correo Electrónico *</label>
                 <input type="email" class="form-control" id="correo" name="correo"
                        value="<?php echo htmlspecialchars($userData['correo'] ?? ''); ?>" required>
-                <!-- feedback dinámico para duplicidad -->
                 <div id="correoFeedback" class="invalid-feedback">
                     Este correo ya está registrado.
                 </div>
@@ -291,48 +295,99 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
+// ✅ Pone en mayúscula la primera letra de cada palabra en nombres/apellidos
+document.addEventListener('DOMContentLoaded', () => {
+    
+    /**
+     * Convierte un string a "Title Case" (Ej: "jorge luis" -> "Jorge Luis")
+     */
+    function toTitleCase(str) {
+        if (!str || typeof str !== 'string') return "";
+        return str.toLowerCase().replace(/\b\w/g, function(char) {
+            return char.toUpperCase();
+        });
+    }
+
+    const fieldsToCapitalize = ['pNombre', 'sNombre', 'aPaterno', 'aMaterno'];
+
+    fieldsToCapitalize.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            // Se aplica cuando el usuario sale del campo
+            input.addEventListener('blur', (e) => {
+                e.target.value = toTitleCase(e.target.value.trim());
+            });
+        }
+    });
+});
+</script>
+
+<script>
 /* -----------------------------------------------------------
-   🔒 Validación de correo único (AJAX)
+   🔒 Validación de correo (Formato + Duplicidad AJAX)
 ----------------------------------------------------------- */
 (function() {
     const correoInput = document.getElementById('correo');
     const btnSubmit   = document.getElementById('btnSubmit');
-    const feedback    = document.getElementById('correoFeedback');
+    const feedback    = document.getElementById('correoFeedback'); // Div de feedback unificado
     const form        = document.getElementById('formUsuario');
 
-    if (!correoInput) return;
+    if (!correoInput || !form || !feedback) return;
 
-    const action = <?php echo json_encode($action); ?>;
     const idActual = <?php echo json_encode($idUsuario); ?>;
-
-    let correoDuplicado = false;
     let debounceTimer = null;
+    let isCorreoValid = true; // Un solo estado para toda la validación
+    
+    // ✅ NUEVO: Definir el sufijo por defecto
+    const defaultSuffix = '@gobiernovalparaiso.cl';
 
-    function setCorreoEstadoDuplicado(isDup) {
-        correoDuplicado = isDup;
-        if (isDup) {
-            correoInput.classList.add('is-invalid');
-            if (feedback) feedback.style.display = 'block';
-            if (btnSubmit) btnSubmit.disabled = true;
-        } else {
+    /**
+     * Actualiza el estado visual y de envío del campo de correo.
+     */
+    function setCorreoEstado(isValid, message = '') {
+        isCorreoValid = isValid;
+        if (isValid) {
             correoInput.classList.remove('is-invalid');
-            if (feedback) feedback.style.display = 'none';
-            if (btnSubmit) btnSubmit.disabled = false;
+            feedback.style.display = 'none';
+            btnSubmit.disabled = false;
+        } else {
+            correoInput.classList.add('is-invalid');
+            feedback.textContent = message;
+            feedback.style.display = 'block';
+            btnSubmit.disabled = true;
         }
     }
 
-    function checkEmail() {
+    /**
+     * Realiza la validación completa: formato y luego duplicidad.
+     */
+    function checkEmailCompleto() {
         const correo = (correoInput.value || '').trim();
+
+        // 1. Si está vacío, limpiamos errores (el 'required' de HTML se encargará)
         if (correo === '') {
-            setCorreoEstadoDuplicado(false);
+            setCorreoEstado(true); 
             return;
         }
+        
+        // 2. ✅ MODIFICADO: Si es SOLO el sufijo, no lo validamos (es un placeholder)
+        if (correo === defaultSuffix) {
+            setCorreoEstado(true); // Asumir como válido para que el usuario pueda escribir
+            return; 
+        }
+
+        // 3. Validación de formato (REQUERIMIENTO NUEVO)
+        if (!correo.includes('@') || !correo.includes('.')) {
+            setCorreoEstado(false, "El correo debe contener '@' y un '.'.");
+            return; // No continuar si el formato es incorrecto
+        }
+
+        // 4. Validación de duplicidad (AJAX)
         const params = new URLSearchParams({
             ajax: 'checkEmail',
             correo: correo,
             idActual: idActual || 0
         });
-        // Importante: ruta relativa al archivo actual (la vista)
         
         fetch('usuario_formulario.php?' + params.toString(), {
             method: 'GET',
@@ -340,33 +395,47 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(r => r.json())
         .then(data => {
-            const exists = !!(data && data.exists);
-            // En create: bloquear si existe. En edit: también, salvo que sea mi mismo id (ya manejado en backend)
-            setCorreoEstadoDuplicado(exists);
+            if (data && data.exists) {
+                setCorreoEstado(false, 'Este correo ya está registrado.');
+            } else {
+                // Pasó formato Y duplicidad
+                setCorreoEstado(true);
+            }
         })
-        .catch(() => setCorreoEstadoDuplicado(false));
+        .catch(() => setCorreoEstado(true)); // Fallar "abierto" si el AJAX falla
     }
 
+    /**
+     * Espera a que el usuario deje de teclear para validar.
+     */
     function debounceCheck() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(checkEmail, 300);
+        debounceTimer = setTimeout(checkEmailCompleto, 300);
     }
 
+    // --- Event Listeners ---
+    
+    // Validar mientras teclea (con debounce)
     correoInput.addEventListener('input', debounceCheck);
-    correoInput.addEventListener('blur', checkEmail);
+    
+    // Validar al salir del campo
+    correoInput.addEventListener('blur', checkEmailCompleto);
 
-    // Validación al enviar
+    // Validación final al enviar
     form.addEventListener('submit', function(e) {
-        if (correoDuplicado) {
+        // Correr la validación completa una última vez
+        checkEmailCompleto(); 
+
+        if (!isCorreoValid) {
             e.preventDefault();
             e.stopPropagation();
             correoInput.focus();
         }
     });
 
-    // Chequeo inicial si viene prellenado (editar)
+    // Chequeo inicial si el formulario viene prellenado (modo editar o crear)
     if (correoInput.value) {
-        checkEmail();
+        checkEmailCompleto();
     }
 })();
 </script>
