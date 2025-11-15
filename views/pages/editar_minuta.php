@@ -50,8 +50,8 @@ try {
 try {
     // Obtener la lista de miembros relevantes
     $stmtMiembros = $pdo->prepare("SELECT idUsuario, pNombre, sNombre, aPaterno, aMaterno,
-                        TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
-                        FROM t_usuario WHERE tipoUsuario_id IN (1, 3) ORDER BY aPaterno");
+                                 TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
+                                 FROM t_usuario WHERE tipoUsuario_id IN (1, 3) ORDER BY aPaterno");
     $stmtMiembros->execute();
     $miembros = $stmtMiembros->fetchAll(PDO::FETCH_ASSOC);
 
@@ -86,8 +86,8 @@ $estadoMinuta = $minuta['estadoMinuta'] ?? 'BORRADOR';
 if ($estadoMinuta === 'PENDIENTE' || $estadoMinuta === 'PARCIAL') {
     // Verificar si el usuario logueado es uno de los firmantes requeridos
     $stmtFirma = $pdo->prepare("SELECT estado_firma FROM t_aprobacion_minuta 
-                WHERE t_minuta_idMinuta = :idMinuta 
-                AND t_usuario_idPresidente = :idUsuario");
+                                WHERE t_minuta_idMinuta = :idMinuta 
+                                AND t_usuario_idPresidente = :idUsuario");
     $stmtFirma->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuarioLogueado]);
     $estadoFirma = $stmtFirma->fetchColumn();
 
@@ -164,7 +164,7 @@ $pdo = null; // Cerrar conexión
                 <h5 class="mb-0">Gestión de Asistencia</h5>
             </div>
             <div class="card-body">
-                <?php if (!$esSoloLectura): ?>
+                <?php if (!$esSoloLectura) : ?>
                     <p class="text-info"><i class="fas fa-edit"></i> Marque/desmarque los usuarios **presentes**. Se respetará el registro original de fecha y el origen de los autogestionados.</p>
                 <?php endif; ?>
 
@@ -183,7 +183,7 @@ $pdo = null; // Cerrar conexión
                                 echo '<tr><td colspan="3" class="text-center text-danger">No se pudo cargar la lista de miembros.</td></tr>';
                             }
                             $i = 1;
-                            foreach ($listaAsistencia as $miembro):
+                            foreach ($listaAsistencia as $miembro) :
                                 $checked = $miembro['presente'] ? 'checked' : '';
                                 $disabled = $esSoloLectura ? 'disabled' : '';
                             ?>
@@ -191,12 +191,7 @@ $pdo = null; // Cerrar conexión
                                     <td><?php echo $i++; ?></td>
                                     <td><?php echo $miembro['nombreCompleto']; ?></td>
                                     <td class="text-center">
-                                        <input class="form-check-input asistencia-checkbox"
-                                            type="checkbox"
-                                            value="<?php echo $miembro['idUsuario']; ?>"
-                                            id="asistencia_<?php echo $miembro['idUsuario']; ?>"
-                                            <?php echo $checked; ?>
-                                            <?php echo $disabled; ?>>
+                                        <input class="form-check-input asistencia-checkbox" type="checkbox" value="<?php echo $miembro['idUsuario']; ?>" id="asistencia_<?php echo $miembro['idUsuario']; ?>" <?php echo $checked; ?> <?php echo $disabled; ?>>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -205,12 +200,13 @@ $pdo = null; // Cerrar conexión
                 </div>
             </div>
         </div>
+
         <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Acciones</h5>
             </div>
             <div class="card-body text-end">
-                <?php if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA'): ?>
+                <?php if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') : ?>
                     <button type="button" class="btn btn-secondary me-2" id="btn-guardar-borrador">
                         <i class="fas fa-save"></i> Guardar Borrador
                     </button>
@@ -219,16 +215,16 @@ $pdo = null; // Cerrar conexión
                         <i class="fas fa-paper-plane"></i> Enviar para Aprobación
                     </button>
 
-                <?php elseif ($esPresidenteFirmante): ?>
-                    <?php if ($haFirmado): ?>
+                <?php elseif ($esPresidenteFirmante) : ?>
+                    <?php if ($haFirmado) : ?>
                         <div class="alert alert-success text-center">
                             <i class="fas fa-check-circle"></i> Usted ya ha registrado su firma para esta versión de la minuta.
                         </div>
-                    <?php elseif ($haEnviadoFeedback): ?>
+                    <?php elseif ($haEnviadoFeedback) : ?>
                         <div class="alert alert-warning text-center">
                             <i class="fas fa-clock"></i> Usted envió feedback. La minuta está en espera de revisión por el Secretario Técnico.
                         </div>
-                    <?php else: // Aún no ha hecho nada, es su turno 
+                    <?php else : // Aún no ha hecho nada, es su turno 
                     ?>
                         <div class="form-check form-switch text-start mb-3">
                             <input class="form-check-input" type="checkbox" role="switch" id="checkFeedback">
@@ -245,7 +241,7 @@ $pdo = null; // Cerrar conexión
                         </button>
                     <?php endif; ?>
 
-                <?php else: ?>
+                <?php else : ?>
                     <p class="text-muted text-center">
                         <i class="fas fa-eye"></i> Minuta en modo de solo lectura.
                     </p>
@@ -303,6 +299,200 @@ $pdo = null; // Cerrar conexión
     const idMinuta = document.getElementById('idMinuta').value;
     const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
     const formMinuta = document.getElementById('form-crear-minuta');
+
+    // ==========================================================
+    // ==========================================================
+    // --- 🚀 INICIO: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
+    // ==========================================================
+    (function() {
+        // Solo ejecuta este script si el panel del ST existe en la página
+        const formCrearVotacion = document.getElementById('form-crear-votacion');
+        if (!formCrearVotacion) {
+            // No es el ST o la minuta está aprobada, no hacer nada.
+            return;
+        }
+
+        // --- 1. Constantes y Elementos ---
+        const idMinutaActual = document.getElementById('votacion_idMinuta').value;
+        const idReunionActual = document.getElementById('votacion_idReunion').value;
+        const idComisionActual = document.getElementById('votacion_idComision').value;
+        // CORRECCIÓN: Ruta con ../../
+        const controllerVotacionURL = '../../controllers/gestionar_votacion_minuta.php';
+
+        const listaContainer = document.getElementById('panel-votaciones-lista');
+        const inputNombreVotacion = document.getElementById('nombreVotacion');
+
+        // --- 2. Función para Cargar la Lista de Votaciones ---
+        async function cargarVotaciones() {
+            listaContainer.innerHTML = `<div class="text-center p-3 text-muted">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span class="ms-2">Actualizando lista...</span>
+            </div>`;
+
+            try {
+                // CORRECCIÓN: Añadido { credentials: 'same-origin' }
+                const response = await fetch(`${controllerVotacionURL}?action=list&idMinuta=${idMinutaActual}`, {
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) throw new Error('Error de red al listar votaciones.');
+
+                // CORRECCIÓN: Manejo de JSON vacío
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("Respuesta inválida del servidor (gestionar_votacion_minuta.php):", text);
+                    throw new Error("El servidor devolvió una respuesta inválida. Revisa la consola.");
+                }
+
+                if (data.status !== 'success') throw new Error(data.message);
+
+                // Limpiar y renderizar
+                listaContainer.innerHTML = '';
+                if (data.data.length === 0) {
+                    listaContainer.innerHTML = '<div class="alert alert-light text-center">Aún no se han creado votaciones para esta minuta.</div>';
+                    return;
+                }
+
+                data.data.forEach(votacion => {
+                    listaContainer.appendChild(renderVotacionItem(votacion));
+                });
+
+            } catch (error) {
+                listaContainer.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            }
+        }
+
+        // --- 3. Función para Renderizar UN item de la lista ---
+        function renderVotacionItem(votacion) {
+            const div = document.createElement('div');
+            div.className = 'list-group-item d-flex justify-content-between align-items-center';
+            const habilitada = parseInt(votacion.habilitada, 10) === 1;
+
+            let badgeClass = habilitada ? 'bg-success' : 'bg-secondary';
+            let badgeIcon = habilitada ? 'fa-play-circle' : 'fa-stop-circle';
+            let badgeText = habilitada ? 'Abierta' : 'Cerrada';
+
+            let btnClass = habilitada ? 'btn-danger' : 'btn-success';
+            let btnIcon = habilitada ? 'fa-stop' : 'fa-play';
+            let btnText = habilitada ? 'Cerrar' : 'Habilitar';
+            let nuevoEstado = habilitada ? 0 : 1;
+
+            div.innerHTML = `
+            <div>
+                <span class="badge ${badgeClass} me-2"><i class="fas ${badgeIcon} me-1"></i> ${badgeText}</span>
+                <strong>${votacion.nombreVotacion}</strong>
+                <small class="text-muted d-block">Comisión: ${votacion.nombreComision || 'No especificada'}</small>
+            </div>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn ${btnClass} btn-sm btn-cambiar-estado" data-id="${votacion.idVotacion}" data-nuevo-estado="${nuevoEstado}">
+                    <i class="fas ${btnIcon} me-1"></i> ${btnText}
+                </button>
+            </div>`;
+            return div;
+        }
+
+        // --- 4. Event Listener para CREAR Votación ---
+        formCrearVotacion.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = inputNombreVotacion.value.trim();
+            if (nombre === '') {
+                Swal.fire('Error', 'Debe ingresar un nombre para la votación.', 'error');
+                return;
+            }
+
+            const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
+
+            const formData = new FormData();
+            formData.append('action', 'create');
+            formData.append('nombreVotacion', nombre);
+            formData.append('idMinuta', idMinutaActual);
+            formData.append('idReunion', idReunionActual);
+            formData.append('idComision', idComisionActual);
+
+            try {
+                // CORRECCIÓN: Añadido { credentials: 'same-origin' }
+                const response = await fetch(controllerVotacionURL, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+                if (data.status !== 'success') throw new Error(data.message);
+
+                Swal.fire('¡Éxito!', 'Votación creada correctamente.', 'success');
+                inputNombreVotacion.value = ''; // Limpiar input
+                cargarVotaciones(); // Recargar la lista
+
+            } catch (error) {
+                Swal.fire('Error', error.message, 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="fas fa-plus me-2"></i>Crear Votación';
+            }
+        });
+
+        // --- 5. Event Listener para Habilitar/Cerrar ---
+        listaContainer.addEventListener('click', async (e) => {
+            const boton = e.target.closest('.btn-cambiar-estado');
+            if (!boton) return;
+
+            const idVotacion = boton.dataset.id;
+            const nuevoEstado = boton.dataset.nuevoEstado;
+            const accionTexto = nuevoEstado === '1' ? 'Habilitar' : 'Cerrar';
+
+            const result = await Swal.fire({
+                title: `¿Seguro que desea ${accionTexto.toLowerCase()} esta votación?`,
+                text: (nuevoEstado === '1') ? 'Los consejeros podrán verla y votar.' : 'Nadie podrá votar y se cerrará la sala.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: `Sí, ${accionTexto}`,
+                confirmButtonColor: (nuevoEstado === '1') ? '#198754' : '#dc3545',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                boton.disabled = true;
+                boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                const formData = new FormData();
+                formData.append('action', 'change_status');
+                formData.append('idVotacion', idVotacion);
+                formData.append('nuevoEstado', nuevoEstado);
+
+                try {
+                    // CORRECCIÓN: Añadido { credentials: 'same-origin' }
+                    const response = await fetch(controllerVotacionURL, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+                    if (data.status !== 'success') throw new Error(data.message);
+
+                    Swal.fire('¡Éxito!', `Votación ${accionTexto.toLowerCase()}da.`, 'success');
+                    cargarVotaciones();
+
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                    cargarVotaciones();
+                }
+            }
+        });
+
+        // --- 6. Carga Inicial ---
+        cargarVotaciones();
+
+    })();
+    // ==========================================================
+    // --- 🚀 FIN: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
+    // ==========================================================
 
     // --- Variables del Modal ---
     const modalConfirmarElement = document.getElementById('modalConfirmarAsistencia');
@@ -460,10 +650,12 @@ $pdo = null; // Cerrar conexión
     }
 
     function firmarMinutaDesdeEditor() {
-        /* ... (Tu lógica de firma aquí, sin cambios) ... */ }
+        /* ... (Tu lógica de firma aquí, sin cambios) ... */
+    }
 
     function enviarFeedbackDesdeEditor() {
-        /* ... (Tu lógica de feedback aquí, sin cambios) ... */ }
+        /* ... (Tu lógica de feedback aquí, sin cambios) ... */
+    }
 
 
     // --- LÓGICA AJAX para 'Guardar Borrador' (Sin cambios) ---

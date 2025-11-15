@@ -147,6 +147,8 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
+    <script src="/corevota/public/vendor/jquery/jquery-3.7.1.min.js"></script>
+
 
     <style>
         :root {

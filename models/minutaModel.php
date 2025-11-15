@@ -348,6 +348,8 @@ class MinutaModel extends BaseConexion
       LEFT JOIN
         t_tema t ON m.idMinuta = t.t_minuta_idMinuta
       LEFT JOIN
+        t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+      LEFT JOIN
         RankedSeguimiento rs ON m.idMinuta = rs.t_minuta_idMinuta AND rs.rn = 1
       WHERE
         1=1 -- ⬅️ CLÁUSULA REMOVIDA: Ya no filtra por m.estadoMinuta <> 'APROBADA'

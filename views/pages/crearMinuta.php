@@ -29,7 +29,7 @@ $idTipoUsuario  = $_SESSION['tipoUsuario_id'] ?? null; // ID de tipo de usuario 
 
 // Variables de estado y control
 $estadoMinuta   = 'BORRADOR'; // Default para nuevas
-$puedeEnviar   = false;      // Permite enviar a aprobación si no está APROBADA
+$puedeEnviar    = false;      // Permite enviar a aprobación si no está APROBADA
 
 // --- Variables para encabezado y votaciones ---
 $idReunionActual = null;
@@ -55,8 +55,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
     try {
         // 1. Cargar datos de t_minuta
         $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta, asistencia_validada
-                       FROM t_minuta
-                       WHERE idMinuta = :idMinutaActual";
+                         FROM t_minuta
+                         WHERE idMinuta = :idMinutaActual";
         $stmt_minuta = $pdo->prepare($sql_minuta);
         $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
         $minutaData = $stmt_minuta->fetch(PDO::FETCH_ASSOC);
@@ -70,8 +70,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
         // 2. Cargar datos de t_reunion (para comisiones mixtas)
         $sql_reunion = "SELECT idReunion, t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2
-                        FROM t_reunion
-                        WHERE t_minuta_idMinuta = :idMinutaActual";
+                          FROM t_reunion
+                          WHERE t_minuta_idMinuta = :idMinutaActual";
         $stmt_reunion = $pdo->prepare($sql_reunion);
         $stmt_reunion->execute([':idMinutaActual' => $idMinutaActual]);
         $reunionData = $stmt_reunion->fetch(PDO::FETCH_ASSOC);
@@ -133,8 +133,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 
         // 5. Cargar temas
         $sql_temas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                      FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                      WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
+                        FROM t_tema t LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+                        WHERE t.t_minuta_idMinuta = :idMinutaActual ORDER BY t.idTema ASC";
         $stmt_temas = $pdo->prepare($sql_temas);
         $stmt_temas->execute([':idMinutaActual' => $idMinutaActual]);
         $temas_de_la_minuta = $stmt_temas->fetchAll(PDO::FETCH_ASSOC);
@@ -424,13 +424,11 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         </div>
                     </div>
                 </div>
+                
                 <div id="contenedorTemas">
-                </div>
-                <button type="button" class="btn btn-outline-dark btn-sm mt-2" onclick="agregarTema()">Agregar Tema <span class="ms-1">➕</span></button>
+                    </div>
 
-            </div>
-
-            <div class="tab-pane fade" id="asistencia-tab-pane" role="tabpanel" aria-labelledby="asistencia-tab" tabindex="0">
+            </div> <div class="tab-pane fade" id="asistencia-tab-pane" role="tabpanel" aria-labelledby="asistencia-tab" tabindex="0">
                 <div class="p-4 border rounded-bottom bg-white" style="border: none !important;">
                     <h5 class="fw-bold mb-3">Asistencia (Marcar estado en tiempo real)</h5>
 
@@ -453,59 +451,48 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
             <div class="tab-pane fade" id="votaciones-tab-pane" role="tabpanel" aria-labelledby="votaciones-tab" tabindex="0">
 
-                <div class="p-4 border rounded-lg bg-white mb-4" style="border: none !important;">
-                    <h5 class="fw-bold">Crear/Gestionar Votaciones</h5>
-                    <form id="formCrearVotacionMinuta" onsubmit="guardarNuevaVotacion(); return false;">
-                        <h6 class="fw-bold mb-3">Crear Nueva Votación</h6>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="votacionComisionId" class="form-label">Asociar a Comisión (para lista de votantes):</label>
-                                <select class="form-select" id="votacionComisionId" required <?php echo $esSoloLectura ? 'disabled' : ''; ?>>
-                                    <option value="">Seleccione una comisión...</option>
-                                    <?php if (empty($comisionesDeLaReunion)): ?>
-                                        <option value="" disabled>No hay comisiones cargadas</option>
-                                    <?php else: ?>
-                                        <?php foreach ($comisionesDeLaReunion as $idCom => $nombreCom): ?>
-                                            <option value="<?php echo $idCom; ?>"><?php echo htmlspecialchars($nombreCom); ?></option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="votacionNombre" class="form-label">Texto de la Votación (Pregunta):</label>
-                                <input type="text" class="form-control" id="votacionNombre" placeholder="Ej: ¿Aprueba el presupuesto para...?" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
-                            </div>
+                <?php if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') : ?>
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-vote-yea me-2"></i>Panel de Votaciones de la Minuta</h5>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-sm" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
-                            <i class="fas fa-plus me-1"></i> Crear y Habilitar Votación
-                        </button>
-                    </form>
+                        <div class="card-body">
 
-                    <hr class="my-4">
+                            <h6 class="border-bottom pb-2 mb-3">Crear Nueva Votación</h6>
+                            <form id="form-crear-votacion" class="row g-3 align-items-end mb-3">
 
-                    <h6 class="fw-bold">Votaciones Creadas</h6>
-                    <div id="listaVotacionesMinuta">
-                        <p class="text-muted" id="votacionesStatus"><i class="fas fa-spinner fa-spin me-2"></i> Cargando votaciones...</p>
-                    </div>
-                </div>
+                                <input type="hidden" id="votacion_idMinuta" value="<?php echo $idMinutaActual; ?>">
+                                <input type="hidden" id="votacion_idReunion" value="<?php echo htmlspecialchars($idReunionActual); ?>">
+                                <input type="hidden" id="votacion_idComision" value="<?php echo htmlspecialchars($minutaData['t_comision_idComision']); ?>">
 
-                <div class="card shadow-sm border-info mt-4">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-chart-simple me-2 text-info"></i>
-                            Resultados en Vivo
-                        </h5>
-                        <button class="btn btn-sm btn-outline-info" id="btn-refrescar-votaciones" onclick="cargarResultadosVotacion()">
-                            <i class="fa-solid fa-sync me-1"></i> Refrescar
-                        </button>
+                                <div class="col-md-8">
+                                    <label for="nombreVotacion" class="form-label">Nombre de la Votación:</label>
+                                    <input type="text" class="form-control" id="nombreVotacion" placeholder="Ej: Aprobar fondos para..." required>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="fas fa-plus me-2"></i>Crear Votación
+                                    </button>
+                                </div>
+                            </form>
+
+                            <hr class="my-4">
+
+                            <h6 class="border-bottom pb-2 mb-3">Votaciones Creadas</h6>
+                            <div id="panel-votaciones-lista">
+                                <div class="text-center p-3 text-muted">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    <span class="ms-2">Cargando votaciones...</span>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
-                    <div class="card-body" id="votacion-resultados-live">
-                        <p class="text-muted text-center" id="votacion-placeholder">Cargando resultados...</p>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
 
             <div class="tab-pane fade" id="documentos-tab-pane" role="tabpanel" aria-labelledby="documentos-tab" tabindex="0">
+
                 <div class="adjuntos-section">
                     <h5 class="fw-bold mb-3">Gestión de Archivos y Enlaces</h5>
                     <input type="hidden" id="idMinutaActual" value="<?php echo htmlspecialchars($idMinutaActual); ?>">
@@ -531,130 +518,131 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         </ul>
                     </div>
                 </div>
+
             </div>
 
-        </div>
-        <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
-            <div class="text-end">
+            <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
+                <div class="text-end">
 
-                <?php
-                // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
+                    <?php
+                    // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
 
-                // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
-                if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
-                    echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
-                        onclick="if (validarCamposMinuta()) guardarBorrador(true);">
-                    <i class="fas fa-save"></i> Guardar Borrador
+                    // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
+                    if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+                        echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
+                            onclick="if (validarCamposMinuta()) guardarBorrador(true);">
+                        <i class="fas fa-save"></i> Guardar Borrador
+                    </button>';
+                    }
+
+                    // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
+                    if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                        // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
+                        echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
+                        onclick="iniciarValidacionAsistencia()">
+                    <i class="fas fa-users-check"></i> Revisar y Validar Asistencia
                 </button>';
-                }
+                    }
 
-                // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
-                if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                    // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
-                    echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
-                onclick="iniciarValidacionAsistencia()">
-            <i class="fas fa-users-check"></i> Revisar y Validar Asistencia
-        </button>';
-                }
+                    // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
+                    // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
+                    if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
+                        echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
+                                onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();">
+                        <i class="fas fa-paper-plane"></i> Enviar para Aprobación
+                    </button>';
+                    }
 
-                // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
-                // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
-                if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
-                    echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
-                        onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();">
-                    <i class="fas fa-paper-plane"></i> Enviar para Aprobación
-                </button>';
-                }
+                    // Mensaje si ya está Aprobada
+                    if ($estadoMinuta === 'APROBADA') {
+                        echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
+                    }
 
-                // Mensaje si ya está Aprobada
-                if ($estadoMinuta === 'APROBADA') {
-                    echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
-                }
+                    // Mensaje si falta validar asistencia
+                    if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                        echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
+                    }
 
-                // Mensaje si falta validar asistencia
-                if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                    echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
-                }
+                    // --- FIN DE LA LÓGICA DE BOTONES ---
+                    ?>
 
-                // --- FIN DE LA LÓGICA DE BOTONES ---
-                ?>
-
+                </div>
             </div>
         </div>
-    </div>
 
-    <template id="plantilla-tema">
-        <div class="tema-block mb-4 border rounded p-3 bg-white shadow-sm position-relative">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold text-primary mb-0">Tema #</h6>
-            </div>
-            <div class="dropdown-form-block mb-3">
-                <button class="btn btn-light border text-start w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#temaTratado_ID_" aria-expanded="true" aria-controls="temaTratado_ID_">TEMA TRATADO</button>
-                <div class="collapse show" id="temaTratado_ID_">
-                    <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                        <div class="editable-area form-control" contenteditable="true" placeholder="Escribe el tema..."></div>
+        <template id="plantilla-tema">
+            <div class="tema-block mb-4 border rounded p-3 bg-white shadow-sm position-relative">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-primary mb-0">Tema #</h6>
+                </div>
+                <div class="dropdown-form-block mb-3">
+                    <button class="btn btn-light border text-start w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#temaTratado_ID_" aria-expanded="true" aria-controls="temaTratado_ID_">TEMA TRATADO</button>
+                    <div class="collapse show" id="temaTratado_ID_">
+                        <div class="editor-container p-3 border border-top-0 bg-white">
+                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                            <div class="editable-area form-control" contenteditable="true" placeholder="Escribe el tema..."></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="dropdown-form-block mb-3">
-                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#objetivo_ID_" aria-expanded="false" aria-controls="objetivo_ID_">OBJETIVO</button>
-                <div class="collapse" id="objetivo_ID_">
-                    <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                        <div class="editable-area form-control" contenteditable="true" placeholder="Describe el objetivo..."></div>
+                <div class="dropdown-form-block mb-3">
+                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#objetivo_ID_" aria-expanded="false" aria-controls="objetivo_ID_">OBJETIVO</button>
+                    <div class="collapse" id="objetivo_ID_">
+                        <div class="editor-container p-3 border border-top-0 bg-white">
+                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                            <div class="editable-area form-control" contenteditable="true" placeholder="Describe el objetivo..."></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="dropdown-form-block mb-3">
-                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
-                <div class="collapse" id="acuerdos_ID_">
-                    <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i< /button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                        <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
+                <div class="dropdown-form-block mb-3">
+                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
+                    <div class="collapse" id="acuerdos_ID_">
+                        <div class="editor-container p-3 border border-top-0 bg-white">
+                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i< /button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                            <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="dropdown-form-block mb-3">
-                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compromisos_ID_" aria-expanded="false" aria-controls="compromisos_ID_">COMPROMISOS Y RESPONSABLES</button>
-                <div class="collapse" id="compromisos_ID_">
-                    <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                        <div class="editable-area form-control" contenteditable="true" placeholder="Registra compromisos..."></div>
+                <div class="dropdown-form-block mb-3">
+                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compromisos_ID_" aria-expanded="false" aria-controls="compromisos_ID_">COMPROMISOS Y RESPONSABLES</button>
+                    <div class="collapse" id="compromisos_ID_">
+                        <div class="editor-container p-3 border border-top-0 bg-white">
+                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                            <div class="editable-area form-control" contenteditable="true" placeholder="Registra compromisos..."></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="dropdown-form-block mb-3">
-                <button class="btn btn-light border text-start w-100 fw-bold text-primary collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#observaciones_ID_" aria-expanded="false" aria-controls="observaciones_ID_">OBSERVACIONES Y COMENTARIOS</button>
-                <div class="collapse" id="observaciones_ID_">
-                    <div class="editor-container p-3 border border-top-0 bg-white">
-                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                        <div class="editable-area form-control" contenteditable="true" placeholder="Añade observaciones..."></div>
+                <div class="dropdown-form-block mb-3">
+                    <button class="btn btn-light border text-start w-100 fw-bold text-primary collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#observaciones_ID_" aria-expanded="false" aria-controls="observaciones_ID_">OBSERVACIONES Y COMENTARIOS</button>
+                    <div class="collapse" id="observaciones_ID_">
+                        <div class="editor-container p-3 border border-top-0 bg-white">
+                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                            <div class="editable-area form-control" contenteditable="true" placeholder="Añade observaciones..."></div>
+                        </div>
                     </div>
                 </div>
+                <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
             </div>
-            <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
-        </div>
-    </template>
+        </template>
 
 
-    <div class="modal fade" id="modalValidarAsistencia" tabindex="-1" aria-labelledby="modalValidarAsistenciaLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalValidarAsistenciaLabel">Validar Asistencia de Minuta</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="contenidoModalAsistencia">
-                    <p>Cargando asistencia...</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-warning" id="btnModificarAsistencia">
-                        <i class="fas fa-edit"></i> Modificar Asistencia
-                    </button>
-                    <button type="button" class="btn btn-success" id="btnConfirmarEnviarAsistencia">
-                        <i class="fas fa-check"></i> Confirmar y Enviar Correo
-                    </button>
+        <div class="modal fade" id="modalValidarAsistencia" tabindex="-1" aria-labelledby="modalValidarAsistenciaLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalValidarAsistenciaLabel">Validar Asistencia de Minuta</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="contenidoModalAsistencia">
+                        <p>Cargando asistencia...</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-warning" id="btnModificarAsistencia">
+                            <i class="fas fa-edit"></i> Modificar Asistencia
+                        </button>
+                        <button type="button" class="btn btn-success" id="btnConfirmarEnviarAsistencia">
+                            <i class="fas fa-check"></i> Confirmar y Enviar Correo
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -683,6 +671,198 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         const inputUrlLink = document.getElementById('inputUrlLink');
         const fileStatus = document.getElementById('file-upload-status');
 
+
+        // ==========================================================
+        // --- 🚀 INICIO: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
+        // (Copiado desde editar_minuta.php y ruta corregida)
+        // ==========================================================
+        (function() {
+            // Solo ejecuta este script si el panel del ST existe en la página
+            const formCrearVotacion = document.getElementById('form-crear-votacion');
+            if (!formCrearVotacion) {
+                // No es el ST o la minuta está aprobada, no hacer nada.
+                return;
+            }
+
+            // --- 1. Constantes y Elementos ---
+            const idMinutaActual = document.getElementById('votacion_idMinuta').value;
+            const idReunionActual = document.getElementById('votacion_idReunion').value;
+            const idComisionActual = document.getElementById('votacion_idComision').value;
+            // ✅ CORRECCIÓN: Ruta absoluta para crearMinuta.php
+            const controllerVotacionURL = '/corevota/controllers/gestionar_votacion_minuta.php';
+
+            const listaContainer = document.getElementById('panel-votaciones-lista');
+            const inputNombreVotacion = document.getElementById('nombreVotacion');
+
+            // --- 2. Función para Cargar la Lista de Votaciones ---
+            async function cargarVotaciones() {
+                listaContainer.innerHTML = `<div class="text-center p-3 text-muted">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+                <span class="ms-2">Actualizando lista...</span>
+                </div>`;
+
+                try {
+                    const response = await fetch(`${controllerVotacionURL}?action=list&idMinuta=${idMinutaActual}`, {
+                        credentials: 'same-origin'
+                    });
+
+                    if (!response.ok) throw new Error('Error de red al listar votaciones.');
+
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        console.error("Respuesta inválida del servidor (gestionar_votacion_minuta.php):", text);
+                        throw new Error("El servidor devolvió una respuesta inválida. Revisa la consola.");
+                    }
+
+                    if (data.status !== 'success') throw new Error(data.message);
+
+                    // Limpiar y renderizar
+                    listaContainer.innerHTML = '';
+                    if (data.data.length === 0) {
+                        listaContainer.innerHTML = '<div class="alert alert-light text-center">Aún no se han creado votaciones para esta minuta.</div>';
+                        return;
+                    }
+
+                    data.data.forEach(votacion => {
+                        listaContainer.appendChild(renderVotacionItem(votacion));
+                    });
+
+                } catch (error) {
+                    listaContainer.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+                }
+            }
+
+            // --- 3. Función para Renderizar UN item de la lista ---
+            function renderVotacionItem(votacion) {
+                const div = document.createElement('div');
+                div.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const habilitada = parseInt(votacion.habilitada, 10) === 1;
+
+                let badgeClass = habilitada ? 'bg-success' : 'bg-secondary';
+                let badgeIcon = habilitada ? 'fa-play-circle' : 'fa-stop-circle';
+                let badgeText = habilitada ? 'Abierta' : 'Cerrada';
+
+                let btnClass = habilitada ? 'btn-danger' : 'btn-success';
+                let btnIcon = habilitada ? 'fa-stop' : 'fa-play';
+                let btnText = habilitada ? 'Cerrar' : 'Habilitar';
+                let nuevoEstado = habilitada ? 0 : 1;
+
+                div.innerHTML = `
+                <div>
+                    <span class="badge ${badgeClass} me-2"><i class="fas ${badgeIcon} me-1"></i> ${badgeText}</span>
+                    <strong>${votacion.nombreVotacion}</strong>
+                    <small class="text-muted d-block">Comisión: ${votacion.nombreComision || 'No especificada'}</small>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn ${btnClass} btn-sm btn-cambiar-estado" data-id="${votacion.idVotacion}" data-nuevo-estado="${nuevoEstado}">
+                        <i class="fas ${btnIcon} me-1"></i> ${btnText}
+                    </button>
+                </div>`;
+                return div;
+            }
+
+            // --- 4. Event Listener para CREAR Votación ---
+            formCrearVotacion.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const nombre = inputNombreVotacion.value.trim();
+                if (nombre === '') {
+                    Swal.fire('Error', 'Debe ingresar un nombre para la votación.', 'error');
+                    return;
+                }
+
+                const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
+
+                const formData = new FormData();
+                formData.append('action', 'create');
+                formData.append('nombreVotacion', nombre);
+                formData.append('idMinuta', idMinutaActual);
+                formData.append('idReunion', idReunionActual);
+                formData.append('idComision', idComisionActual);
+
+                try {
+                    const response = await fetch(controllerVotacionURL, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+                    if (data.status !== 'success') throw new Error(data.message);
+
+                    Swal.fire('¡Éxito!', 'Votación creada correctamente.', 'success');
+                    inputNombreVotacion.value = ''; // Limpiar input
+                    cargarVotaciones(); // Recargar la lista
+
+                } catch (error) {
+                    Swal.fire('Error', error.message, 'error');
+                } finally {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = '<i class="fas fa-plus me-2"></i>Crear Votación';
+                }
+            });
+
+            // --- 5. Event Listener para Habilitar/Cerrar ---
+            listaContainer.addEventListener('click', async (e) => {
+                const boton = e.target.closest('.btn-cambiar-estado');
+                if (!boton) return;
+
+                const idVotacion = boton.dataset.id;
+                const nuevoEstado = boton.dataset.nuevoEstado;
+                const accionTexto = nuevoEstado === '1' ? 'Habilitar' : 'Cerrar';
+
+                const result = await Swal.fire({
+                    title: `¿Seguro que desea ${accionTexto.toLowerCase()} esta votación?`,
+                    text: (nuevoEstado === '1') ? 'Los consejeros podrán verla y votar.' : 'Nadie podrá votar y se cerrará la sala.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: `Sí, ${accionTexto}`,
+                    confirmButtonColor: (nuevoEstado === '1') ? '#198754' : '#dc3545',
+                    cancelButtonText: 'Cancelar'
+                });
+
+                if (result.isConfirmed) {
+                    boton.disabled = true;
+                    boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                    const formData = new FormData();
+                    formData.append('action', 'change_status');
+                    formData.append('idVotacion', idVotacion);
+                    formData.append('nuevoEstado', nuevoEstado);
+
+                    try {
+                        const response = await fetch(controllerVotacionURL, {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'same-origin'
+                        });
+
+                        const data = await response.json();
+                        if (data.status !== 'success') throw new Error(data.message);
+
+                        Swal.fire('¡Éxito!', `Votación ${accionTexto.toLowerCase()}da.`, 'success');
+                        cargarVotaciones();
+
+                    } catch (error) {
+                        Swal.fire('Error', error.message, 'error');
+                        cargarVotaciones();
+                    }
+                }
+            });
+
+            // --- 6. Carga Inicial ---
+            cargarVotaciones();
+
+        })();
+        // ==========================================================
+        // --- 🚀 FIN: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
+        // ==========================================================
+
+
         // ==================================================================
         // --- EVENTOS PRINCIPALES Y LÓGICA DE TABS (NUEVO) ---
         // ==================================================================
@@ -692,8 +872,8 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             cargarTablaAsistencia(true);
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
-            cargarVotacionesDeLaMinuta();
-            cargarResultadosVotacion();
+            // La carga de votaciones se auto-ejecuta desde el bloque IIFE de arriba
+
             // Solo intentar cargar feedback si la minuta NO está Aprobada
             if (ESTADO_MINUTA_ACTUAL !== 'APROBADA') {
                 cargarYAplicarFeedback();
@@ -714,8 +894,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             if (modalValidarAsistencia) {
                 bsModalValidarAsistencia = new bootstrap.Modal(modalValidarAsistencia);
             }
-
-            // views/pages/crearMinuta.php (Bloque de código CORREGIDO para la navegación)
 
             // 4. Lógica de Navegación por Checkbox (¡CORREGIDO!)
             $('.navigate-to-tab').on('change', function() {
@@ -743,6 +921,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     }
                 }
             });
+
             // 5. Eventos para archivos y enlaces (se mantienen los existentes)
             if (inputArchivo) {
                 inputArchivo.addEventListener('change', function(e) {
@@ -836,18 +1015,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         }); // FIN DOMContentLoaded
 
         // ==================================================================
-        // --- SECCIÓN: ASISTENCIA (AJUSTADA PARA POLLING) ---
-        // ==================================================================
-
-        /**
-         * Carga la lista maestra de consejeros y la asistencia guardada.
-         * @param {boolean} isInitialLoad Si es true, muestra mensaje de carga, si es false, es silencioso.
-         */
-        // views/pages/crearMinuta.php (AJUSTES DENTRO DEL <script>)
-
-        // ... (secciones omitidas por brevedad)
-
-        // ==================================================================
         // --- SECCIÓN: ASISTENCIA (AJUSTADA PARA POLLING Y REGLA DE 30 MIN) ---
         // ==================================================================
 
@@ -929,10 +1096,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                             // Aplicar el atributo disabled/title a los checkboxes
                             tabla += `<tr data-userid="${c.idUsuario}">
-                        <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
-                        <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
-                        <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
-                        </tr>`;
+                            <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
+                            <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
+                            <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
+                            </tr>`;
                         });
                         tabla += `</tbody></table>`;
                         cont.innerHTML = tabla;
@@ -951,9 +1118,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     if (REGLAS_FEEDBACK) deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
                 });
         }
-
-        // Resto de las funciones de Asistencia (handleAsistenciaChange, recolectarAsistencia, guardarAsistencia)
-        // se mantienen SIN cambios ya que su lógica es correcta.
 
         function handleAsistenciaChange(userId, changedType) {
             const present = document.getElementById(`present_${userId}`);
@@ -1058,7 +1222,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                                         html += `<tr>
                                     <td>${item.nombreCompleto}</td>
                                     <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
-                                 </tr>`;
+                                    </tr>`;
                                     });
                                     html += '</tbody></table>';
                                     modalBody.innerHTML = html;
@@ -1850,406 +2014,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         })
                         .catch(err => Swal.fire('Error', 'Error de conexión: ' + err.message, 'error'));
                 }
-            });
-        }
-
-
-        // ==================================================================
-        // --- SECCIÓN: GESTIÓN Y RESULTADOS DE VOTACIONES (SE MANTIENEN IGUAL) ---
-        // ==================================================================
-
-        async function guardarNuevaVotacion() {
-            const idComision = document.getElementById('votacionComisionId').value;
-            const nombreVotacion = document.getElementById('votacionNombre').value.trim();
-            const btn = document.querySelector('#formCrearVotacionMinuta button');
-
-            if (!idComision || !nombreVotacion) {
-                Swal.fire('Campos incompletos', 'Debe seleccionar una comisión y escribir el texto de la votación.', 'warning');
-                return;
-            }
-            if (!idMinutaGlobal || !ID_REUNION_GLOBAL) {
-                Swal.fire('Error de Sistema', 'No se pudo encontrar el ID de la Minuta o Reunión. Recargue la página.', 'error');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-
-            const formData = new FormData();
-            formData.append('action', 'create');
-            formData.append('idMinuta', idMinutaGlobal);
-            formData.append('idReunion', ID_REUNION_GLOBAL);
-            formData.append('idComision', idComision);
-            formData.append('nombreVotacion', nombreVotacion);
-
-            try {
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!resp.ok) {
-                    const text = await resp.text();
-                    console.error("Error guardar votacion:", text);
-                    throw new Error(`Error HTTP ${resp.status} (ver consola)`);
-                }
-
-                const data = await resp.json();
-
-                if (data.status === 'success') {
-                    Swal.fire('¡Creada!', 'La votación ha sido creada y habilitada. Los usuarios ya pueden votar.', 'success');
-                    document.getElementById('votacionNombre').value = '';
-                    cargarVotacionesDeLaMinuta();
-                    cargarResultadosVotacion();
-                } else {
-                    Swal.fire('Error', 'No se pudo crear la votación: ' + data.message, 'error');
-                }
-            } catch (err) {
-                console.error("Error fetch guardar votacion:", err);
-                Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
-            }
-
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
-        }
-
-        async function cargarVotacionesDeLaMinuta() {
-            const cont = document.getElementById('listaVotacionesMinuta');
-            const status = document.getElementById('votacionesStatus');
-            if (!cont || !status) return;
-            cont.innerHTML = '';
-            status.textContent = 'Cargando...';
-
-            try {
-                const resp = await fetch(`/corevota/controllers/gestionar_votacion_minuta.php?action=list&idMinuta=${idMinutaGlobal}`);
-                if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
-                const data = await resp.json();
-
-                if (data.status === 'success' && data.data.length > 0) {
-                    status.textContent = `Mostrando ${data.data.length} votacion(es).`;
-                    let html = '<ul class="list-group">';
-                    data.data.forEach(v => {
-                        const isHabilitada = v.habilitada == 1;
-                        const isEditable = ES_ST_EDITABLE;
-                        let botonesAccion = '';
-
-                        if (isHabilitada && isEditable) {
-                            // Botón para registrar voto manual
-                            botonesAccion += `
-                        <button class="btn btn-warning btn-sm me-2" title="Registrar votos manualmente" onclick="abrirModalVoto(${v.idVotacion})">
-                            <i class="fas fa-person-booth"></i> Registrar Voto
-                        </button>`;
-
-                            // 🚀 BOTÓN UNIFICADO: Cerrar y Generar PDF
-                            botonesAccion += `
-                        <button class="btn btn-danger btn-sm" title="Cerrar votación y generar reporte PDF" onclick="cambiarEstadoVotacion(${v.idVotacion}, 0, '${escapeHTML(v.nombreVotacion)}')">
-                            <i class="fas fa-file-pdf"></i> Cerrar y Reportar
-                        </button>`;
-
-                        } else if (!isHabilitada) {
-                            // Botón para RE-GENERAR PDF (si ya está cerrada)
-                            botonesAccion += `
-                        <button class="btn btn-primary btn-sm me-2" title="Generar PDF de resultados nuevamente" onclick="generarPdfVotacion(${v.idVotacion})">
-                            <i class="fas fa-file-pdf"></i> PDF Resultados
-                        </button>`;
-
-                            // Botón para RE-ABRIR VOTACIÓN (Opcional, si el ST está editando)
-                            if (isEditable) {
-                                botonesAccion += `
-                            <button class="btn btn-outline-success btn-sm" title="Re-abrir votación para nuevos votos" onclick="cambiarEstadoVotacion(${v.idVotacion}, 1, '${escapeHTML(v.nombreVotacion)}')">
-                                <i class="fas fa-lock-open"></i> Re-abrir
-                            </button>`;
-                            }
-                        }
-
-                        html += `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="fw-bold">${v.nombreVotacion}</span>
-                            <small class="d-block text-muted">
-                                Comisión: ${v.nombreComision} | Estado:
-                                ${isHabilitada ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
-                            </small>
-                        </div>
-                        <div>${botonesAccion}</div>
-                    </li>`;
-                    });
-                    html += '</ul>';
-                    cont.innerHTML = html;
-                } else {
-                    status.textContent = 'No hay votaciones creadas para esta minuta.';
-                }
-            } catch (err) {
-                console.error("Error cargando votaciones:", err);
-                status.textContent = 'Error al cargar votaciones.';
-                status.className = 'text-danger small';
-            }
-        }
-
-        async function cambiarEstadoVotacion(idVotacion, nuevoEstado, nombreVotacion) {
-            const accion = nuevoEstado === 0 ? 'Cerrar' : 'Re-abrir';
-            const icono = nuevoEstado === 0 ? 'warning' : 'info';
-
-            const mensaje = nuevoEstado === 0 ?
-                `Al cerrar, se bloquean los votos y se generará el reporte final en PDF. ¿Desea continuar y cerrar "${nombreVotacion}"?` :
-                `¿Desea re-abrir "${nombreVotacion}"? Esto permitirá a los usuarios volver a votar.`;
-
-            Swal.fire({
-                title: `${accion} Votación`,
-                text: mensaje,
-                icon: icono,
-                showCancelButton: true,
-                confirmButtonText: nuevoEstado === 0 ? 'Sí, Cerrar y Reportar' : `Sí, ${accion}`,
-                showLoaderOnConfirm: true,
-                preConfirm: async () => {
-                    const formData = new FormData();
-                    formData.append('action', 'change_status');
-                    formData.append('idVotacion', idVotacion);
-                    formData.append('nuevoEstado', nuevoEstado);
-
-                    try {
-                        const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        if (!resp.ok) {
-                            throw new Error(`Error HTTP ${resp.status}`);
-                        }
-                        const data = await resp.json();
-                        if (data.status !== 'success') {
-                            throw new Error(data.message || 'Error desconocido al cambiar estado.');
-                        }
-                        return data;
-                    } catch (error) {
-                        Swal.showValidationMessage(`Falló la operación: ${error.message}`);
-                        return false;
-                    }
-                },
-                allowOutsideClick: () => !Swal.isLoading()
-            }).then((result) => {
-                if (result.isConfirmed) {
-
-                    if (nuevoEstado === 0) {
-                        Swal.fire('¡Cerrada!', `Votación cerrada. Generando reporte PDF...`, 'success');
-                        generarPdfVotacion(idVotacion);
-                    } else {
-                        Swal.fire('¡Éxito!', `Votación re-abierta correctamente.`, 'success');
-                    }
-
-                    cargarVotacionesDeLaMinuta();
-                    cargarResultadosVotacion();
-                }
-            });
-        }
-
-        function generarPdfVotacion(idVotacion) {
-            const url = `/corevota/controllers/generar_pdf_votacion.php?idVotacion=${idVotacion}`;
-            window.open(url, '_blank');
-        }
-
-        async function abrirModalVoto(idVotacion) {
-            if (ASISTENCIA_GUARDADA_IDS.length === 0) {
-                Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
-                return;
-            }
-
-            Swal.fire({
-                title: 'Cargando Estado de Votación...',
-                text: 'Buscando asistentes y votos...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            try {
-                const formData = new FormData();
-                formData.append('action', 'get_status');
-                formData.append('idVotacion', idVotacion);
-                formData.append('asistentes_ids', JSON.stringify(ASISTENCIA_GUARDADA_IDS));
-
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await resp.json();
-
-                if (data.status !== 'success') {
-                    throw new Error(data.message);
-                }
-
-                let modalHtml = '<div class="container-fluid" style="text-align: left;">';
-                modalHtml += '<p class="text-muted">Seleccione el voto para cada asistente que no haya votado.</p>';
-                modalHtml += '<table class="table table-sm table-hover">';
-                modalHtml += '<thead><tr><th>Asistente</th><th class="text-center">Voto Registrado</th><th class="text-center">Registrar Voto</th></tr></thead><tbody>';
-
-                data.data.asistentes.forEach(asistente => {
-                    const voto = data.data.votos[asistente.idUsuario] || null;
-                    modalHtml += `<tr><td>${asistente.nombreCompleto}</td>`;
-
-                    if (voto) {
-                        let badge = 'secondary';
-                        if (voto === 'SI') badge = 'success';
-                        if (voto === 'NO') badge = 'danger';
-                        modalHtml += `<td class="text-center"><span class="badge bg-${badge}">${voto}</span></td>`;
-                        modalHtml += `<td></td>`;
-                    } else {
-                        modalHtml += `<td class="text-center"><span class="badge bg-light text-dark">Pendiente</span></td>`;
-                        modalHtml += `<td class="text-center" style="white-space: nowrap;">
-                                        <button class="btn btn-success btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'SI', this)">SÍ</button>
-                                        <button class="btn btn-danger btn-sm mx-1" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'NO', this)">NO</button>
-                                        <button class="btn btn-secondary btn-sm" onclick="registrarVotoSecretario(${idVotacion}, ${asistente.idUsuario}, 'ABSTENCION', this)">ABS</button>
-                                    </td>`;
-                    }
-                    modalHtml += '</tr>';
-                });
-
-                modalHtml += '</tbody></table></div>';
-
-                Swal.fire({
-                    title: 'Registrar Votos Manualmente',
-                    html: modalHtml,
-                    width: '800px',
-                    showConfirmButton: false,
-                    showCloseButton: true
-                });
-            } catch (err) {
-                Swal.fire('Error', 'No se pudo cargar el estado de la votación: ' + err.message, 'error');
-            }
-        }
-
-        async function registrarVotoSecretario(idVotacion, idUsuario, voto, btn) {
-            const parentTD = btn.parentNode;
-            parentTD.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
-
-            try {
-                const formData = new FormData();
-                formData.append('action', 'register_vote');
-                formData.append('idVotacion', idVotacion);
-                formData.append('idUsuario', idUsuario);
-                formData.append('voto', voto);
-                formData.append('idSecretario', ID_SECRETARIO_LOGUEADO);
-
-                const resp = await fetch('/corevota/controllers/gestionar_votacion_minuta.php', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await resp.json();
-
-                if (data.status === 'success') {
-                    const statusTD = parentTD.previousElementSibling;
-                    let badge = 'secondary';
-                    if (voto === 'SI') badge = 'success';
-                    if (voto === 'NO') badge = 'danger';
-
-                    statusTD.innerHTML = `<span class="badge bg-${badge}">${voto}</span>`;
-                    parentTD.innerHTML = '✅ Registrado';
-
-                    // Actualizar resultados en vivo
-                    cargarResultadosVotacion();
-                } else {
-                    throw new Error(data.message);
-                }
-            } catch (err) {
-                parentTD.innerHTML = '<span class="text-danger">Error</span>';
-                alert('Error al registrar voto: ' + err.message);
-            }
-        }
-
-        function cargarResultadosVotacion() {
-            const container = document.getElementById('votacion-resultados-live');
-            const placeholder = document.getElementById('votacion-placeholder');
-            const refreshButton = document.getElementById('btn-refrescar-votaciones');
-
-            if (!container || !idMinutaGlobal) {
-                console.error("No se pudo encontrar el contenedor o el idMinuta.");
-                if (container) container.innerHTML = '<p class="text-danger text-center">Error: No se pudo cargar el ID de la minuta.</p>';
-                return;
-            }
-
-            if (refreshButton) refreshButton.disabled = true;
-            if (placeholder) placeholder.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Cargando resultados...';
-
-            fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinutaGlobal}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Error de red al cargar votaciones.');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (refreshButton) refreshButton.disabled = false;
-
-                    if (data.status !== 'success') {
-                        throw new Error(data.message || 'Error en la respuesta del servidor.');
-                    }
-
-                    if (data.data.length === 0) {
-                        container.innerHTML = '<p class="text-muted text-center" id="votacion-placeholder">No hay votaciones asociadas a esta minuta/reunión todavía.</p>';
-                        return;
-                    }
-
-                    container.innerHTML = ''; // Limpiar contenedor
-
-                    data.data.forEach(votacion => {
-                        const votosSi = [];
-                        const votosNo = [];
-                        const votosAbs = [];
-
-                        if (votacion.votos) {
-                            votacion.votos.forEach(voto => {
-                                const nombre = escapeHTML(voto.nombreVotante);
-                                if (voto.opcionVoto === 'SI') {
-                                    votosSi.push(nombre);
-                                } else if (voto.opcionVoto === 'NO') {
-                                    votosNo.push(nombre);
-                                } else {
-                                    votosAbs.push(nombre);
-                                }
-                            });
-                        }
-
-                        const votacionHtml = `
-                            <div class="votacion-block-ui mb-4">
-                                <h5 class="fw-bold border-bottom pb-2">${escapeHTML(votacion.nombreVotacion)}</h5>
-                                <table class="table table-sm table-bordered table-striped" style="font-size: 0.9rem;">
-                                    <thead class="table-light text-center">
-                                        <tr>
-                                            <th style="width: 33.3%;">A Favor (${votosSi.length})</th>
-                                            <th style="width: 33.3%;">En Contra (${votosNo.length})</th>
-                                            <th style="width: 33.3%;">Abstención (${votosAbs.length})</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>${votosSi.length > 0 ? '<ul><li>' + votosSi.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
-                                            <td>${votosNo.length > 0 ? '<ul><li>' + votosNo.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
-                                            <td>${votosAbs.length > 0 ? '<ul><li>' + votosAbs.join('</li><li>') + '</li></ul>' : '<em class="text-muted ps-2">Sin votos</em>'}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        `;
-                        container.innerHTML += votacionHtml;
-                    });
-                })
-                .catch(error => {
-                    if (refreshButton) refreshButton.disabled = false;
-                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${error.message}</p>`;
-                    console.error('Error al cargar votaciones:', error);
-                });
-        }
-
-        function escapeHTML(str) {
-            if (!str) return '';
-            return str.replace(/[&<>"']/g, function(m) {
-                return {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [m];
             });
         }
     </script>

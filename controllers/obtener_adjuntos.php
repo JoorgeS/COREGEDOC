@@ -42,10 +42,10 @@ try {
         FROM t_adjunto 
         WHERE t_minuta_idMinuta = :idMinuta
         AND tipoAdjunto <> 'asistencia'"; //aqui añadimos la excepcion para que no se muestre la asistencia en el pdf adjuunto. si quisieran verlo, aqui esta la sql comentada
-    
+
     //$sql = "SELECT idAdjunto, pathAdjunto, tipoAdjunto 
-      //  FROM t_adjunto 
-       // WHERE t_minuta_idMinuta = :idMinuta";
+    //  FROM t_adjunto 
+    // WHERE t_minuta_idMinuta = :idMinuta";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([':idMinuta' => $idMinuta]);
@@ -64,19 +64,34 @@ try {
             $nombreArchivo = $pathOriginal;
         } else {
             // Asumimos que la BD guarda la ruta relativa (e.g., 'public/docs/...')
-            // Si el path ya tiene 'public/', lo usamos; si no, lo prefijamos.
             $pathCorregido = (strpos($pathOriginal, 'public/') === 0) ? $pathOriginal : ('public/docs/' . $pathOriginal);
+
+            // ----------------------------------------------------
+            // !!! INICIO DE LA CORRECCIÓN DE LA RUTA FINAL !!!
+            // ----------------------------------------------------
+
+            // Verificamos si la extensión (ej. .png) ya está en la ruta guardada en la BD.
+            // Si no está, la añadimos. Esto asume que el archivo SIEMPRE es .png en esa carpeta.
+            $extensionFaltante = '.png';
+
+            if (!str_ends_with(strtolower($pathCorregido), $extensionFaltante)) {
+                $pathCorregido .= $extensionFaltante;
+            }
 
             // Construir la URL absoluta para el navegador
             $pathWebFinal = '/corevota/' . $pathCorregido;
-            $nombreArchivo = basename($pathOriginal);
+            $nombreArchivo = basename($pathOriginal) . $extensionFaltante; // Aseguramos que el nombre mostrado también tenga la extensión
+
+            // ----------------------------------------------------
+            // !!! FIN DE LA CORRECCIÓN DE LA RUTA FINAL !!!
+            // ----------------------------------------------------
         }
 
         $adjuntosProcesados[] = [
-            'idAdjunto'     => (int)$adjunto['idAdjunto'],
-            'tipoAdjunto'   => $tipo,
+            'idAdjunto'   => (int)$adjunto['idAdjunto'],
+            'tipoAdjunto'  => $tipo,
             'nombreArchivo' => $nombreArchivo,
-            'pathArchivo'   => $pathWebFinal
+            'pathArchivo'  => $pathWebFinal
         ];
     }
 

@@ -29,7 +29,7 @@ $feedbackTexto = $data['feedback'] ?? null;
 
 // --- ¡NUEVO! ---
 // Capturamos el objeto de campos (ej: {"asistencia": true, "temas": true, ...})
-$feedbackCampos = $data['feedbackCampos'] ?? []; 
+$feedbackCampos = $data['feedbackCampos'] ?? [];
 // --- FIN NUEVO ---
 
 $idUsuarioPresidente = $_SESSION['idUsuario'] ?? 0; // El usuario de la sesión es el Presidente
@@ -64,7 +64,7 @@ class FeedbackManager extends BaseConexion
         $sql = "SELECT u.correo, u.pNombre
                 FROM t_minuta m
                 JOIN t_usuario u ON m.t_usuario_idSecretario = u.idUsuario
-                WHERE m.idMinuta = :idMinuta"; 
+                WHERE m.idMinuta = :idMinuta";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':idMinuta' => $idMinuta]);
@@ -107,18 +107,45 @@ class FeedbackManager extends BaseConexion
             $mail->isHTML(true);
             $mail->Subject = "Feedback Requerido - Minuta N° {$idMinuta}";
 
+            // --- INICIO: LÓGICA DE FIRMA AÑADIDA ---
+
+            // 1. Definir la ruta raíz (asumiendo que este archivo está un nivel dentro del root, ej: /class/)
+            $rootPath = dirname(__DIR__) . '/';
+
+            // 2. Definir la ruta relativa de la firma
+            $firmaPathRelativa = 'public/img/firma.jpeg';
+            $fullPathFirma = $rootPath . $firmaPathRelativa;
+
+            $firmaHTML = ""; // Variable para el HTML de la firma
+
+            // 3. Comprobar si existe y adjuntar la imagen "embebida"
+            if (file_exists($fullPathFirma)) {
+                // Adjunta la imagen y le da un 'cid' (Content ID)
+                $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg');
+                // Prepara el HTML para mostrar la imagen usando el 'cid'
+                $firmaHTML = "<br><img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">";
+            } else {
+                // Registrar un error si la firma no se encuentra
+                error_log("ADVERTENCIA (notificarSecretario): No se encontró el archivo de firma en: " . $fullPathFirma);
+            }
+            // --- FIN: LÓGICA DE FIRMA AÑADIDA ---
+
+
             $mail->Body = "
-                <html><body>
-                <p>Estimado {$nombreST},</p>
-                <p>La minuta <b>N° {$idMinuta}</b> ha recibido feedback del presidente <b>{$nombrePresidente}</b> y requiere su revisión.</p>
-                <hr>
-                <p><b>Comentario del Presidente:</b></p>
-                <p><i>" . nl2br(htmlspecialchars($feedbackTexto)) . "</i></p>
-                <hr>
-                <p>Por favor, ingrese a COREGEDOC para revisar las observaciones, editar la minuta y volver a enviarla para su aprobación.</p>
-                <p>Saludos,<br>Sistema COREGEDOC</p>
-                </body></html>
-            ";
+            <html><body>
+            <p>Estimado {$nombreST},</p>
+            <p>La minuta <b>N° {$idMinuta}</b> ha recibido feedback del presidente <b>{$nombrePresidente}</b> y requiere su revisión.</p>
+            <hr>
+            <p><b>Comentario del Presidente:</b></p>
+            <p><i>" . nl2br(htmlspecialchars($feedbackTexto)) . "</i></p>
+            <hr>
+            <p>Por favor, ingrese a COREGEDOC para revisar las observaciones, editar la minuta y volver a enviarla para su aprobación.</p>
+            <p>Saludos,<br>Sistema COREGEDOC</p>
+            
+            {$firmaHTML}
+
+            </body></html>
+        ";
 
             $mail->send();
             return true;
@@ -173,7 +200,7 @@ class FeedbackManager extends BaseConexion
             $this->db->prepare($sqlResetMinuta)->execute([':idMinuta' => $idMinuta]);
 
             $this->db->commit();
-            
+
             try {
                 $minutaModel = new MinutaModel($this->db);
                 $nombrePresidenteLog = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
@@ -216,6 +243,6 @@ class FeedbackManager extends BaseConexion
 // --- Ejecución (¡MODIFICADO!) ---
 $manager = new FeedbackManager();
 // Pasamos la nueva variable $feedbackCampos a la función
-$resultado = $manager->procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto, $feedbackCampos); 
+$resultado = $manager->procesarFeedback($idMinuta, $idUsuarioPresidente, $feedbackTexto, $feedbackCampos);
 echo json_encode($resultado);
 exit;
