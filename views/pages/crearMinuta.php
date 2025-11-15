@@ -2,7 +2,7 @@
 // views/pages/crearMinuta.php
 
 // ===============================================
-// 1. INICIALIZACIÓN Y CONFIGURACIÓN
+// 1. INICIALIZACIÓN Y CONFIGURACIÓN (SIN CAMBIOS EN PHP)
 // ===============================================
 
 // Iniciar sesión si no está activa
@@ -13,7 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Requerir la clase de conexión a la base de datos
 require_once __DIR__ . '/../../class/class.conectorDB.php';
 // (Tuve que comentar esto, asegúrate que la ruta es correcta si lo necesitas)
-// require_once __DIR__ . '/../../controllers/VotacionController.php'; 
+// require_once __DIR__ . '/../../controllers/VotacionController.php';
 
 $db = new conectorDB();
 $pdo = $db->getDatabase();
@@ -48,14 +48,14 @@ $all_presidents = [];
 
 
 // ===============================================
-// 2. LÓGICA DE CARGA DE DATOS (EDICIÓN)
+// 2. LÓGICA DE CARGA DE DATOS (EDICIÓN) (SIN CAMBIOS EN PHP)
 // ===============================================
 
 if ($idMinutaActual && is_numeric($idMinutaActual)) {
     try {
         // 1. Cargar datos de t_minuta
-        $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta, asistencia_validada 
-                       FROM t_minuta 
+        $sql_minuta = "SELECT t_comision_idComision, t_usuario_idPresidente, estadoMinuta, fechaMinuta, horaMinuta, asistencia_validada
+                       FROM t_minuta
                        WHERE idMinuta = :idMinutaActual";
         $stmt_minuta = $pdo->prepare($sql_minuta);
         $stmt_minuta->execute([':idMinutaActual' => $idMinutaActual]);
@@ -69,8 +69,8 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
         $estadoMinuta = $minutaData['estadoMinuta']; // Guardar el estado
 
         // 2. Cargar datos de t_reunion (para comisiones mixtas)
-        $sql_reunion = "SELECT idReunion, t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2 
-                        FROM t_reunion 
+        $sql_reunion = "SELECT idReunion, t_comision_idComision, t_comision_idComision_mixta, t_comision_idComision_mixta2
+                        FROM t_reunion
                         WHERE t_minuta_idMinuta = :idMinutaActual";
         $stmt_reunion = $pdo->prepare($sql_reunion);
         $stmt_reunion->execute([':idMinutaActual' => $idMinutaActual]);
@@ -156,7 +156,7 @@ if ($idMinutaActual && is_numeric($idMinutaActual)) {
 }
 
 // ===============================================
-// 3. LÓGICA DE PERMISOS Y ESTADO
+// 3. LÓGICA DE PERMISOS Y ESTADO (SIN CAMBIOS EN PHP)
 // ===============================================
 
 // El botón "Enviar para Aprobación" solo está habilitado si el estado NO es APROBADA
@@ -182,7 +182,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
 
 // ===============================================
-// 4. INICIO DEL HTML
+// 4. INICIO DEL HTML (Estructura de Pestañas APLICADA)
 // ===============================================
 ?>
 <!DOCTYPE html>
@@ -198,7 +198,20 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        /* Estilos CSS (Sin cambios, pero bien ubicados) */
+        /* Estilos CSS (Actualizados para las pestañas) */
+
+        /* Resaltar la pestaña activa */
+        .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #0d6efd !important;
+        }
+
+        /* Ocultar pestañas por defecto (para control con checkboxes) */
+        .nav-item.hidden-tab {
+            display: none !important;
+        }
+
+        /* Estilos genéricos */
         .card-header.bg-primary {
             background-color: #0d6efd !important;
         }
@@ -251,8 +264,18 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             opacity: 1;
         }
 
-        .dropdown-form-block .btn.collapsed {
-            background-color: #f8f9fa;
+        /* Asegurar que las secciones en las pestañas no tienen el estilo de colapsable */
+        #asistencia-tab-pane,
+        #votaciones-tab-pane,
+        #documentos-tab-pane {
+            padding-top: 15px;
+            /* Espacio para el contenido debajo del nav */
+        }
+
+        /* Ocultar los títulos de acordeón/dropdown que ya no se usan como tal */
+        #asistencia-tab-pane h5,
+        #votaciones-tab-pane h5 {
+            display: none;
         }
 
         /* == INICIO: ESTILOS PARA VOTACIÓN EN VIVO == */
@@ -287,13 +310,13 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             <div id="feedback-display-texto" style="white-space: pre-wrap; font-family: monospace; max-height: 200px; overflow-y: auto; background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px;">
             </div>
         </div>
-        <div class="row g-3">
 
+        <div class="row g-3">
             <div class="col-12 mb-3">
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
                         <span>Encabezado Minuta</span>
-                        <span class="badge 
+                        <span class="badge
                             <?php
                             switch ($estadoMinuta) {
                                 case 'APROBADA':
@@ -363,171 +386,199 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     </div>
                 </div>
             </div>
-            <div class="col-md-12 mt-2">
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-secondary dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#asistenciaForm" aria-expanded="false" aria-controls="asistenciaForm">
-                        Asistencia (Marcar estado)
-                    </button>
-                    <div class="collapse" id="asistenciaForm">
-                        <div class="p-4 border rounded-bottom bg-white">
-                            <div id="contenedorTablaAsistenciaEstado" style="max-height: 400px; overflow-y: auto;">
-                                <p class="text-muted">Cargando lista de consejeros...</p>
-                            </div>
+        </div>
 
-                            <div class="d-flex justify-content-end align-items-center mt-3 gap-2" id="botonesAsistenciaContainer">
-                                <span id="guardarAsistenciaStatus" class="me-auto small text-muted"></span>
+        <ul class="nav nav-tabs mt-4" id="nav-tabs-minuta" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="desarrollo-tab" data-bs-toggle="tab" data-bs-target="#desarrollo-tab-pane" type="button" role="tab" aria-controls="desarrollo-tab-pane" aria-selected="true"><i class="fa-solid fa-pen-to-square me-1"></i> Desarrollo</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="asistencia-tab" data-bs-toggle="tab" data-bs-target="#asistencia-tab-pane" type="button" role="tab" aria-controls="asistencia-tab-pane" aria-selected="false"><i class="fa-solid fa-users me-1"></i> Asistencia</button>
+            </li>
+            <li class="nav-item hidden-tab" role="presentation" id="nav-item-votaciones">
+                <button class="nav-link" id="votaciones-tab" data-bs-toggle="tab" data-bs-target="#votaciones-tab-pane" type="button" role="tab" aria-controls="votaciones-tab-pane" aria-selected="false"><i class="fa-solid fa-check-to-slot me-1"></i> Votaciones</button>
+            </li>
+            <li class="nav-item hidden-tab" role="presentation" id="nav-item-documentos">
+                <button class="nav-link" id="documentos-tab" data-bs-toggle="tab" data-bs-target="#documentos-tab-pane" type="button" role="tab" aria-controls="documentos-tab-pane" aria-selected="false"><i class="fa-solid fa-paperclip me-1"></i> Documentos Adjuntos</button>
+            </li>
+        </ul>
 
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="btn-refrescar-asistencia" onclick="cargarTablaAsistencia()">
-                                    <i class="fas fa-sync me-1"></i> Refrescar
-                                </button>
-                                <button type="button" class="btn btn-info btn-sm" onclick="guardarAsistencia()" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
-                                    <i class="fas fa-save me-1"></i> Guardar Asistencia
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-12 mt-2">
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-info dropdown-toggle w-100 text-start fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#votacionForm" aria-expanded="false" aria-controls="votacionForm">
-                        <i class="fa-solid fa-check-to-slot me-2"></i> Gestión de Votaciones
-                    </button>
-                    <div class="collapse" id="votacionForm">
-                        <div class="p-4 border rounded-bottom bg-white">
+        <div class="tab-content border border-top-0 p-3 bg-white shadow-sm" id="tab-content-minuta">
 
-                            <form id="formCrearVotacionMinuta" onsubmit="guardarNuevaVotacion(); return false;">
-                                <h6 class="fw-bold">Crear Nueva Votación</h6>
-                                <div class="mb-3">
-                                    <label for="votacionComisionId" class="form-label">Asociar a Comisión (para lista de votantes):</label>
-                                    <select class="form-select" id="votacionComisionId" required>
-                                        <option value="">Seleccione una comisión...</option>
-                                        <?php if (empty($comisionesDeLaReunion)): ?>
-                                            <option value="" disabled>No hay comisiones cargadas</option>
-                                        <?php else: ?>
-                                            <?php foreach ($comisionesDeLaReunion as $idCom => $nombreCom): ?>
-                                                <option value="<?php echo $idCom; ?>"><?php echo htmlspecialchars($nombreCom); ?></option>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="votacionNombre" class="form-label">Texto de la Votación (Pregunta):</label>
-                                    <input type="text" class="form-control" id="votacionNombre" placeholder="Ej: ¿Aprueba el presupuesto para...?" required>
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-plus me-1"></i> Crear y Habilitar Votación
-                                </button>
-                            </form>
-
-                            <hr class="my-4">
-
-                            <h6 class="fw-bold">Votaciones Creadas</h6>
-                            <div id="listaVotacionesMinuta">
-                                <p class="text-muted" id="votacionesStatus">Cargando votaciones...</p>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-12 mt-2">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-chart-simple me-2"></i>
-                            Resultados Preliminares de Votación
-                        </h5>
-                        <button class="btn btn-sm btn-outline-primary" id="btn-refrescar-votaciones" onclick="cargarResultadosVotacion()">
-                            <i class="fa-solid fa-sync me-1"></i> Refrescar
-                        </button>
-                    </div>
-
-                    <div class="card-body" id="votacion-resultados-live">
-                        <p class="text-muted text-center" id="votacion-placeholder">Cargando resultados...</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 mt-4">
+            <div class="tab-pane fade show active" id="desarrollo-tab-pane" role="tabpanel" aria-labelledby="desarrollo-tab" tabindex="0">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">DESARROLLO DE LA MINUTA</h5>
+                </div>
+
+                <div class="card p-3 mb-4 border-primary">
+                    <h6 class="fw-bold text-primary"><i class="fa-solid fa-lightbulb me-1"></i> Opciones de Contenido:</h6>
+                    <small class="text-muted mb-2">Marque las opciones que desea gestionar para que aparezcan en la barra de pestañas.</small>
+                    <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input navigate-to-tab" type="checkbox" id="chkAdjuntos" data-target-tab="documentos-tab">
+                            <label class="form-check-label" for="chkAdjuntos">Adjuntar Documentos</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input navigate-to-tab" type="checkbox" id="chkVotaciones" data-target-tab="votaciones-tab">
+                            <label class="form-check-label" for="chkVotaciones">Gestionar Votaciones</label>
+                        </div>
+                    </div>
                 </div>
                 <div id="contenedorTemas">
                 </div>
                 <button type="button" class="btn btn-outline-dark btn-sm mt-2" onclick="agregarTema()">Agregar Tema <span class="ms-1">➕</span></button>
 
-                <div class="adjuntos-section mt-4 pt-3 border-top">
-                    <h5 class="fw-bold mb-3">DOCUMENTOS ADJUNTOS</h5>
+            </div>
+
+            <div class="tab-pane fade" id="asistencia-tab-pane" role="tabpanel" aria-labelledby="asistencia-tab" tabindex="0">
+                <div class="p-4 border rounded-bottom bg-white" style="border: none !important;">
+                    <h5 class="fw-bold mb-3">Asistencia (Marcar estado en tiempo real)</h5>
+
+                    <div id="contenedorTablaAsistenciaEstado" style="max-height: 500px; overflow-y: auto;">
+                        <p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando lista de consejeros...</p>
+                    </div>
+
+                    <div class="d-flex justify-content-end align-items-center mt-3 gap-2" id="botonesAsistenciaContainer">
+                        <span id="guardarAsistenciaStatus" class="me-auto small text-muted"></span>
+
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refrescar-asistencia" onclick="cargarTablaAsistencia()">
+                            <i class="fas fa-sync me-1"></i> Refrescar (Manual)
+                        </button>
+                        <button type="button" class="btn btn-warning fw-bold btn-sm" onclick="guardarAsistencia()" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
+                            <i class="fas fa-save me-1"></i> Guardar Asistencia (ST)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="votaciones-tab-pane" role="tabpanel" aria-labelledby="votaciones-tab" tabindex="0">
+
+                <div class="p-4 border rounded-lg bg-white mb-4" style="border: none !important;">
+                    <h5 class="fw-bold">Crear/Gestionar Votaciones</h5>
+                    <form id="formCrearVotacionMinuta" onsubmit="guardarNuevaVotacion(); return false;">
+                        <h6 class="fw-bold mb-3">Crear Nueva Votación</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="votacionComisionId" class="form-label">Asociar a Comisión (para lista de votantes):</label>
+                                <select class="form-select" id="votacionComisionId" required <?php echo $esSoloLectura ? 'disabled' : ''; ?>>
+                                    <option value="">Seleccione una comisión...</option>
+                                    <?php if (empty($comisionesDeLaReunion)): ?>
+                                        <option value="" disabled>No hay comisiones cargadas</option>
+                                    <?php else: ?>
+                                        <?php foreach ($comisionesDeLaReunion as $idCom => $nombreCom): ?>
+                                            <option value="<?php echo $idCom; ?>"><?php echo htmlspecialchars($nombreCom); ?></option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="votacionNombre" class="form-label">Texto de la Votación (Pregunta):</label>
+                                <input type="text" class="form-control" id="votacionNombre" placeholder="Ej: ¿Aprueba el presupuesto para...?" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
+                            <i class="fas fa-plus me-1"></i> Crear y Habilitar Votación
+                        </button>
+                    </form>
+
+                    <hr class="my-4">
+
+                    <h6 class="fw-bold">Votaciones Creadas</h6>
+                    <div id="listaVotacionesMinuta">
+                        <p class="text-muted" id="votacionesStatus"><i class="fas fa-spinner fa-spin me-2"></i> Cargando votaciones...</p>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-info mt-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fa-solid fa-chart-simple me-2 text-info"></i>
+                            Resultados en Vivo
+                        </h5>
+                        <button class="btn btn-sm btn-outline-info" id="btn-refrescar-votaciones" onclick="cargarResultadosVotacion()">
+                            <i class="fa-solid fa-sync me-1"></i> Refrescar
+                        </button>
+                    </div>
+                    <div class="card-body" id="votacion-resultados-live">
+                        <p class="text-muted text-center" id="votacion-placeholder">Cargando resultados...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="documentos-tab-pane" role="tabpanel" aria-labelledby="documentos-tab" tabindex="0">
+                <div class="adjuntos-section">
+                    <h5 class="fw-bold mb-3">Gestión de Archivos y Enlaces</h5>
                     <input type="hidden" id="idMinutaActual" value="<?php echo htmlspecialchars($idMinutaActual); ?>">
 
                     <form id="formSubirArchivo" class="mb-3">
-                        <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, XLSX, MP4, PPT, DOCX) <span id="file-upload-status" class="badge bg-light text-dark"></span></label>
+                        <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, DOCX, etc.) <span id="file-upload-status" class="badge bg-light text-dark"></span></label>
                         <div class="input-group">
-                            <input type="file" class="form-control" id="inputArchivo" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx">
+                            <input type="file" class="form-control" id="inputArchivo" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx" <?php echo $esSoloLectura ? 'disabled' : ''; ?>>
                         </div>
                     </form>
 
-                    <form id="formAgregarLink" class="mb-3">
-                        <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Presione Enter o haga clic fuera para añadir)</label>
+                    <form id="formAgregarLink" class="mb-3" onsubmit="handleAgregarLink(event); return false;">
+                        <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Escriba la URL y presione Enter o haga clic fuera):</label>
                         <div class="input-group">
-                            <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required>
+                            <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
                         </div>
                     </form>
 
-                    <div id="adjuntosExistentesContainer" class="mt-4">
+                    <div id="adjuntosExistentesContainer" class="mt-4 pt-3 border-top">
                         <h6>Archivos y Enlaces Existentes:</h6>
                         <ul id="listaAdjuntosExistentes" class="list-group list-group-flush">
                             <li class="list-group-item text-muted">Cargando...</li>
                         </ul>
                     </div>
                 </div>
-                <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
-                    <div class="text-end">
+            </div>
 
-                        <?php
-                        // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
+        </div>
+        <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
+            <div class="text-end">
 
-                        // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
-                        if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
-                            echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
+                <?php
+                // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
+
+                // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
+                if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+                    echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
                         onclick="if (validarCamposMinuta()) guardarBorrador(true);">
                     <i class="fas fa-save"></i> Guardar Borrador
                 </button>';
-                        }
+                }
 
-                        // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
-                        if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                            // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
-                            echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
+                // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
+                if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                    // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
+                    echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
                 onclick="iniciarValidacionAsistencia()">
             <i class="fas fa-users-check"></i> Revisar y Validar Asistencia
         </button>';
-                        }
+                }
 
-                        // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
-                        // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
-                        if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
-                            echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
+                // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
+                // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
+                if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
+                    echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
                         onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();">
                     <i class="fas fa-paper-plane"></i> Enviar para Aprobación
                 </button>';
-                        }
+                }
 
-                        // Mensaje si ya está Aprobada
-                        if ($estadoMinuta === 'APROBADA') {
-                            echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
-                        }
+                // Mensaje si ya está Aprobada
+                if ($estadoMinuta === 'APROBADA') {
+                    echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
+                }
 
-                        // Mensaje si falta validar asistencia
-                        if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                            echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
-                        }
+                // Mensaje si falta validar asistencia
+                if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                    echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
+                }
 
-                        // --- FIN DE LA LÓGICA DE BOTONES ---
-                        ?>
+                // --- FIN DE LA LÓGICA DE BOTONES ---
+                ?>
 
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -608,6 +659,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             </div>
         </div>
     </div>
+
     <script>
         // ==================================================================
         // --- VARIABLES GLOBALES JAVASCRIPT ---
@@ -632,10 +684,12 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         const fileStatus = document.getElementById('file-upload-status');
 
         // ==================================================================
-        // --- EVENTOS PRINCIPALES ---
+        // --- EVENTOS PRINCIPALES Y LÓGICA DE TABS (NUEVO) ---
         // ==================================================================
         document.addEventListener("DOMContentLoaded", () => {
-            cargarTablaAsistencia();
+
+            // 1. Carga Inicial de datos
+            cargarTablaAsistencia(true);
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
             cargarVotacionesDeLaMinuta();
@@ -645,9 +699,52 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 cargarYAplicarFeedback();
             }
 
-            // Eventos automáticos para archivos y enlaces
+            // 2. Implementación del Polling de Asistencia (Actualización cada 1 segundo)
+            // Se mantiene la lógica de polling para la pestaña activa.
+            const INTERVALO_ASISTENCIA = 1000;
+            setInterval(() => {
+                const asistenciaTabButton = document.getElementById('asistencia-tab');
+                if (asistenciaTabButton && asistenciaTabButton.classList.contains('active')) {
+                    cargarTablaAsistencia(false);
+                }
+            }, INTERVALO_ASISTENCIA);
+
+            // 3. Inicializar el modal de Bootstrap (Validación de asistencia)
+            const modalValidarAsistencia = document.getElementById('modalValidarAsistencia');
+            if (modalValidarAsistencia) {
+                bsModalValidarAsistencia = new bootstrap.Modal(modalValidarAsistencia);
+            }
+
+            // views/pages/crearMinuta.php (Bloque de código CORREGIDO para la navegación)
+
+            // 4. Lógica de Navegación por Checkbox (¡CORREGIDO!)
+            $('.navigate-to-tab').on('change', function() {
+                const targetTabName = $(this).data('target-tab'); // ej: 'documentos-tab'
+                const targetNavItemId = `#nav-item-${targetTabName.replace('-tab', '')}`; // ej: '#nav-item-documentos'
+                const targetNavItem = $(targetNavItemId);
+                const targetTabButton = document.getElementById(targetTabName);
+
+                if ($(this).is(':checked')) {
+                    targetNavItem.removeClass('hidden-tab'); // 1. Mostrar la pestaña
+
+                    // 2. Navegar a la pestaña mostrada
+                    if (targetTabButton) {
+                        const bsTab = new bootstrap.Tab(targetTabButton);
+                        bsTab.show();
+                    }
+                } else {
+                    targetNavItem.addClass('hidden-tab'); // 1. Ocultar la pestaña
+
+                    // Navegar a la pestaña de Desarrollo si la pestaña oculta estaba activa
+                    if (targetTabButton && targetTabButton.classList.contains('active')) {
+                        const desarrolloTab = document.getElementById('desarrollo-tab');
+                        const bsTab = new bootstrap.Tab(desarrolloTab);
+                        bsTab.show();
+                    }
+                }
+            });
+            // 5. Eventos para archivos y enlaces (se mantienen los existentes)
             if (inputArchivo) {
-                // Al seleccionar un archivo, se dispara la subida
                 inputArchivo.addEventListener('change', function(e) {
                     if (this.files.length > 0) {
                         formSubirArchivo.dispatchEvent(new Event('submit', {
@@ -657,7 +754,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
             }
             if (inputUrlLink) {
-                // Al perder el foco o presionar Enter, se dispara la adición de link
                 inputUrlLink.addEventListener('change', function() {
                     const url = this.value.trim();
                     if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -669,206 +765,110 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     }
                 });
             }
-
-            // Bind de los submits a las funciones (por si no se disparan por change/focus)
             document.getElementById('formSubirArchivo').addEventListener('submit', handleSubirArchivo);
             document.getElementById('formAgregarLink').addEventListener('submit', handleAgregarLink);
-        });
 
 
-        // --- INICIO: JAVASCRIPT PARA EL MODAL DE VALIDACIÓN (CORREGIDO v2) ---
-        document.addEventListener('DOMContentLoaded', (event) => {
+            // 6. Lógica del Modal de Validación (Confirmación y Modificación)
+            const btnModificar = document.getElementById('btnModificarAsistencia');
+            if (btnModificar) {
+                btnModificar.addEventListener('click', function() {
+                    // Ocultar modal
+                    if (bsModalValidarAsistencia) {
+                        bsModalValidarAsistencia.hide();
+                    }
+                    // Activar la pestaña de Asistencia
+                    const tabButton = document.getElementById('asistencia-tab');
+                    const bsTab = new bootstrap.Tab(tabButton);
+                    bsTab.show();
 
-            const modalValidarAsistencia = document.getElementById('modalValidarAsistencia');
-            if (modalValidarAsistencia) {
+                    // Hacer scroll al inicio de la pestaña (opcional, para mejor UX)
+                    const tabPane = document.getElementById('asistencia-tab-pane');
+                    tabPane.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                });
+            }
 
-                // 1. INICIALIZAR LA INSTANCIA DEL MODAL en nuestra variable global
-                bsModalValidarAsistencia = new bootstrap.Modal(modalValidarAsistencia);
-
-                // 2. Cargar el PREVIEW cuando el modal se muestra
-                modalValidarAsistencia.addEventListener('show.bs.modal', function(event) {
-
+            const btnConfirmar = document.getElementById('btnConfirmarEnviarAsistencia');
+            if (btnConfirmar) {
+                btnConfirmar.addEventListener('click', function() {
+                    // Lógica para enviar asistencia validada y correo (SE MANTIENE IGUAL)
                     if (!idMinutaGlobal) {
-                        console.error("idMinutaGlobal no está definido.");
+                        Swal.fire('Error', 'Error de Javascript: No se pudo encontrar el ID de la minuta.', 'error');
                         return;
                     }
 
-                    const modalTitle = modalValidarAsistencia.querySelector('.modal-title');
-                    const modalBody = modalValidarAsistencia.querySelector('#contenidoModalAsistencia');
+                    const $this = this;
+                    $this.disabled = true;
+                    $this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
 
-                    modalTitle.textContent = 'Validar Asistencia de Minuta N° ' + idMinutaGlobal;
-                    modalBody.innerHTML = '<p>Cargando...</p>';
+                    const formData = new FormData();
+                    formData.append('idMinuta', idMinutaGlobal);
 
-                    fetch(`/COREVOTA/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
-                            method: 'GET'
+                    fetch('/COREVOTA/controllers/enviar_asistencia_validada.php', {
+                            method: 'POST',
+                            body: formData
                         })
                         .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'success' && data.asistencia) {
-                                let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
-                                data.asistencia.forEach(item => {
-                                    html += `<tr>
-                                    <td>${item.nombreCompleto}</td>
-                                    <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
-                                 </tr>`;
-                                });
-                                html += '</tbody></table>';
-                                modalBody.innerHTML = html;
+                        .then(response => {
+                            if (response.success || response.status === 'success') {
+                                Swal.fire('Éxito', 'Asistencia validada y correo enviado con éxito.', 'success')
+                                    .then(() => {
+                                        window.location.reload();
+                                    });
                             } else {
-                                throw new Error(data.message || 'No se pudo cargar la asistencia.');
+                                Swal.fire('Error', 'Error: ' + response.message, 'error');
                             }
                         })
                         .catch(err => {
-                            modalBody.innerHTML = `<p class="text-danger">Error al cargar la asistencia: ${err.message}</p>`;
-                            console.error("Error fetch preview asistencia:", err);
+                            Swal.fire('Error', 'Error de conexión al intentar enviar el correo.', 'error');
+                            console.error("Error fetch enviar_asistencia_validada:", err);
+                        })
+                        .finally(() => {
+                            $this.disabled = false;
+                            $this.innerHTML = '<i class="fas fa-check"></i> Confirmar y Enviar Correo';
                         });
                 });
-
-                // 3. Acción del botón "Modificar Asistencia" (CORREGIDO)
-                const btnModificar = document.getElementById('btnModificarAsistencia');
-                if (btnModificar) {
-                    btnModificar.addEventListener('click', function() {
-                        // 1. Ocultar el modal
-                        // (Usamos la instancia global 'bsModalValidarAsistencia' que definimos al inicio)
-                        if (bsModalValidarAsistencia) {
-                            bsModalValidarAsistencia.hide();
-                        }
-
-                        // 2. Encontrar el botón del acordeón de Asistencia
-                        const accordionButton = document.querySelector('button[data-bs-target="#asistenciaForm"]');
-                        // 3. Encontrar el contenido del acordeón
-                        const accordionContent = document.getElementById('asistenciaForm');
-
-                        if (accordionContent && accordionButton) {
-                            // 4. Crear una instancia de Bootstrap Collapse y mostrarla
-                            // (Esto asegura que el acordeón se abra)
-                            const collapseInstance = bootstrap.Collapse.getOrCreateInstance(accordionContent);
-                            collapseInstance.show();
-
-                            // 5. (Opcional) Hacer scroll hasta el acordeón para que el ST lo vea
-                            accordionButton.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                        } else {
-                            console.error('No se pudo encontrar el acordeón de asistencia #asistenciaForm');
-                        }
-                    });
-                }
-
-                // 4. Acción del botón "Confirmar y Enviar Correo" (Sin cambios)
-                const btnConfirmar = document.getElementById('btnConfirmarEnviarAsistencia');
-                if (btnConfirmar) {
-                    btnConfirmar.addEventListener('click', function() {
-
-                        if (!idMinutaGlobal) {
-                            Swal.fire('Error', 'Error de Javascript: No se pudo encontrar el ID de la minuta.', 'error');
-                            return;
-                        }
-
-                        const $this = this;
-                        $this.disabled = true;
-                        $this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-
-                        const formData = new FormData();
-                        formData.append('idMinuta', idMinutaGlobal);
-
-                        fetch('/COREVOTA/controllers/enviar_asistencia_validada.php', {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(response => response.json())
-                            .then(response => {
-                                if (response.success || response.status === 'success') {
-                                    Swal.fire('Éxito', 'Asistencia validada y correo enviado con éxito.', 'success')
-                                        .then(() => {
-                                            window.location.reload();
-                                        });
-                                } else {
-                                    Swal.fire('Error', 'Error: ' + response.message, 'error');
-                                }
-                            })
-                            .catch(err => {
-                                Swal.fire('Error', 'Error de conexión al intentar enviar el correo.', 'error');
-                                console.error("Error fetch enviar_asistencia_validada:", err);
-                            })
-                            .finally(() => {
-                                $this.disabled = false;
-                                $this.innerHTML = '<i class="fas fa-check"></i> Confirmar y Enviar Correo';
-                            });
-                    });
-                }
-            }
-        });
-
-
-        function iniciarValidacionAsistencia() {
-            const btn = document.getElementById('btnRevisarAsistencia');
-            if (!btn) return;
-
-            // 1. Validar campos (como el Guardar Borrador)
-            // (Esta función ya existe en tu script, línea 973)
-            if (!validarCamposMinuta()) {
-                return; // Detiene si falta un tema/objetivo
             }
 
-            // 2. Mostrar estado de carga
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando cambios...';
-
-            // 3. Llamar a guardarBorrador (que genera el PDF)
-            // (Esta función ya existe en tu script, línea 796)
-            guardarBorrador(false, function(guardadoExitoso) {
-
-                // 4. Resetear el botón
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-users-check"></i> Revisar y Validar Asistencia';
-
-                if (guardadoExitoso) {
-                    // 5. Si se guardó (y generó el PDF), ABRIR EL MODAL
-                    // (Usamos la instancia global que inicializamos en el DOMContentLoaded)
-                    if (bsModalValidarAsistencia) {
-                        bsModalValidarAsistencia.show();
-                    } else {
-                        Swal.fire('Error JS', 'No se pudo instanciar el modal de validación.', 'error');
-                    }
-                } else {
-                    // 6. Si falló el guardado, mostrar error
-                    Swal.fire('Error al Guardar', 'No se pudieron guardar los cambios. El PDF de asistencia no se pudo generar.', 'error');
-                }
-            });
-        }
-        // --- FIN: JAVASCRIPT MODAL ---
-
-
-
-
-
-
-
-
-
-
+        }); // FIN DOMContentLoaded
 
         // ==================================================================
-        // --- SECCIÓN: ASISTENCIA (CORREGIDA/REFACTORIZADA) ---
+        // --- SECCIÓN: ASISTENCIA (AJUSTADA PARA POLLING) ---
         // ==================================================================
 
         /**
          * Carga la lista maestra de consejeros y la asistencia guardada.
+         * @param {boolean} isInitialLoad Si es true, muestra mensaje de carga, si es false, es silencioso.
          */
-        function cargarTablaAsistencia() {
+        // views/pages/crearMinuta.php (AJUSTES DENTRO DEL <script>)
+
+        // ... (secciones omitidas por brevedad)
+
+        // ==================================================================
+        // --- SECCIÓN: ASISTENCIA (AJUSTADA PARA POLLING Y REGLA DE 30 MIN) ---
+        // ==================================================================
+
+        /**
+         * Carga la lista maestra de consejeros y la asistencia guardada.
+         * @param {boolean} isInitialLoad Si es true, muestra mensaje de carga, si es false, es silencioso.
+         */
+        function cargarTablaAsistencia(isInitialLoad) {
             const cont = document.getElementById("contenedorTablaAsistenciaEstado");
             const btnRefresh = document.getElementById("btn-refrescar-asistencia");
-            if (btnRefresh) btnRefresh.disabled = true;
 
-            cont.innerHTML = '<p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando lista de consejeros y asistencia...</p>';
+            if (isInitialLoad) {
+                if (btnRefresh) btnRefresh.disabled = true;
+                cont.innerHTML = '<p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando lista de consejeros y asistencia...</p>';
+            }
 
-            // 1. Cargar la lista MAESTRA de consejeros
+            // 1. Cargar la lista MAESTRA de consejeros (ASISTENTES)
             const fetchConsejeros = fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Error fetch_data.php')));
 
-            // 2. Cargar la lista ACTUAL de asistencia
+            // 2. Cargar la lista ACTUAL de asistencia Y HORA DE INICIO
             const fetchAsistenciaActual = fetch(`/corevota/controllers/obtener_asistencia_actual.php?idMinuta=${idMinutaGlobal}`)
                 .then(res => res.ok ? res.json() : Promise.reject(new Error('Error obtener_asistencia_actual.php')));
 
@@ -882,14 +882,46 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                     const data = responseConsejeros.data; // Lista de usuarios
                     // ¡ACTUALIZAMOS LA VARIABLE GLOBAL!
-                    ASISTENCIA_GUARDADA_IDS = responseAsistencia.data.map(String); // Array de IDs como strings ['15', '37', '40']
+                    ASISTENCIA_GUARDADA_IDS = responseAsistencia.data.map(String); // Array de IDs como strings
 
-                    // Determinar si los checkboxes deben estar deshabilitados
-                    const disabledAttr = ES_ST_EDITABLE ? '' : 'disabled';
-                    const titleAttr = ES_ST_EDITABLE ? '' : 'title="Edición bloqueada por el estado de la minuta o su rol."';
+                    // --- INICIO LÓGICA REGLA DE 30 MINUTOS ---
+                    const meetingTimeData = responseAsistencia.meeting_time;
+                    const meetingDateTimeString = `${meetingTimeData.fecha} ${meetingTimeData.hora}`;
+                    const meetingStartTime = new Date(meetingDateTimeString);
+                    const currentTime = new Date();
+                    // Calcular la diferencia en minutos
+                    const diffInMinutes = (currentTime.getTime() - meetingStartTime.getTime()) / (1000 * 60);
+
+                    // Determinar si la ventana de autogestión está CERRADA
+                    // El ST siempre puede editar (controlado por ES_ST_EDITABLE, que chequea tipoUsuario=2)
+                    const autoCheckInDisabled = diffInMinutes > 30;
+                    let timeWarning = '';
+
+                    if (autoCheckInDisabled) {
+                        timeWarning = '<p class="text-danger fw-bold"><i class="fas fa-clock me-1"></i> ¡Plazo de autogestión de asistencia (30 minutos) ha expirado!</p>';
+                        timeWarning += '<p class="text-muted small">El Secretario Técnico puede seguir marcando asistencia manualmente.</p>';
+                    } else {
+                        const remainingTime = Math.ceil(30 - diffInMinutes);
+                        timeWarning = `<p class="text-success fw-bold"><i class="fas fa-hourglass-half me-1"></i> Plazo restante: ${remainingTime} minutos (aprox.)</p>`;
+                    }
+
+                    // El ST siempre tiene permiso de edición manual, independientemente de la hora.
+                    // Si no es ST (o es ST pero la minuta está APROBADA), los campos se deshabilitan.
+                    const baseDisabledAttr = ES_ST_EDITABLE ? '' : 'disabled';
+                    const baseTitleAttr = ES_ST_EDITABLE ? '' : 'title="Edición bloqueada por el estado de la minuta o su rol."';
+
+                    // El atributo `disabledAttr` para el check de presencia de cada usuario
+                    // Solo se aplica el bloqueo de tiempo si NO es ST.
+                    const userDisabledAttr = ES_ST_EDITABLE ? baseDisabledAttr : (autoCheckInDisabled ? 'disabled' : baseDisabledAttr);
+                    const userTitleAttr = ES_ST_EDITABLE ? baseTitleAttr : (autoCheckInDisabled ? 'title="El plazo de 30 minutos para la autogestión de asistencia ha expirado."' : baseTitleAttr);
+
+                    // --- FIN LÓGICA REGLA DE 30 MINUTOS ---
+
 
                     if (data && data.length > 0) {
-                        let tabla = `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
+                        let tabla = timeWarning; // Añadir la advertencia de tiempo
+
+                        tabla += `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
                         data.forEach(c => {
                             const userIdString = String(c.idUsuario);
                             const isPresent = ASISTENCIA_GUARDADA_IDS.includes(userIdString);
@@ -897,10 +929,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                             // Aplicar el atributo disabled/title a los checkboxes
                             tabla += `<tr data-userid="${c.idUsuario}">
-                                <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
-                                <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${disabledAttr} ${titleAttr}></td>
-                                <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${disabledAttr} ${titleAttr}></td>
-                                </tr>`;
+                        <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
+                        <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
+                        <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
+                        </tr>`;
                         });
                         tabla += `</tbody></table>`;
                         cont.innerHTML = tabla;
@@ -910,18 +942,19 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 })
                 .catch(err => {
                     console.error("Error carga asistencia:", err);
-                    cont.innerHTML = `<p class="text-danger">Error al refrescar asistencia: ${err.message}</p>`;
+                    if (isInitialLoad) {
+                        cont.innerHTML = `<p class="text-danger">Error al refrescar asistencia: ${err.message}</p>`;
+                    }
                 })
                 .finally(() => {
                     if (btnRefresh) btnRefresh.disabled = false;
-                    // Llamar a la lógica de feedback por si estaba en REQUERIDO_REVISION y debe bloquear la sección
                     if (REGLAS_FEEDBACK) deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
                 });
         }
 
-        /**
-         * Maneja el cambio de estado de un checkbox (presente/ausente).
-         */
+        // Resto de las funciones de Asistencia (handleAsistenciaChange, recolectarAsistencia, guardarAsistencia)
+        // se mantienen SIN cambios ya que su lógica es correcta.
+
         function handleAsistenciaChange(userId, changedType) {
             const present = document.getElementById(`present_${userId}`);
             const absent = document.getElementById(`absent_${userId}`);
@@ -932,10 +965,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Recolecta los IDs de los usuarios marcados como 'Presente'.
-         * @returns {Array<string>} Array de IDs de usuario.
-         */
         function recolectarAsistencia() {
             const ids = [];
             const presentes = document.querySelectorAll("#tablaAsistenciaEstado .present-check:checked");
@@ -943,9 +972,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             return ids;
         }
 
-        /**
-         * Envía los IDs de asistencia recolectados al servidor.
-         */
         function guardarAsistencia() {
             const asistenciaIDs = recolectarAsistencia();
 
@@ -957,20 +983,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             const status = document.getElementById('guardarAsistenciaStatus');
             const btn = document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]');
 
-            // --- INICIO DE LA CORRECCIÓN ---
-
-            // 1. Crear un objeto FormData
             const formData = new FormData();
-
-            // 2. Agregar los datos que el PHP espera en $_POST
             formData.append('idMinuta', idMinutaGlobal);
-
-            // 3. Convertir el array de asistencia en un *string* JSON.
-            // (Tu otro script, guardar_minuta_completa.php, espera un string,
-            // así que es casi seguro que guardar_asistencia.php también lo espera)
             formData.append('asistencia', JSON.stringify(asistenciaIDs));
-
-            // --- FIN DE LA CORRECCIÓN ---
 
             btn.disabled = true;
             status.textContent = 'Guardando...';
@@ -978,8 +993,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
             fetch("/corevota/controllers/guardar_asistencia.php", {
                     method: "POST",
-                    // 4. NO enviar 'headers', el navegador lo hace solo
-                    body: formData // 5. Enviar el objeto FormData
+                    body: formData
                 })
                 .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
                 .then(resp => {
@@ -987,10 +1001,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     if (resp.status === "success") {
                         status.textContent = "✅ Guardado";
                         status.className = 'me-auto small text-success fw-bold';
-
-                        // Actualizar la lista global de IDs y la tabla visual
-                        cargarTablaAsistencia();
-
+                        cargarTablaAsistencia(true);
                         setTimeout(() => {
                             status.textContent = '';
                         }, 3000);
@@ -1010,382 +1021,66 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        // ==================================================================
-        // --- SECCIÓN: EDICIÓN DE TEMAS ---
-        // ==================================================================
-
-        /**
-         * Aplica un comando de formato al contenido editable.
-         */
-        function format(command) {
-            try {
-                document.execCommand(command, false, null);
-            } catch (e) {
-                console.error("Format command failed:", e);
-            }
-        }
-
-        /**
-         * Carga los temas existentes o prepara un bloque vacío.
-         */
-        function cargarOPrepararTemas() {
-            if (DATOS_TEMAS_CARGADOS && DATOS_TEMAS_CARGADOS.length > 0) {
-                DATOS_TEMAS_CARGADOS.forEach(t => crearBloqueTema(t));
-            } else {
-                crearBloqueTema();
-            }
-        }
-
-        /**
-         * Agrega un nuevo tema vacío.
-         */
-        function agregarTema() {
-            crearBloqueTema();
-        }
-
-        /**
-         * Crea y añade un bloque de tema al DOM.
-         * @param {Object} [tema=null] - Datos del tema a cargar (opcional).
-         */
-        function crearBloqueTema(tema = null) {
-            contadorTemas++;
-            const plantilla = document.getElementById("plantilla-tema");
-            if (!plantilla || !plantilla.content) return;
-            const nuevo = plantilla.content.cloneNode(true);
-            const div = nuevo.querySelector('.tema-block');
-            if (!div) return;
-            const h6 = nuevo.querySelector('h6');
-            if (h6) h6.innerText = `Tema ${contadorTemas}`;
-
-            // Actualizar IDs y data-bs-target para Bootstrap Collapse
-            nuevo.querySelectorAll('[data-bs-target]').forEach(el => {
-                let target = el.getAttribute('data-bs-target').replace('_ID_', `_${contadorTemas}_`);
-                el.setAttribute('data-bs-target', target);
-                el.setAttribute('aria-controls', target.substring(1));
-            });
-            nuevo.querySelectorAll('.collapse').forEach(el => {
-                el.id = el.id.replace('_ID_', `_${contadorTemas}_`);
-            });
-
-            const areas = nuevo.querySelectorAll('.editable-area');
-            // Cargar datos si se proporcionan
-            if (tema) {
-                if (areas[0]) areas[0].innerHTML = tema.nombreTema || '';
-                if (areas[1]) areas[1].innerHTML = tema.objetivo || '';
-                if (areas[2]) areas[2].innerHTML = tema.descAcuerdo || '';
-                if (areas[3]) areas[3].innerHTML = tema.compromiso || '';
-                if (areas[4]) areas[4].innerHTML = tema.observacion || '';
-                div.dataset.idTema = tema.idTema; // Guardar ID de tema existente
-            }
-
-            // Mostrar botón de eliminar si hay más de 1 tema
-            const btnEliminar = nuevo.querySelector('.eliminar-tema');
-            if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
-            contenedorTemasGlobal.appendChild(nuevo);
-
-            // Si no es editable, deshabilitar áreas
-            if (!ES_ST_EDITABLE) {
-                div.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
-                    el.disabled = true;
-                    el.contentEditable = false;
-                    el.style.cursor = 'not-allowed';
-                    el.style.backgroundColor = '#e9ecef';
-                });
-                div.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
-                    toolbar.style.display = 'none';
-                });
-                if (btnEliminar) btnEliminar.style.display = 'none'; // Ocultar el botón de eliminar si no es editable
-            }
-        }
-
-        /**
-         * Elimina un bloque de tema del DOM y actualiza la numeración.
-         * @param {HTMLElement} btn - Botón de eliminar presionado.
-         */
-        function eliminarTema(btn) {
-            const temaBlock = btn.closest('.tema-block');
-            if (temaBlock) {
-                temaBlock.remove();
-                actualizarNumerosDeTema();
-            }
-        }
-
-        /**
-         * Re-numera los títulos de los bloques de tema.
-         */
-        function actualizarNumerosDeTema() {
-            const bloques = contenedorTemasGlobal.querySelectorAll('.tema-block');
-            contadorTemas = 0;
-            bloques.forEach(b => {
-                contadorTemas++;
-                const h6 = b.querySelector('h6');
-                if (h6) h6.innerText = `Tema ${contadorTemas}`;
-                const btnEliminar = b.querySelector('.eliminar-tema');
-                if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1 && ES_ST_EDITABLE) ? 'inline-block' : 'none';
-            });
-        }
 
         // ==================================================================
-        // --- SECCIÓN: ADJUNTOS (Archivos y Enlaces) ---
+        // --- SECCIÓN: ACCIONES DE MINUTA (Guardar/Enviar) (SE MANTIENEN IGUAL) ---
         // ==================================================================
 
-        /**
-         * Maneja la subida de archivos (disparado por el evento 'change' del input file).
-         */
-        function handleSubirArchivo(e) {
-            e.preventDefault();
-            const input = document.getElementById('inputArchivo');
-            if (!input.files || input.files.length === 0) {
-                Swal.fire('Error', 'Debe seleccionar un archivo.', 'warning');
-                return;
-            }
-            if (!ES_ST_EDITABLE) {
-                Swal.fire('Prohibido', 'No puede subir archivos en este estado.', 'error');
+        function iniciarValidacionAsistencia() {
+            const btn = document.getElementById('btnRevisarAsistencia');
+            if (!btn) return;
+
+            if (!validarCamposMinuta()) {
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('idMinuta', idMinutaGlobal);
-            formData.append('archivo', input.files[0]);
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando cambios...';
 
-            fileStatus.textContent = 'Subiendo...';
-            fileStatus.className = 'badge bg-warning text-dark';
-            input.disabled = true;
+            // El callback de guardarBorrador se encarga de re-habilitar el botón y mostrar el modal
+            guardarBorrador(false, function(guardadoExitoso) {
 
-            fetch('/corevota/controllers/agregar_adjunto.php?action=upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(res => {
-                    if (res.ok) {
-                        return res.json();
-                    }
-                    return res.text().then(text => {
-                        console.error("Respuesta de error del servidor (upload):", text);
-                        throw new Error("El servidor respondió con un error (ver consola).");
-                    });
-                })
-                .then(data => {
-                    if (data.status === 'success') {
-                        Swal.fire('Éxito', 'Archivo subido correctamente.', 'success');
-                        agregarAdjuntoALista(data.data);
-                        input.value = ''; // Limpiar el input
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-users-check"></i> Revisar y Validar Asistencia';
 
-                        fileStatus.textContent = '✅ Subido con éxito';
-                        fileStatus.className = 'badge bg-success';
+                if (guardadoExitoso) {
+                    if (bsModalValidarAsistencia) {
+                        // Cargar el preview en el modal (trigger 'show.bs.modal' en el modal)
+                        fetch(`/COREVOTA/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                                method: 'GET'
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                const modalBody = document.querySelector('#contenidoModalAsistencia');
+                                if (data.status === 'success' && data.asistencia) {
+                                    let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
+                                    data.asistencia.forEach(item => {
+                                        html += `<tr>
+                                    <td>${item.nombreCompleto}</td>
+                                    <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
+                                 </tr>`;
+                                    });
+                                    html += '</tbody></table>';
+                                    modalBody.innerHTML = html;
+                                } else {
+                                    modalBody.innerHTML = `<p class="text-danger">Error al cargar la asistencia: ${data.message || 'No se pudo cargar la asistencia.'}</p>`;
+                                }
+                                bsModalValidarAsistencia.show();
+                            })
+                            .catch(err => {
+                                Swal.fire('Error al cargar preview', 'Error de conexión: ' + err.message, 'error');
+                                console.error("Error fetch preview asistencia:", err);
+                            });
                     } else {
-                        Swal.fire('Error', data.message || 'No se pudo subir el archivo.', 'error');
-                        fileStatus.textContent = '❌ Error de subida';
-                        fileStatus.className = 'badge bg-danger';
+                        Swal.fire('Error JS', 'No se pudo instanciar el modal de validación.', 'error');
                     }
-                })
-                .catch(err => {
-                    Swal.fire('Error', 'Error de conexión al subir: ' + err.message, 'error');
-                    fileStatus.textContent = '❌ Error de conexión';
-                    fileStatus.className = 'badge bg-danger';
-                })
-                .finally(() => {
-                    input.disabled = false;
-                    setTimeout(() => {
-                        fileStatus.textContent = '';
-                    }, 3000);
-                });
-        }
-
-        /**
-         * Maneja la adición de enlaces (disparado por el evento 'change' del input url).
-         */
-        function handleAgregarLink(e) {
-            e.preventDefault();
-            const input = document.getElementById('inputUrlLink');
-            const url = input.value.trim();
-
-            if (!url || !filterUrl(url)) {
-                Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
-                return;
-            }
-            if (!ES_ST_EDITABLE) {
-                Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
-                return;
-            }
-
-            input.disabled = true;
-            input.placeholder = 'Añadiendo...';
-
-            const formData = new FormData();
-            formData.append('idMinuta', idMinutaGlobal);
-            formData.append('urlLink', url);
-
-            fetch('/corevota/controllers/agregar_adjunto.php?action=link', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(res => {
-                    if (res.ok) {
-                        return res.json();
-                    }
-                    return res.text().then(text => {
-                        console.error("Respuesta de error del servidor (link):", text);
-                        throw new Error("El servidor respondió con un error (ver consola).");
-                    });
-                })
-                .then(data => {
-                    if (data.status === 'success') {
-                        Swal.fire('Éxito', 'Enlace agregado correctamente.', 'success');
-                        agregarAdjuntoALista(data.data);
-                        input.value = '';
-                    } else {
-                        Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
-                    }
-                })
-                .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
-                .finally(() => {
-                    input.disabled = false;
-                    input.placeholder = 'https://ejemplo.com';
-                });
-        }
-
-        /**
-         * Valida que una cadena sea una URL con formato correcto.
-         */
-        function filterUrl(str) {
-            const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
-                '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
-                '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
-                '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
-                '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
-                '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
-            return !!pattern.test(str);
-        }
-
-        /**
-         * Carga la lista de adjuntos existentes desde el servidor.
-         */
-        function cargarYMostrarAdjuntosExistentes() {
-            if (!idMinutaGlobal) return;
-
-            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinutaGlobal}&_cacheBust=${new Date().getTime()}`)
-                .then(response => response.ok ? response.json() : Promise.reject('Error al obtener adjuntos'))
-                .then(data => {
-                    if (data.status === 'success' && data.data) {
-                        mostrarAdjuntosExistentes(data.data);
-                    } else {
-                        mostrarAdjuntosExistentes([]);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al cargar adjuntos:', error);
-                    const listaUl = document.getElementById('listaAdjuntosExistentes');
-                    if (listaUl) listaUl.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos actuales.</li>';
-                });
-        }
-
-        /**
-         * Renderiza la lista de adjuntos en el DOM.
-         */
-        function mostrarAdjuntosExistentes(adjuntos) {
-            const listaUl = document.getElementById('listaAdjuntosExistentes');
-            if (!listaUl) return;
-            listaUl.innerHTML = '';
-            if (!adjuntos || adjuntos.length === 0) {
-                listaUl.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>';
-                return;
-            }
-            adjuntos.forEach(adj => agregarAdjuntoALista(adj));
-        }
-
-        /**
-         * Crea y añade un único elemento <li> de adjunto a la lista.
-         */
-        function agregarAdjuntoALista(adj) {
-
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Si el adjunto es de tipo 'asistencia', no lo dibujes y termina la función.
-            if (adj.tipoAdjunto === 'asistencia') {
-                return;
-            }
-            // --- FIN DE LA CORRECCIÓN ---
-
-            const listaUl = document.getElementById('listaAdjuntosExistentes');
-            if (!listaUl) return;
-
-            // Borra el placeholder si es el primer item
-            const placeholder = listaUl.querySelector('.text-muted');
-            if (placeholder) placeholder.remove();
-
-            const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center';
-
-            const link = document.createElement('a');
-            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
-            link.href = url;
-            link.target = '_blank';
-
-            let icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');
-            let nombreArchivo = adj.pathAdjunto.split('/').pop();
-            if (adj.tipoAdjunto === 'link') {
-                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
-            }
-
-            link.textContent = ` ${icon} ${nombreArchivo}`;
-            link.title = adj.pathAdjunto;
-            li.appendChild(link);
-
-            // Añade el botón de eliminar si no es asistencia
-            if (adj.tipoAdjunto !== 'asistencia' && ES_ST_EDITABLE) {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
-                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-                deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li);
-                li.appendChild(deleteBtn);
-            }
-
-            listaUl.appendChild(li);
-        }
-
-        /**
-         * Elimina un adjunto de la base de datos y del DOM.
-         */
-        function eliminarAdjunto(idAdjunto, listItemElement) {
-            if (!ES_ST_EDITABLE) {
-                Swal.fire('Prohibido', 'No puede eliminar adjuntos en este estado.', 'error');
-                return;
-            }
-
-            Swal.fire({
-                title: '¿Eliminar Adjunto?',
-                text: "Esta acción no se puede deshacer.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                confirmButtonText: 'Sí, eliminar',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    fetch(`/corevota/controllers/eliminar_adjunto.php?idAdjunto=${idAdjunto}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data.status === 'success') {
-                                listItemElement.remove();
-                                Swal.fire('Eliminado', 'El adjunto ha sido eliminado.', 'success');
-                            } else {
-                                Swal.fire('Error', data.message || 'No se pudo eliminar el adjunto.', 'error');
-                            }
-                        })
-                        .catch(err => Swal.fire('Error', 'Error de conexión: ' + err.message, 'error'));
+                } else {
+                    Swal.fire('Error al Guardar', 'No se pudieron guardar los cambios. El PDF de asistencia no se pudo generar.', 'error');
                 }
             });
         }
 
-        // ==================================================================
-        // --- SECCIÓN: ACCIONES DE MINUTA (Guardar/Enviar) ---
-        // ==================================================================
-
-        /**
-         * Recolecta todos los datos del formulario (temas, acuerdos, etc.) y los envía al servidor.
-         * @param {boolean} guardarYSalir - Si es true, redirige después de guardar.
-         * @param {Function} [callback=null] - Función a llamar después de guardar (usado por confirmarEnvioAprobacion).
-         */
+        // --- FUNCIONES DE GUARDADO Y ENVÍO SE MANTIENEN IGUAL ---
         function guardarBorrador(guardarYSalir, callback = null) {
             if (!idMinutaGlobal) {
                 alert("Error Crítico: No hay ID de Minuta.");
@@ -1478,13 +1173,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        /**
-         * Pide confirmación y llama a la secuencia Guardar -> Enviar Aprobación.
-         */
-        /**
-         * Pide confirmación y llama a la secuencia Guardar -> Enviar Aprobación.
-         * (MODIFICADA CON EL POP-UP DE "CARGANDO")
-         */
+
         function confirmarEnvioAprobacion() {
             const idMinuta = idMinutaGlobal;
             const btnGuardar = document.getElementById('btnGuardarBorrador');
@@ -1560,7 +1249,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                                         text: data.message, // Debería decir "Minuta enviada a aprobacion"
                                         icon: 'success'
                                     }).then(() => {
-                                        // ✅ CORRECCIÓN DE REDIRECCIÓN
                                         // Redirección al listado de minutas pendientes del ST
                                         window.location.href = 'menu.php?pagina=minutas_pendientes';
                                     });
@@ -1583,13 +1271,11 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             });
         }
 
+
         // ==================================================================
-        // --- SECCIÓN: FEEDBACK / RE-ENVÍO ---
+        // --- SECCIÓN: FEEDBACK / RE-ENVÍO (SE MANTIENE IGUAL) ---
         // ==================================================================
 
-        /**
-         * Llama al controlador para ver si existe feedback para esta minuta.
-         */
         async function cargarYAplicarFeedback() {
             try {
                 const response = await fetch(`/corevota/controllers/obtener_feedback_json.php?idMinuta=${idMinutaGlobal}`);
@@ -1634,24 +1320,29 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Deshabilita las secciones del formulario según las reglas de feedback.
-         */
         function deshabilitarCamposSegunFeedback(reglas) {
 
             // Regla para Asistencia (Bloquea si reglas.asistencia es 'false')
             if (reglas.asistencia === false) {
-                deshabilitarSeccion('asistenciaForm', 'Asistencia bloqueada (sin feedback)');
+                // Buscamos el nav-item y el contenido
+                const navItem = document.getElementById('nav-item-asistencia');
+                if (navItem) navItem.classList.add('opacity-50');
+                deshabilitarSeccion('asistencia-tab-pane', 'Asistencia bloqueada (sin feedback)');
+                document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]').disabled = true;
             }
 
             // Regla para Votaciones
             if (reglas.votaciones === false) {
-                deshabilitarSeccion('votacionForm', 'Votaciones bloqueadas (sin feedback)');
+                const navItem = document.getElementById('nav-item-votaciones');
+                if (navItem) navItem.classList.add('opacity-50');
+                deshabilitarSeccion('votaciones-tab-pane', 'Votaciones bloqueadas (sin feedback)');
             }
 
             // Regla para Adjuntos
             if (reglas.adjuntos === false) {
-                deshabilitarSeccion('adjuntos-section', 'Adjuntos bloqueados (sin feedback)');
+                const navItem = document.getElementById('nav-item-documentos');
+                if (navItem) navItem.classList.add('opacity-50');
+                deshabilitarSeccion('documentos-tab-pane', 'Adjuntos bloqueados (sin feedback)');
             }
 
             // Regla para Temas
@@ -1666,17 +1357,8 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Función helper para deshabilitar visualmente una sección.
-         */
         function deshabilitarSeccion(idElemento, mensaje) {
-            const btnCollapse = document.querySelector(`button[data-bs-target="#${idElemento}"]`);
-            if (btnCollapse) {
-                btnCollapse.disabled = true;
-                btnCollapse.title = mensaje;
-                btnCollapse.classList.add('opacity-50');
-            }
-
+            // Esta función fue ajustada para trabajar con la nueva estructura de pestañas
             const seccion = document.getElementById(idElemento);
             if (seccion) {
                 seccion.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
@@ -1684,6 +1366,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     el.contentEditable = false;
                     el.style.cursor = 'not-allowed';
                     el.style.backgroundColor = '#e9ecef';
+                    el.title = mensaje;
                 });
 
                 seccion.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
@@ -1691,9 +1374,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
             }
 
-            // Casos especiales para secciones que no son 'collapse' o tienen un manejo de opacidad
-            if (idElemento === 'adjuntos-section' || idElemento === 'contenedorTemas') {
-                const target = document.querySelector(`.${idElemento}`) || document.getElementById(idElemento);
+            // En el caso de ContenedorTemas, también se pone opacidad
+            if (idElemento === 'contenedorTemas') {
+                const target = document.getElementById(idElemento);
                 if (target) {
                     target.style.opacity = '0.6';
                     target.style.pointerEvents = 'none';
@@ -1702,9 +1385,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Cambia los botones de acción al final de la página para el modo Feedback.
-         */
         function actualizarBotonesParaFeedback() {
             const btnGuardar = document.getElementById('btnGuardarBorrador');
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
@@ -1722,9 +1402,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Secuencia de Guardar Correcciones -> Confirmar Re-envío.
-         */
         function confirmarAplicarFeedback() {
             if (!ES_ST_EDITABLE) {
                 Swal.fire('Prohibido', 'No puede reenviar la minuta en este estado.', 'error');
@@ -1766,9 +1443,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             });
         }
 
-        /**
-         * Función final que llama al controlador aplicar_feedback.php para el re-envío.
-         */
         function llamarAplicarFeedback() {
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
             if (btnEnviar) {
@@ -1807,10 +1481,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        /**
-         * Valida que los campos obligatorios de cada tema (Tema y Objetivo) no estén vacíos.
-         * @returns {boolean} True si todos los campos obligatorios están llenos.
-         */
         function validarCamposMinuta() {
             const bloques = document.querySelectorAll('#contenedorTemas .tema-block');
             let valido = true;
@@ -1821,7 +1491,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 const temaEl = areas[0];
                 const objetivoEl = areas[1];
 
-                // Limpiar etiquetas HTML y espacios en blanco
                 const tema = temaEl ? temaEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
                 const objetivo = objetivoEl ? objetivoEl.innerHTML.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/g, '').trim() : '';
 
@@ -1839,29 +1508,356 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         confirmButtonColor: '#198754'
                     });
 
-                    // Abrir el bloque del tema y enfocar el campo vacío
-                    const collapse = bloque.querySelector('#temaTratado_' + (index + 1) + '_');
-                    if (collapse && collapse.classList.contains('collapse')) {
-                        const bsCollapse = new bootstrap.Collapse(collapse, {
-                            show: true
-                        });
+                    // Abrir el collapse del tema
+                    const collapseTema = bloque.querySelector('button[data-bs-target^="#temaTratado"]');
+                    if (collapseTema) {
+                        const targetId = collapseTema.getAttribute('data-bs-target');
+                        const collapseElement = document.querySelector(targetId);
+                        if (collapseElement && !collapseElement.classList.contains('show')) {
+                            new bootstrap.Collapse(collapseElement, {
+                                toggle: true
+                            });
+                        }
                     }
 
+                    // Enfocar el campo vacío
                     (tema ? objetivoEl : temaEl)?.focus();
-                    return false; // Sale de la función en el primer error
+                    return false;
                 }
             }
-
             return valido;
         }
 
         // ==================================================================
-        // --- SECCIÓN: GESTIÓN Y RESULTADOS DE VOTACIONES ---
+        // --- SECCIÓN: EDICIÓN DE TEMAS (SE MANTIENEN IGUAL) ---
         // ==================================================================
 
-        /**
-         * Crea una nueva votación y la asocia a la minuta.
-         */
+        function format(command) {
+            try {
+                document.execCommand(command, false, null);
+            } catch (e) {
+                console.error("Format command failed:", e);
+            }
+        }
+
+        function cargarOPrepararTemas() {
+            if (DATOS_TEMAS_CARGADOS && DATOS_TEMAS_CARGADOS.length > 0) {
+                DATOS_TEMAS_CARGADOS.forEach(t => crearBloqueTema(t));
+            } else {
+                crearBloqueTema();
+            }
+        }
+
+        function agregarTema() {
+            crearBloqueTema();
+        }
+
+        function crearBloqueTema(tema = null) {
+            contadorTemas++;
+            const plantilla = document.getElementById("plantilla-tema");
+            if (!plantilla || !plantilla.content) return;
+            const nuevo = plantilla.content.cloneNode(true);
+            const div = nuevo.querySelector('.tema-block');
+            if (!div) return;
+            const h6 = nuevo.querySelector('h6');
+            if (h6) h6.innerText = `Tema ${contadorTemas}`;
+
+            // Actualizar IDs y data-bs-target para Bootstrap Collapse
+            nuevo.querySelectorAll('[data-bs-target]').forEach(el => {
+                let target = el.getAttribute('data-bs-target').replace('_ID_', `_${contadorTemas}_`);
+                el.setAttribute('data-bs-target', target);
+                el.setAttribute('aria-controls', target.substring(1));
+            });
+            nuevo.querySelectorAll('.collapse').forEach(el => {
+                el.id = el.id.replace('_ID_', `_${contadorTemas}_`);
+            });
+
+            const areas = nuevo.querySelectorAll('.editable-area');
+            // Cargar datos si se proporcionan
+            if (tema) {
+                if (areas[0]) areas[0].innerHTML = tema.nombreTema || '';
+                if (areas[1]) areas[1].innerHTML = tema.objetivo || '';
+                if (areas[2]) areas[2].innerHTML = tema.descAcuerdo || '';
+                if (areas[3]) areas[3].innerHTML = tema.compromiso || '';
+                if (areas[4]) areas[4].innerHTML = tema.observacion || '';
+                div.dataset.idTema = tema.idTema; // Guardar ID de tema existente
+            }
+
+            // Mostrar botón de eliminar si hay más de 1 tema
+            const btnEliminar = nuevo.querySelector('.eliminar-tema');
+            if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
+            contenedorTemasGlobal.appendChild(nuevo);
+
+            // Si no es editable, deshabilitar áreas
+            if (!ES_ST_EDITABLE) {
+                div.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
+                    el.disabled = true;
+                    el.contentEditable = false;
+                    el.style.cursor = 'not-allowed';
+                    el.style.backgroundColor = '#e9ecef';
+                });
+                div.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
+                    toolbar.style.display = 'none';
+                });
+                if (btnEliminar) btnEliminar.style.display = 'none'; // Ocultar el botón de eliminar si no es editable
+            }
+            actualizarNumerosDeTema();
+        }
+
+        function eliminarTema(btn) {
+            const temaBlock = btn.closest('.tema-block');
+            if (temaBlock) {
+                temaBlock.remove();
+                actualizarNumerosDeTema();
+            }
+        }
+
+        function actualizarNumerosDeTema() {
+            const bloques = contenedorTemasGlobal.querySelectorAll('.tema-block');
+            contadorTemas = 0;
+            bloques.forEach(b => {
+                contadorTemas++;
+                const h6 = b.querySelector('h6');
+                if (h6) h6.innerText = `Tema ${contadorTemas}`;
+                const btnEliminar = b.querySelector('.eliminar-tema');
+                if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1 && ES_ST_EDITABLE) ? 'inline-block' : 'none';
+            });
+        }
+
+
+        // ==================================================================
+        // --- SECCIÓN: ADJUNTOS (Archivos y Enlaces) (SE MANTIENEN IGUAL) ---
+        // ==================================================================
+
+        function handleSubirArchivo(e) {
+            e.preventDefault();
+            const input = document.getElementById('inputArchivo');
+            if (!input.files || input.files.length === 0) {
+                Swal.fire('Error', 'Debe seleccionar un archivo.', 'warning');
+                return;
+            }
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede subir archivos en este estado.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('idMinuta', idMinutaGlobal);
+            formData.append('archivo', input.files[0]);
+
+            fileStatus.textContent = 'Subiendo...';
+            fileStatus.className = 'badge bg-warning text-dark';
+            input.disabled = true;
+
+            fetch('/corevota/controllers/agregar_adjunto.php?action=upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => {
+                    if (res.ok) {
+                        return res.json();
+                    }
+                    return res.text().then(text => {
+                        console.error("Respuesta de error del servidor (upload):", text);
+                        throw new Error("El servidor respondió con un error (ver consola).");
+                    });
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire('Éxito', 'Archivo subido correctamente.', 'success');
+                        agregarAdjuntoALista(data.data);
+                        input.value = ''; // Limpiar el input
+
+                        fileStatus.textContent = '✅ Subido con éxito';
+                        fileStatus.className = 'badge bg-success';
+                    } else {
+                        Swal.fire('Error', data.message || 'No se pudo subir el archivo.', 'error');
+                        fileStatus.textContent = '❌ Error de subida';
+                        fileStatus.className = 'badge bg-danger';
+                    }
+                })
+                .catch(err => {
+                    Swal.fire('Error', 'Error de conexión al subir: ' + err.message, 'error');
+                    fileStatus.textContent = '❌ Error de conexión';
+                    fileStatus.className = 'badge bg-danger';
+                })
+                .finally(() => {
+                    input.disabled = false;
+                    setTimeout(() => {
+                        fileStatus.textContent = '';
+                    }, 3000);
+                });
+        }
+
+        function handleAgregarLink(e) {
+            e.preventDefault();
+            const input = document.getElementById('inputUrlLink');
+            const url = input.value.trim();
+
+            if (!url || !filterUrl(url)) {
+                Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
+                return;
+            }
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
+                return;
+            }
+
+            input.disabled = true;
+            input.placeholder = 'Añadiendo...';
+
+            const formData = new FormData();
+            formData.append('idMinuta', idMinutaGlobal);
+            formData.append('urlLink', url);
+
+            fetch('/corevota/controllers/agregar_adjunto.php?action=link', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => {
+                    if (res.ok) {
+                        return res.json();
+                    }
+                    return res.text().then(text => {
+                        console.error("Respuesta de error del servidor (link):", text);
+                        throw new Error("El servidor respondió con un error (ver consola).");
+                    });
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire('Éxito', 'Enlace agregado correctamente.', 'success');
+                        agregarAdjuntoALista(data.data);
+                        input.value = '';
+                    } else {
+                        Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
+                    }
+                })
+                .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
+                .finally(() => {
+                    input.disabled = false;
+                    input.placeholder = 'https://ejemplo.com';
+                });
+        }
+
+        function filterUrl(str) {
+            const pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+                '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+                '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+                '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+                '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+                '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+            return !!pattern.test(str);
+        }
+
+        function cargarYMostrarAdjuntosExistentes() {
+            if (!idMinutaGlobal) return;
+
+            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinutaGlobal}&_cacheBust=${new Date().getTime()}`)
+                .then(response => response.ok ? response.json() : Promise.reject('Error al obtener adjuntos'))
+                .then(data => {
+                    if (data.status === 'success' && data.data) {
+                        mostrarAdjuntosExistentes(data.data);
+                    } else {
+                        mostrarAdjuntosExistentes([]);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar adjuntos:', error);
+                    const listaUl = document.getElementById('listaAdjuntosExistentes');
+                    if (listaUl) listaUl.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos actuales.</li>';
+                });
+        }
+
+        function mostrarAdjuntosExistentes(adjuntos) {
+            const listaUl = document.getElementById('listaAdjuntosExistentes');
+            if (!listaUl) return;
+            listaUl.innerHTML = '';
+            if (!adjuntos || adjuntos.length === 0) {
+                listaUl.innerHTML = '<li class="list-group-item text-muted">No hay adjuntos guardados para esta minuta.</li>';
+                return;
+            }
+            adjuntos.forEach(adj => agregarAdjuntoALista(adj));
+        }
+
+        function agregarAdjuntoALista(adj) {
+            // Si el adjunto es de tipo 'asistencia', no lo dibujes
+            if (adj.tipoAdjunto === 'asistencia') {
+                return;
+            }
+
+            const listaUl = document.getElementById('listaAdjuntosExistentes');
+            if (!listaUl) return;
+
+            // Borra el placeholder si es el primer item
+            const placeholder = listaUl.querySelector('.text-muted');
+            if (placeholder) placeholder.remove();
+
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+
+            const link = document.createElement('a');
+            const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
+            link.href = url;
+            link.target = '_blank';
+
+            let icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');
+            let nombreArchivo = adj.pathAdjunto.split('/').pop();
+            if (adj.tipoAdjunto === 'link') {
+                nombreArchivo = adj.pathAdjunto.length > 50 ? adj.pathAdjunto.substring(0, 50) + '...' : adj.pathAdjunto;
+            }
+
+            link.textContent = ` ${icon} ${nombreArchivo}`;
+            link.title = adj.pathAdjunto;
+            li.appendChild(link);
+
+            // Añade el botón de eliminar si no es asistencia
+            if (adj.tipoAdjunto !== 'asistencia' && ES_ST_EDITABLE) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger ms-2';
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                deleteBtn.onclick = () => eliminarAdjunto(adj.idAdjunto, li);
+                li.appendChild(deleteBtn);
+            }
+
+            listaUl.appendChild(li);
+        }
+
+        function eliminarAdjunto(idAdjunto, listItemElement) {
+            if (!ES_ST_EDITABLE) {
+                Swal.fire('Prohibido', 'No puede eliminar adjuntos en este estado.', 'error');
+                return;
+            }
+
+            Swal.fire({
+                title: '¿Eliminar Adjunto?',
+                text: "Esta acción no se puede deshacer.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(`/corevota/controllers/eliminar_adjunto.php?idAdjunto=${idAdjunto}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                listItemElement.remove();
+                                Swal.fire('Eliminado', 'El adjunto ha sido eliminado.', 'success');
+                            } else {
+                                Swal.fire('Error', data.message || 'No se pudo eliminar el adjunto.', 'error');
+                            }
+                        })
+                        .catch(err => Swal.fire('Error', 'Error de conexión: ' + err.message, 'error'));
+                }
+            });
+        }
+
+
+        // ==================================================================
+        // --- SECCIÓN: GESTIÓN Y RESULTADOS DE VOTACIONES (SE MANTIENEN IGUAL) ---
+        // ==================================================================
+
         async function guardarNuevaVotacion() {
             const idComision = document.getElementById('votacionComisionId').value;
             const nombreVotacion = document.getElementById('votacionNombre').value.trim();
@@ -1917,11 +1913,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             btn.innerHTML = '<i class="fas fa-plus me-1"></i> Crear y Habilitar Votación';
         }
 
-        /**
-         * Carga la lista de votaciones asociadas a la minuta y las renderiza.
-         */
-        // views/pages/crearMinuta.php (Reemplazar la función cargarVotacionesDeLaMinuta)
-
         async function cargarVotacionesDeLaMinuta() {
             const cont = document.getElementById('listaVotacionesMinuta');
             const status = document.getElementById('votacionesStatus');
@@ -1939,7 +1930,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     let html = '<ul class="list-group">';
                     data.data.forEach(v => {
                         const isHabilitada = v.habilitada == 1;
-                        // Asumimos que ES_ST_EDITABLE es una variable global
                         const isEditable = ES_ST_EDITABLE;
                         let botonesAccion = '';
 
@@ -1977,7 +1967,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         <div>
                             <span class="fw-bold">${v.nombreVotacion}</span>
                             <small class="d-block text-muted">
-                                Comisión: ${v.nombreComision} | Estado: 
+                                Comisión: ${v.nombreComision} | Estado:
                                 ${isHabilitada ? '<span class="badge bg-success">Habilitada</span>' : '<span class="badge bg-secondary">Cerrada</span>'}
                             </small>
                         </div>
@@ -1996,20 +1986,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        // views/pages/crearMinuta.php (Añadir al final del <script> o reemplazar la versión existente)
-
-        /**
-         * Llama al controlador para cambiar el estado de la votación (Cerrar/Re-abrir).
-         * Si se cierra (estado 0), genera el PDF automáticamente.
-         * @param {number} idVotacion 
-         * @param {number} nuevoEstado 0 para Cerrar, 1 para Habilitar.
-         * @param {string} nombreVotacion 
-         */
         async function cambiarEstadoVotacion(idVotacion, nuevoEstado, nombreVotacion) {
             const accion = nuevoEstado === 0 ? 'Cerrar' : 'Re-abrir';
             const icono = nuevoEstado === 0 ? 'warning' : 'info';
 
-            // Cambiamos el mensaje para reflejar la generación del PDF
             const mensaje = nuevoEstado === 0 ?
                 `Al cerrar, se bloquean los votos y se generará el reporte final en PDF. ¿Desea continuar y cerrar "${nombreVotacion}"?` :
                 `¿Desea re-abrir "${nombreVotacion}"? Esto permitirá a los usuarios volver a votar.`;
@@ -2049,7 +2029,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }).then((result) => {
                 if (result.isConfirmed) {
 
-                    // 🚀 LÓGICA CLAVE: DISPARA EL PDF AL CERRAR
                     if (nuevoEstado === 0) {
                         Swal.fire('¡Cerrada!', `Votación cerrada. Generando reporte PDF...`, 'success');
                         generarPdfVotacion(idVotacion);
@@ -2057,41 +2036,17 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         Swal.fire('¡Éxito!', `Votación re-abierta correctamente.`, 'success');
                     }
 
-                    // Refrescar ambas secciones después de la acción
                     cargarVotacionesDeLaMinuta();
                     cargarResultadosVotacion();
                 }
             });
         }
 
-        /**
-         * Llama al script PHP para generar y descargar el PDF de resultados.
-         * (Debe ser una función separada en el script)
-         * @param {number} idVotacion 
-         */
         function generarPdfVotacion(idVotacion) {
-            // Usamos window.open para que el script PHP pueda manejar la descarga del archivo
             const url = `/corevota/controllers/generar_pdf_votacion.php?idVotacion=${idVotacion}`;
             window.open(url, '_blank');
         }
 
-        // Asegúrate de que esta función auxiliar exista en tu script:
-        function escapeHTML(str) {
-            if (!str) return '';
-            return str.replace(/[&<>"']/g, function(m) {
-                return {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                } [m];
-            });
-        }
-
-        /**
-         * Abre un modal para registrar o modificar votos de asistentes manualmente.
-         */
         async function abrirModalVoto(idVotacion) {
             if (ASISTENCIA_GUARDADA_IDS.length === 0) {
                 Swal.fire('Sin Asistentes', 'No hay asistentes marcados como "Presente" en esta minuta. Guarde la asistencia primero.', 'info');
@@ -2163,9 +2118,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Registra o anula un voto para un usuario específico (usado por el secretario).
-         */
         async function registrarVotoSecretario(idVotacion, idUsuario, voto, btn) {
             const parentTD = btn.parentNode;
             parentTD.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
@@ -2204,9 +2156,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        /**
-         * Llama a la API y renderiza los resultados en vivo de las votaciones.
-         */
         function cargarResultadosVotacion() {
             const container = document.getElementById('votacion-resultados-live');
             const placeholder = document.getElementById('votacion-placeholder');
@@ -2291,9 +2240,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        /**
-         * Helper para evitar inyección XSS.
-         */
         function escapeHTML(str) {
             if (!str) return '';
             return str.replace(/[&<>"']/g, function(m) {

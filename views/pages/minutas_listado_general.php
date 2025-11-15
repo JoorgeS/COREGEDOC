@@ -28,6 +28,7 @@ if (!isset($estadoActual)) {
 
 $pageTitle  = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
 $paginaForm  = ($estadoActual === 'APROBADA') ? 'minutas_aprobadas' : 'minutas_pendientes';
+
 // --- FIN CORRECCIÓN DE ESTADO ---
 
 // -------- Filtros de UI (SIEMPRE ACTIVOS) --------
@@ -168,7 +169,7 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
 
         $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-        // Palabra clave (en HAVING por agregaciones)
+        // Palabra clave (en HAVING por agregaciones) fdfsdfsdfsdfsdfsdf
         $having = '';
         if ($__hasKeyword) {
             $params[':kw'] = '%' . $normalizedKeyword . '%';
@@ -347,7 +348,9 @@ function renderPaginationListado($current, $pages)
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
             <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
-            <li class="breadcrumb-item active" aria-current="page"><?php echo htmlspecialchars($tituloPagina); ?></li>
+
+            <li class="breadcrumb-item active" aria-current="page"><?php echo htmlspecialchars($pageTitle ?? ''); ?></li>
+            
         </ol>
     </nav>
 
@@ -551,6 +554,8 @@ function renderPaginationListado($current, $pages)
         </div>
     </div>
 </div>
+
+
 
 <script>
     // Definición directa de la función global 'verAdjuntos'

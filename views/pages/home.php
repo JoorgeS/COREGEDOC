@@ -223,14 +223,14 @@ try {
 </style>
 
 <div class="container mt-4">
-    <h4>Nuestra querida región</h4>
+    <h4>Nuestra querida quinta región</h4>
 
     <div id="carouselZonasRegion" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="5000">
 
         <div class="carousel-indicators">
-            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Zona 1"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Zona 3"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="1" aria-label="Zona 2"></button>
-            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="2" aria-label="Zona 3"></button>
+            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="2" aria-label="Zona 1"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="3" aria-label="Zona 4"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="4" aria-label="Zona 5"></button>
             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="5" aria-label="Zona 6"></button>
@@ -240,9 +240,9 @@ try {
 
         <div class="carousel-inner rounded shadow-sm">
             <div class="carousel-item active">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_1.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE VALPARAÍSO">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE VALPARAÍSO">
                 <div class="carousel-caption d-none d-md-block">
-                    <h5>PROVINCIA DE VALPARAÍSO</h5>
+                    <h5>PROVINCIA DE QUILLOTA</h5>
                 </div>
             </div>
             <div class="carousel-item">
@@ -252,9 +252,9 @@ try {
                 </div>
             </div>
             <div class="carousel-item">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_1.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h5>PROVINCIA DE QUILLOTA</h5>
+                    <h5>PROVINCIA DE VALPARAÍSO</h5>
                 </div>
             </div>
             <div class="carousel-item">
