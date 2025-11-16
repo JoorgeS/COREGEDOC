@@ -119,74 +119,49 @@ if ($votacionVigente) {
                     <i class="fas fa-bullhorn me-2"></i> Votación Abierta
                 </div>
                 <div class="card-body py-4" id="tarjetaVotacionVigente">
-                    <?php if (empty($votacionVigente)): ?>
-                        <div class="alert alert-info text-center mb-0">
-                            <i class="fas fa-spinner fa-spin me-2"></i>
-                            No hay votaciones habilitadas en este momento. Esperando...
-                        </div>
-                    <?php else: ?>
-                        <h4 class="fw-bold mb-2 text-dark"><?= htmlspecialchars($votacionVigente['nombreVotacion']) ?></h4>
-                        <p class="mb-4 text-muted">Comisión: <strong><?= htmlspecialchars($votacionVigente['nombreComision'] ?? 'No definida') ?></strong></p>
 
-                        <form method="post" class="form-voto text-center" id="form-de-votacion" data-nombre="<?= htmlspecialchars($votacionVigente['nombreVotacion']) ?>" <?php if ($yaVoto) echo 'style="display:none;"'; ?>>
-                            <input type="hidden" name="idVotacion" value="<?= $votacionVigente['idVotacion'] ?>">
-                            <input type="hidden" name="opcionVoto" value="">
-                            <h5 class="mb-4">¿Cuál es tu voto?</h5>
-                            <div class="d-flex justify-content-center gap-4">
-                                <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI">SÍ</button>
-                                <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO">NO</button>
-                                <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION">ABS</button>
+                    <div id="votacionContainer">
+
+                        <?php if (empty($votacionVigente)): ?>
+                            <div class="alert alert-info text-center mb-0">
+                                <i class="fas fa-spinner fa-spin me-2"></i>
+                                No hay votaciones habilitadas en este momento. Esperando...
                             </div>
-                        </form>
+                        <?php else: ?>
+                            <h2 id="tituloVotacion" class="fw-bold mb-2 text-dark text-center">
+                                <?= htmlspecialchars($votacionVigente['nombreVotacion']) ?>
+                            </h2>
+                            <p class="mb-4 text-muted text-center">Comisión: <strong><?= htmlspecialchars($votacionVigente['nombreComision'] ?? 'No definida') ?></strong></p>
 
-                        <div id="dashboard-en-vivo-container" <?php if (!$yaVoto) echo 'style="display:none;"'; ?>>
-                            <h5 class="fw-bold mb-3 text-center">Resultados en Vivo</h5>
-                            <div class="row text-center">
-                                <div class="col-4">
-                                    <div class="p-3 bg-success-soft rounded-3">
-                                        <h1 class="display-4 fw-bold text-success mb-0" id="total-si">0</h1>
-                                        <span class="fw-bold text-success fs-5">SÍ</span>
-                                    </div>
+                            <div id="opcionesVotoContainer" class="text-center" <?php if ($yaVoto) echo 'style="display:none;"'; ?>>
+
+                                <h5 class="mb-4">¿Cuál es tu voto?</h5>
+                                <div class="d-flex justify-content-center gap-4">
+                                    <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI" onclick="registrarVoto(<?= $votacionVigente['idVotacion'] ?>, 'SI')">SÍ</button>
+                                    <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO" onclick="registrarVoto(<?= $votacionVigente['idVotacion'] ?>, 'NO')">NO</button>
+                                    <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION" onclick="registrarVoto(<?= $votacionVigente['idVotacion'] ?>, 'ABSTENCION')">ABS</button>
                                 </div>
-                                <div class="col-4">
-                                    <div class="p-3 bg-danger-soft rounded-3">
-                                        <h1 class="display-4 fw-bold text-danger mb-0" id="total-no">0</h1>
-                                        <span class="fw-bold text-danger fs-5">NO</span>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="p-3 bg-secondary-soft rounded-3">
-                                        <h1 class="display-4 fw-bold text-secondary mb-0" id="total-abstencion">0</h1>
-                                        <span class="fw-bold text-secondary fs-5">ABS</span>
-                                    </div>
+
+                            </div>
+
+                            <div id="votoPropioContainer" class="my-3" <?php if (!$yaVoto) echo 'style="display:none;"'; ?>>
+                                <?php
+                                // Si ya votó al cargar, ponemos un mensaje de estado inicial
+                                if ($yaVoto) {
+                                    echo "<div class='alert alert-info text-center'>Cargando estado de tu voto...</div>";
+                                }
+                                ?>
+                            </div>
+
+                            <div id="dashboardResultados">
+                                <div class="alert alert-light text-center" role="alert">
+                                    Cargando resultados en vivo...
                                 </div>
                             </div>
 
-                            <hr class="my-4">
+                        <?php endif; ?>
+                    </div>
 
-                            <div class="row">
-                                <div class="col-6">
-                                    <div class="card h-100 text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">MI VOTO</h6>
-                                            <span class="fs-4 fw-bold text-primary" id="mi-voto">--</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="card h-100 text-center">
-                                        <div class="card-body">
-                                            <h6 class="card-title text-muted">FALTAN POR VOTAR</h6>
-                                            <span class="fs-4 fw-bold text-warning" id="faltan-votar">--</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer text-muted text-center bg-light mt-3 rounded-3">
-                                <i class="fa-solid fa-clock-rotate-left me-1"></i>
-                                Actualizado: <span id="hora-actualizacion">--:--:--</span>
-                            </div>
-                        </div> <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -224,268 +199,312 @@ if ($votacionVigente) {
 
 <style>
     /* Estilos (sin cambios) */
-    .voto-btn { width: 100px; border-radius: 10px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-    .voto-btn:hover { transform: translateY(-3px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
-    .card { border-radius: 0.5rem; }
-    .card-body.py-4 { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
-    .card-header.bg-primary { background-color: #0d6efd !important; }
-    .bg-success-soft { background-color: rgba(25, 135, 84, 0.1); }
-    .bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); }
-    .bg-secondary-soft { background-color: rgba(108, 117, 125, 0.1); }
+    .voto-btn {
+        width: 100px;
+        border-radius: 10px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .voto-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    }
+
+    .card {
+        border-radius: 0.5rem;
+    }
+
+    .card-body.py-4 {
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+
+    .card-header.bg-primary {
+        background-color: #0d6efd !important;
+    }
+
+    .bg-success-soft {
+        background-color: rgba(25, 135, 84, 0.1);
+    }
+
+    .bg-danger-soft {
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+
+    .bg-secondary-soft {
+        background-color: rgba(108, 117, 125, 0.1);
+    }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // --- (INICIO DEL NUEVO SCRIPT) ---
+
+    // --- 1. CONFIGURACIÓN GLOBAL ---
+    const ID_USUARIO = <?= json_encode($idUsuario); ?>;
+    const INTERVALO_POLLING = 3000; // Buscar cambios cada 3 segundos
+    let pollerID = null;
+    let cacheDatos = ""; // Caché para evitar "parpadeos"
+    let idVotacionActivaCache = null; // Para saber en qué votación estamos
+
+    // Contenedores principales (los definimos una sola vez)
+    const contenedorPrincipal = document.getElementById('votacionContainer');
+    const contenedorOpciones = document.getElementById('opcionesVotoContainer');
+    const contenedorVotoPropio = document.getElementById('votoPropioContainer');
+    const contenedorResultados = document.getElementById('dashboardResultados');
+    const tituloVotacionEl = document.getElementById('tituloVotacion');
+
+    /**
+     * Función principal que se ejecuta al cargar la página
+     */
     document.addEventListener('DOMContentLoaded', function() {
-
-        // --- 1. CONFIGURACIÓN DEL DASHBOARD ---
-        const idMinuta = <?= json_encode($idMinuta); ?>;
-        const idVotacionActual = <?= $votacionVigente ? json_encode($votacionVigente['idVotacion']) : 'null'; ?>;
-        const yaVoto = <?= json_encode($yaVoto); ?>;
-        const formVotacion = document.getElementById('form-de-votacion');
-        const dashboardContainer = document.getElementById('dashboard-en-vivo-container');
-        let timerInterval = null;
-        let votacionEstaAbierta = (idVotacionActual != null); // Estado inicial
-
-
-        // --- 2. LÓGICA DE VOTACIÓN (Tu código original, sin cambios) ---
-        document.querySelectorAll('.voto-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                // ... (toda tu lógica de Swal.fire y fetch para votar) ...
-                // ... (la dejamos intacta, ya funciona bien) ...
-                const form = this.closest('.form-voto');
-                const nombre = form.dataset.nombre;
-                const opcion = this.dataset.value;
-                const idVotacion = form.querySelector('input[name="idVotacion"]').value;
-
-                Swal.fire({
-                    title: `¿Confirmas tu voto "${opcion}"?`,
-                    text: `Votación: ${nombre}`,
-                    icon: 'question',
-                    showCancelButton: true,
-                    confirmButtonColor: '#198754',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'Sí, votar',
-                    cancelButtonText: 'Cancelar'
-                }).then(result => {
-                    if (result.isConfirmed) {
-                        const formData = new FormData();
-                        formData.append('idVotacion', idVotacion);
-                        formData.append('opcionVoto', opcion);
-
-                        fetch('voto_autogestion.php', {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(response => response.json())
-                            .then(resp => {
-                                if (resp.status === 'success') {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: '✅ Voto registrado',
-                                        text: 'Mostrando resultados en vivo...',
-                                        showConfirmButton: false,
-                                        timer: 1500
-                                    });
-                                    if (formVotacion) {
-                                        formVotacion.style.display = 'none';
-                                    }
-                                    if (dashboardContainer) {
-                                        dashboardContainer.style.display = 'block';
-                                    }
-                                    // Forzamos una actualización inmediata
-                                    actualizarResultados(); 
-                                } else if (resp.status === 'duplicate') {
-                                    Swal.fire('⚠️ Ya registraste tu voto', 'No puedes votar nuevamente.', 'warning');
-                                } else if (resp.status === 'unauthorized') {
-                                    Swal.fire('❌ Voto no permitido', resp.message || 'Debe registrar su asistencia.', 'error');
-                                } else {
-                                    Swal.fire('Error', resp.message || 'Inténtalo nuevamente.', 'error');
-                                }
-                            })
-                            .catch(error => {
-                                console.error("Error en la promesa fetch:", error);
-                                Swal.fire('Error de conexión', 'No se pudo comunicar con el servidor.', 'error');
-                            });
-                    }
-                });
-            });
-        });
-
-
-        // --- 3. NUEVAS FUNCIONES DEL DASHBOARD ---
-
-        function iniciarDashboardEnVivo() {
-            if (!idMinuta || !idVotacionActual) {
-                console.error('Faltan idMinuta o idVotacionActual para iniciar el dashboard.');
-                return;
-            }
-            if (timerInterval) {
-                clearInterval(timerInterval);
-            }
-            
-            actualizarResultados(); // Primera llamada inmediata
-            timerInterval = setInterval(actualizarResultados, 1000); // Actualiza cada segundo
-        }
-
-        async function actualizarResultados() {
-            // Si la votación ya se marcó como cerrada, no hacemos nada más.
-            if (!votacionEstaAbierta) {
-                clearInterval(timerInterval);
-                return;
-            }
-
-            const elTotalSi = document.getElementById('total-si');
-            const elTotalNo = document.getElementById('total-no');
-            const elTotalAbs = document.getElementById('total-abstencion');
-            const elMiVoto = document.getElementById('mi-voto');
-            const elFaltanVotar = document.getElementById('faltan-votar');
-            const elHoraActualizacion = document.getElementById('hora-actualizacion');
-
-            if (!elTotalSi || !elMiVoto || !elFaltanVotar) {
-                if (timerInterval) clearInterval(timerInterval);
-                return;
-            }
-
-            try {
-                // 1. Llamar al API
-                const response = await fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinuta}`);
-                if (!response.ok) throw new Error(`Error en la respuesta del API: ${response.statusText}`);
-                
-                const resultadoAPI = await response.json();
-                if (resultadoAPI.status !== 'success') throw new Error(resultadoAPI.message || 'El API no devolvió un éxito');
-
-                // 2. Encontrar la votación específica
-                const votacion = resultadoAPI.data.find(v => v.idVotacion == idVotacionActual);
-                if (!votacion) return; 
-
-                // 3. Actualizar los contadores
-                elTotalSi.textContent = votacion.totalSi;
-                elTotalNo.textContent = votacion.totalNo;
-                elTotalAbs.textContent = votacion.totalAbstencion;
-                elFaltanVotar.textContent = votacion.faltanVotar;
-
-                // 4. Actualizar "Mi Voto"
-                if (votacion.votoPersonal) {
-                    elMiVoto.textContent = votacion.votoPersonal;
-                    if (votacion.votoPersonal === 'SI') elMiVoto.className = 'fs-4 fw-bold text-success';
-                    else if (votacion.votoPersonal === 'NO') elMiVoto.className = 'fs-4 fw-bold text-danger';
-                    else elMiVoto.className = 'fs-4 fw-bold text-secondary';
-                } else {
-                    elMiVoto.textContent = 'PENDIENTE';
-                    elMiVoto.className = 'fs-4 fw-bold text-warning';
-                }
-
-                // 5. Actualizar la hora
-                elHoraActualizacion.textContent = new Date().toLocaleTimeString('es-CL');
-
-                // 6. Chequeo de estado (para cierre automático)
-                const nuevoEstado = (votacion.habilitada == 1); 
-
-                if (votacionEstaAbierta && !nuevoEstado) {
-                    // ¡ACABA DE CERRARSE!
-                    clearInterval(timerInterval); 
-                    votacionEstaAbierta = false;  
-
-                    const resultadosHtml = `
-                        <div style="text-align: left; padding: 0 1rem; margin-top: 1rem;">
-                            <hr>
-                            <p style="text-align: center;"><strong>Resultados Finales:</strong></p>
-                            <p style="font-size: 1.3rem; text-align: center;">
-                                <span style="color: #198754;"><strong>SÍ: ${votacion.totalSi}</span></strong><br>
-                                <span style="color: #dc3545;"><strong>NO: ${votacion.totalNo}</span></strong><br>
-                                <span style="color: #6c757d;"><strong>ABSTENCIÓN: ${votacion.totalAbstencion}</span></strong>
-                            </p>
-                        </div>
-                    `;
-
-                    Swal.fire({
-                        title: 'Votación Cerrada',
-                        html: 'La votación ha sido cerrada por el Secretario Técnico.' + resultadosHtml,
-                        icon: 'info',
-                        allowOutsideClick: false, 
-                        allowEscapeKey: false,  
-                        confirmButtonText: 'OK',
-                        confirmButtonColor: '#0d6efd'
-                    }).then(() => {
-                        // 🚀 --- INICIO DE LA MODIFICACIÓN --- 🚀
-                        // Al hacer clic en OK, reemplazamos el contenido de la tarjeta
-                        // con el mensaje de "No hay votaciones".
-                        const tarjetaVotacion = document.getElementById('tarjetaVotacionVigente');
-                        if (tarjetaVotacion) {
-                            tarjetaVotacion.innerHTML = `
-                                <div class="alert alert-info text-center mb-0">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>
-                                    No hay votaciones habilitadas en este momento. Esperando...
-                                </div>
-                            `;
-                            // IMPORTANTE: Reiniciamos el poller para buscar
-                            // la *próxima* votación que habilite el ST.
-                            iniciarPollerVotacionNueva();
-                        }
-                        // 🚀 --- FIN DE LA MODIFICACIÓN --- 🚀
-                    });
-                }
-
-            } catch (error) {
-                console.error('Error al actualizar dashboard:', error);
-                if (elHoraActualizacion) elHoraActualizacion.textContent = 'Error de conexión';
-                if (timerInterval) clearInterval(timerInterval);
-            }
-        }
-
-        // --- 4. LÓGICA DE INICIO AUTOMÁTICO ---
-        
-        // Variable para el nuevo poller
-        let pollerNuevaVotacion = null;
-
-        /**
-         * Esta función revisa si el ST ha habilitado una nueva votación.
-         */
-        async function verificarVotacionNueva() {
-            try {
-                // 🚀 Usamos la nueva API que creamos
-                const response = await fetch(`/corevota/controllers/verificar_votacion_activa.php`);
-                if (!response.ok) {
-                    console.warn("Error chequeando nueva votación, se reintentará.");
-                    return;
-                }
-                const data = await response.json();
-                
-                if (data.status === 'success' && data.votacionActiva === true) {
-                    // ¡VOTACIÓN ENCONTRADA!
-                    // 1. Detenemos este poller
-                    if (pollerNuevaVotacion) clearInterval(pollerNuevaVotacion);
-
-                    // 2. Mostramos un aviso y recargamos
-                    Swal.fire({
-                        title: '¡Nueva Votación!',
-                        text: 'Se ha habilitado una nueva votación.',
-                        icon: 'info',
-                        timer: 2000,
-                        showConfirmButton: false,
-                        allowOutsideClick: false
-                    }).then(() => {
-                        window.location.reload(); // Recarga la página para mostrar los botones
-                    });
-                }
-                // Si es false, no hace nada y sigue sondeando.
-
-            } catch (error) {
-                console.error("Error en poller de nueva votación:", error);
-            }
-        }
-
-        // --- LÓGICA DE ARRANQUE ---
-        if (idVotacionActual) {
-            // Caso 1: La página cargó CON una votación activa.
-            // Iniciamos el dashboard (para tiempo real)
-            iniciarDashboardEnVivo(); 
-        } else {
-            // Caso 2: La página cargó SIN votación activa ("No hay votaciones...").
-            // Iniciamos el poller para VERIFICAR si una nueva votación aparece.
-            pollerNuevaVotacion = setInterval(verificarVotacionNueva, 3000); // Chequea cada 3 seg
-        }
-        
+        iniciarPollingSala();
     });
+
+    /**
+     * Inicia el sondeo (polling) para mantener la sala actualizada
+     */
+    function iniciarPollingSala() {
+        if (pollerID !== null) return; // Evitar múltiples pollers
+        console.log('Sala de Votaciones: Polling INICIADO.');
+
+        // Ejecutar inmediatamente al cargar
+        actualizarSala();
+
+        // Iniciar el intervalo
+        pollerID = setInterval(actualizarSala, INTERVALO_POLLING);
+    }
+
+    /**
+     * Busca en el servidor el estado actual de la votación
+     */
+    async function actualizarSala() {
+        try {
+            // 1. Llamar al nuevo controlador (el que creamos en el Paso 1)
+            const response = await fetch(`/corevota/controllers/obtener_estado_sala_votante.php?_t=${new Date().getTime()}`, {
+                method: 'GET',
+                cache: 'no-store'
+            });
+
+            if (!response.ok) throw new Error('Error de red');
+
+            const textoRespuesta = await response.text();
+
+            // 2. Lógica Anti-Parpadeo (Si no hay cambios, no hacer nada)
+            if (textoRespuesta === cacheDatos) {
+                // console.log('Polling: Sin cambios.');
+                return;
+            }
+            cacheDatos = textoRespuesta; // Actualizar caché
+
+            const data = JSON.parse(textoRespuesta);
+            if (data.status === 'error') throw new Error(data.message);
+
+            // 3. Renderizar la sala con los nuevos datos
+            renderSala(data);
+
+        } catch (error) {
+            console.error('Error en el polling de la sala:', error);
+            // Si falla el polling, mostramos el error (opcional)
+            // contenedorPrincipal.innerHTML = `<div class="alert alert-danger">Error de conexión. Reintentando...</div>`;
+        }
+    }
+
+    /**
+     * Dibuja la interfaz según los datos recibidos del servidor
+     */
+    function renderSala(data) {
+        // CASO 1: No hay votación activa
+        if (!data.votacion) {
+            idVotacionActivaCache = null;
+            contenedorPrincipal.innerHTML = `
+                <div class="alert alert-info text-center mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>
+                    No hay votaciones habilitadas en este momento. Esperando...
+                </div>`;
+            return;
+        }
+
+        // Si la votación que llegó es NUEVA, regeneramos el HTML
+        if (data.votacion.idVotacion !== idVotacionActivaCache) {
+            idVotacionActivaCache = data.votacion.idVotacion;
+            const idVot = idVotacionActivaCache; // ID para los botones
+
+            // Regeneramos el HTML base (título, botones, contenedores vacíos)
+            contenedorPrincipal.innerHTML = `
+                <h2 id="tituloVotacion" class="fw-bold mb-2 text-dark text-center">
+                    ${escapeHTML(data.votacion.nombreAcuerdo)}
+                </h2>
+                <p class="mb-4 text-muted text-center">Comisión: <strong>${escapeHTML(data.votacion.nombreComision || 'No definida')}</strong></p>
+
+                <div id="opcionesVotoContainer" class="text-center">
+                    <h5 class="mb-4">¿Cuál es tu voto?</h5>
+                    <div class="d-flex justify-content-center gap-4">
+                        <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI" onclick="registrarVoto(${idVot}, 'SI')">SÍ</button>
+                        <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO" onclick="registrarVoto(${idVot}, 'NO')">NO</button>
+                        <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION" onclick="registrarVoto(${idVot}, 'ABSTENCION')">ABS</button>
+                    </div>
+                </div>
+
+                <div id="votoPropioContainer" class="my-3" style="display:none;"></div>
+                <div id="dashboardResultados"></div>
+            `;
+        }
+
+        // CASO 2: Hay votación Y el usuario YA VOTÓ
+        if (data.votoUsuario) {
+            document.getElementById('opcionesVotoContainer').style.display = 'none';
+            renderVotoPropio(data.votoUsuario.opcionVoto);
+            renderResultados(data.resultados); // Mostrar resultados
+        }
+        // CASO 3: Hay votación Y el usuario NO HA VOTADO
+        else {
+            document.getElementById('opcionesVotoContainer').style.display = 'block';
+            document.getElementById('votoPropioContainer').style.display = 'none';
+            document.getElementById('dashboardResultados').innerHTML = ''; // Ocultar resultados
+        }
+    }
+
+    /**
+     * Dibuja el mensaje "Usted ha votado..."
+     */
+    function renderVotoPropio(opcionVoto) {
+        const container = document.getElementById('votoPropioContainer');
+        if (!container) return;
+
+        let badgeClass = 'bg-secondary';
+        let opcionTexto = 'Abstención';
+        if (opcionVoto === 'SI') {
+            badgeClass = 'bg-success';
+            opcionTexto = 'Sí';
+        } else if (opcionVoto === 'NO') {
+            badgeClass = 'bg-danger';
+            opcionTexto = 'No';
+        }
+
+        container.innerHTML = `
+            <div class="alert alert-info text-center mt-3">
+                <h5 class="alert-heading">¡Tu voto ha sido registrado!</h5>
+                <p class="mb-0">Has votado: <span class="badge ${badgeClass} fs-5">${opcionTexto}</span></p>
+            </div>`;
+        container.style.display = 'block';
+    }
+
+    /**
+     * Dibuja el panel de resultados
+     */
+    function renderResultados(resultados) {
+        const container = document.getElementById('dashboardResultados');
+        if (!container) return;
+
+        const totalVotantes = resultados.votosSi + resultados.votosNo + resultados.votosAbstencion;
+        const faltanVotar = resultados.totalPresentes - totalVotantes;
+
+        container.innerHTML = `
+            <div class="card mt-4 shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">Resultados Preliminares</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <h4 class="text-success">${resultados.votosSi}</h4>
+                            <p class="mb-0 small">SÍ</p>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-danger">${resultados.votosNo}</h4>
+                            <p class="mb-0 small">NO</p>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-secondary">${resultados.votosAbstencion}</h4>
+                            <p class="mb-0 small">ABS.</p>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="text-warning">${Math.max(0, faltanVotar)}</h4>
+                            <p class="mb-0 small">FALTAN</p>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    /**
+     * Esta es la función que llaman los botones.
+     * Envía el voto al servidor.
+     */
+    function registrarVoto(idVotacion, opcionVoto) {
+        const nombreVotacion = document.getElementById('tituloVotacion')?.textContent || 'esta votación';
+
+        Swal.fire({
+            title: `¿Confirmas tu voto "${opcionVoto}"?`,
+            text: `Votación: ${nombreVotacion}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, votar',
+            cancelButtonText: 'Cancelar'
+        }).then(result => {
+            if (result.isConfirmed) {
+                // Deshabilitar botones para evitar doble voto
+                document.querySelectorAll('.voto-btn').forEach(btn => btn.disabled = true);
+
+                const formData = new FormData();
+                formData.append('idVotacion', idVotacion);
+                formData.append('opcionVoto', opcionVoto);
+
+                // Usamos la URL de esta misma página (voto_autogestion.php) para el POST
+                fetch('voto_autogestion.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(resp => {
+                        if (resp.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '✅ Voto registrado',
+                                text: 'Mostrando resultados en vivo...',
+                                showConfirmButton: false,
+                                timer: 1500
+                            });
+                            // Forzamos una actualización inmediata de la sala
+                            actualizarSala();
+                        } else if (resp.status === 'duplicate') {
+                            Swal.fire('⚠️ Ya registraste tu voto', 'No puedes votar nuevamente.', 'warning');
+                        } else if (resp.status === 'unauthorized') {
+                            Swal.fire('❌ Voto no permitido', resp.message || 'Debe registrar su asistencia.', 'error');
+                        } else {
+                            Swal.fire('Error', resp.message || 'Inténtalo nuevamente.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error en la promesa fetch:", error);
+                        Swal.fire('Error de conexión', 'No se pudo comunicar con el servidor.', 'error');
+                    })
+                    .finally(() => {
+                        // Volver a habilitar los botones si el voto falló (excepto si fue duplicado)
+                        document.querySelectorAll('.voto-btn').forEach(btn => btn.disabled = false);
+                    });
+            }
+        });
+    }
+
+    /**
+     * Función auxiliar para evitar XSS
+     */
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>\"']/g, function(m) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '\"': '&quot;',
+                "\'": '&#39;'
+            } [m];
+        });
+    }
+
+    // --- (FIN DEL NUEVO SCRIPT) ---
 </script>

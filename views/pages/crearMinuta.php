@@ -395,8 +395,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="asistencia-tab" data-bs-toggle="tab" data-bs-target="#asistencia-tab-pane" type="button" role="tab" aria-controls="asistencia-tab-pane" aria-selected="false"><i class="fa-solid fa-users me-1"></i> Asistencia</button>
             </li>
-            <li class="nav-item hidden-tab" role="presentation" id="nav-item-votaciones">
-                <button class="nav-link" id="votaciones-tab" data-bs-toggle="tab" data-bs-target="#votaciones-tab-pane" type="button" role="tab" aria-controls="votaciones-tab-pane" aria-selected="false"><i class="fa-solid fa-check-to-slot me-1"></i> Votaciones</button>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="votaciones-tab" data-bs-toggle="tab" data-bs-target="#votaciones-tab-pane" type="button" role="tab" aria-controls="votaciones-tab-pane" aria-selected="false">
+                    <i class="fas fa-vote-yea me-2"></i> Votaciones
+                </button>
             </li>
             <li class="nav-item hidden-tab" role="presentation" id="nav-item-documentos">
                 <button class="nav-link" id="documentos-tab" data-bs-toggle="tab" data-bs-target="#documentos-tab-pane" type="button" role="tab" aria-controls="documentos-tab-pane" aria-selected="false"><i class="fa-solid fa-paperclip me-1"></i> Documentos Adjuntos</button>
@@ -479,174 +481,191 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                             <hr class="my-4">
 
-                            <h6 class="border-bottom pb-2 mb-3">Votaciones Creadas</h6>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">Votaciones Creadas</h6>
+                                <span id="poll-status-display" class="text-muted small" style="font-family: 'Courier New', monospace;">
+                                </span>
+                            </div>
                             <div id="panel-votaciones-lista">
-                                <div class="text-center p-3 text-muted">
-                                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                                    <span class="ms-2">Cargando votaciones...</span>
-                                </div>
                             </div>
 
+                            <hr class="my-5">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0 text-primary"><i class="fas fa-chart-bar me-2"></i>Resultados en Vivo</h6>
+                                <span id="poll-resultados-status" class="text-muted small" style="font-family: 'Courier New', monospace;">
+                                </span>
+                            </div>
+
+                            <div id="panel-resultados-en-vivo">
+                                <p class="text-muted text-center" id="votacion-placeholder">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>Cargando resultados...
+                                </p>
+                            </div>
                         </div>
                     </div>
-                <?php endif; ?>
+
+
+
             </div>
+        </div>
+    <?php endif; ?>
+    </div>
 
-            <div class="tab-pane fade" id="documentos-tab-pane" role="tabpanel" aria-labelledby="documentos-tab" tabindex="0">
+    <div class="tab-pane fade" id="documentos-tab-pane" role="tabpanel" aria-labelledby="documentos-tab" tabindex="0">
 
-                <div class="adjuntos-section">
-                    <h5 class="fw-bold mb-3">Gestión de Archivos y Enlaces</h5>
-                    <input type="hidden" id="idMinutaActual" value="<?php echo htmlspecialchars($idMinutaActual); ?>">
+        <div class="adjuntos-section">
+            <h5 class="fw-bold mb-3">Gestión de Archivos y Enlaces</h5>
+            <input type="hidden" id="idMinutaActual" value="<?php echo htmlspecialchars($idMinutaActual); ?>">
 
-                    <form id="formSubirArchivo" class="mb-3">
-                        <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, DOCX, etc.) <span id="file-upload-status" class="badge bg-light text-dark"></span></label>
-                        <div class="input-group">
-                            <input type="file" class="form-control" id="inputArchivo" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx" <?php echo $esSoloLectura ? 'disabled' : ''; ?>>
-                        </div>
-                    </form>
-
-                    <form id="formAgregarLink" class="mb-3" onsubmit="handleAgregarLink(event); return false;">
-                        <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Escriba la URL y presione Enter o haga clic fuera):</label>
-                        <div class="input-group">
-                            <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
-                        </div>
-                    </form>
-
-                    <div id="adjuntosExistentesContainer" class="mt-4 pt-3 border-top">
-                        <h6>Archivos y Enlaces Existentes:</h6>
-                        <ul id="listaAdjuntosExistentes" class="list-group list-group-flush">
-                            <li class="list-group-item text-muted">Cargando...</li>
-                        </ul>
-                    </div>
+            <form id="formSubirArchivo" class="mb-3">
+                <label for="inputArchivo" class="form-label">Añadir nuevo archivo (PDF, JPG, PNG, DOCX, etc.) <span id="file-upload-status" class="badge bg-light text-dark"></span></label>
+                <div class="input-group">
+                    <input type="file" class="form-control" id="inputArchivo" name="archivo" required accept=".pdf,.jpg,.jpeg,.png,.xlsx,.mp4,.ppt,.pptx,.doc,.docx" <?php echo $esSoloLectura ? 'disabled' : ''; ?>>
                 </div>
+            </form>
 
+            <form id="formAgregarLink" class="mb-3" onsubmit="handleAgregarLink(event); return false;">
+                <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Escriba la URL y presione Enter o haga clic fuera):</label>
+                <div class="input-group">
+                    <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
+                </div>
+            </form>
+
+            <div id="adjuntosExistentesContainer" class="mt-4 pt-3 border-top">
+                <h6>Archivos y Enlaces Existentes:</h6>
+                <ul id="listaAdjuntosExistentes" class="list-group list-group-flush">
+                    <li class="list-group-item text-muted">Cargando...</li>
+                </ul>
             </div>
+        </div>
 
-            <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
-                <div class="text-end">
+    </div>
 
-                    <?php
-                    // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
+    <div class="d-flex justify-content-center gap-3 mt-4 pt-4 border-top">
+        <div class="text-end">
 
-                    // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
-                    if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
-                        echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
+            <?php
+            // --- INICIO DE LA LÓGICA DE BOTONES MEJORADA ---
+
+            // 1. Botón Guardar Borrador (Visible si es ST y la minuta NO está Aprobada)
+            if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
+                echo '<button type="button" class="btn btn-success fw-bold" id="btnGuardarBorrador"
                             onclick="if (validarCamposMinuta()) guardarBorrador(true);">
                         <i class="fas fa-save"></i> Guardar Borrador
                     </button>';
-                    }
+            }
 
-                    // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
-                    if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                        // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
-                        echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
+            // 2. Botón Validar Asistencia (Visible si es ST, la asistencia AÚN NO está validada, y la minuta NO está Aprobada)
+            if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                // Quitamos data-bs-toggle y data-bs-target, y añadimos onclick=
+                echo '<button type="button" class="btn btn-info fw-bold ms-3" id="btnRevisarAsistencia"
                         onclick="iniciarValidacionAsistencia()">
                     <i class="fas fa-users-check"></i> Revisar y Validar Asistencia
                 </button>';
-                    }
+            }
 
-                    // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
-                    // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
-                    if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
-                        echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
+            // 3. Botón Enviar/Re-enviar (Visible si es ST, la asistencia SÍ está validada, y la minuta NO está Aprobada)
+            // Tu JS existente (línea 939) se encargará de cambiar el texto a "Aplicar y Reenviar" si el estado es REQUIERE_REVISION
+            if ($esSecretarioTecnico && $asistenciaValidada == 1 && $estadoMinuta !== 'APROBADA') {
+                echo '<button type="button" class="btn btn-danger fw-bold ms-3" id="btnEnviarAprobacion"
                                 onclick="if (validarCamposMinuta()) confirmarEnvioAprobacion();">
                         <i class="fas fa-paper-plane"></i> Enviar para Aprobación
                     </button>';
-                    }
+            }
 
-                    // Mensaje si ya está Aprobada
-                    if ($estadoMinuta === 'APROBADA') {
-                        echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
-                    }
+            // Mensaje si ya está Aprobada
+            if ($estadoMinuta === 'APROBADA') {
+                echo '<small class="d-block text-success mt-2">Esta minuta ya fue APROBADA y no puede modificarse.</small>';
+            }
 
-                    // Mensaje si falta validar asistencia
-                    if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
-                        echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
-                    }
+            // Mensaje si falta validar asistencia
+            if ($esSecretarioTecnico && $asistenciaValidada == 0 && $estadoMinuta !== 'APROBADA') {
+                echo '<small class="d-block text-warning mt-2">Debe "Revisar y Validar Asistencia" para poder enviar a aprobación.</small>';
+            }
 
-                    // --- FIN DE LA LÓGICA DE BOTONES ---
-                    ?>
+            // --- FIN DE LA LÓGICA DE BOTONES ---
+            ?>
 
+        </div>
+    </div>
+    </div>
+
+    <template id="plantilla-tema">
+        <div class="tema-block mb-4 border rounded p-3 bg-white shadow-sm position-relative">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-primary mb-0">Tema #</h6>
+            </div>
+            <div class="dropdown-form-block mb-3">
+                <button class="btn btn-light border text-start w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#temaTratado_ID_" aria-expanded="true" aria-controls="temaTratado_ID_">TEMA TRATADO</button>
+                <div class="collapse show" id="temaTratado_ID_">
+                    <div class="editor-container p-3 border border-top-0 bg-white">
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="editable-area form-control" contenteditable="true" placeholder="Escribe el tema..."></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown-form-block mb-3">
+                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#objetivo_ID_" aria-expanded="false" aria-controls="objetivo_ID_">OBJETIVO</button>
+                <div class="collapse" id="objetivo_ID_">
+                    <div class="editor-container p-3 border border-top-0 bg-white">
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="editable-area form-control" contenteditable="true" placeholder="Describe el objetivo..."></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown-form-block mb-3">
+                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
+                <div class="collapse" id="acuerdos_ID_">
+                    <div class="editor-container p-3 border border-top-0 bg-white">
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i< /button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown-form-block mb-3">
+                <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compromisos_ID_" aria-expanded="false" aria-controls="compromisos_ID_">COMPROMISOS Y RESPONSABLES</button>
+                <div class="collapse" id="compromisos_ID_">
+                    <div class="editor-container p-3 border border-top-0 bg-white">
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="editable-area form-control" contenteditable="true" placeholder="Registra compromisos..."></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dropdown-form-block mb-3">
+                <button class="btn btn-light border text-start w-100 fw-bold text-primary collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#observaciones_ID_" aria-expanded="false" aria-controls="observaciones_ID_">OBSERVACIONES Y COMENTARIOS</button>
+                <div class="collapse" id="observaciones_ID_">
+                    <div class="editor-container p-3 border border-top-0 bg-white">
+                        <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
+                        <div class="editable-area form-control" contenteditable="true" placeholder="Añade observaciones..."></div>
+                    </div>
+                </div>
+            </div>
+            <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
+        </div>
+    </template>
+
+
+    <div class="modal fade" id="modalValidarAsistencia" tabindex="-1" aria-labelledby="modalValidarAsistenciaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalValidarAsistenciaLabel">Validar Asistencia de Minuta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="contenidoModalAsistencia">
+                    <p>Cargando asistencia...</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" id="btnModificarAsistencia">
+                        <i class="fas fa-edit"></i> Modificar Asistencia
+                    </button>
+                    <button type="button" class="btn btn-success" id="btnConfirmarEnviarAsistencia">
+                        <i class="fas fa-check"></i> Confirmar y Enviar Correo
+                    </button>
                 </div>
             </div>
         </div>
-
-        <template id="plantilla-tema">
-            <div class="tema-block mb-4 border rounded p-3 bg-white shadow-sm position-relative">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold text-primary mb-0">Tema #</h6>
-                </div>
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-light border text-start w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#temaTratado_ID_" aria-expanded="true" aria-controls="temaTratado_ID_">TEMA TRATADO</button>
-                    <div class="collapse show" id="temaTratado_ID_">
-                        <div class="editor-container p-3 border border-top-0 bg-white">
-                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                            <div class="editable-area form-control" contenteditable="true" placeholder="Escribe el tema..."></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#objetivo_ID_" aria-expanded="false" aria-controls="objetivo_ID_">OBJETIVO</button>
-                    <div class="collapse" id="objetivo_ID_">
-                        <div class="editor-container p-3 border border-top-0 bg-white">
-                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                            <div class="editable-area form-control" contenteditable="true" placeholder="Describe el objetivo..."></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#acuerdos_ID_" aria-expanded="false" aria-controls="acuerdos_ID_">ACUERDOS ADOPTADOS</button>
-                    <div class="collapse" id="acuerdos_ID_">
-                        <div class="editor-container p-3 border border-top-0 bg-white">
-                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></i< /button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                            <div class="editable-area form-control" contenteditable="true" placeholder="Anota acuerdos..."></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-light border text-start w-100 fw-bold collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compromisos_ID_" aria-expanded="false" aria-controls="compromisos_ID_">COMPROMISOS Y RESPONSABLES</button>
-                    <div class="collapse" id="compromisos_ID_">
-                        <div class="editor-container p-3 border border-top-0 bg-white">
-                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                            <div class="editable-area form-control" contenteditable="true" placeholder="Registra compromisos..."></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="dropdown-form-block mb-3">
-                    <button class="btn btn-light border text-start w-100 fw-bold text-primary collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#observaciones_ID_" aria-expanded="false" aria-controls="observaciones_ID_">OBSERVACIONES Y COMENTARIOS</button>
-                    <div class="collapse" id="observaciones_ID_">
-                        <div class="editor-container p-3 border border-top-0 bg-white">
-                            <div class="bb-editor-toolbar no-select mb-2" role="toolbar"> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('bold')"><b>B</b></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('italic')"><i>I</i></button> <button type="button" class="btn btn-sm btn-light border me-1" onclick="format('underline')"><u>U</u></button> </div>
-                            <div class="editable-area form-control" contenteditable="true" placeholder="Añade observaciones..."></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-end mt-3"> <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" style="display:none;">❌ Eliminar Tema</button> </div>
-            </div>
-        </template>
-
-
-        <div class="modal fade" id="modalValidarAsistencia" tabindex="-1" aria-labelledby="modalValidarAsistenciaLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="modalValidarAsistenciaLabel">Validar Asistencia de Minuta</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body" id="contenidoModalAsistencia">
-                        <p>Cargando asistencia...</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-warning" id="btnModificarAsistencia">
-                            <i class="fas fa-edit"></i> Modificar Asistencia
-                        </button>
-                        <button type="button" class="btn btn-success" id="btnConfirmarEnviarAsistencia">
-                            <i class="fas fa-check"></i> Confirmar y Enviar Correo
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    </div>
     </div>
 
     <script>
@@ -758,120 +777,310 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>\"']/g, function(m) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '\"': '&quot;',
+                    "\'": '&#39;'
+                } [m];
+            });
+        }
 
-        // ==========================================================
-        // --- 🚀 INICIO: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
-        // (Copiado desde editar_minuta.php y ruta corregida)
-        // ==========================================================
-        (function() {
-            // Solo ejecuta este script si el panel del ST existe en la página
-            const formCrearVotacion = document.getElementById('form-crear-votacion');
-            if (!formCrearVotacion) {
-                // No es el ST o la minuta está aprobada, no hacer nada.
-                return;
+        // --- Variables y función para Polling de Votaciones ---
+        const INTERVALO_VOTACIONES = 1000;
+        let intervalVotacionID = null; // Es diferente de 'intervalAsistenciaID', no hay conflicto
+
+        function iniciarPollingVotaciones() {
+            if (intervalVotacionID !== null) return;
+
+            const statusDisplay = document.getElementById('poll-status-display');
+            if (!statusDisplay) return;
+
+            console.log('Polling de Votaciones (Smart) INICIADO.');
+
+            // Función interna para actualizar el tiempo
+            const actualizarTimestamp = (icono, mensaje) => {
+                if (!statusDisplay) return;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('es-CL', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                statusDisplay.innerHTML = `<i class="fas ${icono} me-1"></i> ${mensaje} (${timeString})`;
+            };
+
+            // Iniciar el intervalo
+            intervalVotacionID = setInterval(() => {
+                const votacionTabButton = document.getElementById('votaciones-tab');
+
+                if (votacionTabButton && votacionTabButton.classList.contains('active')) {
+
+                    // 1. Mostrar que está "Buscando..."
+                    actualizarTimestamp('', '');
+
+                    // 2. Llamar al "puente"
+                    if (typeof exposedCargarVotaciones === 'function') {
+
+                        // Pasamos 'false' y una callback para que nos avise si hubo cambios
+                        exposedCargarVotaciones(false, (cambiosDetectados) => {
+                            // 3. La callback actualiza el estado visual
+                            if (cambiosDetectados) {
+                                actualizarTimestamp('fa-check text-success', 'Lista actualizada');
+                            } else {
+                                actualizarTimestamp('fa-satellite-dish text-muted', '');
+                            }
+                        });
+                    }
+                } else {
+                    if (statusDisplay.innerHTML !== '') {
+                        statusDisplay.innerHTML = ''; // Limpiar si la pestaña se cierra
+                    }
+                }
+            }, INTERVALO_VOTACIONES); // Usará el nuevo intervalo de 3 segundos
+        }
+
+        // Variable "puente" que conectará con la función privada
+        let exposedCargarVotaciones;
+        let cacheVotaciones = "";
+
+        
+
+         (function() {
+        // Solo ejecuta este script si el panel del ST existe en la página
+        const formCrearVotacion = document.getElementById('form-crear-votacion');
+        if (!formCrearVotacion) {
+            // No es el ST o la minuta está aprobada, no hacer nada.
+            return;
+        }
+
+        // --- 1. Constantes y Elementos ---
+        const idMinutaActual = document.getElementById('votacion_idMinuta').value;
+        const idReunionActual = document.getElementById('votacion_idReunion').value;
+        const idComisionActual = document.getElementById('votacion_idComision').value;
+        // CORRECCIÓN: Ruta con ../../
+        const controllerVotacionURL = '../../controllers/gestionar_votacion_minuta.php';
+
+        const listaContainer = document.getElementById('panel-votaciones-lista');
+        const inputNombreVotacion = document.getElementById('nombreVotacion');
+
+        // --- 2. Función para Cargar la Lista de Votaciones ---
+        /**
+         * Carga los resultados preliminares de las votaciones activas.
+         * Muestra el detalle de votos y faltantes (Requerimiento ST).
+         */
+        function cargarVotaciones(inicial = true) {
+            const container = document.getElementById('contenedorVotaciones');
+            if (!container) return;
+
+            if (inicial) {
+                container.innerHTML = '<p class="text-center"><i class="fas fa-spinner fa-spin"></i> Cargando votaciones en vivo...</p>';
             }
 
-            // --- 1. Constantes y Elementos ---
-            const idMinutaActual = document.getElementById('votacion_idMinuta').value;
-            const idReunionActual = document.getElementById('votacion_idReunion').value;
-            const idComisionActual = document.getElementById('votacion_idComision').value;
-            // ✅ CORRECCIÓN: Ruta absoluta para crearMinuta.php
-            const controllerVotacionURL = '/corevota/controllers/gestionar_votacion_minuta.php';
+            const idMinutaActual = document.getElementById('idMinuta').value;
 
-            const listaContainer = document.getElementById('panel-votaciones-lista');
-            const inputNombreVotacion = document.getElementById('nombreVotacion');
-
-            // --- 2. Función para Cargar la Lista de Votaciones ---
-            async function cargarVotaciones() {
-                listaContainer.innerHTML = `<div class="text-center p-3 text-muted">
-                <div class="spinner-border spinner-border-sm" role="status"></div>
-                <span class="ms-2">Actualizando lista...</span>
-                </div>`;
-
-                try {
-                    const response = await fetch(`${controllerVotacionURL}?action=list&idMinuta=${idMinutaActual}`, {
-                        credentials: 'same-origin'
-                    });
-
-                    if (!response.ok) throw new Error('Error de red al listar votaciones.');
-
-                    const text = await response.text();
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (e) {
-                        console.error("Respuesta inválida del servidor (gestionar_votacion_minuta.php):", text);
-                        throw new Error("El servidor devolvió una respuesta inválida. Revisa la consola.");
-                    }
-
-                    if (data.status !== 'success') throw new Error(data.message);
-
-                    // Limpiar y renderizar
-                    listaContainer.innerHTML = '';
-                    if (data.data.length === 0) {
-                        listaContainer.innerHTML = '<div class="alert alert-light text-center">Aún no se han creado votaciones para esta minuta.</div>';
+            // Nota: Necesitas crear el controlador PHP: /corevota/controllers/obtener_resultados_votacion.php
+            // LÍNEA CORREGIDA
+            // LÍNEA CORREGIDA
+            fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(idMinutaActual)}`, {
+                    method: 'GET'
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Error de red al obtener resultados de votación.');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'error') {
+                        container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${data.message}</p>`;
                         return;
                     }
 
-                    data.data.forEach(votacion => {
-                        listaContainer.appendChild(renderVotacionItem(votacion));
+                    if (!data.votaciones || data.votaciones.length === 0) {
+                        container.innerHTML = `<p class="text-muted text-center" id="votacion-placeholder">No hay votaciones activas para esta minuta.</p>`;
+                        return;
+                    }
+
+                    container.innerHTML = ''; // Limpiar contenedor
+
+                    data.votaciones.forEach(v => {
+                        const totalVotantes = v.votosSi + v.votosNo + v.votosAbstencion;
+                        const faltanVotar = v.totalPresentes - totalVotantes;
+
+                        // Helper para generar lista de votantes para el ST
+                        const getVoterList = (list) => list.length > 0 ? `<ul><li>${list.map(escapeHTML).join('</li><li>')}</li></ul>` : '<em class="text-muted ps-2">Sin votos</em>';
+
+                        const votacionHtml = `
+                    <div class="card mb-4 shadow-sm votacion-block" data-id-votacion="${v.idVotacion}">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Votación Activa: ${escapeHTML(v.nombreAcuerdo)}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-4">
+                                <div class="col-4">
+                                    <h3 class="text-success">${v.votosSi}</h3>
+                                    <p class="mb-0">Votos a Favor (Sí)</p>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-danger">${v.votosNo}</h3>
+                                    <p class="mb-0">Votos en Contra (No)</p>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-secondary">${v.votosAbstencion}</h3>
+                                    <p class="mb-0">Abstenciones</p>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h4 class="text-info">${v.totalPresentes}</h4>
+                                    <p class="mb-0">Asistentes Requeridos</p>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="text-warning">${Math.max(0, faltanVotar)}</h4>
+                                    <p class="mb-0">Faltan Votar</p>
+                                </div>
+                            </div>
+                            
+                            <h6 class="mt-4 border-bottom pb-1">Detalle de Votantes (ST)</h6>
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th class="text-success">Sí (${v.votosSi})</th>
+                                        <th class="text-danger">No (${v.votosNo})</th>
+                                        <th class="text-secondary">Abst. (${v.votosAbstencion})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>${getVoterList(v.votosSi_nombres || [])}</td>
+                                        <td>${getVoterList(v.votosNo_nombres || [])}</td>
+                                        <td>${getVoterList(v.votosAbstencion_nombres || [])}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                        container.innerHTML += votacionHtml;
                     });
+                })
+                .catch(error => {
+                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${error.message}</p>`;
+                    console.error('Error al cargar votaciones:', error);
+                });
+        }
 
-                } catch (error) {
-                    listaContainer.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
-                }
+        let intervalResultadosID = null;
+        let cacheResultados = "";
+
+        exposedCargarVotaciones = cargarVotaciones;
+
+        // --- 3. Función para Renderizar UN item de la lista ---
+        function renderVotacionItem(votacion) {
+            const div = document.createElement('div');
+            div.className = 'list-group-item d-flex justify-content-between align-items-center';
+            const habilitada = parseInt(votacion.habilitada, 10) === 1;
+
+            let badgeClass = habilitada ? 'bg-success' : 'bg-secondary';
+            let badgeIcon = habilitada ? 'fa-play-circle' : 'fa-stop-circle';
+            let badgeText = habilitada ? 'Abierta' : 'Cerrada';
+
+            let btnClass = habilitada ? 'btn-danger' : 'btn-success';
+            let btnIcon = habilitada ? 'fa-stop' : 'fa-play';
+            let btnText = habilitada ? 'Cerrar' : 'Habilitar';
+            let nuevoEstado = habilitada ? 0 : 1;
+
+            div.innerHTML = `
+            <div>
+                <span class="badge ${badgeClass} me-2"><i class="fas ${badgeIcon} me-1"></i> ${badgeText}</span>
+                <strong>${votacion.nombreVotacion}</strong>
+                <small class="text-muted d-block">Comisión: ${votacion.nombreComision || 'No especificada'}</small>
+            </div>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn ${btnClass} btn-sm btn-cambiar-estado" data-id="${votacion.idVotacion}" data-nuevo-estado="${nuevoEstado}">
+                    <i class="fas ${btnIcon} me-1"></i> ${btnText}
+                </button>
+            </div>`;
+            return div;
+        }
+
+        // --- 4. Event Listener para CREAR Votación ---
+        formCrearVotacion.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = inputNombreVotacion.value.trim();
+            if (nombre === '') {
+                Swal.fire('Error', 'Debe ingresar un nombre para la votación.', 'error');
+                return;
             }
 
-            // --- 3. Función para Renderizar UN item de la lista ---
-            function renderVotacionItem(votacion) {
-                const div = document.createElement('div');
-                div.className = 'list-group-item d-flex justify-content-between align-items-center';
-                const habilitada = parseInt(votacion.habilitada, 10) === 1;
+            const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
 
-                let badgeClass = habilitada ? 'bg-success' : 'bg-secondary';
-                let badgeIcon = habilitada ? 'fa-play-circle' : 'fa-stop-circle';
-                let badgeText = habilitada ? 'Abierta' : 'Cerrada';
+            const formData = new FormData();
+            formData.append('action', 'create');
+            formData.append('nombreVotacion', nombre);
+            formData.append('idMinuta', idMinutaActual);
+            formData.append('idReunion', idReunionActual);
+            formData.append('idComision', idComisionActual);
 
-                let btnClass = habilitada ? 'btn-danger' : 'btn-success';
-                let btnIcon = habilitada ? 'fa-stop' : 'fa-play';
-                let btnText = habilitada ? 'Cerrar' : 'Habilitar';
-                let nuevoEstado = habilitada ? 0 : 1;
+            try {
+                // CORRECCIÓN: Añadido { credentials: 'same-origin' }
+                const response = await fetch(controllerVotacionURL, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                });
 
-                div.innerHTML = `
-                <div>
-                    <span class="badge ${badgeClass} me-2"><i class="fas ${badgeIcon} me-1"></i> ${badgeText}</span>
-                    <strong>${votacion.nombreVotacion}</strong>
-                    <small class="text-muted d-block">Comisión: ${votacion.nombreComision || 'No especificada'}</small>
-                </div>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn ${btnClass} btn-sm btn-cambiar-estado" data-id="${votacion.idVotacion}" data-nuevo-estado="${nuevoEstado}">
-                        <i class="fas ${btnIcon} me-1"></i> ${btnText}
-                    </button>
-                </div>`;
-                return div;
+                const data = await response.json();
+                if (data.status !== 'success') throw new Error(data.message);
+
+                Swal.fire('¡Éxito!', 'Votación creada correctamente.', 'success');
+                inputNombreVotacion.value = ''; // Limpiar input
+                cargarVotaciones(); // Recargar la lista
+
+            } catch (error) {
+                Swal.fire('Error', error.message, 'error');
+            } finally {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = '<i class="fas fa-plus me-2"></i>Crear Votación';
             }
+        });
 
-            // --- 4. Event Listener para CREAR Votación ---
-            formCrearVotacion.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const nombre = inputNombreVotacion.value.trim();
-                if (nombre === '') {
-                    Swal.fire('Error', 'Debe ingresar un nombre para la votación.', 'error');
-                    return;
-                }
+        // --- 5. Event Listener para Habilitar/Cerrar ---
+        listaContainer.addEventListener('click', async (e) => {
+            const boton = e.target.closest('.btn-cambiar-estado');
+            if (!boton) return;
 
-                const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
-                btnSubmit.disabled = true;
-                btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
+            const idVotacion = boton.dataset.id;
+            const nuevoEstado = boton.dataset.nuevoEstado;
+            const accionTexto = nuevoEstado === '1' ? 'Habilitar' : 'Cerrar';
+
+            const result = await Swal.fire({
+                title: `¿Seguro que desea ${accionTexto.toLowerCase()} esta votación?`,
+                text: (nuevoEstado === '1') ? 'Los consejeros podrán verla y votar.' : 'Nadie podrá votar y se cerrará la sala.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: `Sí, ${accionTexto}`,
+                confirmButtonColor: (nuevoEstado === '1') ? '#198754' : '#dc3545',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (result.isConfirmed) {
+                boton.disabled = true;
+                boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
                 const formData = new FormData();
-                formData.append('action', 'create');
-                formData.append('nombreVotacion', nombre);
-                formData.append('idMinuta', idMinutaActual);
-                formData.append('idReunion', idReunionActual);
-                formData.append('idComision', idComisionActual);
+                formData.append('action', 'change_status');
+                formData.append('idVotacion', idVotacion);
+                formData.append('nuevoEstado', nuevoEstado);
 
                 try {
+                    // CORRECCIÓN: Añadido { credentials: 'same-origin' }
                     const response = await fetch(controllerVotacionURL, {
                         method: 'POST',
                         body: formData,
@@ -881,72 +1090,184 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     const data = await response.json();
                     if (data.status !== 'success') throw new Error(data.message);
 
-                    Swal.fire('¡Éxito!', 'Votación creada correctamente.', 'success');
-                    inputNombreVotacion.value = ''; // Limpiar input
-                    cargarVotaciones(); // Recargar la lista
+                    Swal.fire('¡Éxito!', `Votación ${accionTexto.toLowerCase()}da.`, 'success');
+                    cargarVotaciones();
 
                 } catch (error) {
                     Swal.fire('Error', error.message, 'error');
-                } finally {
-                    btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = '<i class="fas fa-plus me-2"></i>Crear Votación';
+                    cargarVotaciones();
                 }
-            });
+            }
+        });
 
-            // --- 5. Event Listener para Habilitar/Cerrar ---
-            listaContainer.addEventListener('click', async (e) => {
-                const boton = e.target.closest('.btn-cambiar-estado');
-                if (!boton) return;
+        // --- 6. Carga Inicial ---
+        cargarVotaciones();
 
-                const idVotacion = boton.dataset.id;
-                const nuevoEstado = boton.dataset.nuevoEstado;
-                const accionTexto = nuevoEstado === '1' ? 'Habilitar' : 'Cerrar';
+    })();
 
-                const result = await Swal.fire({
-                    title: `¿Seguro que desea ${accionTexto.toLowerCase()} esta votación?`,
-                    text: (nuevoEstado === '1') ? 'Los consejeros podrán verla y votar.' : 'Nadie podrá votar y se cerrará la sala.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: `Sí, ${accionTexto}`,
-                    confirmButtonColor: (nuevoEstado === '1') ? '#198754' : '#dc3545',
-                    cancelButtonText: 'Cancelar'
+
+        function iniciarPollingResultados() {
+            if (intervalResultadosID !== null) return;
+
+            const statusDisplay = document.getElementById('poll-resultados-status');
+            if (!statusDisplay) return;
+
+            console.log('Polling de Resultados (Smart) INICIADO.');
+
+            const actualizarTimestamp = (icono, mensaje) => {
+                if (!statusDisplay) return;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('es-CL', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                statusDisplay.innerHTML = `<i class="fas ${icono} me-1"></i> ${mensaje} (${timeString})`;
+            };
+
+            intervalResultadosID = setInterval(() => {
+                const votacionTabButton = document.getElementById('votaciones-tab');
+
+                if (votacionTabButton && votacionTabButton.classList.contains('active')) {
+                    actualizarTimestamp('fa-sync fa-spin text-primary', 'Buscando votos...');
+
+                    // Llamamos a la función que carga los resultados
+                    cargarResultadosVotacion(false, (cambiosDetectados) => {
+                        if (cambiosDetectados) {
+                            actualizarTimestamp('fa-check text-success', 'Resultados actualizados');
+                        } else {
+                            actualizarTimestamp('fa-satellite-dish text-muted', 'Sin nuevos votos');
+                        }
+                    });
+                } else {
+                    if (statusDisplay.innerHTML !== '') statusDisplay.innerHTML = '';
+                }
+            }, INTERVALO_VOTACIONES); // Usa el mismo intervalo de 3 segundos
+        }
+
+
+        /**
+         * Carga los resultados (copiado de editar_minuta.php)
+         * Usa la caché para evitar el "parpadeo"
+         */
+        async function cargarResultadosVotacion(esCargaInicial = false, callback = null) {
+            const container = document.getElementById('panel-resultados-en-vivo');
+            if (!container) return;
+
+            if (esCargaInicial) {
+                container.innerHTML = '<p class="text-center" id="votacion-placeholder"><i class="fas fa-spinner fa-spin"></i> Cargando resultados...</p>';
+            }
+
+            try {
+
+                const idMinutaActual = document.getElementById('idMinuta').value;
+                // Este es el controlador que SÍ devuelve los resultados detallados
+                
+                const response = await fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(window.idMinuta)}`, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                if (!response.ok) throw new Error('Error de red al obtener resultados.');
+
+                const text = await response.text();
+
+                // Lógica Anti-Blink
+                if (text === cacheResultados) {
+                    if (callback) callback(false); // No hubo cambios
+                    return;
+                }
+                cacheResultados = text;
+
+                const data = JSON.parse(text);
+
+                if (data.status === 'error') {
+                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${data.message}</p>`;
+                    if (callback) callback(false);
+                    return;
+                }
+
+                if (!data.votaciones || data.votaciones.length === 0) {
+                    container.innerHTML = `<p class="text-muted text-center" id="votacion-placeholder">No hay votaciones activas para esta minuta.</p>`;
+                    if (callback) callback(false);
+                    return;
+                }
+
+                container.innerHTML = ''; // Limpiar contenedor
+
+                data.votaciones.forEach(v => {
+                    const totalVotantes = v.votosSi + v.votosNo + v.votosAbstencion;
+                    const faltanVotar = v.totalPresentes - totalVotantes;
+
+                    // Helper para generar lista de votantes para el ST
+                    const getVoterList = (list) => list.length > 0 ? `<ul class="list-unstyled mb-0 small">${list.map(name => `<li><i class="fas fa-user fa-fw me-1 text-muted"></i>${escapeHTML(name)}</li>`).join('')}</ul>` : '<em class="text-muted small ps-2">Sin votos</em>';
+
+                    const votacionHtml = `
+                <div class="card mb-4 shadow-sm votacion-block-ui" data-id-votacion="${v.idVotacion}">
+                    <div class="card-header bg-light border-bottom">
+                        <h5 class="mb-0 fw-bold">${escapeHTML(v.nombreAcuerdo)}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-4">
+                            <div class="col-4">
+                                <h3 class="text-success mb-0">${v.votosSi}</h3>
+                                <p class="mb-0 small text-uppercase">A Favor</p>
+                            </div>
+                            <div class="col-4">
+                                <h3 class="text-danger mb-0">${v.votosNo}</h3>
+                                <p class="mb-0 small text-uppercase">En Contra</p>
+                            </div>
+                            <div class="col-4">
+                                <h3 class="text-secondary mb-0">${v.votosAbstencion}</h3>
+                                <p class="mb-0 small text-uppercase">Abstención</p>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row text-center mb-3">
+                            <div class="col-6">
+                                <h4 class="text-info mb-0">${v.totalPresentes}</h4>
+                                <p class="mb-0 small">Asistentes Requeridos</p>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-warning mb-0">${Math.max(0, faltanVotar)}</h4>
+                                <p class="mb-0 small">Faltan Votar</p>
+                            </div>
+                        </div>
+                        
+                        <h6 class="mt-4 border-bottom pb-1 small text-uppercase text-muted">Detalle de Votantes (ST)</h6>
+                        <table class="table table-sm table-bordered" style="font-size: 0.9rem;">
+                            <thead>
+                                <tr class="table-light">
+                                    <th class="text-success">Sí (${v.votosSi})</th>
+                                    <th class="text-danger">No (${v.votosNo})</th>
+                                    <th class="text-secondary">Abst. (${v.votosAbstencion})</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="vertical-align: top;">${getVoterList(v.votosSi_nombres || [])}</td>
+                                    <td style="vertical-align: top;">${getVoterList(v.votosNo_nombres || [])}</td>
+                                    <td style="vertical-align: top;">${getVoterList(v.votosAbstencion_nombres || [])}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+                    container.innerHTML += votacionHtml;
                 });
 
-                if (result.isConfirmed) {
-                    boton.disabled = true;
-                    boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                if (callback) callback(true); // SÍ hubo cambios
 
-                    const formData = new FormData();
-                    formData.append('action', 'change_status');
-                    formData.append('idVotacion', idVotacion);
-                    formData.append('nuevoEstado', nuevoEstado);
-
-                    try {
-                        const response = await fetch(controllerVotacionURL, {
-                            method: 'POST',
-                            body: formData,
-                            credentials: 'same-origin'
-                        });
-
-                        const data = await response.json();
-                        if (data.status !== 'success') throw new Error(data.message);
-
-                        Swal.fire('¡Éxito!', `Votación ${accionTexto.toLowerCase()}da.`, 'success');
-                        cargarVotaciones();
-
-                    } catch (error) {
-                        Swal.fire('Error', error.message, 'error');
-                        cargarVotaciones();
-                    }
+            } catch (error) {
+                if (esCargaInicial) {
+                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${error.message}</p>`;
                 }
-            });
-
-            // --- 6. Carga Inicial ---
-            cargarVotaciones();
-
-        })();
+                console.error('Error al cargar resultados:', error);
+                if (callback) callback(false);
+            }
+        }
         // ==========================================================
-        // --- 🚀 FIN: LÓGICA DEL PANEL DE VOTACIONES (ST) ---
+        // --- 🚀 FIN: LÓGICA DE RESULTADOS EN VIVO (ST) ---
+        // ==========================================================
         // ==========================================================
 
 
@@ -981,6 +1302,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             // Se reemplaza el bloque IF/ELSE de polling por la llamada a la función condicional.
             // ✅ REQUERIMIENTO 1: Inicia el polling si el tiempo y el rol lo permiten.
             iniciarPollingCondicional();
+
+            iniciarPollingVotaciones(); // para las votaciones
+            iniciarPollingResultados();
 
             // 4. Lógica de Navegación por Checkbox (Se mantiene)
             $('.navigate-to-tab').on('change', function() {

@@ -296,9 +296,82 @@ $pdo = null; // Cerrar conexión
     const feedbackBox = document.getElementById('cajaFeedbackContenedor');
     const btnAccion = document.getElementById('btn-accion-presidente');
     const feedbackTexto = document.getElementById('cajaFeedbackTexto');
-    const idMinuta = document.getElementById('idMinuta').value;
+    // LÍNEA CORREGIDA
+    //window.idMinuta = document.getElementById('idMinuta').value;
     const btnGuardarBorrador = document.getElementById('btn-guardar-borrador');
     const formMinuta = document.getElementById('form-crear-minuta');
+
+    const INTERVALO_VOTACIONES = 1000; // 1 segundo para actualizar resultados
+    let intervalVotacionID = null; // Almacena la referencia del setInterval
+
+
+    function iniciarPollingVotaciones() {
+        // Si ya está corriendo, no hacer nada
+        if (intervalVotacionID !== null) return;
+
+        console.log('Polling de Votaciones INICIADO.');
+        intervalVotacionID = setInterval(() => {
+            const votacionTabButton = document.getElementById('votaciones-tab');
+
+            // Solo actualiza si la pestaña de votaciones está activa
+            if (votacionTabButton && votacionTabButton.classList.contains('active')) {
+                // true = con spinner, false = sin spinner
+                // cargarVotaciones(false); // <-- ESTA ES LA LÍNEA ORIGINAL (incorrecta)
+                exposedCargarVotaciones(false); // <-- ESTA ES LA LÍNEA CORREGIDA
+            }
+        }, INTERVALO_VOTACIONES);
+    }
+
+    // Asegúrate de que esta función auxiliar exista, ya sea en editar_minuta.php o en un archivo incluido.
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>\"']/g, function(m) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '\"': '&quot;',
+                "\'": '&#39;'
+            } [m];
+        });
+    }
+
+    function iniciarPollingCondicional() {
+        const now = new Date();
+        const HORA_INICIO_REUNION_ISO = HORA_INICIO_REUNION.replace(' ', 'T');
+        const [h, m, s] = HORA_INICIO_REUNION_ISO.split(':').map(part => parseInt(part, 10));
+        const horaInicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+        if (isNaN(horaInicioHoy.getTime())) {
+            console.error('Error al parsear HORA_INICIO_REUNION. Polling no iniciado.');
+            return;
+        }
+        const horaLimiteAutogestion = new Date(horaInicioHoy.getTime() + LIMITE_MINUTOS_AUTOGESTION * 60 * 1000);
+        const haPasadoLimite = now.getTime() > horaLimiteAutogestion.getTime();
+        if (!ES_ST_EDITABLE || haPasadoLimite || asistenciaModificando) {
+            let causa = !ES_ST_EDITABLE ?
+                'Usuario no es ST' :
+                haPasadoLimite ?
+                `Límite de ${LIMITE_MINUTOS_AUTOGESTION} minutos excedido.` :
+                'Modificación manual activa.';
+            console.log(`Polling no iniciado/reanudado. Causa: ${causa}.`);
+            return;
+        }
+        if (intervalAsistenciaID === null) {
+            console.log('Asistencia: Auto-refresh iniciado (ST, < 30 min)');
+            intervalAsistenciaID = setInterval(() => {
+                const asistenciaTabButton = document.getElementById('asistencia-tab');
+                if (asistenciaTabButton && asistenciaTabButton.classList.contains('active')) {
+                    cargarTablaAsistencia(false);
+                }
+            }, INTERVALO_ASISTENCIA);
+        }
+    }
+
+    let exposedCargarVotaciones;
+
+
+
+
 
     // ==========================================================
     // ==========================================================
@@ -323,47 +396,108 @@ $pdo = null; // Cerrar conexión
         const inputNombreVotacion = document.getElementById('nombreVotacion');
 
         // --- 2. Función para Cargar la Lista de Votaciones ---
-        async function cargarVotaciones() {
-            listaContainer.innerHTML = `<div class="text-center p-3 text-muted">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span class="ms-2">Actualizando lista...</span>
-            </div>`;
+        /**
+         * Carga los resultados preliminares de las votaciones activas.
+         * Muestra el detalle de votos y faltantes (Requerimiento ST).
+         */
+        function cargarVotaciones(inicial = true) {
+            const container = document.getElementById('contenedorVotaciones');
+            if (!container) return;
 
-            try {
-                // CORRECCIÓN: Añadido { credentials: 'same-origin' }
-                const response = await fetch(`${controllerVotacionURL}?action=list&idMinuta=${idMinutaActual}`, {
-                    credentials: 'same-origin'
-                });
-
-                if (!response.ok) throw new Error('Error de red al listar votaciones.');
-
-                // CORRECCIÓN: Manejo de JSON vacío
-                const text = await response.text();
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch (e) {
-                    console.error("Respuesta inválida del servidor (gestionar_votacion_minuta.php):", text);
-                    throw new Error("El servidor devolvió una respuesta inválida. Revisa la consola.");
-                }
-
-                if (data.status !== 'success') throw new Error(data.message);
-
-                // Limpiar y renderizar
-                listaContainer.innerHTML = '';
-                if (data.data.length === 0) {
-                    listaContainer.innerHTML = '<div class="alert alert-light text-center">Aún no se han creado votaciones para esta minuta.</div>';
-                    return;
-                }
-
-                data.data.forEach(votacion => {
-                    listaContainer.appendChild(renderVotacionItem(votacion));
-                });
-
-            } catch (error) {
-                listaContainer.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+            if (inicial) {
+                container.innerHTML = '<p class="text-center"><i class="fas fa-spinner fa-spin"></i> Cargando votaciones en vivo...</p>';
             }
+
+            
+            fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(window.idMinuta)}`, {
+                    method: 'GET'
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Error de red al obtener resultados de votación.');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'error') {
+                        container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${data.message}</p>`;
+                        return;
+                    }
+
+                    if (!data.votaciones || data.votaciones.length === 0) {
+                        container.innerHTML = `<p class="text-muted text-center" id="votacion-placeholder">No hay votaciones activas para esta minuta.</p>`;
+                        return;
+                    }
+
+                    container.innerHTML = ''; // Limpiar contenedor
+
+                    data.votaciones.forEach(v => {
+                        const totalVotantes = v.votosSi + v.votosNo + v.votosAbstencion;
+                        const faltanVotar = v.totalPresentes - totalVotantes;
+
+                        // Helper para generar lista de votantes para el ST
+                        const getVoterList = (list) => list.length > 0 ? `<ul><li>${list.map(escapeHTML).join('</li><li>')}</li></ul>` : '<em class="text-muted ps-2">Sin votos</em>';
+
+                        const votacionHtml = `
+                    <div class="card mb-4 shadow-sm votacion-block" data-id-votacion="${v.idVotacion}">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Votación Activa: ${escapeHTML(v.nombreAcuerdo)}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-4">
+                                <div class="col-4">
+                                    <h3 class="text-success">${v.votosSi}</h3>
+                                    <p class="mb-0">Votos a Favor (Sí)</p>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-danger">${v.votosNo}</h3>
+                                    <p class="mb-0">Votos en Contra (No)</p>
+                                </div>
+                                <div class="col-4">
+                                    <h3 class="text-secondary">${v.votosAbstencion}</h3>
+                                    <p class="mb-0">Abstenciones</p>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h4 class="text-info">${v.totalPresentes}</h4>
+                                    <p class="mb-0">Asistentes Requeridos</p>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="text-warning">${Math.max(0, faltanVotar)}</h4>
+                                    <p class="mb-0">Faltan Votar</p>
+                                </div>
+                            </div>
+                            
+                            <h6 class="mt-4 border-bottom pb-1">Detalle de Votantes (ST)</h6>
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th class="text-success">Sí (${v.votosSi})</th>
+                                        <th class="text-danger">No (${v.votosNo})</th>
+                                        <th class="text-secondary">Abst. (${v.votosAbstencion})</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>${getVoterList(v.votosSi_nombres || [])}</td>
+                                        <td>${getVoterList(v.votosNo_nombres || [])}</td>
+                                        <td>${getVoterList(v.votosAbstencion_nombres || [])}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                        container.innerHTML += votacionHtml;
+                    });
+                })
+                .catch(error => {
+                    container.innerHTML = `<p class="text-danger text-center" id="votacion-placeholder"><strong>Error:</strong> ${error.message}</p>`;
+                    console.error('Error al cargar votaciones:', error);
+                });
         }
+
+        exposedCargarVotaciones = cargarVotaciones;
 
         // --- 3. Función para Renderizar UN item de la lista ---
         function renderVotacionItem(votacion) {
