@@ -696,6 +696,8 @@ $pdo = null; // Cerrar conexión
                         })
                         .then(data => {
                             Swal.fire('¡Guardado! ✅', data.message, 'success');
+                            // REQUERIMIENTO 3: Intentar reanudar el polling después de guardar exitosamente.
+                            iniciarPollingCondicional();
                         })
                         .catch(error => {
                             Swal.fire('Error al Guardar ❌', error.message, 'error');

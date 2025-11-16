@@ -424,11 +424,12 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         </div>
                     </div>
                 </div>
-                
-                <div id="contenedorTemas">
-                    </div>
 
-            </div> <div class="tab-pane fade" id="asistencia-tab-pane" role="tabpanel" aria-labelledby="asistencia-tab" tabindex="0">
+                <div id="contenedorTemas">
+                </div>
+
+            </div>
+            <div class="tab-pane fade" id="asistencia-tab-pane" role="tabpanel" aria-labelledby="asistencia-tab" tabindex="0">
                 <div class="p-4 border rounded-bottom bg-white" style="border: none !important;">
                     <h5 class="fw-bold mb-3">Asistencia (Marcar estado en tiempo real)</h5>
 
@@ -661,8 +662,29 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
         const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
         let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // Se actualiza con cada fetch
-        const ES_ST_EDITABLE = <?php echo json_encode(!$esSoloLectura); ?>; // Nuevo control de edición ST/APROBADA
+        // Nuevo control de edición ST/APROBADA
+        // ESTE BLOQUE DEBE ESTAR AL INICIO DE SU <script> PRINCIPAL
+        const HORA_INICIO_REUNION = "<?php echo htmlspecialchars(date('H:i:s', strtotime($minutaData['horaMinuta'] ?? 'now'))); ?>";
+        const ES_ST_EDITABLE = <?php echo $esSoloLectura ? 'false' : 'true'; ?>; // Si esta ya existe, déjela.
+
+        // === Lógica de tiempo (Revise la sintaxis JS aquí) ===
+        const LIMITE_MINUTOS_AUTOGESTION = 30;
+        const INTERVALO_ASISTENCIA = 1000;
+
+
+
+
+        // === NUEVAS VARIABLES GLOBALES ===
+        let intervalAsistenciaID = null; // Almacena la referencia del setInterval
+        let asistenciaModificando = false; // Bandera para edición manual
+        // =======================================================
+
+
         let REGLAS_FEEDBACK = null; // Para control de Feedback
+
+
+
+
 
         // Elementos de UI
         const formSubirArchivo = document.getElementById('formSubirArchivo');
@@ -670,6 +692,71 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         const formAgregarLink = document.getElementById('formAgregarLink');
         const inputUrlLink = document.getElementById('inputUrlLink');
         const fileStatus = document.getElementById('file-upload-status');
+
+
+        // ==============================================================================
+        // === 2. FUNCIONES DE POLLING (DEBEN IR AQUÍ PARA SER GLOBALES) ===
+        // ==============================================================================
+
+        /**
+         * Detiene el polling de asistencia.
+         */
+        function detenerPollingAsistencia() {
+            if (intervalAsistenciaID !== null) {
+                clearInterval(intervalAsistenciaID);
+                intervalAsistenciaID = null;
+                asistenciaModificando = true;
+                console.log('Polling de asistencia DETENIDO por acción del ST/Guardado manual.');
+            }
+        }
+
+
+        /**
+         * Inicia o reanuda el polling condicionalmente. (Usando la lógica de fecha corregida)
+         */
+        function iniciarPollingCondicional() {
+            const now = new Date();
+
+            // 1. Extraer los componentes de tiempo 
+            const HORA_INICIO_REUNION_ISO = HORA_INICIO_REUNION.replace(' ', 'T');
+            const [h, m, s] = HORA_INICIO_REUNION_ISO.split(':').map(part => parseInt(part, 10));
+
+            // 2. Crear objeto Date de inicio en el día de HOY para una comparación válida.
+            const horaInicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+
+            if (isNaN(horaInicioHoy.getTime())) {
+                console.error('Error al parsear HORA_INICIO_REUNION. Polling no iniciado.');
+                return;
+            }
+
+            const horaLimiteAutogestion = new Date(horaInicioHoy.getTime() + LIMITE_MINUTOS_AUTOGESTION * 60 * 1000);
+            const haPasadoLimite = now.getTime() > horaLimiteAutogestion.getTime();
+
+            // Condición para NO iniciar/reanudar
+            if (!ES_ST_EDITABLE || haPasadoLimite || asistenciaModificando) {
+                let causa = !ES_ST_EDITABLE ?
+                    'Usuario no es ST' :
+                    haPasadoLimite ?
+                    `Límite de ${LIMITE_MINUTOS_AUTOGESTION} minutos excedido.` :
+                    'Modificación manual activa.';
+
+                console.log(`Polling no iniciado/reanudado. Causa: ${causa}.`);
+                return;
+            }
+
+            // 3. Iniciar el Polling
+            if (intervalAsistenciaID === null) {
+                console.log('Asistencia: Auto-refresh iniciado (ST, < 30 min)');
+
+                intervalAsistenciaID = setInterval(() => {
+                    const asistenciaTabButton = document.getElementById('asistencia-tab');
+                    if (asistenciaTabButton && asistenciaTabButton.classList.contains('active')) {
+                        // Se asume que esta función existe en otro lugar
+                        cargarTablaAsistencia(false);
+                    }
+                }, INTERVALO_ASISTENCIA);
+            }
+        }
 
 
         // ==========================================================
@@ -868,34 +955,34 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         // ==================================================================
         document.addEventListener("DOMContentLoaded", () => {
 
-            // 1. Carga Inicial de datos
+            // 1. Carga Inicial de datos (Se mantiene)
             cargarTablaAsistencia(true);
             cargarOPrepararTemas();
             cargarYMostrarAdjuntosExistentes();
             // La carga de votaciones se auto-ejecuta desde el bloque IIFE de arriba
 
-            // Solo intentar cargar feedback si la minuta NO está Aprobada
+            const modalElement = document.getElementById('modalValidarAsistencia');
+            if (modalElement) {
+                // Inicializa el objeto Bootstrap Modal y guarda la referencia
+                bsModalValidarAsistencia = new bootstrap.Modal(modalElement, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            } else {
+                console.error("CRÍTICO: Elemento modal ValidarAsistencia no encontrado en el DOM.");
+            }
+
+            // Solo intentar cargar feedback si la minuta NO está Aprobada (Se mantiene)
             if (ESTADO_MINUTA_ACTUAL !== 'APROBADA') {
                 cargarYAplicarFeedback();
             }
 
             // 2. Implementación del Polling de Asistencia (Actualización cada 1 segundo)
-            // Se mantiene la lógica de polling para la pestaña activa.
-            const INTERVALO_ASISTENCIA = 1000;
-            setInterval(() => {
-                const asistenciaTabButton = document.getElementById('asistencia-tab');
-                if (asistenciaTabButton && asistenciaTabButton.classList.contains('active')) {
-                    cargarTablaAsistencia(false);
-                }
-            }, INTERVALO_ASISTENCIA);
+            // Se reemplaza el bloque IF/ELSE de polling por la llamada a la función condicional.
+            // ✅ REQUERIMIENTO 1: Inicia el polling si el tiempo y el rol lo permiten.
+            iniciarPollingCondicional();
 
-            // 3. Inicializar el modal de Bootstrap (Validación de asistencia)
-            const modalValidarAsistencia = document.getElementById('modalValidarAsistencia');
-            if (modalValidarAsistencia) {
-                bsModalValidarAsistencia = new bootstrap.Modal(modalValidarAsistencia);
-            }
-
-            // 4. Lógica de Navegación por Checkbox (¡CORREGIDO!)
+            // 4. Lógica de Navegación por Checkbox (Se mantiene)
             $('.navigate-to-tab').on('change', function() {
                 const targetTabName = $(this).data('target-tab'); // ej: 'documentos-tab'
                 const targetNavItemId = `#nav-item-${targetTabName.replace('-tab', '')}`; // ej: '#nav-item-documentos'
@@ -922,7 +1009,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 }
             });
 
-            // 5. Eventos para archivos y enlaces (se mantienen los existentes)
+            // 5. Eventos para archivos y enlaces (Se mantienen)
             if (inputArchivo) {
                 inputArchivo.addEventListener('change', function(e) {
                     if (this.files.length > 0) {
@@ -952,15 +1039,17 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             const btnModificar = document.getElementById('btnModificarAsistencia');
             if (btnModificar) {
                 btnModificar.addEventListener('click', function() {
-                    // Ocultar modal
+
+                    // ✅ REQUERIMIENTO 2: Detener el refresh al modificar manualmente (Se mantiene)
+                    detenerPollingAsistencia();
+
+                    // ... (Lógica para ocultar modal, activar pestaña, y scroll - Se mantiene) ...
                     if (bsModalValidarAsistencia) {
                         bsModalValidarAsistencia.hide();
                     }
-                    // Activar la pestaña de Asistencia
                     const tabButton = document.getElementById('asistencia-tab');
                     const bsTab = new bootstrap.Tab(tabButton);
                     bsTab.show();
-
                     // Hacer scroll al inicio de la pestaña (opcional, para mejor UX)
                     const tabPane = document.getElementById('asistencia-tab-pane');
                     tabPane.scrollIntoView({
@@ -1136,6 +1225,11 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             return ids;
         }
 
+        /**
+         * REQUERIMIENTO 1 y 3: Inicia/Reanuda el polling si el ST y el tiempo lo permiten.
+         */
+
+
         function guardarAsistencia() {
             const asistenciaIDs = recolectarAsistencia();
 
@@ -1190,6 +1284,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         // --- SECCIÓN: ACCIONES DE MINUTA (Guardar/Enviar) (SE MANTIENEN IGUAL) ---
         // ==================================================================
 
+        // ==============================================================================
+        // === BLOQUE 2: iniciarValidacionAsistencia() (Modificado) ===
+        // ==============================================================================
+
         function iniciarValidacionAsistencia() {
             const btn = document.getElementById('btnRevisarAsistencia');
             if (!btn) return;
@@ -1200,6 +1298,10 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando cambios...';
+
+            // ✅ REQUERIMIENTO 2: Detener el polling antes de iniciar el guardado.
+            detenerPollingAsistencia();
+
 
             // El callback de guardarBorrador se encarga de re-habilitar el botón y mostrar el modal
             guardarBorrador(false, function(guardadoExitoso) {
@@ -1220,9 +1322,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                                     let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
                                     data.asistencia.forEach(item => {
                                         html += `<tr>
-                                    <td>${item.nombreCompleto}</td>
-                                    <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
-                                    </tr>`;
+                            <td>${item.nombreCompleto}</td>
+                            <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
+                            </tr>`;
                                     });
                                     html += '</tbody></table>';
                                     modalBody.innerHTML = html;
