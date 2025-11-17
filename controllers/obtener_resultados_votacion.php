@@ -1,89 +1,147 @@
 <?php
-// controllers/eliminar_adjunto.php
-
+// /corevota/controllers/obtener_resultados_votacion.php
 header('Content-Type: application/json');
-error_reporting(E_ALL);
+error_reporting(0);
 ini_set('display_errors', 0);
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
 
-// 1. Incluir dependencias
-define('ROOT_PATH', dirname(__DIR__) . '/');
-require_once ROOT_PATH . 'class/class.conectorDB.php';
+require_once __DIR__ . '/../class/class.conectorDB.php';
 
-// 2. Validar sesión y datos de entrada
-$idUsuarioLogueado = $_SESSION['idUsuario'] ?? null;
-
-// [✅ CORRECCIÓN INICIADA]
-// 2.1. Intentar leer idAdjunto desde el cuerpo JSON (si es un fetch con body)
-$data = json_decode(file_get_contents('php://input'), true);
-$idAdjunto = $data['idAdjunto'] ?? null;
-
-// 2.2. Si no se encontró en el cuerpo JSON, intentar leer desde el Query String (para llamadas GET/URL)
-if (is_null($idAdjunto)) {
-  $idAdjunto = $_GET['idAdjunto'] ?? null;
-}
-// [✅ CORRECCIÓN FINALIZADA]
-
-if (!$idUsuarioLogueado || !$idAdjunto || !is_numeric($idAdjunto)) {
-  echo json_encode(['status' => 'error', 'message' => 'Datos insuficientes o sesión no válida.']);
+if (!isset($_SESSION['idUsuario'])) {
+  http_response_code(403);
+  echo json_encode(['status' => 'error', 'message' => 'Acceso no autorizado. Debe iniciar sesión.']);
   exit;
 }
 
-$db = null;
+$idMinuta = $_GET['idMinuta'] ?? null;
+$idVotacionEspecifica = $_GET['idVotacion'] ?? null; // Variable para el botón "Ver"
+
+$idUsuarioLogueado = $_SESSION['idUsuario'];
+$idTipoUsuario = $_SESSION['tipoUsuario_id'];
+$esSecretarioTecnico = ($idTipoUsuario == 2);
+
+if (!$idMinuta) {
+  http_response_code(400);
+  echo json_encode(['status' => 'error', 'message' => 'ID de Minuta no proporcionado.']);
+  exit;
+}
+
 try {
   $db = new conectorDB();
   $pdo = $db->getDatabase();
 
-  $pdo->beginTransaction();
+  $sqlReunion = $pdo->prepare("SELECT idReunion FROM t_reunion WHERE t_minuta_idMinuta = :idMinuta LIMIT 1");
+  $sqlReunion->execute([':idMinuta' => $idMinuta]);
+  $reunion = $sqlReunion->fetch(PDO::FETCH_ASSOC);
+  $idReunion = $reunion ? $reunion['idReunion'] : null;
 
-  // 1. Obtener la info del adjunto ANTES de borrarlo
-  $sql_select = "SELECT pathAdjunto, tipoAdjunto FROM t_adjunto WHERE idAdjunto = :idAdjunto";
-  $stmt_select = $pdo->prepare($sql_select);
-  $stmt_select->execute([':idAdjunto' => $idAdjunto]);
-  $adjunto = $stmt_select->fetch(PDO::FETCH_ASSOC);
+    // --- LÓGICA SQL DINÁMICA (Esta parte ya está correcta) ---
+    $params = [
+        ':idMinuta' => $idMinuta,
+        ':idReunion' => $idReunion
+    ];
+    $query_where = "WHERE (v.t_minuta_idMinuta = :idMinuta OR v.t_reunion_idReunion = :idReunion)";
 
-  if (!$adjunto) {
-    throw new Exception('El adjunto no existe o ya fue eliminado.');
+    if ($idVotacionEspecifica) {
+        // Para el botón "Ver"
+        $query_where .= " AND v.idVotacion = :idVotacion";
+        $params[':idVotacion'] = $idVotacionEspecifica;
+    } else {
+        // Para "Resultados en Vivo"
+        $query_where .= " AND v.habilitada = 1";
+    }
+
+  $sqlVotaciones = $pdo->prepare("SELECT v.idVotacion, v.nombreVotacion, v.idComision, v.habilitada 
+                                    FROM t_votacion v
+                  $query_where
+                  ORDER BY v.idVotacion ASC");
+  $sqlVotaciones->execute($params);
+  $votaciones = $sqlVotaciones->fetchAll(PDO::FETCH_ASSOC);
+
+  if (empty($votaciones)) {
+    echo json_encode(['status' => 'success', 'data' => []]); 
+    exit;
   }
 
-  // 2. Si es un archivo ('file'), borrarlo del disco
-  if ($adjunto['tipoAdjunto'] === 'file') {
+  // OBTENER TOTAL DE ASISTENTES (El JS lo necesita)
+  $sqlAsistentes = $pdo->prepare("SELECT t_usuario_idUsuario FROM t_asistencia 
+                 WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario IN (SELECT idUsuario FROM t_usuario WHERE tipoUsuario_id = 1 OR tipoUsuario_id = 3)");
+  $sqlAsistentes->execute([':idMinuta' => $idMinuta]);
+  $asistentesIDs = $sqlAsistentes->fetchAll(PDO::FETCH_COLUMN, 0);
+  $totalAsistentes = count($asistentesIDs); // El JS espera esta variable
 
-    // 🚨 CORRECCIÓN DE RUTA
-    // El pathAdjunto ya incluye 'public/docs/'. Lo concatenamos directamente con ROOT_PATH.
-    $physicalPath = ROOT_PATH . $adjunto['pathAdjunto']; 
+  $resultadosFinales = [];
 
-    // Borrar el archivo si existe
-    if (file_exists($physicalPath)) {
-      if (!unlink($physicalPath)) {
-        // Si falla el borrado, hacemos rollback
-        throw new Exception('No se pudo eliminar el archivo físico del servidor.');
+    // --- INICIO DE LA MODIFICACIÓN 3: REESTRUCTURAR EL FOREACH ---
+    // (Esta es la corrección principal al problema de 'undefined')
+
+  foreach ($votaciones as $votacion) {
+    $idVotacion = $votacion['idVotacion'];
+
+        // 1. Inicializamos el array con las claves que el JS SÍ espera
+    $resultado = [
+      'idVotacion' => $idVotacion,
+            // 'nombreAcuerdo' es la clave que espera tu JS (la usaste en la función del modal)
+      'nombreAcuerdo' => $votacion['nombreVotacion'], 
+      'habilitada' => (int)$votacion['habilitada'],
+            'votosSi' => 0, // JS espera 'votosSi'
+            'votosNo' => 0, // JS espera 'votosNo'
+            'votosAbstencion' => 0, // JS espera 'votosAbstencion'
+            'totalPresentes' => $totalAsistentes, // JS espera 'totalPresentes'
+            'votosSi_nombres' => [], // JS espera un array simple de nombres
+            'votosNo_nombres' => [], // JS espera un array simple de nombres
+            'votosAbstencion_nombres' => [], // JS espera un array simple de nombres
+      'votoPersonal' => null, // Tu código ya lo tenía
+    ];
+
+    // 2. Obtenemos los votos (esta consulta está bien)
+    $sqlVotos = $pdo->prepare("
+      SELECT v.opcionVoto, 
+         v.t_usuario_idUsuario,
+         CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+      FROM t_voto v
+      JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
+      WHERE v.t_votacion_idVotacion = :idVotacion
+    ");
+    $sqlVotos->execute([':idVotacion' => $idVotacion]);
+    $votosData = $sqlVotos->fetchAll(PDO::FETCH_ASSOC);
+
+    // 3. Procesamos los votos y los guardamos en las claves correctas
+    foreach ($votosData as $voto) {
+      $opcion = strtoupper($voto['opcionVoto']);
+            $nombreVotante = $voto['nombreVotante'];
+
+      if ($opcion === 'SI') {
+                $resultado['votosSi']++;
+                if ($esSecretarioTecnico) $resultado['votosSi_nombres'][] = $nombreVotante;
+            } 
+            elseif ($opcion === 'NO') {
+                $resultado['votosNo']++;
+                if ($esSecretarioTecnico) $resultado['votosNo_nombres'][] = $nombreVotante;
+            } 
+            elseif ($opcion === 'ABSTENCION') {
+                $resultado['votosAbstencion']++;
+                if ($esSecretarioTecnico) $resultado['votosAbstencion_nombres'][] = $nombreVotante;
+            }
+
+      // Cargar voto personal
+      if ($voto['t_usuario_idUsuario'] == $idUsuarioLogueado) {
+        $resultado['votoPersonal'] = $opcion;
       }
     }
-    // Si no existe, no hacemos nada, solo borramos el registro
+        // El JS calcula 'faltanVotar' por sí mismo, así que no es necesario enviarlo
+
+    $resultadosFinales[] = $resultado;
   }
-  // Si es un 'link', no hay archivo físico que borrar
+    // --- FIN DE LA MODIFICACIÓN 3 ---
 
-  // 3. Borrar el registro de la Base de Datos
-  $sql_delete = "DELETE FROM t_adjunto WHERE idAdjunto = :idAdjunto";
-  $stmt_delete = $pdo->prepare($sql_delete);
-  $stmt_delete->execute([':idAdjunto' => $idAdjunto]);
+  echo json_encode(['status' => 'success', 'data' => $resultadosFinales, 'esSecretarioTecnico' => $esSecretarioTecnico]);
 
-  // 4. Confirmar la transacción
-  $pdo->commit();
-
-  echo json_encode(['status' => 'success', 'message' => 'Adjunto eliminado correctamente.']);
 } catch (Exception $e) {
-  // Si algo falla, revertir cambios
-  if (isset($pdo) && $pdo->inTransaction()) {
-    $pdo->rollBack();
-  }
-  error_log("Error en eliminar_adjunto.php: " . $e->getMessage());
-  echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-} finally {
-  $pdo = null;
-  $db = null;
+  http_response_code(500); // Internal Server Error
+  error_log("Error en obtener_resultados_votacion.php: " . $e->getMessage());
+  echo json_encode(['status' => 'error', 'message' => 'Error de base de datos.']);
 }
