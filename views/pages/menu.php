@@ -409,7 +409,6 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                             Inicio
                         </a>
                     </li>
-
                     <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
@@ -417,15 +416,16 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                                 Minutas
                             </a>
                         </li>
-                    <?php elseif ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_ADMINISTRADOR) : ?>
+                    <?php elseif ($tipoUsuario == ROL_CONSEJERO) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=minutas_aprobadas" class="nav-link <?php echo esActivo('minutas', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                                <i class="fas fa-file-check fa-fw"></i>
+
+                                <i class="fa-solid fa-file-pdf"></i>
+
                                 Minutas Aprobadas
                             </a>
                         </li>
                     <?php endif; ?>
-
 
                     <?php if ($tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">

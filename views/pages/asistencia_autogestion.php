@@ -26,6 +26,7 @@ try {
                      JOIN t_comision c ON r.t_comision_idComision = c.idComision
                      WHERE r.vigente = 1 AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR', 'PARCIAL')
                      ORDER BY r.fechaInicioReunion DESC"; // Agregado estado PARCIAL
+                     
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $reunionesActivas = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
 

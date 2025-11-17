@@ -39,7 +39,7 @@ try {
                     JOIN t_minuta m ON r.t_minuta_idMinuta = m.idMinuta
                     JOIN t_comision c ON r.t_comision_idComision = c.idComision
                     WHERE r.vigente = 1 
-                    AND m.estadoMinuta IN ('PENDIENTE', 'BORRADOR', 'PARCIAL')
+                    AND m.estadoMinuta IN ('BORRADOR')
                     AND r.fechaInicioReunion >= :hoyInicio  -- <-- REGLA 2 APLICADA
                     ORDER BY r.fechaInicioReunion ASC";
     
