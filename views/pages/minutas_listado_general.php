@@ -22,8 +22,8 @@ $rol = $_SESSION['tipoUsuario_id'] ?? null;
 // --- INICIO CORRECCIÓN DE ESTADO ---
 // Detectar el estado basado en la 'pagina' de la URL, si '$estadoActual' no viene seteado
 if (!isset($estadoActual)) {
-  $paginaGet = $_GET['pagina'] ?? 'minutas_pendientes';
-  $estadoActual = ($paginaGet === 'minutas_aprobadas') ? 'APROBADA' : 'PENDIENTE';
+    $paginaGet = $_GET['pagina'] ?? 'minutas_pendientes';
+    $estadoActual = ($paginaGet === 'minutas_aprobadas') ? 'APROBADA' : 'PENDIENTE';
 }
 
 $pageTitle  = ($estadoActual === 'APROBADA') ? 'Minutas Aprobadas' : 'Minutas Pendientes';
@@ -169,55 +169,72 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
 
         $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-        // Palabra clave (en HAVING por agregaciones) fdfsdfsdfsdfsdfsdf
+        // Palabra clave (en HAVING por agregaciones)
+        // Palabra clave (en HAVING por agregaciones)
         $having = '';
         if ($__hasKeyword) {
             $params[':kw'] = '%' . $normalizedKeyword . '%';
             $having = " HAVING
                 /* AÑADIR ESTE BLOQUE OR */
-                LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(m.nombreReunion,''), 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) LIKE :kw
+                LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(r.nombreReunion,''), 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) LIKE :kw
                 OR
                 /* FIN BLOQUE AÑADIDO */
                 LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(GROUP_CONCAT(DISTINCT tt.nombreTema SEPARATOR ' '),''), 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) LIKE :kw
-                OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(GROUP_CONCAT(DISTINCT tt.objetivo   SEPARATOR ' '),''), 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) LIKE :kw
+                OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(GROUP_CONCAT(DISTINCT tt.objetivo  SEPARATOR ' '),''), 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) LIKE :kw
             ";
         }
 
-        $sql = "
-      SELECT
+        // --- INICIO DE LA CORRECCIÓN ---
+        // Construimos la query en partes para evitar el error de sintaxis
+
+        $sql_base = "
+    SELECT
         m.idMinuta,
         m.fechaMinuta,
-        m.nombreReunion,
+        r.nombreReunion,
         m.pathArchivo,
-        m.estadoMinuta, -- <-- 1. AÑADIDO
+        m.estadoMinuta, 
         m.t_comision_idComision AS comisionId,
-        r.t_usuario_idSecretario, -- <-- 2. AÑADIDO
+        m.t_usuario_idSecretario, 
         c.nombreComision,
         IFNULL(GROUP_CONCAT(DISTINCT tt.nombreTema ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS nombreTemas,
         IFNULL(GROUP_CONCAT(DISTINCT tt.objetivo  ORDER BY tt.idTema SEPARATOR '<br>'),'N/A') AS objetivos,
         COUNT(DISTINCT adj.idAdjunto) AS totalAdjuntos,
         (SELECT COUNT(DISTINCT am1.t_usuario_idPresidente)
-          FROM t_aprobacion_minuta am1
+          FROM t_aprobacion_minuta am1
          WHERE am1.t_minuta_idMinuta = m.idMinuta
           AND am1.estado_firma = 'FIRMADO') AS firmasActuales,
         (SELECT COUNT(*)
-          FROM t_aprobacion_minuta am2
+          FROM t_aprobacion_minuta am2
          WHERE am2.t_minuta_idMinuta = m.idMinuta
           AND am2.estado_firma = 'REQUIERE_REVISION') AS tieneFeedback,
         COALESCE(m.presidentesRequeridos,1) AS presidentesRequeridos
-      FROM t_minuta m
-      LEFT JOIN t_comision c  ON c.idComision = m.t_comision_idComision
-      LEFT JOIN t_tema   tt ON tt.t_minuta_idMinuta = m.idMinuta
-      LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
-      LEFT JOIN t_reunion r  ON r.t_minuta_idMinuta = m.idMinuta -- <-- 3. AÑADIDO
-      $whereSql
-      GROUP BY
+    FROM t_minuta m
+    LEFT JOIN t_comision c  ON c.idComision = m.t_comision_idComision
+    LEFT JOIN t_tema   tt ON tt.t_minuta_idMinuta = m.idMinuta
+    LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+    LEFT JOIN t_reunion r  ON r.t_minuta_idMinuta = m.idMinuta
+    $whereSql
+    GROUP BY
         m.idMinuta, m.fechaMinuta, m.pathArchivo, m.estadoMinuta, m.t_comision_idComision,
-        r.t_usuario_idSecretario, c.nombreComision, m.presidentesRequeridos, m.nombreReunion
-            $having
+        m.t_usuario_idSecretario, c.nombreComision, m.presidentesRequeridos, r.nombreReunion
+        ";
+
+        // Añadimos $having SÓLO si no está vacío
+        if (!empty($having)) {
+            $sql_base .= $having;
+        }
+
+        // Añadimos el final de la query
+        $sql_base .= "
             ORDER BY m.fechaMinuta DESC, m.idMinuta DESC
             LIMIT 1000
         ";
+
+        // Asignamos la query final a la variable $sql
+        $sql = $sql_base;
+
+        $st = $pdo->prepare($sql);
 
         $st = $pdo->prepare($sql);
         $st->execute($params);
@@ -298,7 +315,7 @@ if ($hasComisionSelect) {
         if ($cid !== null && $cid !== '') {
             return (string)$cid === (string)$selectedComisionId;
         }
-        return true;
+        return false;
     }));
 }
 
@@ -350,7 +367,7 @@ function renderPaginationListado($current, $pages)
             <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
 
             <li class="breadcrumb-item active" aria-current="page"><?php echo htmlspecialchars($pageTitle ?? ''); ?></li>
-            
+
         </ol>
     </nav>
 
@@ -554,153 +571,163 @@ function renderPaginationListado($current, $pages)
         </div>
     </div>
 </div>
-
-
-
 <script>
-    // Definición directa de la función global 'verAdjuntos'
-    window.verAdjuntos = function(idMinuta) {
-        const modalElement = document.getElementById('modalAdjuntos');
-        const modalList = document.getElementById('listaDeAdjuntos');
+    document.addEventListener('DOMContentLoaded', function() {
 
-        // Mostrar error si faltan elementos cruciales
-        if (!modalElement || !modalList) {
-            // Utilizamos Swal para alertar al usuario si el modal no existe
-            Swal.fire("Error", "No se encontró el modal de adjuntos (Elementos HTML faltantes).", "error");
-            return;
-        }
+        // --- Función para el Modal de Adjuntos (Sin cambios) ---
+        window.verAdjuntos = function(idMinuta) {
+            const modalElement = document.getElementById('modalAdjuntos');
+            const modalList = document.getElementById('listaDeAdjuntos');
 
-        // Es esencial usar una instancia de Modal
-        const modal = new bootstrap.Modal(modalElement);
+            if (!modalElement || !modalList) {
+                Swal.fire("Error", "No se encontró el modal de adjuntos (Elementos HTML faltantes).", "error");
+                return;
+            }
 
-        // Mostrar estado de carga antes del fetch
-        modalList.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
-        modal.show();
+            const modal = new bootstrap.Modal(modalElement);
+            modalList.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
+            modal.show();
 
-        // La URL utiliza el ID de la minuta
-        fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
-            .then(r => {
-                if (!r.ok) {
-                    // Si el servidor devuelve un error HTTP (ej: 500)
-                    return r.text().then(text => Promise.reject(`Error HTTP ${r.status}: ${text.substring(0, 50)}...`));
-                }
-                return r.json();
-            })
-            .then(data => {
-                // Verificar el formato de la respuesta del controlador
-                if (data.status === 'success' && data.adjuntos && data.adjuntos.length > 0) { // <-- Usar data.adjuntos
-                    modalList.innerHTML = '';
-                    data.adjuntos.forEach(adj => {
+            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
+                .then(r => {
+                    if (!r.ok) {
+                        return r.text().then(text => Promise.reject(`Error HTTP ${r.status}: ${text.substring(0, 50)}...`));
+                    }
+                    return r.json();
+                })
+                .then(data => {
+                    if (data.status === 'success' && data.adjuntos && data.adjuntos.length > 0) {
+                        modalList.innerHTML = '';
+                        let hasFiles = false;
+                        data.adjuntos.forEach(adj => {
+                            if (adj.tipoAdjunto === 'asistencia') {
+                                return;
+                            }
 
-                        // --- INICIO DE LA CORRECCIÓN ---
-                        // Si el adjunto es de tipo 'asistencia', sáltalo.
-                        if (adj.tipoAdjunto === 'asistencia') {
-                            return; // Salta esta iteración del bucle
+                            hasFiles = true;
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            const link = document.createElement('a');
+                            const url = adj.pathArchivo;
+
+                            link.href = url;
+                            link.target = '_blank';
+
+                            let icon = (adj.tipoAdjunto === 'file') ? '📄' : '🔗';
+                            const displayName = adj.nombreArchivo;
+
+                            link.innerHTML = ` ${icon} ${displayName}`;
+                            link.title = adj.pathArchivo;
+                            li.appendChild(link);
+                            modalList.appendChild(li);
+                        });
+
+                        if (!hasFiles) {
+                            modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos (archivos o enlaces).</li>';
                         }
 
-                        // <-- Iterar sobre data.adjuntos
-                        const li = document.createElement('li');
-                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                        const link = document.createElement('a');
+                    } else {
+                        modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error al cargar adjuntos:", error);
+                    modalList.innerHTML = `<li class="list-group-item text-danger">Error al cargar adjuntos.</li>`;
+                });
+        };
 
-                        // Construcción de URL (el controlador ahora devuelve el pathWebFinal)
-                        // NOTA: El controlador en el paso anterior devolvía 'pathArchivo' y no 'pathAdjunto'
-                        const url = adj.pathArchivo;
+        // --- CÓDIGO DE FILTROS AUTOMÁTICOS (REVISADO) ---
 
-                        link.href = url;
-                        link.target = '_blank';
-                        let icon = '🔗';
-                        if (adj.tipoAdjunto === 'asistencia') icon = '👥';
-                        else if (adj.tipoAdjunto === 'file') icon = '📄';
-
-                        // El controlador devuelve el nombre ya simplificado en 'nombreArchivo'
-                        const displayName = adj.nombreArchivo;
-
-                        link.innerHTML = ` ${icon} ${displayName}`;
-                        link.title = adj.pathArchivo;
-                        li.appendChild(link);
-                        modalList.appendChild(li);
-                    });
-                } else {
-                    modalList.innerHTML = '<li class="list-group-item text-muted">No se encontraron adjuntos.</li>';
-                }
-            })
-            .catch((error) => {
-                console.error("Error al cargar adjuntos:", error);
-                modalList.innerHTML = `<li class="list-group-item text-danger">Error al cargar adjuntos. Verifique la consola (F12) para detalles.</li>`;
-            });
-    };
-
-    // Autosubmit y manejo de filtros SIEMPRE ACTIVOS
-    // ... (Tu código de filtros original va aquí) ...
-    (function() {
         const form = document.getElementById('filtrosForm');
-        if (!form) return;
+        if (!form) {
+            console.error("No se encontró el formulario 'filtrosForm'.");
+            return;
+        }
 
         const qInput = document.getElementById('themeName');
         const desdeInp = document.getElementById('startDate');
         const hastaInp = document.getElementById('endDate');
-        const perPage = document.getElementById('per_page');
         const pHidden = document.getElementById('pHidden');
         const comSelect = document.getElementById('comisionSelectId');
 
         function toFirstPage() {
-            if (pHidden) {
-                pHidden.value = '1';
-            }
+            if (pHidden) pHidden.value = '1';
         }
 
         function submitNow() {
-            if (form.requestSubmit) form.requestSubmit();
-            else form.submit();
+            if (form.requestSubmit) {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
         }
 
-        [desdeInp, hastaInp, perPage].forEach(el => {
-            if (!el) return;
-            el.addEventListener('change', () => {
+        // --- 1. Filtros de Fecha (inmediato) ---
+        if (desdeInp) {
+            desdeInp.addEventListener('change', () => {
                 toFirstPage();
                 submitNow();
             });
-        });
+        }
 
-        // Texto: autosubmit >=5 chars o vacío
-        if (qInput) {
-            let t = null;
-            const DEBOUNCE_MS = 350;
-            const launch = () => {
-                const val = (qInput.value || '').trim();
-                if (val.length >= 5 || val.length === 0) {
-                    toFirstPage();
-                    submitNow();
-                }
-            };
-            qInput.addEventListener('input', () => {
-                clearTimeout(t);
-                t = setTimeout(launch, DEBOUNCE_MS);
+        if (hastaInp) {
+            hastaInp.addEventListener('change', () => {
+                toFirstPage();
+                submitNow();
             });
+        }
+
+        // --- 2. Filtro de Palabra Clave (con retraso) ---
+        if (qInput) {
+            let debounceTimer = null;
+            const DEBOUNCE_MS = 350;
+
+            const launchSubmit = () => {
+                toFirstPage();
+                submitNow();
+            };
+
+            qInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(launchSubmit, DEBOUNCE_MS);
+            });
+
             qInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    toFirstPage();
-                    submitNow();
+                    clearTimeout(debounceTimer);
+                    launchSubmit();
                 }
             });
         }
 
-        // Combobox de comisión
-        comSelect?.addEventListener('change', () => {
-            toFirstPage();
-            submitNow();
-        });
+        // --- 3. Filtro de Combobox Comisión (inmediato) ---
+        if (comSelect) {
+            comSelect.addEventListener('change', () => {
 
-        // Limpiar todo
-        document.getElementById('btnClearAll')?.addEventListener('click', () => {
-            if (desdeInp) desdeInp.value = '';
-            if (hastaInp) hastaInp.value = '';
-            if (qInput) qInput.value = '';
-            if (comSelect) comSelect.value = '';
-            toFirstPage();
-            submitNow();
-        });
-    })();
+                // --- INICIO DE LA MODIFICACIÓN ---
+                // Estas líneas ahora están REACTIVADAS
+                toFirstPage();
+                submitNow();
+                // --- FIN DE LA MODIFICACIÓN ---
+            });
+
+        } else {
+            console.error("ERROR CRÍTICO: No se encontró el select 'comisionSelectId'.");
+        }
+
+        // --- 4. Botón Limpiar (inmediato) ---
+        const btnClear = document.getElementById('btnClearAll');
+        if (btnClear) {
+            btnClear.addEventListener('click', () => {
+                if (desdeInp) desdeInp.value = '';
+                if (hastaInp) hastaInp.value = '';
+                if (qInput) qInput.value = '';
+                if (comSelect) comSelect.value = '';
+                toFirstPage();
+                submitNow();
+            });
+        }
+
+    }); // <-- FIN DEL 'DOMContentLoaded'
 </script>

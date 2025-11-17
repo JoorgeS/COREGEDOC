@@ -1,14 +1,10 @@
 <?php
-// views/pages/home.php
-// Este archivo es incluido por menu.php, por lo que las variables
-// de sesión ($tipoUsuario, $idUsuarioLogueado) y las constantes ROL_...
-// ya están disponibles.
 
-// 1. CONEXIÓN A BBDD
-// Es necesario instanciarla aquí, ya que menu.php no la provee globalmente.
 require_once __DIR__ . '/../../class/class.conectorDB.php';
 $db  = new conectorDB();
 $pdo = $db->getDatabase();
+
+require_once __DIR__ . '/../../cfg/config.php';
 
 // 2. PREPARAR VARIABLES
 $tareas_pendientes = [];
@@ -18,30 +14,56 @@ $minutas_recientes_aprobadas = []; // <- NUEVA VARIABLE
 
 // Obtenemos el ID del usuario logueado desde la sesión
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? 0;
+$tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
 try {
-    // =================================================================
-    // 3. OBTENER TAREAS PENDIENTES (Según el Rol)
-    // =================================================================
-    
+
+    echo "<pre style='background: #fffbe6; padding: 15px; border: 1px solid #ffe58f; margin: 15px; font-size: 14px; color: #664d03; border-radius: 5px;'>";
+    echo "<b>--- INICIO DEBUGGING DASHBOARD ---</b><br>";
+
+    // 1. Verificar variables de Sesión
+    echo "<br><b>PASO 1: Variables de Sesión</b><br>";
+    echo "ID Usuario (SESSION): ";
+    var_dump($_SESSION['idUsuario'] ?? 'NO DEFINIDO');
+    echo "Tipo Usuario ID (SESSION): ";
+    var_dump($_SESSION['tipoUsuario_id'] ?? 'NO DEFINIDO');
+
+    // 2. Verificar Constantes y Variables locales
+    echo "<br><b>PASO 2: Variables y Constantes Locales</b><br>";
+    echo "Valor Constante ROL_PRESIDENTE_COMISION: ";
+    var_dump(defined('ROL_PRESIDENTE_COMISION') ? ROL_PRESIDENTE_COMISION : 'NO DEFINIDA');
+    echo "Valor Variable \$tipoUsuario: ";
+    var_dump($tipoUsuario);
+    echo "Valor Variable \$idUsuarioLogueado: ";
+    var_dump($idUsuarioLogueado);
+
+    // 3. Verificar la condición del IF
+    echo "<br><b>PASO 3: Condición Lógica</b><br>";
+    echo "¿Entra en el IF del Presidente? (\$tipoUsuario == ROL_PRESIDENTE_COMISION): ";
+    var_dump($tipoUsuario == ROL_PRESIDENTE_COMISION);
+    echo "<br><b>--- FIN DEBUGGING ---</b>";
+    echo "</pre>";
+
+
     // --- TAREAS PARA PRESIDENTE DE COMISIÓN (ROL 3) ---
     if ($tipoUsuario == ROL_PRESIDENTE_COMISION) {
-        // Contar minutas pendientes de firma para ESTE presidente
-        $sql_firmas = "SELECT COUNT(DISTINCT m.idMinuta) 
+        // Esta es la consulta CORRECTA (la que probaste y te dio '0')
+        $sql_firmas = "SELECT COUNT(DISTINCT m.idMinuta)
                        FROM t_aprobacion_minuta am
                        JOIN t_minuta m ON am.t_minuta_idMinuta = m.idMinuta
-                       WHERE am.t_usuario_idPresidente = :idUsuario 
+                       WHERE am.t_usuario_idPresidente = :idUsuario
                        AND am.estado_firma = 'PENDIENTE'
-                       AND m.estadoMinuta IN ('PENDIENTE', 'PARCIAL')";
+                       AND m.estadoMinuta NOT IN ('APROBADA', 'BORRADOR')";
+
         $stmt_firmas = $pdo->prepare($sql_firmas);
         $stmt_firmas->execute([':idUsuario' => $idUsuarioLogueado]);
         $conteo_firmas = $stmt_firmas->fetchColumn();
-        
+
         if ($conteo_firmas > 0) {
             $s = $conteo_firmas > 1 ? 's' : '';
             $tareas_pendientes[] = [
                 'texto' => "Tienes <strong>{$conteo_firmas} minuta{$s}</strong> esperando tu firma.",
-                'link'  => "menu.php?pagina=minutaPendiente",
+                'link'  => "menu.php?pagina=minutaPendiente", // (El link está bien)
                 'icono' => "fa-file-signature",
                 'color' => "danger"
             ];
@@ -73,7 +95,7 @@ try {
             ];
         }
     }
-    
+
     // --- TAREAS PARA SECRETARIO TÉCNICO (ROL 2) ---
     if ($tipoUsuario == ROL_SECRETARIO_TECNICO) {
         // Contar minutas que requieren revisión (feedback)
@@ -90,15 +112,15 @@ try {
                 'color' => "danger"
             ];
         }
-        
+
         // Contar minutas en borrador
         $sql_borrador = "SELECT COUNT(*) FROM t_minuta WHERE estadoMinuta = 'BORRADOR'";
         $stmt_borrador = $pdo->query($sql_borrador);
         $conteo_borrador = $stmt_borrador->fetchColumn();
-        
+
         if ($conteo_borrador > 0) {
-             $s = $conteo_borrador > 1 ? 's' : '';
-             $tareas_pendientes[] = [
+            $s = $conteo_borrador > 1 ? 's' : '';
+            $tareas_pendientes[] = [
                 'texto' => "Tienes <strong>{$conteo_borrador} minuta{$s} en borrador</strong> lista{$s} para enviar.",
                 'link'  => "menu.php?pagina=minutas_pendientes",
                 'icono' => "fa-pencil-alt",
@@ -106,13 +128,13 @@ try {
             ];
         }
     }
-    
+
     // =================================================================
     // 4. OBTENER ACTIVIDAD RECIENTE o MINUTAS APROBADAS (Según Rol)
     // =================================================================
-    
+
     // --- ✅ INICIO DE LA MODIFICACIÓN ---
-    if ($tipoUsuario == ROL_CONSEJERO) { 
+    if ($tipoUsuario == ROL_CONSEJERO) {
         // --- Para Consejero: Mostrar Minutas Aprobadas Recientemente ---
         $sql_minutas_recientes = "SELECT idMinuta, fechaAprobacion, pathArchivo, nombreMinuta 
                                   FROM t_minuta
@@ -122,7 +144,6 @@ try {
                                   LIMIT 5";
         $stmt_minutas_recientes = $pdo->query($sql_minutas_recientes);
         $minutas_recientes_aprobadas = $stmt_minutas_recientes->fetchAll(PDO::FETCH_ASSOC);
-    
     } else {
         // --- Para otros roles (Admin, ST): Mostrar Timeline de Actividad ---
         $sql_actividad = "SELECT 
@@ -153,10 +174,9 @@ try {
                       WHERE r.fechaInicioReunion >= NOW()
                       ORDER BY r.fechaInicioReunion ASC
                       LIMIT 3";
-                      
+
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $proximas_reuniones = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
-
 } catch (Exception $e) {
     // Manejar el error de forma silenciosa en el dashboard
     error_log("Error al cargar datos del dashboard home.php: " . $e->getMessage());
@@ -171,6 +191,7 @@ try {
         padding: 0;
         position: relative;
     }
+
     .timeline:before {
         content: '';
         position: absolute;
@@ -180,10 +201,12 @@ try {
         width: 2px;
         background-color: #e9ecef;
     }
+
     .timeline-item {
         margin-bottom: 20px;
         position: relative;
     }
+
     .timeline-icon {
         position: absolute;
         left: 0;
@@ -199,23 +222,27 @@ try {
         font-size: 1rem;
         z-index: 1;
     }
+
     .timeline-content {
         margin-left: 60px;
         padding-top: 5px;
     }
+
     .timeline-content .time {
         font-size: 0.8rem;
         color: #6c757d;
     }
+
     .timeline-content p {
         margin-bottom: 0;
         font-size: 0.95rem;
     }
-    
+
     /* Estilos para que el Carrusel sea semi-transparente */
     .carousel-image-transparent {
         opacity: 0.7;
     }
+
     .carousel-caption h5 {
         font-weight: bold;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
@@ -283,9 +310,9 @@ try {
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_8.jpg"
-                     class="d-block w-100 carousel-image-transparent"
-                     style="max-height: 400px; object-fit: cover;"
-                     alt="PROVINCIA DE ISLA DE PASCUA">
+                    class="d-block w-100 carousel-image-transparent"
+                    style="max-height: 400px; object-fit: cover;"
+                    alt="PROVINCIA DE ISLA DE PASCUA">
                 <div class="carousel-caption d-none d-md-block">
                     <h5>PROVINCIA DE ISLA DE PASCUA</h5>
                 </div>
@@ -307,7 +334,7 @@ try {
 
 <div class="container my-4">
     <div class="row g-4">
-        
+
         <div class="col-lg-8">
 
             <div class="card shadow-sm mb-4">
@@ -347,7 +374,7 @@ try {
                             <p class="text-muted text-center p-3">No hay minutas aprobadas recientemente.</p>
                         <?php else: ?>
                             <div class="list-group list-group-flush">
-                                <?php foreach ($minutas_recientes_aprobadas as $minuta): 
+                                <?php foreach ($minutas_recientes_aprobadas as $minuta):
                                     // Aseguramos que la ruta al PDF sea correcta
                                     $urlPdf = "/corevota/" . ltrim(htmlspecialchars($minuta['pathArchivo']), '/');
                                 ?>
@@ -376,7 +403,7 @@ try {
                             <p class="text-muted text-center p-3">No hay actividad reciente en el sistema.</p>
                         <?php else: ?>
                             <ul class="timeline">
-                                <?php foreach ($actividad_reciente as $actividad): 
+                                <?php foreach ($actividad_reciente as $actividad):
                                     $icono_actividad = 'fa-info-circle'; // Default
                                     if (str_contains(strtolower($actividad['accion']), 'firm')) $icono_actividad = 'fa-file-signature text-success';
                                     if (str_contains(strtolower($actividad['accion']), 'enviad')) $icono_actividad = 'fa-paper-plane text-primary';
@@ -391,10 +418,10 @@ try {
                                         </div>
                                         <div class="timeline-content">
                                             <p>
-                                                <strong><?php echo htmlspecialchars($actividad['usuario_nombre']); ?></strong> 
+                                                <strong><?php echo htmlspecialchars($actividad['usuario_nombre']); ?></strong>
                                                 <?php echo htmlspecialchars($actividad['detalle']); ?>
                                             </p>
-                                            <span class="time"><i class="fas fa-clock"></i> 
+                                            <span class="time"><i class="fas fa-clock"></i>
                                                 <?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($actividad['fecha_hora']))); ?> hrs.
                                             </span>
                                         </div>
@@ -405,9 +432,10 @@ try {
                     </div>
                 </div>
             <?php endif; ?>
-            
-            </div> <div class="col-lg-4">
-            
+
+        </div>
+        <div class="col-lg-4">
+
             <div class="card shadow-sm">
                 <div class="card-header bg-white border-0 pt-3">
                     <h5 class="mb-0 fw-bold"><i class="fas fa-calendar-alt me-2 text-primary"></i> Próximas Reuniones</h5>
@@ -440,86 +468,88 @@ try {
             </div>
         </div>
 
-    </div> </div> <div class="container my-4">
+    </div>
+</div>
+<div class="container my-4">
     <hr class="mb-4">
     <h2 class="h5 fw-bold mb-3"><i class="fas fa-rocket me-2 text-primary"></i> Acciones Rápidas</h2>
     <div class="row g-3">
-        
+
         <?php
         // La visibilidad de estas tarjetas depende del ROL del usuario ($tipoUsuario)
         ?>
 
         <?php if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=minutas_dashboard">
-                <i class="fas fa-file-alt"></i>
-                <h5>Gestión de Minutas</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=minutas_dashboard">
+                    <i class="fas fa-file-alt"></i>
+                    <h5>Gestión de Minutas</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=minutas_aprobadas">
-                <i class="fa-solid fa-file-pdf"></i>
-                <h5>Ver Minutas Aprobadas</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=minutas_aprobadas">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <h5>Ver Minutas Aprobadas</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=reuniones_dashboard">
-                <i class="fas fa-calendar-plus"></i>
-                <h5>Gestión de Reuniones</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=reuniones_dashboard">
+                    <i class="fas fa-calendar-plus"></i>
+                    <h5>Gestión de Reuniones</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION || $tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=sala_reuniones">
-                <i class="fas fa-chalkboard-teacher"></i>
-                <h5>Sala de Reuniones</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=sala_reuniones">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <h5>Sala de Reuniones</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=votaciones_dashboard">
-                <i class="fas fa-tasks"></i>
-                <h5>Gestión de Votaciones</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=votaciones_dashboard">
+                    <i class="fas fa-tasks"></i>
+                    <h5>Gestión de Votaciones</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=voto_autogestion">
-                <i class="fa-solid fa-person-booth me-2"></i>
-                <h5>Sala de Votaciones</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=voto_autogestion">
+                    <i class="fa-solid fa-person-booth me-2"></i>
+                    <h5>Sala de Votaciones</h5>
+                </a>
+            </div>
         <?php endif; ?>
-        
+
         <?php if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=comisiones_dashboard">
-                <i class="fas fa-landmark"></i>
-                <h5>Gestión de Comisiones</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=comisiones_dashboard">
+                    <i class="fas fa-landmark"></i>
+                    <h5>Gestión de Comisiones</h5>
+                </a>
+            </div>
         <?php endif; ?>
 
         <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
-        <div class="col-xl-3 col-md-6 mb-3">
-            <a class="dashboard-card h-100" href="menu.php?pagina=usuarios_dashboard">
-                <i class="fas fa-users-cog"></i>
-                <h5>Gestión de Usuarios</h5>
-            </a>
-        </div>
+            <div class="col-xl-3 col-md-6 mb-3">
+                <a class="dashboard-card h-100" href="menu.php?pagina=usuarios_dashboard">
+                    <i class="fas fa-users-cog"></i>
+                    <h5>Gestión de Usuarios</h5>
+                </a>
+            </div>
         <?php endif; ?>
-        
+
     </div>
 </div>

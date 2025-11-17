@@ -195,41 +195,32 @@ try {
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
+        // --- CÓDIGO DEL MODAL (EXISTENTE) ---
         const modalElement = document.getElementById('modalSeguimiento');
 
         if (modalElement) {
             const modalTitle = document.getElementById('modalSeguimientoLabel');
             const modalBody = document.getElementById('modalSeguimientoContenido');
 
-            // 1. Escuchamos el evento que Bootstrap dispara ANTES de mostrar el modal
             modalElement.addEventListener('show.bs.modal', function(event) {
-
-                // 2. Obtenemos el botón que fue clickeado
                 const button = event.relatedTarget;
-
                 if (button) {
-                    // 3. Sacamos el ID del atributo 'data-id' del botón
                     const minutaId = button.getAttribute('data-id');
-
                     if (minutaId) {
-                        // 4. Actualizamos el título y ponemos un "Cargando..."
                         modalTitle.textContent = 'Seguimiento Minuta N° ' + minutaId;
                         modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
 
-                        // 5. Usamos fetch() (JavaScript puro) para llamar al controlador
                         fetch('/corevota/controllers/obtener_preview_seguimiento.php?id=' + minutaId)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error('Error en la red: ' + response.statusText);
                                 }
-                                return response.text(); // La respuesta es el HTML
+                                return response.text();
                             })
                             .then(html => {
-                                // 6. Cargamos el HTML en el cuerpo del modal
                                 modalBody.innerHTML = html;
                             })
                             .catch(error => {
-                                // 7. Manejamos cualquier error
                                 console.error("Error en fetch:", error);
                                 modalBody.innerHTML = '<p class="alert alert-danger"><strong>Error al cargar los datos.</strong></p><pre>' + error.message + '</pre>';
                             });
@@ -237,5 +228,50 @@ try {
                 }
             });
         }
+
+        // ---======================================================---
+        // --- INICIO: CÓDIGO AÑADIDO PARA FILTROS AUTOMÁTICOS ---
+        // ---======================================================---
+
+        const form = document.getElementById('filtrosFormSeguimiento');
+        if (form) {
+            let debounceTimeout;
+
+            // 1. Función que retrasa la acción
+            // Esto evita que se envíe el formulario con CADA tecla presionada
+            const debounceSubmit = () => {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => {
+                    form.submit();
+                }, 500); // Espera 500ms (medio segundo) después de la última tecla
+            };
+
+            // 2. Función para envío inmediato (para el select)
+            const submitNow = () => {
+                form.submit();
+            };
+
+            // 3. Asignar los "oyentes" (listeners) a los campos
+
+            // a) ID Minuta (con retraso)
+            const idMinutaInput = document.getElementById('idMinuta');
+            if (idMinutaInput) {
+                idMinutaInput.addEventListener('input', debounceSubmit);
+            }
+
+            // b) Palabra Clave (con retraso)
+            const keywordInput = document.getElementById('keyword');
+            if (keywordInput) {
+                keywordInput.addEventListener('input', debounceSubmit);
+            }
+
+            // c) Comisión (inmediato)
+            const comisionSelect = document.getElementById('comisionId');
+            if (comisionSelect) {
+                comisionSelect.addEventListener('change', submitNow);
+            }
+        }
+        // --- FIN DE CÓDIGO AÑADIDO ---
+
     });
 </script>
