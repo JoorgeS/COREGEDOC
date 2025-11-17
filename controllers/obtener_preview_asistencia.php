@@ -38,7 +38,8 @@ try {
                     FROM 
                         t_usuario
                     WHERE 
-                        tipoUsuario_id IN (1, 3) 
+                        tipoUsuario_id IN (1, 3, 7)
+                        AND estado = 1 
                     ORDER BY 
                         aPaterno, aMaterno, pNombre";
     

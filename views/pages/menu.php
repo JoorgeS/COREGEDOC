@@ -437,7 +437,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                     <?php endif; ?>
 
 
-                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR || $tipoUsuario == ROL_SECRETARIO_TECNICO) : ?>
+                    <?php if ($tipoUsuario == ROL_ADMINISTRADOR) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=comisiones_dashboard" class="nav-link <?php echo esActivo('comisiones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
                                 <i class="fas fa-landmark fa-fw"></i>

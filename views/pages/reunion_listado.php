@@ -236,6 +236,15 @@ function renderPagination($current, $pages)
                                                     <i class="fas fa-check-circle me-1 text-success"></i> Finalizada con minuta aprobada
                                                 </span>
                                             <?php
+                                            } elseif ($estadoMinuta === 'PARCIAL') {
+                                                // --- 4. ESTADO APROBADA (Finalizada real) ---
+                                            ?>
+                                                <span title="La minuta fue guardada como borrador y está pendiente de aprobación por más de un Presidente.">
+                                                    <i class="fas fa-clock me-1 text-warning"></i></i> Finalizada esperando aprobación de minuta
+                                                </span>
+                                            <?php
+
+
                                             } else {
                                                 // --- 5. ESTADO INVÁLIDO (Fallback) ---
                                             ?>
