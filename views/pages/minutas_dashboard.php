@@ -59,15 +59,26 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
             </a>
         </div>
 
-        <div class="col-xl-4 col-md-6 mb-4">
-            <a href="menu.php?pagina=seguimiento_general" class="dashboard-card text-decoration-none">
-                <div class="card-body text-center">
-                    <i class="fas fa-tasks fa-3x mb-3 text-info"></i>
-                    <h5 class="card-title mb-2 font-weight-bold text-info">Seguimiento General</h5>
-                    <p class="card-text text-muted">Ver el estado actual y la última acción de todas las minutas en proceso.</p>
-                </div>
-            </a>
-        </div>
+        <?php 
+        // ---=================================================---
+        // --- INICIO DE LA CORRECCIÓN QUE SOLICITASTE ---
+        // --- Mostramos esta tarjeta SÓLO si es Administrador ---
+        // ---=================================================---
+        if ($tipoUsuario == ROL_ADMINISTRADOR): 
+        ?>
+            <div class="col-xl-4 col-md-6 mb-4">
+                <a href="menu.php?pagina=seguimiento_general" class="dashboard-card text-decoration-none">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tasks fa-3x mb-3 text-info"></i>
+                        <h5 class="card-title mb-2 font-weight-bold text-info">Seguimiento General</h5>
+                        <p class="card-text text-muted">Ver el estado actual y la última acción de todas las minutas en proceso.</p>
+                    </div>
+                </a>
+            </div>
+        <?php 
+        // --- FIN DE LA CORRECCIÓN ---
+        endif; 
+        ?>
 
     </div>
 </div>

@@ -18,31 +18,7 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
 try {
 
-    echo "<pre style='background: #fffbe6; padding: 15px; border: 1px solid #ffe58f; margin: 15px; font-size: 14px; color: #664d03; border-radius: 5px;'>";
-    echo "<b>--- INICIO DEBUGGING DASHBOARD ---</b><br>";
-
-    // 1. Verificar variables de Sesión
-    echo "<br><b>PASO 1: Variables de Sesión</b><br>";
-    echo "ID Usuario (SESSION): ";
-    var_dump($_SESSION['idUsuario'] ?? 'NO DEFINIDO');
-    echo "Tipo Usuario ID (SESSION): ";
-    var_dump($_SESSION['tipoUsuario_id'] ?? 'NO DEFINIDO');
-
-    // 2. Verificar Constantes y Variables locales
-    echo "<br><b>PASO 2: Variables y Constantes Locales</b><br>";
-    echo "Valor Constante ROL_PRESIDENTE_COMISION: ";
-    var_dump(defined('ROL_PRESIDENTE_COMISION') ? ROL_PRESIDENTE_COMISION : 'NO DEFINIDA');
-    echo "Valor Variable \$tipoUsuario: ";
-    var_dump($tipoUsuario);
-    echo "Valor Variable \$idUsuarioLogueado: ";
-    var_dump($idUsuarioLogueado);
-
-    // 3. Verificar la condición del IF
-    echo "<br><b>PASO 3: Condición Lógica</b><br>";
-    echo "¿Entra en el IF del Presidente? (\$tipoUsuario == ROL_PRESIDENTE_COMISION): ";
-    var_dump($tipoUsuario == ROL_PRESIDENTE_COMISION);
-    echo "<br><b>--- FIN DEBUGGING ---</b>";
-    echo "</pre>";
+ 
 
 
     // --- TAREAS PARA PRESIDENTE DE COMISIÓN (ROL 3) ---
@@ -136,7 +112,7 @@ try {
     // --- ✅ INICIO DE LA MODIFICACIÓN ---
     if ($tipoUsuario == ROL_CONSEJERO) {
         // --- Para Consejero: Mostrar Minutas Aprobadas Recientemente ---
-        $sql_minutas_recientes = "SELECT idMinuta, fechaAprobacion, pathArchivo, nombreMinuta 
+        $sql_minutas_recientes = "SELECT idMinuta, fechaAprobacion, pathArchivo
                                   FROM t_minuta
                                   WHERE estadoMinuta = 'APROBADA'
                                     AND fechaAprobacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)

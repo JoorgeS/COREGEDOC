@@ -534,10 +534,15 @@ function renderPaginationListado($current, $pages)
                                 <?php endif; ?>
 
                                 <?php // El botón de seguimiento es visible para todos 
+                                if ($estadoActual !== 'APROBADA'):
                                 ?>
                                 <a href="menu.php?pagina=seguimiento_minuta&id=<?php echo $minuta['idMinuta']; ?>" class="btn btn-info btn-sm" title="Seguimiento de Aprobación">
                                     <i class="fas fa-route"></i>
                                 </a>
+                        
+                            <?php 
+                            endif;
+                            ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

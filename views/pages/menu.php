@@ -654,7 +654,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 // --- SECCIÓN MINUTAS ---
                 'minutas_dashboard' => ['type' => 'view', 'file' => $base_path . '/minutas_dashboard.php'],
                 'seguimiento_minuta' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'seguimiento']],
-                'seguimiento_general' => ['type' => 'view', 'file' => $base_path . '/seguimiento_general.php'],
+                'seguimiento_general' => ['type' => 'view', 'file' => $base_path . '/seguimiento_general.php', 'roles' => [ROL_ADMINISTRADOR]],
                 'crear_minuta' => ['type' => 'view', 'file' => $base_path . '/crearMinuta.php'],
                 'minutas_pendientes' => $rutaMinutasPendientes, // Ruta dinámica
                 'minutas_aprobadas' => ['type' => 'controller', 'file' => $controllers_path . '/MinutaController.php', 'params' => ['action' => 'list', 'estado' => 'APROBADA']],

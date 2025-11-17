@@ -30,21 +30,26 @@ switch ($action) {
 
         // --- INICIO BLOQUE DE SEGURIDAD POR ROL ---
 
-        // Definimos los roles para que el código sea legible.
-        // (Asegúrate de que estos números coincidan con tu BBDD)
-        if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 1);
-        if (!defined('ROL_SECRETARIO')) define('ROL_SECRETARIO', 2);
-        if (!defined('ROL_PRESIDENTE')) define('ROL_PRESIDENTE', 3);
-        if (!defined('ROL_CONSEJERO')) define('ROL_CONSEJERO', 4);
+        // <-- CORREGIDO: Roles eliminados.
+        // Ya no se definen roles aquí. Se usan los definidos en menu.php
+        // (ROL_ADMINISTRADOR = 6, ROL_SECRETARIO_TECNICO = 2, etc.)
 
         $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
 
         // REGLA 1: La lista 'PENDIENTE' es SÓLO para el Secretario (o Admin).
-        if ($estado_filtro == 'PENDIENTE' && ($tipoUsuario != ROL_SECRETARIO && $tipoUsuario != ROL_ADMINISTRADOR)) {
-            // ¡Acceso Denegado!
-            // Redirigimos al dashboard con un mensaje de error.
-            header('Location: menu.php?pagina=minutas_dashboard&error=acceso_denegado');
-            exit;
+        // <-- CORREGIDO: Usamos ROL_SECRETARIO_TECNICO
+        if ($estado_filtro == 'PENDIENTE' && ($tipoUsuario != ROL_SECRETARIO_TECNICO && $tipoUsuario != ROL_ADMINISTRADOR)) {
+            
+            // <-- CORREGIDO: ¡No usar header()! Mostramos un error en la página.
+            echo "<div class='container-fluid mt-4'>";
+            echo "  <div class='alert alert-danger text-center'>";
+            echo "      <h4 class='alert-heading'><i class='fas fa-exclamation-triangle'></i> Acceso Denegado</h4>";
+            echo "      <p>No tiene los permisos necesarios para acceder a esta sección.</p>";
+            echo "  </div>";
+            echo "</div>";
+            
+            // Salimos del switch
+            break;
         }
 
         // REGLA 2: La lista 'APROBADA' es para todos.
@@ -79,12 +84,14 @@ switch ($action) {
         // 5. Incluir la Vista (Paso final)
         include __DIR__ . '/../views/pages/minutas_listado_general.php';
         break; // Fin case 'list'
+
     case 'view':
         // ... (Tu código view original) ...
         $id = (int)($_GET['id'] ?? 0);
         $tema = $model->getTemaById($id);
         if (!$tema) {
             $_SESSION['error'] = 'Tema no encontrado.';
+            // NOTA: Este header() SÍ funciona porque 'view' no se incluye desde menu.php
             header('Location: menu.php?pagina=minutas_pendientes');
             exit;
         }
@@ -113,28 +120,8 @@ switch ($action) {
         exit;
         break;
 
-    case 'seguimiento':
-        if (!isset($_GET['id'])) {
-            echo "<div class='alert alert-danger'>Error: No se proporcionó ID de minuta.</div>";
-            break; // Detiene la ejecución de este case
-        }
-
-        $minuta_id = (int)$_GET['id'];
-
-        // $model ya está definido al inicio del archivo
-        $minuta = $model->getMinutaById($minuta_id);
-        $seguimiento = $model->getSeguimiento($minuta_id);
-
-        if (!$minuta) {
-            echo "<div class='alert alert-danger'>Error: Minuta no encontrada (ID: $minuta_id).</div>";
-            break; // Detiene la ejecución de este case
-        }
-
-        // Ahora que $minuta y $seguimiento existen, incluimos la vista
-        // Esto es igual a como funciona tu case 'list'
-        include __DIR__ . '/../views/pages/seguimiento_minuta.php';
-        break;
-
+    // <-- CORREGIDO: El 'case seguimiento_general' se eliminó completamente.
+    // La lógica de permisos para esa página se moverá a menu.php
 
     default:
         // Redirigir a una página por defecto si la acción no se reconoce

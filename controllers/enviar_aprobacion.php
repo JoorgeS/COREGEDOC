@@ -176,7 +176,7 @@ class AprobacionSender extends BaseConexion
                 $mail->addAddress($destinatario['correo'], $destinatario['pNombre'] . ' ' . $destinatario['aPaterno']);
 
                 // Construir el cuerpo final con la firma
-                $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema CoreVota</p>{$firmaHTML}</body></html>";
+                $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema COREGEDOC</p>{$firmaHTML}</body></html>";
                 $mail->send();
             }
         } catch (Exception $e) {
