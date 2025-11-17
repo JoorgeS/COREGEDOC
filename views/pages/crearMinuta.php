@@ -1422,17 +1422,26 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             formData.append('asistencia', JSON.stringify(asistenciaIDs));
             formData.append('temas', JSON.stringify(temasData));
 
+            // ID correcto para crearMinuta.php
             const btnGuardar = document.getElementById('btnGuardarBorrador');
             const btnEnviar = document.getElementById('btnEnviarAprobacion');
 
             if (btnGuardar) btnGuardar.disabled = true;
             if (btnEnviar) btnEnviar.disabled = true;
 
-            if (!callback && btnGuardar) {
+            if (!callback) {
+                Swal.fire({
+                    title: 'Guardando borrador.',
+                    text: 'Por favor espere...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+            } else if (btnGuardar) {
                 btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
             }
 
-            // ⚡ RUTA CORREGIDA
             fetch("../../controllers/guardar_minuta_completa.php", {
                     method: "POST",
                     body: formData,
@@ -1452,9 +1461,21 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         if (callback) {
                             callback(true);
                         } else {
-                            Swal.fire('Guardado', 'Borrador guardado con éxito.', 'success');
+                            Swal.fire({
+                                title: '¡Guardado!',
+                                text: 'Minuta borrador guardada',
+                                icon: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+
                             if (guardarYSalir) {
-                                window.location.href = 'menu.php?pagina=minutas_listado_general&tab=borradores';
+                                setTimeout(() => {
+                                    // --- ÚNICO CAMBIO EN ESTA VERSIÓN ---
+                                    // Redirige a minutas pendientes en lugar de borradores
+                                    window.location.href = 'menu.php?pagina=minutas_pendientes';
+                                    // --- FIN DEL CAMBIO ---
+                                }, 2000);
                             }
                         }
                     } else {
@@ -1464,8 +1485,9 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 .catch(err => {
                     if (callback) {
                         callback(false);
+                    } else {
+                        Swal.fire("Error al Guardar", err.message, "error");
                     }
-                    Swal.fire("Error al Guardar", err.message, "error");
                     console.error("Error fetch-guardar borrador:", err);
                 })
                 .finally(() => {

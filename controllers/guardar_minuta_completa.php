@@ -254,7 +254,19 @@ class MinutaManager extends BaseConexion
         $html = "
         <!DOCTYPE html><html><head><meta charset='UTF-8'><title>Lista de Asistencia - Minuta {$idMinuta}</title>
         <style>
+
          body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 0; padding: 0; }
+
+         @page {
+                /* Define márgenes para CADA página 
+                   Aumentamos el margen inferior para dar espacio al pie de página */
+                margin: 0; /* Reseteamos márgenes por si acaso */
+                margin-top: 2.5cm; /* Margen superior (aprox) */
+                margin-bottom: 1.5cm; /* Margen inferior (¡Importante!) */
+                margin-left: 1.5cm;
+                margin-right: 1.5cm;
+            }
+            /* --- FIN REGLA @PAGE --- */
          .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
          
          .header-logos { width: 100%; display: table; table-layout: fixed; margin-bottom: 10px; }
@@ -350,12 +362,22 @@ class MinutaManager extends BaseConexion
          
          .footer { 
              position: fixed; 
-             bottom: 0; 
-             width: 100%; 
+             bottom: -1cm; 
+             left: 0;
+             right: 0;
+             height: 1cm;
+          
              text-align: center; 
              font-size: 9px; 
              color: #999; 
+             background-color: #f1f1f1; /* Fondo gris claro */
+             padding: 5px 0; /* Espacio interno (padding) */
+             border-top: 1px solid #ccc; /* Línea superior */
+             box-sizing: border-box;
          }
+
+
+         
         </style></head><body>
           <div class='header'>
            <div class='header-logos'>
@@ -416,7 +438,7 @@ class MinutaManager extends BaseConexion
             </div>
         </div>
         
-        <div class='footer'>Generado por CoreVota el {$fechaGeneracion}</div></body></html>";
+        <div class='footer'>Generado por COREGEDOC el {$fechaGeneracion}</div></body></html>";
 
         $options = new Options();
         $options->set('isRemoteEnabled', true);

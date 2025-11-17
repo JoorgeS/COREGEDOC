@@ -95,7 +95,7 @@ function notificarPresidentes(PDO $db, int $idMinuta, array $listaPresidentes)
         // --- TEXTOS PARA UN RE-ENVÍO ---
         $asunto = "Minuta N° {$idMinuta} ACTUALIZADA - Requiere su firma";
         $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} ha sido actualizada por el Secretario Técnico en base al feedback recibido.</p>
-                 <p>Su aprobación ha sido reiniciada. Por favor, ingrese a CoreVota para revisar la nueva versión y registrar su firma.</p>";
+                 <p>Su aprobación ha sido reiniciada. Por favor, ingrese a COREGEDOC para revisar la nueva versión y registrar su firma.</p>";
 
         $mail = new PHPMailer(true); // Instancia única
         // Configuración SMTP (tomada de tus scripts)
