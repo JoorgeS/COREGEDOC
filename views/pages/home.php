@@ -461,7 +461,7 @@ try {
         <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION): ?>
         <div class="col-xl-3 col-md-6 mb-3">
             <a class="dashboard-card h-100" href="menu.php?pagina=minutas_aprobadas">
-                <i class="fas fa-file-check"></i>
+                <i class="fa-solid fa-file-pdf"></i>
                 <h5>Ver Minutas Aprobadas</h5>
             </a>
         </div>
@@ -497,7 +497,7 @@ try {
         <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION): ?>
         <div class="col-xl-3 col-md-6 mb-3">
             <a class="dashboard-card h-100" href="menu.php?pagina=voto_autogestion">
-                <i class="fas fa-vote-yea"></i>
+                <i class="fa-solid fa-person-booth me-2"></i>
                 <h5>Sala de Votaciones</h5>
             </a>
         </div>

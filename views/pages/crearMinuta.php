@@ -417,7 +417,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                 <div class="card p-3 mb-4 border-primary">
                     <h6 class="fw-bold text-primary"><i class="fa-solid fa-lightbulb me-1"></i> Opciones de Contenido:</h6>
-                    <small class="text-muted mb-2">Marque las opciones que desea gestionar para que aparezcan en la barra de pestañas.</small>
+                    <small class="text-muted mb-2">Selecciona la funcionalidad que necesites para el desarrollo de esta minuta.</small>
                     <div class="d-flex flex-wrap gap-3">
                         <div class="form-check form-check-inline">
                             <input class="form-check-input navigate-to-tab" type="checkbox" id="chkAdjuntos" data-target-tab="documentos-tab">
@@ -444,10 +444,6 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                     <div class="d-flex justify-content-end align-items-center mt-3 gap-2" id="botonesAsistenciaContainer">
                         <span id="guardarAsistenciaStatus" class="me-auto small text-muted"></span>
-
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refrescar-asistencia" onclick="cargarTablaAsistencia()">
-                            <i class="fas fa-sync me-1"></i> Refrescar (Manual)
-                        </button>
                         <button type="button" class="btn btn-warning fw-bold btn-sm" onclick="guardarAsistencia()" <?php echo $esSoloLectura ? 'disabled title="La minuta no es editable en el estado actual."' : ''; ?>>
                             <i class="fas fa-save me-1"></i> Guardar Asistencia (ST)
                         </button>
@@ -682,7 +678,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
         const LIMITE_MINUTOS_AUTOGESTION = 30;
         const INTERVALO_ASISTENCIA = 1000;
-        const INTERVALO_VOTACIONES = 3000;
+        const INTERVALO_VOTACIONES = 1000;
 
         let intervalAsistenciaID = null;
         let asistenciaModificando = false;
@@ -1082,12 +1078,12 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 const votacionTabButton = document.getElementById('votaciones-tab');
 
                 if (votacionTabButton && votacionTabButton.classList.contains('active')) {
-                    actualizarTimestamp('fa-sync fa-spin text-primary', 'Buscando cambios...');
+                    actualizarTimestamp('', '');
                     cargarListaDeVotaciones(false, (cambiosDetectados) => {
                         if (cambiosDetectados) {
                             actualizarTimestamp('fa-check text-success', 'Lista actualizada');
                         } else {
-                            actualizarTimestamp('fa-satellite-dish text-muted', 'Sincronizado');
+                            actualizarTimestamp('', '');
                         }
                     });
                 } else {
@@ -1119,13 +1115,13 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 const votacionTabButton = document.getElementById('votaciones-tab');
 
                 if (votacionTabButton && votacionTabButton.classList.contains('active')) {
-                    actualizarTimestamp('fa-sync fa-spin text-primary', 'Buscando votos...');
+                    actualizarTimestamp('', '');
 
                     cargarResultadosVotacion(false, (cambiosDetectados) => {
                         if (cambiosDetectados) {
                             actualizarTimestamp('fa-check text-success', 'Resultados actualizados');
                         } else {
-                            actualizarTimestamp('fa-satellite-dish text-muted', 'Sin nuevos votos');
+                            actualizarTimestamp('', '');
                         }
                     });
                 } else {
@@ -1172,7 +1168,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     const autoCheckInDisabled = diffInMinutes > 30;
                     let timeWarning = '';
                     if (autoCheckInDisabled) {
-                        timeWarning = '<p class="text-danger fw-bold"><i class="fas fa-clock me-1"></i> ¡Plazo de autogestión de asistencia (30 minutos) ha expirado!</p>';
+                        timeWarning = '<p class="text-danger fw-bold"><i class="fas fa-clock me-1"></i> Ha expirado el tiempo para que los usuarios registraran su asistencia</p>';
                         timeWarning += '<p class="text-muted small">El Secretario Técnico puede seguir marcando asistencia manualmente.</p>';
                     } else {
                         const remainingTime = Math.ceil(30 - diffInMinutes);
@@ -1214,13 +1210,51 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        function handleAsistenciaChange(userId, changedType) {
+        // --- MODIFICADA PARA CONFIRMACIÓN ---
+        async function handleAsistenciaChange(userId, changedType) {
             const present = document.getElementById(`present_${userId}`);
             const absent = document.getElementById(`absent_${userId}`);
+
+            // 1. Encontrar el nombre de la persona
+            const row = present.closest('tr');
+            const label = row.querySelector('label');
+            const nombrePersona = label ? label.textContent.trim() : 'esta persona';
+
+            // 2. Determinar la acción (El 'onchange' se dispara DESPUÉS del clic)
+            let accionTexto = "";
             if (changedType === 'present') {
-                absent.checked = !present.checked;
-            } else if (changedType === 'absent') {
-                present.checked = !absent.checked;
+                accionTexto = present.checked ? "marcar como PRESENTE" : "marcar como AUSENTE";
+            } else { // 'absent'
+                accionTexto = absent.checked ? "marcar como AUSENTE" : "marcar como PRESENTE";
+            }
+
+            // 3. Mostrar la confirmación
+            const result = await Swal.fire({
+                title: '¿Confirmar Cambio?',
+                text: `¿Está seguro que desea ${accionTexto} a ${nombrePersona}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, confirmar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            // 4. Si se confirma, aplicar la lógica. Si se cancela, revertir.
+            if (result.isConfirmed) {
+                // Lógica original para sincronizar las casillas
+                if (changedType === 'present') {
+                    absent.checked = !present.checked;
+                } else if (changedType === 'absent') {
+                    present.checked = !absent.checked;
+                }
+            } else {
+                // REVERTIR EL CLIC
+                if (changedType === 'present') {
+                    present.checked = !present.checked;
+                } else if (changedType === 'absent') {
+                    absent.checked = !absent.checked;
+                }
             }
         }
 
@@ -1231,54 +1265,75 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             return ids;
         }
 
-        function guardarAsistencia() {
-            const asistenciaIDs = recolectarAsistencia();
+        async function guardarAsistencia() {
+            // 1. Validar si puede editar
             if (!ES_ST_EDITABLE) {
                 Swal.fire('Prohibido', 'No puede guardar la asistencia en este estado.', 'error');
                 return;
             }
+
+            // 2. Referencias a elementos del DOM
             const status = document.getElementById('guardarAsistenciaStatus');
             const btn = document.querySelector('#botonesAsistenciaContainer button[onclick="guardarAsistencia()"]');
+
+            // 3. Preparar datos
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
-            formData.append('asistencia', JSON.stringify(asistenciaIDs));
-            btn.disabled = true;
-            status.textContent = 'Guardando...';
-            status.className = 'me-auto small text-muted';
+            formData.append('asistencia', JSON.stringify(recolectarAsistencia()));
 
-            // ⚡ RUTA CORREGIDA
-            fetch("../../controllers/guardar_asistencia.php", {
+            try {
+                // 4. Iniciar proceso: deshabilitar UI
+                btn.disabled = true;
+                status.textContent = 'Guardando...';
+                status.className = 'me-auto small text-muted';
+
+                // 5. Realizar la petición
+                const response = await fetch("../../controllers/guardar_asistencia.php", {
                     method: "POST",
                     body: formData,
                     credentials: 'same-origin'
-                })
-                .then(res => res.ok ? res.json() : res.text().then(text => Promise.reject(new Error("Respuesta servidor inválida: " + text))))
-                .then(resp => {
-                    btn.disabled = false;
-                    if (resp.status === "success") {
-                        status.textContent = "✅ Guardado";
-                        status.className = 'me-auto small text-success fw-bold';
-                        cargarTablaAsistencia(true);
-                        setTimeout(() => {
-                            status.textContent = '';
-                        }, 3000);
-                    } else {
-                        status.textContent = `⚠️ Error: ${resp.message}`;
-                        status.className = 'me-auto small text-danger';
-                    }
-                })
-                .catch(err => {
-                    btn.disabled = false;
-                    status.textContent = "Error conexión.";
-                    status.className = 'me-auto small text-danger';
-                    console.error("Error fetch asistencia:", err);
-                    setTimeout(() => {
-                        status.textContent = '';
-                    }, 5000);
                 });
-        }
 
-        // --- Funciones de Acciones de Minuta (Guardar/Enviar) ---
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Error del servidor (${response.status}): ${errorText}`);
+                }
+
+                const resp = await response.json();
+
+                // 6. Manejar respuesta de la aplicación
+                if (resp.status === "success") {
+                    status.textContent = '';
+                    Swal.fire({ // <-- Pop-up de ÉXITO
+                        icon: 'success',
+                        title: 'Asistencia Actualizada',
+                        text: 'Se ha modificado el registro de asistencia con éxito.',
+                        timer: 2500,
+                        showConfirmButton: false
+                    });
+                    cargarTablaAsistencia(true);
+                } else {
+                    throw new Error(resp.message || 'Error desconocido al guardar');
+                }
+
+            } catch (err) {
+                // 7. Manejo centralizado de errores
+                console.error("Error en guardarAsistencia:", err);
+                Swal.fire('Error de Conexión', err.message, 'error');
+                status.textContent = `⚠️ Error: ${err.message}`;
+                status.className = 'me-auto small text-danger';
+
+                setTimeout(() => {
+                    if (status.textContent.startsWith('⚠️ Error:')) {
+                        status.textContent = '';
+                    }
+                }, 5000);
+
+            } finally {
+                // 8. Esto se ejecuta SIEMPRE
+                btn.disabled = false;
+            }
+        }
 
         function iniciarValidacionAsistencia() {
             const btn = document.getElementById('btnRevisarAsistencia');

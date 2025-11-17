@@ -479,7 +479,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                     <?php if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) : ?>
                         <li class="nav-item">
                             <a href="menu.php?pagina=voto_autogestion" class="nav-link <?php echo esActivo('votaciones', $paginaActual, $gruposPaginas) ? 'active' : ''; ?>">
-                                <i class="fas fa-vote-yea fa-fw"></i>
+                                <i class="fa-solid fa-person-booth me-2"></i>
                                 Sala de Votaciones
                             </a>
                         </li>
