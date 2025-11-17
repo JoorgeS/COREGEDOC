@@ -54,7 +54,7 @@ try {
         $query_where .= " AND v.habilitada = 1";
     }
 
-  $sqlVotaciones = $pdo->prepare("SELECT v.idVotacion, v.nombreVotacion, v.idComision, v.habilitada 
+  $sqlVotaciones = $pdo->prepare("SELECT v.idVotacion, v.nombreVotacion, v.idComision, v.habilitada
                                     FROM t_votacion v
                   $query_where
                   ORDER BY v.idVotacion ASC");

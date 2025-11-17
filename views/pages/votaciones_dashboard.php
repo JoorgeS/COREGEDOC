@@ -34,8 +34,8 @@ if (!defined('ROL_ADMINISTRADOR')) define('ROL_ADMINISTRADOR', 6);
         <div class="col-md-6 col-lg-4">
             <a href="menu.php?pagina=votacion_listado" class="dashboard-card h-100">
                 <i class="fas fa-list-check"></i>
-                <h5 class="mt-3">Votaciones Activas</h5>
-                <p class="mb-0 text-muted">Ver todas las votaciones disponibles.</p>
+                <h5 class="mt-3">Votaciones Realizadas</h5>
+                <p class="mb-0 text-muted">Ver historial de votaciones realizadas.</p>
             </a>
         </div>
 

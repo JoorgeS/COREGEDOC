@@ -89,6 +89,7 @@ class VotacionController
             $sql = "
                 SELECT 
                     v.idVotacion, v.nombreVotacion, v.habilitada, 
+                    v.t_minuta_idMinuta,
                     c.nombreComision, v.fechaCreacion,
                     COUNT(voto.idVoto) AS totalVotos,
                     SUM(CASE WHEN voto.opcionVoto = 'SI' THEN 1 ELSE 0 END) AS totalSi,

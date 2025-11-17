@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
     try {
         // A. Verificar si ya votó
         $sqlCheck = "SELECT COUNT(*) FROM t_voto 
-                     WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+          WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
         $stmt = $pdo->prepare($sqlCheck);
         $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $idVotacion]);
         if ($stmt->fetchColumn() > 0) {
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['idVotacion'], $_POST[
 
         // C. Verificar si el usuario está presente en la minuta (t_asistencia)
         $sqlAsistencia = "SELECT COUNT(*) FROM t_asistencia 
-                          WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
+             WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idUsuario = :idUsuario";
         $stmtAsistencia = $pdo->prepare($sqlAsistencia);
         $stmtAsistencia->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
 
@@ -98,7 +98,7 @@ if ($votacionVigente) {
 
     // Verificamos si el usuario ya votó (lógica original)
     $sqlCheck = "SELECT opcionVoto FROM t_voto 
-                 WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
+        WHERE t_usuario_idUsuario = :idUsuario AND t_votacion_idVotacion = :idVotacion";
     $stmt = $pdo->prepare($sqlCheck);
     $stmt->execute([':idUsuario' => $idUsuario, ':idVotacion' => $votacionVigente['idVotacion']]);
     $votoPrevio = $stmt->fetchColumn();
@@ -246,6 +246,7 @@ if ($votacionVigente) {
     let pollerID = null;
     let cacheDatos = ""; // Caché para evitar "parpadeos"
     let idVotacionActivaCache = null; // Para saber en qué votación estamos
+    let estadoAnteriorVotacion = null;
 
     // Contenedores principales (los definimos una sola vez)
     const contenedorPrincipal = document.getElementById('votacionContainer');
@@ -275,24 +276,44 @@ if ($votacionVigente) {
         pollerID = setInterval(actualizarSala, INTERVALO_POLLING);
     }
 
+    function mostrarNotificacion(nuevoEstado) {
+        // 1. CLAVE: Determinamos el estado booleano de forma explícita
+        const isAbierta = nuevoEstado === 1;
+
+        // 2. Asignación de contenido (usa el booleano isAbierta)
+        const titulo = isAbierta ? '¡VOTACIÓN ABIERTA!' : 'VOTACIÓN CERRADA';
+        const texto = isAbierta ? 'El Secretario Técnico ha habilitado la votación.' : 'El Secretario Técnico ha cerrado la votación.';
+        const icon = isAbierta ? 'info' : 'warning';
+
+        // 3. Disparo de SweetAlert
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: icon,
+            title: titulo,
+            text: texto,
+            showConfirmButton: false,
+            timer: 5000,
+            timerProgressBar: true
+        });
+    }
     /**
-     * Busca en el servidor el estado actual de la votación
+     * Busca en el servidor el estado actual de la votación y notifica los cambios.
      */
     async function actualizarSala() {
         try {
-            // 1. Llamar al nuevo controlador (el que creamos en el Paso 1)
+            // 1. Fetch de datos sin caché
             const response = await fetch(`/corevota/controllers/obtener_estado_sala_votante.php?_t=${new Date().getTime()}`, {
                 method: 'GET',
                 cache: 'no-store'
             });
 
-            if (!response.ok) throw new Error('Error de red');
+            if (!response.ok) throw new Error('Error de red al obtener el estado.');
 
             const textoRespuesta = await response.text();
 
-            // 2. Lógica Anti-Parpadeo (Si no hay cambios, no hacer nada)
+            // 2. Lógica Anti-Parpadeo y Carga
             if (textoRespuesta === cacheDatos) {
-                // console.log('Polling: Sin cambios.');
                 return;
             }
             cacheDatos = textoRespuesta; // Actualizar caché
@@ -300,13 +321,21 @@ if ($votacionVigente) {
             const data = JSON.parse(textoRespuesta);
             if (data.status === 'error') throw new Error(data.message);
 
-            // 3. Renderizar la sala con los nuevos datos
+            // 3. Lógica de Estado y Notificación
+            const votacion = data.votacion;
+            const nuevoEstado = votacion ? 1 : 0;
+
+            // 🚨 CRÍTICO: Comprobar si el estado ha cambiado y si ya pasamos la carga inicial
+            if (estadoAnteriorVotacion !== null && nuevoEstado !== estadoAnteriorVotacion) {
+                mostrarNotificacion(nuevoEstado);
+            }
+
+            // 4. Actualizar el estado global y renderizar
+            estadoAnteriorVotacion = nuevoEstado;
             renderSala(data);
 
         } catch (error) {
             console.error('Error en el polling de la sala:', error);
-            // Si falla el polling, mostramos el error (opcional)
-            // contenedorPrincipal.innerHTML = `<div class="alert alert-danger">Error de conexión. Reintentando...</div>`;
         }
     }
 
@@ -318,10 +347,10 @@ if ($votacionVigente) {
         if (!data.votacion) {
             idVotacionActivaCache = null;
             contenedorPrincipal.innerHTML = `
-                <div class="alert alert-info text-center mb-0">
-                    <i class="fas fa-spinner fa-spin me-2"></i>
-                    No hay votaciones habilitadas en este momento. Esperando...
-                </div>`;
+        <div class="alert alert-info text-center mb-0">
+          <i class="fas fa-spinner fa-spin me-2"></i>
+          No hay votaciones habilitadas en este momento. Esperando...
+        </div>`;
             return;
         }
 
@@ -332,23 +361,23 @@ if ($votacionVigente) {
 
             // Regeneramos el HTML base (título, botones, contenedores vacíos)
             contenedorPrincipal.innerHTML = `
-                <h2 id="tituloVotacion" class="fw-bold mb-2 text-dark text-center">
-                    ${escapeHTML(data.votacion.nombreAcuerdo)}
-                </h2>
-                <p class="mb-4 text-muted text-center">Comisión: <strong>${escapeHTML(data.votacion.nombreComision || 'No definida')}</strong></p>
+        <h2 id="tituloVotacion" class="fw-bold mb-2 text-dark text-center">
+          ${escapeHTML(data.votacion.nombreAcuerdo)}
+        </h2>
+        <p class="mb-4 text-muted text-center">Comisión: <strong>${escapeHTML(data.votacion.nombreComision || 'No definida')}</strong></p>
 
-                <div id="opcionesVotoContainer" class="text-center">
-                    <h5 class="mb-4">¿Cuál es tu voto?</h5>
-                    <div class="d-flex justify-content-center gap-4">
-                        <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI" onclick="registrarVoto(${idVot}, 'SI')">SÍ</button>
-                        <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO" onclick="registrarVoto(${idVot}, 'NO')">NO</button>
-                        <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION" onclick="registrarVoto(${idVot}, 'ABSTENCION')">ABS</button>
-                    </div>
-                </div>
+        <div id="opcionesVotoContainer" class="text-center">
+          <h5 class="mb-4">¿Cuál es tu voto?</h5>
+          <div class="d-flex justify-content-center gap-4">
+            <button type="button" class="btn btn-success btn-lg voto-btn px-4 py-2 fw-semibold" data-value="SI" onclick="registrarVoto(${idVot}, 'SI')">SÍ</button>
+            <button type="button" class="btn btn-danger btn-lg voto-btn px-4 py-2 fw-semibold" data-value="NO" onclick="registrarVoto(${idVot}, 'NO')">NO</button>
+            <button type="button" class="btn btn-secondary btn-lg voto-btn px-4 py-2 fw-semibold" data-value="ABSTENCION" onclick="registrarVoto(${idVot}, 'ABSTENCION')">ABS</button>
+          </div>
+        </div>
 
-                <div id="votoPropioContainer" class="my-3" style="display:none;"></div>
-                <div id="dashboardResultados"></div>
-            `;
+        <div id="votoPropioContainer" class="my-3" style="display:none;"></div>
+        <div id="dashboardResultados"></div>
+      `;
         }
 
         // CASO 2: Hay votación Y el usuario YA VOTÓ
@@ -383,10 +412,10 @@ if ($votacionVigente) {
         }
 
         container.innerHTML = `
-            <div class="alert alert-info text-center mt-3">
-                <h5 class="alert-heading">¡Tu voto ha sido registrado!</h5>
-                <p class="mb-0">Has votado: <span class="badge ${badgeClass} fs-5">${opcionTexto}</span></p>
-            </div>`;
+      <div class="alert alert-info text-center mt-3">
+        <h5 class="alert-heading">¡Tu voto ha sido registrado!</h5>
+        <p class="mb-0">Has votado: <span class="badge ${badgeClass} fs-5">${opcionTexto}</span></p>
+      </div>`;
         container.style.display = 'block';
     }
 
@@ -401,31 +430,31 @@ if ($votacionVigente) {
         const faltanVotar = resultados.totalPresentes - totalVotantes;
 
         container.innerHTML = `
-            <div class="card mt-4 shadow-sm">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">Resultados Preliminares</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-3">
-                            <h4 class="text-success">${resultados.votosSi}</h4>
-                            <p class="mb-0 small">SÍ</p>
-                        </div>
-                        <div class="col-3">
-                            <h4 class="text-danger">${resultados.votosNo}</h4>
-                            <p class="mb-0 small">NO</p>
-                        </div>
-                        <div class="col-3">
-                            <h4 class="text-secondary">${resultados.votosAbstencion}</h4>
-                            <p class="mb-0 small">ABS.</p>
-                        </div>
-                        <div class="col-3">
-                            <h4 class="text-warning">${Math.max(0, faltanVotar)}</h4>
-                            <p class="mb-0 small">FALTAN</p>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
+      <div class="card mt-4 shadow-sm">
+        <div class="card-header bg-light">
+          <h6 class="mb-0">Resultados Preliminares</h6>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-3">
+              <h4 class="text-success">${resultados.votosSi}</h4>
+              <p class="mb-0 small">SÍ</p>
+            </div>
+            <div class="col-3">
+              <h4 class="text-danger">${resultados.votosNo}</h4>
+              <p class="mb-0 small">NO</p>
+            </div>
+            <div class="col-3">
+              <h4 class="text-secondary">${resultados.votosAbstencion}</h4>
+              <p class="mb-0 small">ABS.</p>
+            </div>
+            <div class="col-3">
+              <h4 class="text-warning">${Math.max(0, faltanVotar)}</h4>
+              <p class="mb-0 small">FALTAN</p>
+            </div>
+          </div>
+        </div>
+      </div>`;
     }
 
     /**
@@ -474,6 +503,7 @@ if ($votacionVigente) {
                             Swal.fire('⚠️ Ya registraste tu voto', 'No puedes votar nuevamente.', 'warning');
                         } else if (resp.status === 'unauthorized') {
                             Swal.fire('❌ Voto no permitido', resp.message || 'Debe registrar su asistencia.', 'error');
+                            // Revertimos el disabled, pero la lógica de polling actualizará la UI de todas formas
                         } else {
                             Swal.fire('Error', resp.message || 'Inténtalo nuevamente.', 'error');
                         }

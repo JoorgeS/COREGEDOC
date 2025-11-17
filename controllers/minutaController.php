@@ -39,7 +39,7 @@ switch ($action) {
         // REGLA 1: La lista 'PENDIENTE' es SÓLO para el Secretario (o Admin).
         // <-- CORREGIDO: Usamos ROL_SECRETARIO_TECNICO
         if ($estado_filtro == 'PENDIENTE' && ($tipoUsuario != ROL_SECRETARIO_TECNICO && $tipoUsuario != ROL_ADMINISTRADOR)) {
-            
+
             // <-- CORREGIDO: ¡No usar header()! Mostramos un error en la página.
             echo "<div class='container-fluid mt-4'>";
             echo "  <div class='alert alert-danger text-center'>";
@@ -47,7 +47,7 @@ switch ($action) {
             echo "      <p>No tiene los permisos necesarios para acceder a esta sección.</p>";
             echo "  </div>";
             echo "</div>";
-            
+
             // Salimos del switch
             break;
         }
@@ -91,7 +91,6 @@ switch ($action) {
         $tema = $model->getTemaById($id);
         if (!$tema) {
             $_SESSION['error'] = 'Tema no encontrado.';
-            // NOTA: Este header() SÍ funciona porque 'view' no se incluye desde menu.php
             header('Location: menu.php?pagina=minutas_pendientes');
             exit;
         }
@@ -101,23 +100,29 @@ switch ($action) {
 
     case 'edit':
         // ... (Tu código edit original) ...
-        header('Location: menu.php?pagina=editar_minuta&id=' . ($_GET['id'] ?? 0));
-        exit;
-        break;
+        if (!$minutaEncontrada) {
+            $_SESSION['error'] = 'Minuta no encontrada o ya está en proceso.';
+            $targetUrl = 'menu.php?pagina=minutas_pendientes';
+            echo "<script>window.location.href = '{$targetUrl}';</script>";
+            exit;
+        }
 
 
     case 'update':
-        // ... (Tu código update original) ...
+        // ... Tu lógica de procesamiento de POST ...
         $id = (int)($_POST['idTema'] ?? 0);
-        $data = [ /* ... tus datos ... */];
+        // ...
 
+        $targetUrl = 'menu.php?pagina=minutas_pendientes';
         if ($model->updateTema($id, $data)) {
             $_SESSION['success'] = 'Actualizado con éxito.';
         } else {
             $_SESSION['error'] = 'Error al actualizar.';
         }
-        header('Location: menu.php?pagina=minutas_pendientes');
-        exit;
+
+        // ESTA ES LA REDIRECCIÓN SEGURA (Reemplaza la línea 128)
+        echo "<script>window.location.href = '{$targetUrl}';</script>";
+        exit; // Detiene la ejecución.
         break;
 
     // <-- CORREGIDO: El 'case seguimiento_general' se eliminó completamente.
