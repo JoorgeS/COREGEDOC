@@ -36,24 +36,25 @@ $votaciones = $response['data'] ?? [];
 
 
 /* =========================
-   FILTRADO EN VISTA (mantiene filtros de fecha y keyword)
+   FILTRADO EN VISTA (Solo por Palabra Clave)
    ========================= */
-$reunionesFiltradas = $votaciones;
 
 // 1. Palabra Clave (para Nombre Reunión)
 $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 
-// 2. Rango de Fecha (con valores por defecto)
-$fechaInicio_val = isset($_GET['fecha_inicio']) && !empty($_GET['fecha_inicio']) ? $_GET['fecha_inicio'] : date('Y-m-01');
-$fechaTermino_val = isset($_GET['fecha_termino']) && !empty($_GET['fecha_termino']) ? $_GET['fecha_termino'] : date('Y-m-d');
-
+// 2. Rango de Fecha (ELIMINADO - El controlador ya filtró por mes/año)
+// $fechaInicio_val = ...
+// $fechaTermino_val = ...
 
 /* =========================
-   FILTRADO EN VISTA (mantiene filtros de fecha y keyword)
+   FILTRADO EN VISTA
    ========================= */
+// Empezamos con los datos YA FILTRADOS por el controlador (mes, año, comision)
 $reunionesFiltradas = $votaciones;
 
 // --- A. Filtro por Palabra Clave ---
+// Este es el único filtro que aplica la vista,
+// porque el controlador no lo está recibiendo.
 if ($q !== '') {
   $needle = mb_strtolower($q, 'UTF-8');
   $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($needle) {
@@ -63,22 +64,24 @@ if ($q !== '') {
 }
 
 // --- B. Filtro por Rango de Fecha (fecha de CREACIÓN) ---
+// ¡¡ELIMINADO!!
+// Este bloque es el que causaba el error. El controlador ya
+// filtró por mes y año. No necesitamos un filtro de fecha conflictivo aquí.
+/*
 if ($fechaInicio_val && $fechaTermino_val) {
-  $inicioTimestamp = strtotime($fechaInicio_val . ' 00:00:00');
-  $terminoTimestamp = strtotime($fechaTermino_val . ' 23:59:59');
-
-  $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($inicioTimestamp, $terminoTimestamp) {
-    $reunionTimestamp = strtotime($r['fechaCreacion']);
-    return ($reunionTimestamp >= $inicioTimestamp) && ($reunionTimestamp <= $terminoTimestamp);
-  });
+  // ... bloque de filtro de fecha eliminado ...
 }
+*/
 
 // --- C. Filtro por Comisión ---
+// ¡¡ELIMINADO!!
+// El controlador ya filtró por $comId.
+// Hacerlo de nuevo aquí es innecesario.
+/*
 if ($comId) {
-  $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($comId) {
-    return (int)($r['idComision'] ?? 0) === (int)$comId;
-  });
+  // ... bloque de filtro de comisión eliminado ...
 }
+*/
 $votacionesFiltradas = array_values($reunionesFiltradas);
 
 
@@ -164,149 +167,169 @@ function renderPagination($current, $pages)
 <body>
 
 
-    <nav aria-label="breadcrumb" class="mb-2">
-      <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
-        <li class="breadcrumb-item"><a href="menu.php?pagina=votaciones_dashboard">Gestión de Votaciones</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Listado de Votaciones</li>
-      </ol>
-    </nav>
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+      <li class="breadcrumb-item"><a href="menu.php?pagina=votaciones_dashboard">Gestión de Votaciones</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Listado de Votaciones</li>
+    </ol>
+  </nav>
 
-    <h3 class="mb-3">Votaciones y resultados anteriores</h3>
+  <h3 class="mb-3">Votaciones y resultados anteriores</h3>
 
-    <div class="card card-narrow shadow-sm">
-      <div class="card-body">
-        <h5 class="mb-3">Filtrar Resultados</h5>
+  <div class="card card-narrow shadow-sm">
+    <div class="card-body">
+      <h5 class="mb-3">Filtrar Resultados</h5>
 
-        <form id="filtrosForm" method="GET" class="row g-3">
-          <input type="hidden" name="pagina" value="votacion_listado">
-          <input type="hidden" name="p" id="pHidden" value="1">
-          <div class="row g-3 align-items-end">
+      <form id="filtrosForm" method="GET" class="row g-3">
+        <input type="hidden" name="pagina" value="votacion_listado">
+        <input type="hidden" name="p" id="pHidden" value="1">
+        <div class="row g-3 align-items-end">
 
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Mes</label>
-              <select name="mes" class="form-select form-select-sm">
-                <?php for ($m = 1; $m <= 12; $m++): $val = str_pad((string)$m, 2, '0', STR_PAD_LEFT); ?>
-                  <option value="<?= $val ?>" <?= ($val === $mes ? 'selected' : '') ?>><?= $val ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Año</label>
-              <select name="anio" class="form-select form-select-sm">
-                <?php $yNow = (int)date('Y');
-                for ($y = $yNow; $y >= $yNow - 3; $y--): ?>
-                  <option value="<?= $y ?>" <?= ((string)$y === (string)$anio ? 'selected' : '') ?>><?= $y ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-
-            <div class="col-md-4">
-              <label class="form-label fw-bold">Comisión</label>
-              <select name="comision_id" class="form-select form-select-sm" id="comision_id_select">
-                <option value="">-- Todas --</option>
-                <?php foreach ($listaComisiones as $c): ?>
-                  <option value="<?= (int)$c['idComision'] ?>" <?= ($comId == $c['idComision'] ? 'selected' : '') ?>>
-                    <?= htmlspecialchars($c['nombreComision']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-
-            <div class="col-md-2">
-              <label class="form-label fw-bold">Palabra Clave</label>
-              <input type="text" class="form-control form-control-sm" id="q" name="q" placeholder="Buscar..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
-            </div>
-
-            <div class="col-md-1">
-              <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
-            </div>
-            <div class="col-md-1">
-              <a href="menu.php?pagina=votacion_listado" class="btn btn-outline-secondary btn-sm w-100">
-                <i class="fas fa-times"></i> Limpiar
-              </a>
-            </div>
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Mes</label>
+            <select name="mes" class="form-select form-select-sm">
+              <?php for ($m = 1; $m <= 12; $m++): $val = str_pad((string)$m, 2, '0', STR_PAD_LEFT); ?>
+                <option value="<?= $val ?>" <?= ($val === $mes ? 'selected' : '') ?>><?= $val ?></option>
+              <?php endfor; ?>
+            </select>
           </div>
-        </form>
-      </div>
-    </div>
 
-    <div class="card card-narrow shadow-sm">
-      <div class="card-body">
-        <?php if (empty($votacionesPage)): ?>
-          <div class="alert alert-info">No se encontraron votaciones registradas para los filtros seleccionados.</div>
-        <?php else: ?>
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped table-hover align-middle">
-              <thead class="table-light">
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Año</label>
+            <select name="anio" class="form-select form-select-sm">
+              <?php $yNow = (int)date('Y');
+              for ($y = $yNow; $y >= $yNow - 3; $y--): ?>
+                <option value="<?= $y ?>" <?= ((string)$y === (string)$anio ? 'selected' : '') ?>><?= $y ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold">Comisión</label>
+            <select name="comision_id" class="form-select form-select-sm" id="comision_id_select">
+              <option value="">-- Todas --</option>
+              <?php foreach ($listaComisiones as $c): ?>
+                <option value="<?= (int)$c['idComision'] ?>" <?= ($comId == $c['idComision'] ? 'selected' : '') ?>>
+                  <?= htmlspecialchars($c['nombreComision']) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label fw-bold">Palabra Clave</label>
+            <input type="text" class="form-control form-control-sm" id="q" name="q" placeholder="Buscar..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="col-md-1">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+          </div>
+          <div class="col-md-1">
+            <a href="menu.php?pagina=votacion_listado" class="btn btn-outline-secondary btn-sm w-100">
+              <i class="fas fa-times"></i> Limpiar
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card card-narrow shadow-sm">
+    <div class="card-body">
+      <?php if (empty($votacionesPage)): ?>
+        <div class="alert alert-info">No se encontraron votaciones registradas para los filtros seleccionados.</div>
+      <?php else: ?>
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Nombre de la Adenda</th>
+                <th>Comisión</th>
+                <th>Fecha de Creación</th>
+                <th class="text-center">Resultados</th>
+                <th class="text-center">Participación</th>
+                <th class="text-center">Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($votacionesPage as $v): ?>
+                <?php
+                // Cálculos para la barra de progreso
+                $totalVotos = (int)($v['totalSi'] ?? 0) + (int)($v['totalNo'] ?? 0) + (int)($v['totalAbstencion'] ?? 0);
+                $porcentajeSi = ($totalVotos > 0) ? round((int)($v['totalSi'] ?? 0) / $totalVotos * 100) : 0;
+                ?>
                 <tr>
-                  <th>ID</th>
-                  <th>Nombre de la Adenda</th>
-                  <th>Comisión</th>
-                  <th>Fecha de Creación</th>
-                  <th class="text-center">Resultados</th>
-                  <th class="text-center">Participación</th>
-                  <th class="text-center">Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($votacionesPage as $v): ?>
-                  <?php
-                  // Cálculos para la barra de progreso
-                  $totalVotos = (int)($v['totalSi'] ?? 0) + (int)($v['totalNo'] ?? 0) + (int)($v['totalAbstencion'] ?? 0);
-                  $porcentajeSi = ($totalVotos > 0) ? round((int)($v['totalSi'] ?? 0) / $totalVotos * 100) : 0;
-                  ?>
-                  <tr>
-                    <td><strong><?= $v['idVotacion'] ?></strong></td>
-                    <td><?= htmlspecialchars($v['nombreVotacion']) ?></td>
-                    <td><?= htmlspecialchars($v['nombreComision']) ?></td>
-                    <td>
-                      <?php
-                      $fecha = $v['fechaCreacion'] ? date('d-m-Y H:i', strtotime($v['fechaCreacion'])) : 'N/A';
-                      echo $fecha;
-                      ?>
-                    </td>
-                    <td class="text-center" style="min-width: 150px; white-space: nowrap;">
-                      <span class="badge bg-success" title="Sí">
-                        SÍ: <?= (int)($v['totalSi'] ?? 0) ?>
-                      </span>
-                      <span class="badge bg-danger" title="No">
-                        NO: <?= (int)($v['totalNo'] ?? 0) ?>
-                      </span>
-                      <span class="badge bg-warning text-dark" title="Abstención">
-                        ABS: <?= (int)($v['totalAbstencion'] ?? 0) ?>
-                      </span>
-                    </td>
-                    <td style="min-width: 150px;">
-                      <small class="d-block mb-1 text-muted">Aprobación: <strong><?= $porcentajeSi ?>%</strong></small>
-                      <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-success" role="progressbar"
-                          style="width: <?= $porcentajeSi ?>%"
-                          aria-valuenow="<?= $porcentajeSi ?>"
-                          aria-valuemin="0" aria-valuemax="100">
-                        </div>
+                  <td><strong><?= $v['idVotacion'] ?></strong></td>
+                  <td><?= htmlspecialchars($v['nombreVotacion']) ?></td>
+                  <td><?= htmlspecialchars($v['nombreComision']) ?></td>
+                  <td>
+                    <?php
+                    $fecha = $v['fechaCreacion'] ? date('d-m-Y H:i', strtotime($v['fechaCreacion'])) : 'N/A';
+                    echo $fecha;
+                    ?>
+                  </td>
+
+                  <td class="text-center">
+                    <?php
+                    // --- INICIO: Lógica de Resultado Unificado ---
+                    $si = (int)($v['totalSi'] ?? 0);
+                    $no = (int)($v['totalNo'] ?? 0);
+                    $abs = (int)($v['totalAbstencion'] ?? 0);
+
+                    $statusText = '';
+                    $statusClass = '';
+
+                    if ($si > $no) {
+                      $statusText = 'APROBADO';
+                      $statusClass = 'bg-success';
+                    } elseif ($no > $si) {
+                      $statusText = 'RECHAZADO';
+                      $statusClass = 'bg-danger';
+                    } else {
+                      // Cubre $si == $no (incluyendo 0 vs 0)
+                      $statusText = 'EMPATE';
+                      $statusClass = 'bg-secondary';
+                    }
+                    // --- FIN: Lógica ---
+                    ?>
+
+                    <span class="badge <?= $statusClass ?> fw-bold" style="font-size: 0.9rem;"><?= $statusText ?></span>
+
+                    <div class="small text-muted mt-1" style="white-space: nowrap;">
+                      (Sí: <?= $si ?>, No: <?= $no ?>, Abs: <?= $abs ?>)
+                    </div>
+                  </td>
+                  <td style="min-width: 150px;">
+                    <small class="d-block mb-1 text-muted">Aprobación: <strong><?= $porcentajeSi ?>%</strong></small>
+                    <div class="progress" style="height: 10px;">
+                      <div class="progress-bar bg-success" role="progressbar"
+                        style="width: <?= $porcentajeSi ?>%"
+                        aria-valuenow="<?= $porcentajeSi ?>"
+                        aria-valuemin="0" aria-valuemax="100">
                       </div>
-                      <small class="d-block text-end mt-1 text-muted">Total votos: <?= $totalVotos ?></small>
-                    </td>
-                    <td class="text-center">
-                      <button type="button" class="btn btn-sm btn-info"
-                        onclick="mostrarDetalleVotacion('<?= $v['idVotacion'] ?>', '<?= $v['t_minuta_idMinuta'] ?? 0 ?>', '<?= htmlspecialchars($v['nombreVotacion'] ?? 'N/A', ENT_QUOTES) ?>')"
-                        title="Ver Detalle de Votos y Nombres">
-                        <i class="fas fa-eye"></i>
-                      </button>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-          <div class="d-flex justify-content-end">
-            <?php renderPagination($page, $pages); ?>
-          </div>
-        <?php endif; ?>
-      </div>
+                    </div>
+                    <small class="d-block text-end mt-1 text-muted">Total votos: <?= $totalVotos ?></small>
+                  </td>
+                  <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-info"
+                      onclick="mostrarDetalleVotacion('<?= $v['idVotacion'] ?>', '<?= $v['t_minuta_idMinuta'] ?? 0 ?>', '<?= htmlspecialchars($v['nombreVotacion'] ?? 'N/A', ENT_QUOTES) ?>')"
+                      title="Ver Detalle de Votos y Nombres">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-end">
+          <?php renderPagination($page, $pages); ?>
+        </div>
+      <?php endif; ?>
     </div>
+  </div>
   </div>
 
   <div class="modal fade" id="modalDetalleVotacion" tabindex="-1" aria-labelledby="modalDetalleVotacionLabel" aria-hidden="true">
@@ -407,39 +430,39 @@ function renderPagination($current, $pages)
           '<em class="text-muted small ps-2">Sin votos registrados</em>';
 
         return `
-                    <div class="row text-center mb-4">
-                        <div class="col-4">
-                            <h3 class="text-success mb-0">${v.votosSi}</h3>
-                            <p class="mb-0 small text-uppercase">A Favor</p>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-danger mb-0">${v.votosNo}</h3>
-                            <p class="mb-0 small text-uppercase">En Contra</p>
-                        </div>
-                        <div class="col-4">
-                            <h3 class="text-warning mb-0">${v.votosAbstencion}</h3>
-                            <p class="mb-0 small text-uppercase">Abstención</p>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-4">
-                            <h6 class="text-success border-bottom pb-1">Votaron SÍ (${v.votosSi})</h6>
-                            ${getVoterList(v.votosSi_nombres || [])}
-                        </div>
-                        <div class="col-4">
-                            <h6 class="text-danger border-bottom pb-1">Votaron NO (${v.votosNo})</h6>
-                            ${getVoterList(v.votosNo_nombres || [])}
-                        </div>
-                        <div class="col-4">
-                            <h6 class="text-warning border-bottom pb-1">Se Abstienen (${v.votosAbstencion})</h6>
-                            ${getVoterList(v.votosAbstencion_nombres || [])}
-                        </div>
-                    </div>
-                    <hr class="mt-4">
-                    <p class="text-muted small"><strong>Total de Asistentes Requeridos:</strong> ${v.totalPresentes}</p>
-                    <p class="text-muted small"><strong>Total de Votos Emitidos:</strong> ${v.votosSi + v.votosNo + v.votosAbstencion}</p>
-                `;
+                          <div class="row text-center mb-4">
+                              <div class="col-4">
+                                  <h3 class="text-success mb-0">${v.votosSi}</h3>
+                                  <p class="mb-0 small text-uppercase">A Favor</p>
+                              </div>
+                              <div class="col-4">
+                                  <h3 class="text-danger mb-0">${v.votosNo}</h3>
+                                  <p class="mb-0 small text-uppercase">En Contra</p>
+                              </div>
+                              <div class="col-4">
+                                  <h3 class="text-warning mb-0">${v.votosAbstencion}</h3>
+                                  <p class="mb-0 small text-uppercase">Abstención</p>
+                              </div>
+                          </div>
+                          <hr>
+                          <div class="row">
+                              <div class="col-4">
+                                  <h6 class="text-success border-bottom pb-1">Votaron SÍ (${v.votosSi})</h6>
+                                  ${getVoterList(v.votosSi_nombres || [])}
+                              </div>
+                              <div class="col-4">
+                                  <h6 class="text-danger border-bottom pb-1">Votaron NO (${v.votosNo})</h6>
+                                  ${getVoterList(v.votosNo_nombres || [])}
+                              </div>
+                              <div class="col-4">
+                                  <h6 class="text-warning border-bottom pb-1">Se Abstienen (${v.votosAbstencion})</h6>
+                                  ${getVoterList(v.votosAbstencion_nombres || [])}
+                              </div>
+                          </div>
+                          <hr class="mt-4">
+                          <p class="text-muted small"><strong>Total de Asistentes Requeridos:</strong> ${v.totalPresentes}</p>
+                          <p class="text-muted small"><strong>Total de Votos Emitidos:</strong> ${v.votosSi + v.votosNo + v.votosAbstencion}</p>
+                      `;
       }
 
     })();
