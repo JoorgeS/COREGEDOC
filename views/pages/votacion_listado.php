@@ -22,6 +22,21 @@ try {
 } catch (Throwable $e) {
   $listaComisiones = [];
 }
+
+// --- INICIO DE LA MODIFICACIÓN 1 ---
+// Esta es tu nueva lógica para obtener el universo de votantes
+$universoVotantes = 0; // Default
+try {
+  // Contamos todos los usuarios que DEBERÍAN votar (roles 1, 3, 7)
+  $stUniverso = $pdo->query("SELECT COUNT(*) FROM t_usuario WHERE tipoUsuario_id IN (1, 3, 7)");
+  $universoVotantes = (int)$stUniverso->fetchColumn();
+} catch (Throwable $e) {
+  error_log("Error al contar universo de votantes: " . $e->getMessage());
+  $universoVotantes = 0; // Si hay error, la participación será 0
+}
+// --- FIN DE LA MODIFICACIÓN 1 ---
+
+
 // 🚀 FIN: LÓGICA DE FILTROS
 
 // Ahora llamamos al controlador con los filtros
@@ -102,7 +117,7 @@ $votacionesPage = array_slice($votacionesFiltradas, $offset, $perPage);
 function renderPagination($current, $pages)
 {
   if ($pages <= 1) return;
-  echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0">';
+  echo '<nav aria-label="PaginACIÓN"><ul class="pagination pagination-sm mb-0">';
   for ($i = 1; $i <= $pages; $i++) {
     $qsArr = $_GET;
     $qsArr['p'] = $i;
@@ -256,9 +271,11 @@ function renderPagination($current, $pages)
             <tbody>
               <?php foreach ($votacionesPage as $v): ?>
                 <?php
-                // Cálculos para la barra de progreso
+                // --- Cálculo de Votos Totales (SÍ + NO + ABS) ---
                 $totalVotos = (int)($v['totalSi'] ?? 0) + (int)($v['totalNo'] ?? 0) + (int)($v['totalAbstencion'] ?? 0);
-                $porcentajeSi = ($totalVotos > 0) ? round((int)($v['totalSi'] ?? 0) / $totalVotos * 100) : 0;
+
+                // --- Cálculo de Porcentaje de Aprobación (para el modal, si se necesita) ---
+                // $porcentajeSi = ($totalVotos > 0) ? round((int)($v['totalSi'] ?? 0) / $totalVotos * 100) : 0;
                 ?>
                 <tr>
                   <td><strong><?= $v['idVotacion'] ?></strong></td>
@@ -301,16 +318,31 @@ function renderPagination($current, $pages)
                       (Sí: <?= $si ?>, No: <?= $no ?>, Abs: <?= $abs ?>)
                     </div>
                   </td>
+
                   <td style="min-width: 150px;">
-                    <small class="d-block mb-1 text-muted">Aprobación: <strong><?= $porcentajeSi ?>%</strong></small>
+                    <?php
+                    // --- INICIO: Lógica de Participación ---
+                    $porcentajeParticipacion = 0;
+                    // Usamos la variable $universoVotantes que calculamos al inicio del archivo
+                    if ($universoVotantes > 0) {
+                      $porcentajeParticipacion = round(($totalVotos / $universoVotantes) * 100);
+                    }
+                    // --- FIN: Lógica ---
+                    ?>
+
+                    <small class="d-block mb-1 text-muted">Participación: <strong><?= $porcentajeParticipacion ?>%</strong></small>
+
                     <div class="progress" style="height: 10px;">
-                      <div class="progress-bar bg-success" role="progressbar"
-                        style="width: <?= $porcentajeSi ?>%"
-                        aria-valuenow="<?= $porcentajeSi ?>"
+                      <div class="progress-bar bg-info" role="progressbar"
+                        style="width: <?= $porcentajeParticipacion ?>%"
+                        aria-valuenow="<?= $porcentajeParticipacion ?>"
                         aria-valuemin="0" aria-valuemax="100">
                       </div>
                     </div>
-                    <small class="d-block text-end mt-1 text-muted">Total votos: <?= $totalVotos ?></small>
+
+                    <small class="d-block text-end mt-1 text-muted">
+                      <?= $totalVotos ?> de <?= $universoVotantes ?> votaron
+                    </small>
                   </td>
                   <td class="text-center">
                     <button type="button" class="btn btn-sm btn-info"
