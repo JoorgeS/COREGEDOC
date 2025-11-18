@@ -147,7 +147,7 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
             $where[] = "(
         m.estadoMinuta IN ('PENDIENTE', 'REQUIERE_REVISION') 
         OR 
-        (m.estadoMinuta = 'BORRADOR' AND r.t_usuario_idSecretario = :idStLogueado)
+        (m.estadoMinuta = 'BORRADOR' AND m.t_usuario_idSecretario = :idStLogueado)
       )";
         }
 
