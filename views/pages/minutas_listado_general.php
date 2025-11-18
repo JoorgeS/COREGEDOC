@@ -212,7 +212,7 @@ if (($__minutasCountBackend === 0 || $__hasKeyword || $hasComisionSelect) && $pd
     FROM t_minuta m
     LEFT JOIN t_comision c  ON c.idComision = m.t_comision_idComision
     LEFT JOIN t_tema   tt ON tt.t_minuta_idMinuta = m.idMinuta
-    LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta
+    LEFT JOIN t_adjunto adj ON adj.t_minuta_idMinuta = m.idMinuta AND adj.tipoAdjunto <> 'asistencia'
     LEFT JOIN t_reunion r  ON r.t_minuta_idMinuta = m.idMinuta
     $whereSql
     GROUP BY
