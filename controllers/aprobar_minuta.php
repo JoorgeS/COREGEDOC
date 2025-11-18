@@ -118,7 +118,22 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
-        '.votacion-detalle{columns:2;-webkit-columns:2;column-gap:20px;padding-left:20px;margin-top:5px;}' .
+        /* MODIFICADO: Ajustado para que funcione dentro de la nueva tabla */
+        '.votacion-detalle{padding-left:5px; margin-top:0px; font-size: 8pt; line-height: 1.2;}' .
+        '.votacion-detalle b { font-size: 9pt; }' .
+        '.comision-header { 
+      background-color: #f0f0f0; 
+      font-weight: bold; 
+      padding: 6px 8px; 
+      font-size: 10pt; 
+      border-bottom: 1px solid #ccc;
+      border-top: 1px solid #ccc;
+      color: #333;
+    }' .
+        '.votacion-nombre-indentada { 
+      padding-left: 20px !important; /* Añadimos indentación */
+    }' .
+
         '</style></head><body>';
 
     // (Contenido HTML del PDF - Encabezado y Asistentes sin cambios)
@@ -199,41 +214,82 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
     }
 
     // --- BLOQUE DE VOTACIONES (Sin cambios, ya estaba correcto) ---
+    // --- BLOQUE DE VOTACIONES (MODIFICADO para agrupar por comisión) ---
     if (!empty($data['votaciones']) && is_array($data['votaciones'])) {
         $html .= '<div class="seccion-titulo">Votaciones Realizadas:</div>';
+
+        $comisionActual = null; // Variable de seguimiento
+
+        // Usamos una tabla principal para todo el bloque de votaciones
+        $html .= '<table class="votacion-tabla" style="width: 100%;">'; // Tabla principal
+        $html .= '<thead><tr>
+          <th>Comisión / Votación</th>
+          <th style="width:80px; text-align:center;">Resultado</th>
+          <th style="width:250px;">Detalle de Votos</th>
+         </tr></thead>';
+        $html .= '<tbody>';
+
         foreach ($data['votaciones'] as $votacion) {
+
+            // --- Lógica de Agrupación ---
+            // Si la comisión no está seteada (es NULL), la asignamos a un grupo "General"
+            $nombreComision = $votacion['nombreComision'] ?? 'Votaciones Generales';
+
+            if ($nombreComision !== $comisionActual) {
+                $html .= '<tr><td class="comision-header" colspan="3">' . htmlspecialchars(strtoupper($nombreComision)) . '</td></tr>';
+                $comisionActual = $nombreComision;
+            }
+
+            // --- Lógica de conteo de votos (la movemos aquí) ---
             $votosSi = 0;
             $votosNo = 0;
             $votosAbs = 0;
-            $listaVotos = ['SI' => [], 'NO' => [], 'ABSTENCION' => []];
+            $listaVotosSI = [];
+            $listaVotosNO = [];
+            $listaVotosABS = [];
 
             if (!empty($votacion['votos'])) {
                 foreach ($votacion['votos'] as $voto) {
+                    $nombreVotanteSafe = htmlspecialchars($voto['nombreVotante']);
                     if ($voto['opcionVoto'] == 'SI') {
                         $votosSi++;
-                        $listaVotos['SI'][] = htmlspecialchars($voto['nombreVotante']);
+                        $listaVotosSI[] = $nombreVotanteSafe;
                     } elseif ($voto['opcionVoto'] == 'NO') {
                         $votosNo++;
-                        $listaVotos['NO'][] = htmlspecialchars($voto['nombreVotante']);
-                    } else {
+                        $listaVotosNO[] = $nombreVotanteSafe;
+                    } else { // ABSTENCION
                         $votosAbs++;
-                        $listaVotos['ABSTENCION'][] = htmlspecialchars($voto['nombreVotante']);
+                        $listaVotosABS[] = $nombreVotanteSafe;
                     }
                 }
             }
 
-            $html .= '<div class="votacion-block">' .
-                '<h4>Votación: ' . htmlspecialchars($votacion['nombreVotacion']) . '</h4>' .
-                '<table class="votacion-tabla">' .
-                '<thead><tr><th>A Favor (' . $votosSi . ')</th><th>En Contra (' . $votosNo . ')</th><th>Abstención (' . $votosAbs . ')</th></tr></thead>' .
-                '<tbody><tr>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['SI']) . '</td>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['NO']) . '</td>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['ABSTENCION']) . '</td>' .
-                '</tr></tbody>' .
-                '</table>' .
-                '</div>';
+            // --- Determinar Resultado ---
+            $totalVotos = $votosSi + $votosNo + $votosAbs;
+            $resultadoStr = 'Sin Votos';
+            if ($totalVotos > 0) {
+                if ($votosSi > $votosNo) $resultadoStr = 'Aprobado';
+                elseif ($votosNo > $votosSi) $resultadoStr = 'Rechazado';
+                else $resultadoStr = 'Empate';
+            }
+
+            // --- Fila de la Votación ---
+            $html .= '<tr>';
+            // Aplicamos la indentación al nombre de la votación
+            $html .= '<td class="votacion-nombre-indentada" style="vertical-align: top;">' . htmlspecialchars($votacion['nombreVotacion']) . '</td>';
+            $html .= '<td style="text-align:center; vertical-align: top;">' . $resultadoStr . '</td>';
+
+            // Columna de detalle (con listas separadas)
+            $html .= '<td class="votacion-detalle" style="vertical-align: top;">';
+            $html .= '<b>SÍ (' . $votosSi . '):</b> ' . (empty($listaVotosSI) ? '<i>-</i>' : implode(', ', $listaVotosSI)) . '<br>';
+            $html .= '<b>NO (' . $votosNo . '):</b> ' . (empty($listaVotosNO) ? '<i>-</i>' : implode(', ', $listaVotosNO)) . '<br>';
+            $html .= '<b>ABS (' . $votosAbs . '):</b> ' . (empty($listaVotosABS) ? '<i>-</i>' : implode(', ', $listaVotosABS));
+            $html .= '</td>';
+
+            $html .= '</tr>';
         }
+
+        $html .= '</tbody></table>';
     }
     // --- FIN BLOQUE DE VOTACIONES ---
 

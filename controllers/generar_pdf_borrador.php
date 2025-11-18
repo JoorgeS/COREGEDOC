@@ -104,12 +104,34 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '.desarrollo-tema h4{font-size:10pt;font-weight:bold;margin:10px 0 3px 0;background-color:#f2f2f2;padding:3px 5px;border:1px solid #ddd;}' .
         '.desarrollo-tema div{margin:0 0 8px 5px;padding-left:5px;border-left:2px solid #eee;}' .
         '.desarrollo-tema strong{display:block;margin-bottom:2px;font-size:9pt;color:#555;}' .
-        // Estilos de Votación (copiados)
-        '.votacion-block{page-break-inside:avoid; margin-bottom:15px; font-size:9pt;}' .
+
+        // --- INICIO: CSS DE VOTACIÓN MODIFICADO ---
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
-        '.votacion-detalle{columns:2;-webkit-columns:2;column-gap:20px;padding-left:20px;margin-top:5px;}' .
+        '.votacion-detalle{
+      padding-left:5px; 
+      margin-top:0px; 
+      font-size: 8pt; 
+      line-height: 1.2;
+    }' .
+        '.votacion-detalle b { 
+      font-size: 9pt; 
+    }' .
+        '.comision-header { 
+      background-color: #f0f0f0; 
+      font-weight: bold; 
+      padding: 6px 8px; 
+      font-size: 10pt; 
+      border-bottom: 1px solid #ccc;
+      border-top: 1px solid #ccc;
+      color: #333;
+    }' .
+        '.votacion-nombre-indentada { 
+      padding-left: 20px !important; /* Añadimos indentación */
+      font-size: 9pt;
+    }' .
+        /* --- FIN: CSS DE VOTACIÓN MODIFICADO --- */
 
         // (INTEGRADO) Estilos para firmas y sellos
         '.signature-box-container{width:100%; margin-top:30px; padding-top: 15px; border-top: 1px solid #ccc; page-break-inside:avoid; text-align:center;}' .
@@ -202,42 +224,83 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         $html .= '<p style="font-size:10pt;">No hay detalles registrados para los temas.</p>';
     }
 
-    // --- BLOQUE DE VOTACIONES (Copiado de aprobar_minuta.php) ---
+    // --- BLOQUE DE VOTACIONES (MODIFICADO para agrupar por comisión) ---
     if (!empty($data['votaciones']) && is_array($data['votaciones'])) {
         $html .= '<div class="seccion-titulo">Votaciones Realizadas:</div>';
+
+        // Usamos una tabla principal para todo el bloque de votaciones
+        $html .= '<table class="votacion-tabla" style="width: 100%;">'; // Tabla principal
+        $html .= '<thead><tr>
+          <th style="text-align: left;">Comisión / Votación</th>
+          <th style="width:80px; text-align:center;">Resultado</th>
+          <th style="width:250px; text-align: left;">Detalle de Votos</th>
+         </tr></thead>';
+        $html .= '<tbody>';
+
+        $comisionActual = null; // Variable de seguimiento
+
         foreach ($data['votaciones'] as $votacion) {
+
+            // --- Lógica de Agrupación ---
+            // Si la comisión no está seteada (es NULL), la asignamos a un grupo "General"
+            $nombreComision = $votacion['nombreComision'] ?? 'Votaciones Generales';
+
+            if ($nombreComision !== $comisionActual) {
+                $html .= '<tr><td class="comision-header" colspan="3">' . htmlspecialchars(strtoupper($nombreComision)) . '</td></tr>';
+                $comisionActual = $nombreComision;
+            }
+
+            // --- Lógica de conteo de votos ---
             $votosSi = 0;
             $votosNo = 0;
             $votosAbs = 0;
-            $listaVotos = ['SI' => [], 'NO' => [], 'ABSTENCION' => []];
+            $listaVotosSI = [];
+            $listaVotosNO = [];
+            $listaVotosABS = [];
 
+            // (Importante: $votacion['votos'] viene de la consulta en la línea 334)
             if (!empty($votacion['votos'])) {
                 foreach ($votacion['votos'] as $voto) {
+                    $nombreVotanteSafe = htmlspecialchars($voto['nombreVotante']);
                     if ($voto['opcionVoto'] == 'SI') {
                         $votosSi++;
-                        $listaVotos['SI'][] = htmlspecialchars($voto['nombreVotante']);
+                        $listaVotosSI[] = $nombreVotanteSafe;
                     } elseif ($voto['opcionVoto'] == 'NO') {
                         $votosNo++;
-                        $listaVotos['NO'][] = htmlspecialchars($voto['nombreVotante']);
-                    } else {
+                        $listaVotosNO[] = $nombreVotanteSafe;
+                    } else { // ABSTENCION
                         $votosAbs++;
-                        $listaVotos['ABSTENCION'][] = htmlspecialchars($voto['nombreVotante']);
+                        $listaVotosABS[] = $nombreVotanteSafe;
                     }
                 }
             }
 
-            $html .= '<div class="votacion-block">' .
-                '<h4>Votación: ' . htmlspecialchars($votacion['nombreVotacion']) . '</h4>' .
-                '<table class="votacion-tabla">' .
-                '<thead><tr><th>A Favor (' . $votosSi . ')</th><th>En Contra (' . $votosNo . ')</th><th>Abstención (' . $votosAbs . ')</th></tr></thead>' .
-                '<tbody><tr>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['SI']) . '</td>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['NO']) . '</td>' .
-                '<td style="vertical-align: top;">' . implode('<br>', $listaVotos['ABSTENCION']) . '</td>' .
-                '</tr></tbody>' .
-                '</table>' .
-                '</div>';
+            // --- Determinar Resultado ---
+            $totalVotos = $votosSi + $votosNo + $votosAbs;
+            $resultadoStr = 'Sin Votos';
+            if ($totalVotos > 0) {
+                if ($votosSi > $votosNo) $resultadoStr = 'Aprobado';
+                elseif ($votosNo > $votosSi) $resultadoStr = 'Rechazado';
+                else $resultadoStr = 'Empate';
+            }
+
+            // --- Fila de la Votación ---
+            $html .= '<tr>';
+            // Aplicamos la indentación al nombre de la votación
+            $html .= '<td class="votacion-nombre-indentada" style="vertical-align: top;">' . htmlspecialchars($votacion['nombreVotacion']) . '</td>';
+            $html .= '<td style="text-align:center; vertical-align: top;">' . $resultadoStr . '</td>';
+
+            // Columna de detalle (con listas separadas)
+            $html .= '<td class="votacion-detalle" style="vertical-align: top;">';
+            $html .= '<b>SÍ (' . $votosSi . '):</b> ' . (empty($listaVotosSI) ? '<i>-</i>' : implode(', ', $listaVotosSI)) . '<br>';
+            $html .= '<b>NO (' . $votosNo . '):</b> ' . (empty($listaVotosNO) ? '<i>-</i>' : implode(', ', $listaVotosNO)) . '<br>';
+            $html .= '<b>ABS (' . $votosAbs . '):</b> ' . (empty($listaVotosABS) ? '<i>-</i>' : implode(', ', $listaVotosABS));
+            $html .= '</td>';
+
+            $html .= '</tr>';
         }
+
+        $html .= '</tbody></table>';
     }
 
     // Pie de página de borrador
@@ -290,7 +353,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
 
 
 /* =============================================================================
- 🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT 🔽
+🔽 COMIENZA EL "MOTOR" PRINCIPAL DEL SCRIPT 🔽
 =============================================================================
 */
 
@@ -322,9 +385,9 @@ try {
     // (¡IMPORTANTE!) Buscamos al ST (rol 2) explícitamente, NO al admin (rol 6)
     // Esto es para que el nombre en el PDF sea "Santiago" y no "Pamela"
     $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
-                             FROM t_usuario 
-                             WHERE tipoUsuario_id = 2 
-                             LIMIT 1");
+              FROM t_usuario 
+              WHERE tipoUsuario_id = 2 
+              LIMIT 1");
     $sqlSec->execute();
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
 
@@ -366,20 +429,20 @@ try {
 
     // 2c. ASISTENTES
     $sqlAsis = "SELECT CONCAT(u.pNombre, ' ', u.aPaterno) as nombreCompleto 
-                FROM t_asistencia a
-                JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                WHERE a.t_minuta_idMinuta = :id
-                ORDER BY u.aPaterno, u.pNombre";
+        FROM t_asistencia a
+        JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+        WHERE a.t_minuta_idMinuta = :id
+        ORDER BY u.aPaterno, u.pNombre";
     $stmtAsis = $pdo->prepare($sqlAsis);
     $stmtAsis->execute([':id' => $idMinuta]);
     $data_pdf['asistentes'] = $stmtAsis->fetchAll(PDO::FETCH_ASSOC);
 
     // 2d. TEMAS Y ACUERDOS
     $sqlTemas = "SELECT t.idTema, t.nombreTema, t.objetivo, t.compromiso, t.observacion, a.descAcuerdo
-                 FROM t_tema t 
-                 LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
-                 WHERE t.t_minuta_idMinuta = :id
-                 ORDER BY t.idTema ASC";
+        FROM t_tema t 
+        LEFT JOIN t_acuerdo a ON a.t_tema_idTema = t.idTema
+        WHERE t.t_minuta_idMinuta = :id
+        ORDER BY t.idTema ASC";
     $stmtTemas = $pdo->prepare($sqlTemas);
     $stmtTemas->execute([':id' => $idMinuta]);
     $data_pdf['temas'] = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
@@ -401,10 +464,17 @@ try {
     // --- INICIO DE LA MODIFICACIÓN 2 (Corregir consulta de votaciones) ---
     // =========================================================================
     // 2e. VOTACIONES
-    // Buscamos votaciones ligadas a la minuta DIRECTAMENTE o a través de la REUNIÓN
-    $sqlVotaciones = $pdo->prepare("SELECT * FROM t_votacion 
-                                  WHERE t_minuta_idMinuta = :idMinuta 
-                                  OR t_reunion_idReunion = :idReunion");
+    // (MODIFICADO) Añadimos JOIN con t_comision (c) y ORDER BY
+    // Se corrige el ON clause a "v.idComision" (basado en el error 1054)
+    $sqlVotaciones = $pdo->prepare("
+        SELECT 
+            v.idVotacion, 
+            v.nombreVotacion, 
+            c.nombreComision 
+        FROM t_votacion v
+        LEFT JOIN t_comision c ON v.idComision = c.idComision  /* <-- ESTA ES LA CORRECCIÓN */
+        WHERE (v.t_minuta_idMinuta = :idMinuta OR v.t_reunion_idReunion = :idReunion)
+        ORDER BY c.nombreComision ASC, v.nombreVotacion ASC"); // Ordenado por comisión, luego por nombre
     $sqlVotaciones->execute([
         ':idMinuta' => $idMinuta,
         ':idReunion' => $idReunion // Usamos el $idReunion que obtuvimos
@@ -417,11 +487,11 @@ try {
 
     if (!empty($data_pdf['votaciones'])) {
         $sqlVotos = $pdo->prepare("
-              SELECT v.t_votacion_idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
-              FROM t_voto v
-              JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
-              WHERE v.t_votacion_idVotacion = :idVotacion
-         ");
+       SELECT v.t_votacion_idVotacion, v.opcionVoto, CONCAT(u.pNombre, ' ', u.aPaterno) as nombreVotante
+       FROM t_voto v
+       JOIN t_usuario u ON v.t_usuario_idUsuario = u.idUsuario
+       WHERE v.t_votacion_idVotacion = :idVotacion
+    ");
         foreach ($data_pdf['votaciones'] as $i => $votacion) {
             // CORRECCIÓN: El idVotacion está en la key 'idVotacion' no en 'idVotacion'
             // (Tu código original estaba correcto, pero lo ajusto para que coincida con el SELECT de t_voto)
@@ -432,12 +502,12 @@ try {
 
     // 2f. (INTEGRADO) Cargar SELLOS del ST
     $sqlSellos = $pdo->prepare("SELECT 
-                                    CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
-                                    v.fechaValidacion
-                                    FROM t_validacion_st v
-                                    JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
-                                    WHERE v.t_minuta_idMinuta = :idMinuta
-                                    ORDER BY v.fechaValidacion ASC");
+                  CONCAT(u.pNombre, ' ', u.aPaterno) as nombreSecretario, 
+                  v.fechaValidacion
+                  FROM t_validacion_st v
+                  JOIN t_usuario u ON v.t_usuario_idSecretario = u.idUsuario
+                  WHERE v.t_minuta_idMinuta = :idMinuta
+                  ORDER BY v.fechaValidacion ASC");
     $sqlSellos->execute([':idMinuta' => $idMinuta]);
     $data_pdf['sellos_st'] = $sqlSellos->fetchAll(PDO::FETCH_ASSOC);
 
