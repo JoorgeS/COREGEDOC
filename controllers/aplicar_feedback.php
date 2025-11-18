@@ -75,59 +75,78 @@ function getListaPresidentesRequeridos(PDO $db, int $idMinuta): array
         return [];
     }
 }
+class AplicarFeedback {
 
-/**
- * Notifica a todos los presidentes requeridos que la minuta fue ACTUALIZADA.
- */
-function notificarPresidentes(PDO $db, int $idMinuta, array $listaPresidentes)
-{
-    if (empty($listaPresidentes)) {
-        throw new Exception('No se econtraron destinatarios para notificar.');
+    private $db;
+    private const FIRMA_PATH_RELATIVE = 'public/img/firma.jpeg';
+
+    public function __construct($db) {
+        $this->db = $db;
     }
 
-    try {
-        $placeholders = implode(',', array_fill(0, count($listaPresidentes), '?'));
-        $sql = "SELECT correo, pNombre, aPaterno FROM t_usuario WHERE idUsuario IN ($placeholders)";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($listaPresidentes);
-        $destinatarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    public function notificarPresidentes(int $idMinuta, array $listaPresidentes)
+    {
+        if (empty($listaPresidentes)) {
+            throw new Exception('No se econtraron destinatarios para notificar.');
+        }
 
-        // --- TEXTOS PARA UN RE-ENVÍO ---
-        $asunto = "Minuta N° {$idMinuta} ACTUALIZADA - Requiere su firma";
-        $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} ha sido actualizada por el Secretario Técnico en base al feedback recibido.</p>
-                 <p>Su aprobación ha sido reiniciada. Por favor, ingrese a COREGEDOC para revisar la nueva versión y registrar su firma.</p>";
+        $db = $this->db;
 
-        $mail = new PHPMailer(true); // Instancia única
-        // Configuración SMTP (tomada de tus scripts)
-        $mail->isSMTP();
-        $mail->Host = 'smtp.gmail.com';
-        $mail->SMTPAuth = true;
-        $mail->Username = 'equiposieteduocuc@gmail.com';
-        $mail->Password = 'ioheaszmlkflucsq';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
-        $mail->CharSet = 'UTF-8';
-        $mail->setFrom('equiposieteduocuc@gmail.com', 'Gestor Documental del CORE');
-        $mail->isHTML(true);
-        $mail->Subject = $asunto;
+        try {
+            $placeholders = implode(',', array_fill(0, count($listaPresidentes), '?'));
+            $sql = "SELECT correo, pNombre, aPaterno FROM t_usuario WHERE idUsuario IN ($placeholders)";
+            $stmt = $db->prepare($sql);
+            $stmt->execute($listaPresidentes);
+            $destinatarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($destinatarios as $destinatario) {
-            if (empty($destinatario['correo'])) {
-                error_log("ADVERTENCIA idMinuta {$idMinuta}: No se envió correo al presidente {$destinatario['pNombre']} por email vacío.");
-                continue;
+            // --- TEXTOS PARA UN RE-ENVÍO ---
+            $asunto = "Minuta N° {$idMinuta} ACTUALIZADA - Requiere su firma";
+            $cuerpo = "<p>Le informamos que la Minuta N° {$idMinuta} ha sido actualizada por el Secretario Técnico en base al feedback recibido.</p>
+                     <p>Su aprobación ha sido reiniciada. Por favor, ingrese a COREGEDOC para revisar la nueva versión y registrar su firma.</p>";
+
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host = 'smtp.gmail.com';
+            $mail->SMTPAuth = true;
+            $mail->Username = 'equiposieteduocuc@gmail.com';
+            $mail->Password = 'ioheaszmlkflucsq';
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port = 587;
+            $mail->CharSet = 'UTF-8';
+            $mail->setFrom('equiposieteduocuc@gmail.com', 'Gestor Documental del CORE');
+            $mail->isHTML(true);
+            $mail->Subject = $asunto;
+
+            $fullPathFirma = __DIR__ . '/../' . self::FIRMA_PATH_RELATIVE;
+
+            if (!file_exists($fullPathFirma)) {
+                error_log("ERROR CRÍTICO: El archivo de firma ('" . self::FIRMA_PATH_RELATIVE . "') no existe en el servidor.");
+            } else {
+                $mail->AddEmbeddedImage($fullPathFirma, 'firma_institucional', 'firma.jpeg');
             }
 
-            $mail->clearAddresses(); // Limpiar destinatario anterior
-            $mail->addAddress($destinatario['correo'], $destinatario['pNombre'] . ' ' . $destinatario['aPaterno']);
-            $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema COREGEDOC</p></body></html>";
-            $mail->send();
+            // Cuerpo común para la firma
+            $firmaHTML = "<br><img src=\"cid:firma_institucional\" alt=\"Firma Institucional\">";
+
+            foreach ($destinatarios as $destinatario) {
+                if (empty($destinatario['correo'])) {
+                    error_log("ADVERTENCIA idMinuta {$idMinuta}: Correo vacío para {$destinatario['pNombre']}.");
+                    continue;
+                }
+
+                $mail->clearAddresses();
+                $mail->addAddress($destinatario['correo'], $destinatario['pNombre'].' '.$destinatario['aPaterno']);
+                $mail->Body = "<html><body><p>Estimado(a) {$destinatario['pNombre']} {$destinatario['aPaterno']},</p>{$cuerpo}<p>Saludos cordiales,<br>Sistema COREGEDOC</p>{$firmaHTML}</body></html>";
+                $mail->send();
+            }
+
+        } catch (Exception $e) {
+            error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El RE-ENVÍO falló: {$mail->ErrorInfo}");
+            throw new Exception("Error al enviar notificación: " . $mail->ErrorInfo);
         }
-    } catch (Exception $e) {
-        error_log("ERROR CRÍTICO idMinuta {$idMinuta}: El correo de RE-ENVÍO (aplicar_feedback) NO se pudo enviar. Mailer Error: {$mail->ErrorInfo}");
-        // Lanzar la excepción de nuevo para que la transacción principal falle
-        throw new Exception("Error al enviar notificación por correo: " . $mail->ErrorInfo);
     }
 }
+
 
 /**
  * ==========================================================
@@ -177,7 +196,8 @@ try {
 
     // ... (código anterior) ...
     // 6. (NUEVO) Enviar los correos de notificación
-    notificarPresidentes($conexion, $idMinuta, $listaPresidentes);
+    $feedback = new AplicarFeedback($conexion);   // usar SIEMPRE el mismo PDO
+    $feedback->notificarPresidentes($idMinuta, $listaPresidentes);
 
     // 7. COMMIT (SOLUCIÓN: Mover el commit ANTES del log)
     // Esto cierra la transacción y libera el bloqueo de la base de datos.
