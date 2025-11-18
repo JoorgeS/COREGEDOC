@@ -465,13 +465,30 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
 
                                 <input type="hidden" id="votacion_idMinuta" value="<?php echo $idMinutaActual; ?>">
                                 <input type="hidden" id="votacion_idReunion" value="<?php echo htmlspecialchars($idReunionActual); ?>">
-                                <input type="hidden" id="votacion_idComision" value="<?php echo htmlspecialchars($minutaData['t_comision_idComision']); ?>">
 
-                                <div class="col-md-8">
+                                <div class="col-md-5">
                                     <label for="nombreVotacion" class="form-label">Nombre de la Votación:</label>
                                     <input type="text" class="form-control" id="nombreVotacion" placeholder="Ej: Aprobar fondos para..." required>
                                 </div>
+
                                 <div class="col-md-4">
+                                    <label for="votacion_idComision" class="form-label">Asociar a Comisión:</label>
+                                    <select id="votacion_idComision" class="form-select" required>
+                                        <?php
+                                        // Usamos la variable $comisionesDeLaReunion que ya cargaste en la sección 2 del PHP
+                                        if (empty($comisionesDeLaReunion)) {
+                                            echo '<option value="">-- No hay comisiones --</option>';
+                                        } else {
+                                            foreach ($comisionesDeLaReunion as $idCom => $nombreCom) {
+                                                // $idCom es el ID, $nombreCom es el Nombre
+                                                echo '<option value="' . htmlspecialchars($idCom) . '">' . htmlspecialchars($nombreCom) . '</option>';
+                                            }
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
                                     <button type="submit" class="btn btn-success w-100">
                                         <i class="fas fa-plus me-2"></i>Crear Votación
                                     </button>
@@ -2283,13 +2300,19 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         return;
                     }
 
+                    // --- ✅ 1. ASEGÚRATE DE QUE ESTA LÍNEA EXISTA ---
+                    const nombreCapitalizado = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+
                     const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
                     btnSubmit.disabled = true;
                     btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
 
                     const formData = new FormData();
                     formData.append('action', 'create');
-                    formData.append('nombreVotacion', nombre);
+
+                    // --- ✅ 2. ASEGÚRATE DE USAR LA VARIABLE "nombreCapitalizado" AQUÍ ---
+                    formData.append('nombreVotacion', nombreCapitalizado); // <-- No debe decir "nombre"
+
                     formData.append('idMinuta', idMinutaGlobal);
                     formData.append('idReunion', ID_REUNION_GLOBAL);
                     const idComisionActual = document.getElementById('votacion_idComision').value;
@@ -2318,6 +2341,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     }
                 });
 
+                // ... (el resto del código sigue igual)
                 listaContainer.addEventListener('click', async (e) => {
                     const boton = e.target.closest('.btn-cambiar-estado');
                     const botonVer = e.target.closest('.btn-ver-resultados');

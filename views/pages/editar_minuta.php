@@ -863,7 +863,6 @@ $pdo = null; // Cerrar conexión
 
         if (formCrearVotacion && listaContainer && inputNombreVotacion) {
 
-            // --- Listener para CREAR Votación ---
             formCrearVotacion.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const nombre = inputNombreVotacion.value.trim();
@@ -872,34 +871,38 @@ $pdo = null; // Cerrar conexión
                     return;
                 }
 
+                // --- ✅ 1. ASEGÚRATE DE QUE ESTA LÍNEA EXISTA ---
+                const nombreCapitalizado = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+
                 const btnSubmit = formCrearVotacion.querySelector('button[type="submit"]');
                 btnSubmit.disabled = true;
                 btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
 
                 const formData = new FormData();
                 formData.append('action', 'create');
-                formData.append('nombreVotacion', nombre);
+
+                // --- ✅ 2. ASEGÚRATE DE USAR LA VARIABLE "nombreCapitalizado" AQUÍ ---
+                formData.append('nombreVotacion', nombreCapitalizado); // <-- No debe decir "nombre"
+
                 formData.append('idMinuta', idMinutaGlobal);
                 formData.append('idReunion', ID_REUNION_GLOBAL);
-
-                // Obtener la comisión principal del formulario
                 const idComisionActual = document.getElementById('votacion_idComision').value;
                 formData.append('idComision', idComisionActual);
 
                 try {
-                    // ⚡ CORRECCIÓN: Se añade 'credentials' y ruta correcta
+                    // ⚡ RUTA CORREGIDA
                     const response = await fetch('../../controllers/gestionar_votacion_minuta.php', {
                         method: 'POST',
                         body: formData,
-                        credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
+                        credentials: 'same-origin'
                     });
 
                     const data = await response.json();
                     if (data.status !== 'success') throw new Error(data.message);
 
                     Swal.fire('¡Éxito!', 'Votación creada correctamente.', 'success');
-                    inputNombreVotacion.value = ''; // Limpiar input
-                    cargarListaDeVotaciones(true); // Recargar la lista
+                    inputNombreVotacion.value = '';
+                    cargarListaDeVotaciones(true);
 
                 } catch (error) {
                     Swal.fire('Error', error.message, 'error');
