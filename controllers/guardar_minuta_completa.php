@@ -102,8 +102,8 @@ class MinutaManager extends BaseConexion
 
         // 3. Get Secretary Name (Nombre completo)
         $sqlSecretary = "SELECT pNombre, sNombre, aPaterno, aMaterno
-                             FROM t_usuario 
-                             WHERE idUsuario = ?";
+                           FROM t_usuario 
+                           WHERE idUsuario = ?";
         $stmtSecretary = $this->db->prepare($sqlSecretary);
         $stmtSecretary->execute([$minutaData['t_usuario_idSecretario']]);
         $secData = $stmtSecretary->fetch(PDO::FETCH_ASSOC);
@@ -115,9 +115,9 @@ class MinutaManager extends BaseConexion
         // 4. Get Secretary Position (Cargo)
         // Uso de descTipoUsuario (CORREGIDO)
         $sqlSecretaryPosition = "SELECT t2.descTipoUsuario
-                                     FROM t_usuario t1
-                                     JOIN t_tipousuario t2 ON t1.tipoUsuario_id = t2.idTipoUsuario
-                                     WHERE t1.idUsuario = ?";
+                                 FROM t_usuario t1
+                                 JOIN t_tipousuario t2 ON t1.tipoUsuario_id = t2.idTipoUsuario
+                                 WHERE t1.idUsuario = ?";
         $stmtSecretaryPosition = $this->db->prepare($sqlSecretaryPosition);
         $stmtSecretaryPosition->execute([$minutaData['t_usuario_idSecretario']]);
         $minutaData['cargoSecretario'] = $stmtSecretaryPosition->fetchColumn() ?? 'Cargo Desconocido';
@@ -131,8 +131,8 @@ class MinutaManager extends BaseConexion
 
             // Obtener la fecha de registro de asistencia de la tabla t_asistencia
             $sqlAsistencia = "SELECT t_usuario_idUsuario, fechaRegistroAsistencia 
-                                 FROM t_asistencia 
-                                 WHERE t_minuta_idMinuta = ? AND t_usuario_idUsuario IN ({$placeholders})";
+                              FROM t_asistencia 
+                              WHERE t_minuta_idMinuta = ? AND t_usuario_idUsuario IN ({$placeholders})";
 
             $stmtAsistencia = $this->db->prepare($sqlAsistencia);
             $stmtAsistencia->execute($params);
@@ -144,14 +144,14 @@ class MinutaManager extends BaseConexion
 
         // 6. Get all relevant users (Tipo 1: Consejero Regional and 3: Presidente Comisión)
         $sqlUsers = "SELECT 
-                          idUsuario, 
-                          TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
-                      FROM 
-                          t_usuario
-                      WHERE 
-                          tipoUsuario_id IN (1, 3) 
-                      ORDER BY 
-                          nombreCompleto";
+                         idUsuario, 
+                         TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
+                     FROM 
+                         t_usuario
+                     WHERE 
+                         tipoUsuario_id IN (1, 3) 
+                     ORDER BY 
+                         nombreCompleto";
 
         $stmtUsers = $this->db->prepare($sqlUsers);
         $stmtUsers->execute();
@@ -209,10 +209,24 @@ class MinutaManager extends BaseConexion
     /**
      * Método 2: Generar el PDF de asistencia (Implementación con el estilo de sello final)
      */
-    private function generarPdfAsistencia(int $idMinuta, array $dataAsistencia): string
+    private function generarPdfAsistencia(int $idMinuta, array $dataAsistencia): array
     {
         $nombresAsistentes = $dataAsistencia['asistentes'];
 
+        $hashAsistencia = hash('sha256', $idMinuta . '-asistencia-' . time() . '-' . rand(1000, 9999));
+
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
+        $urlValidacion = $protocol . '://' . $host . "/corevota/public/validar.php?hash={$hashAsistencia}";
+
+        $qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=' . urlencode($urlValidacion);
+
+        $rawQrData = @file_get_contents($qrApiUrl);
+
+        $qrBase64 = ($rawQrData !== false)
+            ? 'data:image/png;base64,' . base64_encode($rawQrData)
+            : '';
         // Extracción de Metadatos 
         // ... (extracción de metadatos sin cambios) ...
         $nombreReunion = htmlspecialchars($dataAsistencia['nombreReunion']);
@@ -258,15 +272,15 @@ class MinutaManager extends BaseConexion
          body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 0; padding: 0; }
 
          @page {
-                /* Define márgenes para CADA página 
-                   Aumentamos el margen inferior para dar espacio al pie de página */
-                margin: 0; /* Reseteamos márgenes por si acaso */
-                margin-top: 2.5cm; /* Margen superior (aprox) */
-                margin-bottom: 1.5cm; /* Margen inferior (¡Importante!) */
-                margin-left: 1.5cm;
-                margin-right: 1.5cm;
-            }
-            /* --- FIN REGLA @PAGE --- */
+               /* Define márgenes para CADA página 
+                  Aumentamos el margen inferior para dar espacio al pie de página */
+               margin: 0; /* Reseteamos márgenes por si acaso */
+               margin-top: 2.5cm; /* Margen superior (aprox) */
+               margin-bottom: 1.5cm; /* Margen inferior (¡Importante!) */
+               margin-left: 1.5cm;
+               margin-right: 1.5cm;
+             }
+             /* --- FIN REGLA @PAGE --- */
          .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
          
          .header-logos { width: 100%; display: table; table-layout: fixed; margin-bottom: 10px; }
@@ -366,7 +380,7 @@ class MinutaManager extends BaseConexion
              left: 0;
              right: 0;
              height: 1cm;
-          
+         
              text-align: center; 
              font-size: 9px; 
              color: #999; 
@@ -391,12 +405,12 @@ class MinutaManager extends BaseConexion
            
            <div class='metadata'>
              <table class='metadata-grid'>
-               <tr><td class='label'>Minuta N°:</td><td>{$idMinuta}</td></tr>
-               <tr><td class='label'>Nombre de la Reunión:</td><td>{$nombreReunion}</td></tr>
-               <tr><td class='label'>Secretario Técnico:</td><td>{$nombreSecretario}</td></tr>
-               <tr><td class='label'>Cargo:</td><td>{$cargoSecretario}</td></tr>
-               <tr><td class='label'>Fecha / Hora Reunión:</td><td>{$fechaMinuta} / {$horaMinuta}</td></tr>
-               <tr><td class='label'>COMISIÓN(ES):</td><td>{$comisiones}</td></tr>
+              <tr><td class='label'>Minuta N°:</td><td>{$idMinuta}</td></tr>
+              <tr><td class='label'>Nombre de la Reunión:</td><td>{$nombreReunion}</td></tr>
+              <tr><td class='label'>Secretario Técnico:</td><td>{$nombreSecretario}</td></tr>
+              <tr><td class='label'>Cargo:</td><td>{$cargoSecretario}</td></tr>
+              <tr><td class='label'>Fecha / Hora Reunión:</td><td>{$fechaMinuta} / {$horaMinuta}</td></tr>
+              <tr><td class='label'>COMISIÓN(ES):</td><td>{$comisiones}</td></tr>
              </table>
              
              <h2 class='main-title'>Listado de Asistencia</h2>
@@ -419,26 +433,49 @@ class MinutaManager extends BaseConexion
                 }
 
                 $html .= "<tr>
-                            <td>" . ($index + 1) . "</td>
-                            <td>" . htmlspecialchars($miembro['nombreCompleto']) . "</td>
-                            <td class='{$claseCss}'>" . $estado . $fechaFirma . "</td>
-                          </tr>";
+                           <td>" . ($index + 1) . "</td>
+                           <td>" . htmlspecialchars($miembro['nombreCompleto']) . "</td>
+                           <td class='{$claseCss}'>" . $estado . $fechaFirma . "</td>
+                         </tr>";
             }
         }
 
         $html .= "</tbody></table>
-        
-        <div class='validation-block-container'>
-            <div class='validation-content'>
-                <strong>{$nombreSecretario}</strong>
-                <em>{$cargoSecretario}</em>
-                <p class='validation-text-small'>Validación de Asistencia</p>
-                <div class='dashed-line'></div>
-                <p class='timestamp-large'>" . (new DateTime())->format('d-m-Y H:i:s') . "</p>
-            </div>
-        </div>
-        
-        <div class='footer'>Generado por COREGEDOC el {$fechaGeneracion}</div></body></html>";
+         
+         <div class='validation-block-container'>
+             <div class='validation-content'>
+                 <strong>{$nombreSecretario}</strong>
+                 <em>{$cargoSecretario}</em>
+                 <p class='validation-text-small'>Validación de Asistencia</p>
+                 <div class='dashed-line'></div>
+                 <p class='timestamp-large'>" . (new DateTime())->format('d-m-Y H:i:s') . "</p>
+             </div>
+         </div>";
+
+        if (!empty($qrBase64)) {
+            $html .= "
+             <div style='margin-top:40px; text-align:right; margin-right:25px;'>
+                 <table style='border-collapse:collapse;'>
+                     <tr>
+                         <td>
+                             <img src=\"{$qrBase64}\" 
+                                  style=\"width:85px; border:1px solid #ccc; padding:4px; background:#fff;\">
+                         </td>
+                         <td style='padding-left:10px; font-size:9pt;'>
+                             <p style='margin:0; font-weight:bold;'>Documento validable en:</p>
+                             <p style='margin:2px 0; font-size:8pt;'>{$urlValidacion}</p>
+                             <p style='margin:2px 0; font-size:8pt;'>
+                                 Código de Validación:
+                                 <span style='font-family:monospace; font-weight:bold;'>{$hashAsistencia}</span>
+                             </p>
+                         </td>
+                     </tr>
+                 </table>
+             </div>
+             ";
+        }
+
+        $html .= "<div class='footer'>Generado por COREGEDOC el {$fechaGeneracion}</div></body></html>";
 
         $options = new Options();
         $options->set('isRemoteEnabled', true);
@@ -460,7 +497,9 @@ class MinutaManager extends BaseConexion
         $relativePath = 'public/docs/asistencia/' . $nombreArchivo;
 
         file_put_contents($rutaCompleta, $dompdf->output());
-        return $relativePath;
+
+        // Devolvemos la ruta Y el hash
+        return ['path' => $relativePath, 'hash' => $hashAsistencia];
     }
 
     public function guardarMinutaCompleta($idMinuta, $asistenciaIDs, $temasData, $enlaceAdjunto)
@@ -477,8 +516,8 @@ class MinutaManager extends BaseConexion
             // 2.2 [NUEVA LÓGICA] Respaldar TODOS los datos originales de la minuta
             $mapaDatosOriginales = [];
             $sqlFechasOriginales = "SELECT t_usuario_idUsuario, fechaRegistroAsistencia, origenAsistencia 
-                            FROM t_asistencia 
-                            WHERE t_minuta_idMinuta = ?";
+                                    FROM t_asistencia 
+                                    WHERE t_minuta_idMinuta = ?";
             $stmtFechasOriginales = $this->db->prepare($sqlFechasOriginales);
             $stmtFechasOriginales->execute([$idMinuta]);
 
@@ -498,18 +537,18 @@ class MinutaManager extends BaseConexion
             $idTipoReunion = 1; // Asumido
             if (!empty($asistenciaIDs_clean)) {
                 $sqlAsistencia = "INSERT INTO t_asistencia (
-                            t_minuta_idMinuta, 
-                            t_usuario_idUsuario, 
-                            t_tipoReunion_idTipoReunion, 
-                            fechaRegistroAsistencia, 
-                            origenAsistencia
-                          ) VALUES (
-                            :idMinuta, 
-                            :idUsuario, 
-                            :idTipoReunion, 
-                            :fechaAsistencia, 
-                            :origen
-                          )";
+                                    t_minuta_idMinuta, 
+                                    t_usuario_idUsuario, 
+                                    t_tipoReunion_idTipoReunion, 
+                                    fechaRegistroAsistencia, 
+                                    origenAsistencia
+                                ) VALUES (
+                                    :idMinuta, 
+                                    :idUsuario, 
+                                    :idTipoReunion, 
+                                    :fechaAsistencia, 
+                                    :origen
+                                )";
                 $stmtAsistencia = $this->db->prepare($sqlAsistencia);
 
                 foreach ($asistenciaIDs_clean as $idUsuario) {
@@ -542,21 +581,38 @@ class MinutaManager extends BaseConexion
 
             // Solo generar si se encontraron miembros (Tipo de Usuario 1 o 3)
             if (!empty($dataAsistencia['asistentes'])) {
-                $rutaPdfAsistencia = $this->generarPdfAsistencia($idMinuta, $dataAsistencia);
 
-                $sqlInsertAdjunto = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto) VALUES (:idMinuta, :path, :tipo)";
-                $stmtInsertAdjunto = $this->db->prepare($sqlInsertAdjunto);
+                // --- INICIO DE LA CORRECCIÓN ---
+
+                $pdfResult = $this->generarPdfAsistencia($idMinuta, $dataAsistencia);
+                $rutaPdfAsistencia = $pdfResult['path']; // La ruta
+                $hashAsistenciaPDF = $pdfResult['hash']; // El hash
+
                 // Eliminar cualquier adjunto de 'asistencia' anterior para evitar duplicados
                 $this->db->prepare("DELETE FROM t_adjunto WHERE t_minuta_idMinuta = :idMinuta AND tipoAdjunto = 'asistencia'")
                     ->execute([':idMinuta' => $idMinuta]);
 
-                $stmtInsertAdjunto->execute([
+                // ¡NUEVO! SQL específico para el PDF de asistencia con el hash
+                // (Asume que añadiste la columna `hash_validacion` a `t_adjunto`)
+                $sqlInsertAdjuntoAsistencia = "INSERT INTO t_adjunto (
+                        t_minuta_idMinuta, pathAdjunto, tipoAdjunto, hash_validacion
+                    ) VALUES (
+                        :idMinuta, :path, :tipo, :hash
+                    )";
+                $stmtInsertAdjuntoAsistencia = $this->db->prepare($sqlInsertAdjuntoAsistencia);
+
+                // ¡CORREGIDO! Usar la nueva consulta y el hash
+                $stmtInsertAdjuntoAsistencia->execute([
                     ':idMinuta' => $idMinuta,
                     ':path' => $rutaPdfAsistencia,
-                    ':tipo' => 'asistencia'
+                    ':tipo' => 'asistencia',
+                    ':hash' => $hashAsistenciaPDF  // <-- LA CLAVE
                 ]);
+
+                // --- FIN DE LA CORRECCIÓN ---
+
                 $lastAdjId = $this->db->lastInsertId();
-                $adjuntosGuardados[] = ['idAdjunto' => $lastAdjId, 'pathAdjunto' => $rutaPdfAsistencia, 'tipoAdjunto' => 'asistencia'];
+                $adjuntosGuardados[] = ['idAdjunto' => $lastAdjId, 'pathAdjunto' => $rutaPdfAsistencia, 'tipoAdjunto' => 'asistencia', 'hash' => $hashAsistenciaPDF];
                 error_log("DEBUG idMinuta {$idMinuta}: PDF de asistencia generado y guardado en la BD: {$rutaPdfAsistencia}");
             }
 
@@ -629,9 +685,12 @@ class MinutaManager extends BaseConexion
                 }
             }
 
-            // --- 4. PROCESAR ADJUNTOS (Tu lógica sin cambios) ---
+            // --- 4. PROCESAR ADJUNTOS (archivos y links) ---
+
+            // ¡MOVIMOS ESTO AQUÍ! Esta es la consulta genérica para archivos y links SIN HASH.
             $sqlInsertAdjunto = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto) VALUES (:idMinuta, :path, :tipo)";
             $stmtInsertAdjunto = $this->db->prepare($sqlInsertAdjunto);
+
             $baseUploadPath = __DIR__ . '/../public/DocumentosAdjuntos/';
             $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'xlsx', 'mp4', 'ppt', 'pptx', 'doc', 'docx'];
 
@@ -713,9 +772,9 @@ class MinutaManager extends BaseConexion
             }
             // --- 6. ASEGURAR QUE EL ESTADO SEA 'BORRADOR' ---
             $sqlSetBorrador = "UPDATE t_minuta 
-                                 SET estadoMinuta = 'BORRADOR' 
-                                 WHERE idMinuta = :idMinuta 
-                                 AND estadoMinuta <> 'APROBADA'";
+                                SET estadoMinuta = 'BORRADOR' 
+                                WHERE idMinuta = :idMinuta 
+                                AND estadoMinuta <> 'APROBADA'";
             $this->db->prepare($sqlSetBorrador)->execute([':idMinuta' => $idMinuta]);
 
             // --- 7. COMMIT ---

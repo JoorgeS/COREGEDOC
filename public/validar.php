@@ -7,6 +7,7 @@ $hash = $_GET['hash'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Validación de Documento - Consejo Regional de Valparaíso</title>
@@ -16,26 +17,32 @@ $hash = $_GET['hash'] ?? '';
             background-color: #f5f6fa;
             font-family: 'Segoe UI', sans-serif;
         }
+
         .card {
             margin-top: 80px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
         }
+
         .header {
             text-align: center;
             margin-bottom: 20px;
         }
+
         .header img {
             height: 70px;
         }
+
         .valid {
             color: #007e00;
             font-weight: bold;
         }
+
         .invalid {
             color: #d00;
             font-weight: bold;
         }
+
         .footer {
             margin-top: 25px;
             text-align: center;
@@ -44,57 +51,92 @@ $hash = $_GET['hash'] ?? '';
         }
     </style>
 </head>
+
 <body>
-<div class="container">
-    <div class="card p-4 mx-auto" style="max-width: 600px;">
-        <div class="header">
-            <img src="/corevota/public/img/logo2.png" alt="Logo GORE" class="me-2">
-            <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE">
-            <h4 class="mt-3">Consejo Regional de Valparaíso</h4>
-            <h6>Validación de Autenticidad de Documentos</h6>
-        </div>
-        <hr>
+    <div class="container">
+        <div class="card p-4 mx-auto" style="max-width: 600px;">
+            <div class="header">
+                <img src="/corevota/public/img/logo2.png" alt="Logo GORE" class="me-2">
+                <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE">
+                <h4 class="mt-3">Consejo Regional de Valparaíso</h4>
+                <h6>Validación de Autenticidad de Documentos</h6>
+            </div>
+            <hr>
 
-        <?php
-        if (empty($hash)) {
-            echo '<div class="alert alert-warning text-center">⚠️ No se proporcionó ningún código de validación.</div>';
-        } else {
-            try {
-                $db = new conectorDB();
-                $pdo = $db->getDatabase();
+            <?php
+            if (empty($hash)) {
+                echo '<div class="alert alert-warning text-center">⚠️ No se proporcionó ningún código de validación.</div>';
+            } else {
+                try {
+                    $db = new conectorDB();
+                    $pdo = $db->getDatabase();
 
-                $sql = "SELECT idMinuta, pathArchivo, fechaAprobacion, estadoMinuta
-                        FROM t_minuta
-                        WHERE hashValidacion = :hash
-                        LIMIT 1";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([':hash' => $hash]);
-                $minuta = $stmt->fetch(PDO::FETCH_ASSOC);
+                    // --- INICIO DE LA CORRECCIÓN ---
+                    
+                    // 1. La consulta AHORA busca en t_adjunto (donde guardamos el hash)
+                    //    y se une con t_minuta y t_reunion para obtener los detalles.
+                    $sql = "SELECT 
+                                adj.pathAdjunto,
+                                m.idMinuta,
+                                m.estadoMinuta,
+                                r.nombreReunion,
+                                DATE_FORMAT(m.fechaMinuta, '%d/%m/%Y') as fechaMinutaFmt
+                            FROM 
+                                t_adjunto adj
+                            JOIN 
+                                t_minuta m ON adj.t_minuta_idMinuta = m.idMinuta
+                            LEFT JOIN
+                                t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                            WHERE 
+                                adj.hash_validacion = :hash 
+                            AND 
+                                adj.tipoAdjunto = 'asistencia'
+                            LIMIT 1";
+                    
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([':hash' => $hash]);
+                    $documento = $stmt->fetch(PDO::FETCH_ASSOC); // Renombrado a $documento
 
-                if ($minuta) {
-                    echo '<div class="text-center">';
-                    echo '<p class="valid">✅ Documento verificado correctamente</p>';
-                    echo '<p>El documento corresponde a la minuta <strong>#' . htmlspecialchars($minuta['idMinuta']) . '</strong> emitida por el Consejo Regional de Valparaíso.</p>';
-                    echo '<p><strong>Fecha de aprobación:</strong> ' . htmlspecialchars($minuta['fechaAprobacion']) . '</p>';
-                    echo '<p><strong>Estado:</strong> ' . htmlspecialchars($minuta['estadoMinuta']) . '</p>';
-                    echo '<a href="/corevota/' . htmlspecialchars($minuta['pathArchivo']) . '" target="_blank" class="btn btn-success mt-3">📄 Ver documento original</a>';
-                    echo '</div>';
-                } else {
-                    echo '<div class="text-center">';
-                    echo '<p class="invalid">❌ Código no válido o documento no encontrado</p>';
-                    echo '<p>El código ingresado no corresponde a ningún documento emitido por el Consejo Regional.</p>';
-                    echo '</div>';
+                    // 2. La comprobación if ($documento) ahora viene PRIMERO,
+                    //    antes de intentar acceder a sus datos.
+                    if ($documento) {
+                        
+                        // 3. Esta línea (la que causaba el error) se movió AQUÍ DENTRO.
+                        //    Ahora es segura y usa la columna correcta.
+                        $rutaArchivo = $documento['pathAdjunto']; 
+
+                        echo '<div class="text-center">';
+                        echo '<p class="valid">✅ Documento verificado correctamente</p>';
+                        echo '<p>El documento (Lista de Asistencia) corresponde a la <strong>Minuta #' . htmlspecialchars($documento['idMinuta']) . '</strong>.</p>';
+                        echo '<p><strong>Reunión:</strong> ' . htmlspecialchars($documento['nombreReunion'] ?: 'N/A') . '</p>';
+                        echo '<p><strong>Fecha Reunión:</strong> ' . htmlspecialchars($documento['fechaMinutaFmt']) . '</p>';
+                        echo '<p><strong>Estado Minuta:</strong> ' . htmlspecialchars($documento['estadoMinuta']) . '</p>';
+                        
+                        // Corregimos el enlace para que apunte a la ruta correcta
+                        echo '<a href="/corevota/' . htmlspecialchars($rutaArchivo) . '" target="_blank" class="btn btn-success mt-3">📄 Ver Lista de Asistencia</a>';
+                        echo '</div>';
+                    
+                    } else {
+                        // Esto se muestra si el $documento es 'false' (hash no encontrado)
+                        echo '<div class="text-center">';
+                        echo '<p class="invalid">❌ Código no válido o documento no encontrado</p>';
+                        echo '<p>El código ingresado no corresponde a ningún documento emitido por el Consejo Regional.</p>';
+                        echo '<p style="font-size: 0.8rem; color: #777;">Código: ' . htmlspecialchars($hash) . '</p>';
+                        echo '</div>';
+                    }
+                    // --- FIN DE LA CORRECCIÓN ---
+
+                } catch (Throwable $e) {
+                    echo '<div class="alert alert-danger text-center">Error al validar: ' . htmlspecialchars($e->getMessage()) . '</div>';
                 }
-            } catch (Throwable $e) {
-                echo '<div class="alert alert-danger text-center">Error al validar: ' . htmlspecialchars($e->getMessage()) . '</div>';
             }
-        }
-        ?>
+            ?>
 
-        <div class="footer">
-            © <?php echo date('Y'); ?> Consejo Regional de Valparaíso · Sistema COREGEDOC
+            <div class="footer">
+                © <?php echo date('Y'); ?> Consejo Regional de Valparaíso · Sistema COREGEDOC
+            </div>
         </div>
     </div>
-</div>
 </body>
+
 </html>
