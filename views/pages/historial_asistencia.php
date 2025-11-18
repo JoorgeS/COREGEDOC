@@ -27,12 +27,12 @@ function renderPaginationHistorial($current, $pages)
 {
     if ($pages <= 1) return;
     echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0">';
-
+    
     // Flecha "Anterior"
     $prevDisabled = ($current <= 1) ? 'disabled' : '';
     $qsArr = $_GET;
     $qsArr['p'] = $current - 1;
-    echo "<li class=\"page-item {$prevDisabled}\"><a class=\"page-link\" href=\"?" . http_build_query($qsArr) . "\">&laquo;</a></li>";
+    echo "<li class=\"page-item {$prevDisabled}\"><a class=\"page-link\" href=\"?".http_build_query($qsArr)."\">&laquo;</a></li>";
 
     // Números de Página
     for ($i = 1; $i <= $pages; $i++) {
@@ -42,12 +42,12 @@ function renderPaginationHistorial($current, $pages)
         $qs = http_build_query($qsArr);
         echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qs . '">' . $i . '</a></li>';
     }
-
+    
     // Flecha "Siguiente"
     $nextDisabled = ($current >= $pages) ? 'disabled' : '';
     $qsArr = $_GET;
     $qsArr['p'] = $current + 1;
-    echo "<li class=\"page-item {$nextDisabled}\"><a class=\"page-link\" href=\"?" . http_build_query($qsArr) . "\">&raquo;</a></li>";
+    echo "<li class=\"page-item {$nextDisabled}\"><a class=\"page-link\" href=\"?".http_build_query($qsArr)."\">&raquo;</a></li>";
 
     echo '</ul></nav>';
 }
@@ -128,15 +128,15 @@ $reuniones = $stHist->fetchAll(PDO::FETCH_ASSOC);
 
 // 1. Agrupar reuniones por día
 $reunionesPorDia = [];
-$reunionesAsc = array_reverse($reuniones);
+$reunionesAsc = array_reverse($reuniones); 
 
 foreach ($reunionesAsc as $r) {
-    $dia = date('j', strtotime($r['fechaInicioReunion']));
-
+    $dia = date('j', strtotime($r['fechaInicioReunion'])); 
+    
     if (!isset($reunionesPorDia[$dia])) {
         $reunionesPorDia[$dia] = ['asistio' => 0, 'total' => 0];
     }
-
+    
     $reunionesPorDia[$dia]['total']++;
     if (($r['asistenciasUsuario'] ?? 0) > 0) {
         $reunionesPorDia[$dia]['asistio']++;
@@ -158,11 +158,11 @@ for ($dia = 1; $dia <= $diasDelMes; $dia++) {
         $totalReunionesAcumulado += $reunionesPorDia[$dia]['total'];
     }
 
-    $porcentajeAcumulado = 0;
+    $porcentajeAcumulado = 0; 
     if ($totalReunionesAcumulado > 0) {
         $porcentajeAcumulado = round(($totalAsistidasAcumulado / $totalReunionesAcumulado) * 100);
     }
-
+    
     $chartDataPoints[] = $porcentajeAcumulado;
 }
 
@@ -170,7 +170,7 @@ for ($dia = 1; $dia <= $diasDelMes; $dia++) {
 $chartData = [
     'labels' => $chartLabels,
     'data'   => $chartDataPoints,
-    'totalReuniones' => $totalReunionesAcumulado
+    'totalReuniones' => $totalReunionesAcumulado 
 ];
 
 // ===============================================
@@ -203,7 +203,7 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome para el ícono de limpiar -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
+    
     <!-- Chart.js (para el gráfico) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -231,7 +231,7 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
         }
 
         .filtros-card,
-        .grafico-card,
+        .grafico-card, 
         .tabla-card {
             max-width: 900px;
             margin: 1rem auto 2rem auto;
@@ -240,10 +240,10 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
         .tabla-card {
             margin: 0 auto 3rem auto;
         }
-
+        
         #chartContainer {
             position: relative;
-            height: 300px;
+            height: 300px; 
             width: 100%;
         }
     </style>
@@ -303,7 +303,7 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                 </div>
 
                 <div class="col-md-1 d-flex align-items-end">
-                    <a href="menu.php?pagina=historial_asistencia" class="btn btn-outline-secondary w-100" title="Limpiar filtros">
+                     <a href="menu.php?pagina=historial_asistencia" class="btn btn-outline-secondary w-100" title="Limpiar filtros">
                         <i class="fas fa-times"></i>
                     </a>
                 </div>
@@ -313,15 +313,32 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
 
     <div class="card grafico-card">
         <div class="card-body">
-            <h5 class="card-title">Comportamiento de Asistencia (<?php echo "{$mesSeleccionado}-{$anioSeleccionado}"; ?>)</h5>
-
-            <?php if ($chartData['totalReuniones'] === 0): ?>
-                <p class="text-muted text-center py-4">No hay datos de reuniones para mostrar un gráfico.</p>
-            <?php else: ?>
+             <h5 class="card-title">Mi participación durante el periodo correspondiente al (<?php echo "{$mesSeleccionado}-{$anioSeleccionado}"; ?>)</h5>
+             
+             <?php if ($chartData['totalReuniones'] === 0): ?>
+                 <p class="text-muted text-center py-4">No hay datos de reuniones para mostrar un gráfico.</p>
+             <?php else: ?>
                 <div id="chartContainer">
                     <canvas id="asistenciaChart"></canvas>
                 </div>
-            <?php endif; ?>
+                
+                <!-- =============================================== -->
+                <!-- --- INICIO: EXPLICACIÓN DEL GRÁFICO --- -->
+                <!-- =============================================== -->
+                <div class="mt-4 p-3 bg-light border rounded" style="font-size: 0.9rem;">
+                    <h6 class="fw-bold"><i class="fas fa-info-circle text-primary me-1"></i> ¿Cómo interpretar este gráfico?</h6>
+                    <p class="mb-1">Este gráfico muestra su <strong>porcentaje de asistencia acumulado</strong> a lo largo del mes. Es un promedio de todas las reuniones a las que fue convocado hasta la fecha.</p>
+                    <ul class="mb-0 small text-muted" style="list-style-type: disc; padding-left: 20px;">
+                        <li>Una <strong>línea que sube</strong> <i class="fas fa-arrow-trend-up text-success"></i> significa que asistió a reuniones, mejorando su promedio.</li>
+                        <li>Una <strong>línea que baja</strong> <i class="fas fa-arrow-trend-down text-danger"></i> significa que faltó a reuniones, empeorando su promedio.</li>
+                        <li>Una <strong>línea plana</strong> <i class="fas fa-arrow-right text-secondary"></i> significa que no hubo reuniones en esos días.</li>
+                    </ul>
+                </div>
+                <!-- =============================================== -->
+                <!-- --- FIN: EXPLICACIÓN DEL GRÁFICO --- -->
+                <!-- =============================================== -->
+
+             <?php endif; ?>
         </div>
     </div>
 
@@ -342,16 +359,14 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($reunionesParaTabla)): // Modificado 
-                        ?>
+                        <?php if (empty($reunionesParaTabla)): // Modificado ?>
                             <tr>
                                 <td colspan="5" class="text-center text-muted py-4">
                                     Sin registros en el periodo seleccionado
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php foreach ($reunionesParaTabla as $r): // Modificado 
-                            ?>
+                            <?php foreach ($reunionesParaTabla as $r): // Modificado ?>
                                 <?php
                                 $asistio = ($r['asistenciasUsuario'] ?? 0) > 0;
                                 $fechaFmt = '';
@@ -382,12 +397,8 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                     </tbody>
                 </table>
             </div>
-
-            <!-- =============================================== -->
-            <!-- --- INICIO: SECCIÓN DE PAGINACIÓN --- -->
-            <!-- =============================================== -->
-            <?php if ($totalReuniones > $perPage): // Solo mostrar si hay más de 1 pág 
-            ?>
+            
+            <?php if ($totalReuniones > $perPage): // Solo mostrar si hay más de 1 pág ?>
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <span class="text-muted small">
                         Página <?php echo $page; ?> de <?php echo $totalPages; ?> (Total: <?php echo $totalReuniones; ?> reuniones)
@@ -395,9 +406,6 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                     <?php renderPaginationHistorial($page, $totalPages); ?>
                 </div>
             <?php endif; ?>
-            <!-- =============================================== -->
-            <!-- --- FIN: SECCIÓN DE PAGINACIÓN --- -->
-            <!-- =============================================== -->
 
         </div>
     </div>
@@ -421,25 +429,18 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
         document.addEventListener('DOMContentLoaded', function() {
             // 1. Encontrar el formulario por su ID
             const form = document.getElementById('filtroAsistenciaForm');
-            // AÑADIDO: Input 'p' (página)
-            const pHidden = document.getElementById('pHidden');
+            const pHidden = document.getElementById('pHidden'); 
 
-            // AÑADIDO: Función para resetear la pág. a 1
             function toFirstPage() {
                 if (pHidden) pHidden.value = '1';
             }
 
             if (form) {
-                // 2. Encontrar TODOS los <select> dentro de ese formulario
                 const selects = form.querySelectorAll('select');
-
-                // 3. La función que enviará el formulario
                 const autoSubmitForm = function() {
-                    toFirstPage(); // <-- AÑADIDO: Resetea a pág 1
+                    toFirstPage(); 
                     form.submit();
                 };
-
-                // 4. Asignar el "detector de cambios" a CADA select
                 selects.forEach(function(select) {
                     select.addEventListener('change', autoSubmitForm);
                 });
@@ -449,44 +450,38 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
             // ===============================================
             // --- INICIO: SCRIPT PARA EL GRÁFICO DE LÍNEAS ---
             // ===============================================
-
-            // 1. Obtener los datos desde PHP
+            
             const chartData = <?php echo json_encode($chartData); ?>;
 
-            // 2. Verificar si hay datos para el gráfico
             if (chartData.totalReuniones > 0) {
-                // 3. Obtener el lienzo (canvas)
                 const ctx = document.getElementById('asistenciaChart');
-
                 if (ctx) {
-                    // 4. Crear el gráfico
                     new Chart(ctx, {
-                        type: 'line', // <-- CAMBIADO A LÍNEA
+                        type: 'line', 
                         data: {
-                            labels: chartData.labels, // Eje X (Días: "01-11", "02-11"...)
+                            labels: chartData.labels, 
                             datasets: [{
                                 label: 'Asistencia Acumulada',
-                                data: chartData.data, // Eje Y (Porcentaje: 0, 50, 75...)
-                                backgroundColor: 'rgba(40, 167, 69, 0.1)', // Relleno verde suave
-                                borderColor: '#28a745', // Línea verde sólida
+                                data: chartData.data, 
+                                backgroundColor: 'rgba(40, 167, 69, 0.1)', 
+                                borderColor: '#28a745', 
                                 borderWidth: 2,
-                                fill: true, // Rellenar área bajo la línea
-                                tension: 0.1 // Ligeramente curvada
+                                fill: true, 
+                                tension: 0.1 
                             }]
                         },
                         options: {
                             responsive: true,
-                            maintainAspectRatio: false, // Se adapta al alto del div
+                            maintainAspectRatio: false, 
                             plugins: {
                                 legend: {
-                                    display: false // Ocultamos la leyenda (solo hay 1 dato)
+                                    display: false 
                                 },
                                 title: {
-                                    display: false // El título ya está en el HTML
+                                    display: false 
                                 },
                                 tooltip: {
                                     callbacks: {
-                                        // Formatear el texto del tooltip
                                         label: function(context) {
                                             let label = context.dataset.label || '';
                                             let value = context.parsed.y;
@@ -496,17 +491,16 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                                 }
                             },
                             scales: {
-                                y: { // Eje Y (Porcentaje)
+                                y: { 
                                     beginAtZero: true,
-                                    max: 100, // Forzar el eje Y a 100%
+                                    max: 100, 
                                     ticks: {
-                                        // Añadir el símbolo "%" a las etiquetas
                                         callback: function(value) {
                                             return value + '%';
                                         }
                                     }
                                 },
-                                x: { // Eje X (Días)
+                                x: { 
                                     title: {
                                         display: true,
                                         text: 'Días del Mes (<?php echo "{$mesSeleccionado}-{$anioSeleccionado}"; ?>)'

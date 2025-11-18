@@ -516,7 +516,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                     </a>
 
                     <a href="https://x.com/Core_Valparaiso" target="_blank" title="X (Twitter) Core Valparaíso" class="rrss-icon-link">
-                        <i class="fab fa-twitter"></i>
+                        <i class="fa-brands fa-x-twitter"></i>
                     </a>
 
                     <a href="https://www.facebook.com/GOREValparaiso/" target="_blank" title="Facebook GORE Valparaíso" class="rrss-icon-link">
