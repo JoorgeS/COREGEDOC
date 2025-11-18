@@ -1379,6 +1379,19 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                             .then(data => {
                                 const modalBody = document.querySelector('#contenidoModalAsistencia');
                                 if (data.status === 'success' && data.asistencia) {
+
+                                    // ==================================
+                                    // --- INICIO DE LA MODIFICACIÓN ---
+                                    // ==================================
+                                    // Ordenar la data por nombreCompleto usando localeCompare
+                                    data.asistencia.sort((a, b) => {
+                                        // Usar localeCompare para un orden alfabético correcto (maneja tildes, etc.)
+                                        return (a.nombreCompleto || '').localeCompare(b.nombreCompleto || '');
+                                    });
+                                    // ==================================
+                                    // ---- FIN DE LA MODIFICACIÓN ----
+                                    // ==================================
+
                                     let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
                                     data.asistencia.forEach(item => {
                                         html += `<tr>

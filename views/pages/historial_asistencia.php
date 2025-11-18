@@ -138,11 +138,7 @@ $reuniones = $stHist->fetchAll(PDO::FETCH_ASSOC);
         <div class="card-body">
             <h4 class="card-title mb-3">Historial de asistencia</h4>
 
-            <!-- IMPORTANTE:
-             Agregamos pagina=historial_asistencia escondido,
-             para que el router de menu.php se mantenga en esta vista después de filtrar.
-        -->
-            <form method="get" class="row g-3">
+            <form method="get" class="row g-3" id="filtroAsistenciaForm">
                 <input type="hidden" name="pagina" value="historial_asistencia">
 
                 <div class="col-md-2">
@@ -251,7 +247,6 @@ $reuniones = $stHist->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- === SweetAlert2 === -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <?php if (isset($_GET['asistencia']) && $_GET['asistencia'] === 'ok'): ?>
@@ -266,6 +261,27 @@ $reuniones = $stHist->fetchAll(PDO::FETCH_ASSOC);
         </script>
     <?php endif; ?>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Encontrar el formulario por su ID
+            const form = document.getElementById('filtroAsistenciaForm');
+
+            if (form) {
+                // 2. Encontrar TODOS los <select> dentro de ese formulario
+                const selects = form.querySelectorAll('select');
+
+                // 3. La función que enviará el formulario
+                const autoSubmitForm = function() {
+                    form.submit();
+                };
+
+                // 4. Asignar el "detector de cambios" a CADA select
+                selects.forEach(function(select) {
+                    select.addEventListener('change', autoSubmitForm);
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>
