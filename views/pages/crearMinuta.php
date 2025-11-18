@@ -535,7 +535,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                         </div>
                     </form>
 
-                    <form id="formAgregarLink" class="mb-3" onsubmit="handleAgregarLink(event); return false;">
+                    <form id="formAgregarLink" class="mb-3">
                         <label for="inputUrlLink" class="form-label">Añadir nuevo enlace (Escriba la URL y presione Enter o haga clic fuera):</label>
                         <div class="input-group">
                             <input type="url" class="form-control" id="inputUrlLink" name="urlLink" placeholder="https://ejemplo.com" required <?php echo $esSoloLectura ? 'readonly' : ''; ?>>
@@ -1992,25 +1992,40 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
         }
 
-        function handleAgregarLink(e) {
-            e.preventDefault();
+        // --- FUNCIÓN MODIFICADA PARA MANEJAR 'submit' y 'change' ---
+        function handleAgregarLink(event) {
+            // Prevenir el envío si es un evento 'submit' (tecla Enter)
+            if (event) {
+                event.preventDefault();
+            }
+
             const input = document.getElementById('inputUrlLink');
             const url = input.value.trim();
+
+            // 1. Validar la URL
             if (!url || !filterUrl(url)) {
-                Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
+                // Si el campo no está vacío pero es inválido, mostrar advertencia
+                if (url !== '') {
+                    Swal.fire('Error', 'La URL proporcionada no es válida. Asegúrese que empiece con http:// o https://', 'warning');
+                }
+                // Si está vacío, simplemente no hacer nada (no guardar)
                 return;
             }
+
+            // 2. Validar permisos
             if (!ES_ST_EDITABLE) {
                 Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
                 return;
             }
+
+            // 3. Deshabilitar UI y preparar datos
             input.disabled = true;
             input.placeholder = 'Añadiendo...';
             const formData = new FormData();
             formData.append('idMinuta', idMinutaGlobal);
             formData.append('urlLink', url);
 
-            // ⚡ RUTA CORREGIDA
+            // 4. Hacer el fetch (esta lógica es la misma que tenías)
             fetch('../../controllers/agregar_adjunto.php?action=link', {
                     method: 'POST',
                     body: formData,
@@ -2029,13 +2044,14 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                     if (data.status === 'success') {
                         Swal.fire('Éxito', 'Enlace agregado correctamente.', 'success');
                         agregarAdjuntoALista(data.data);
-                        input.value = '';
+                        input.value = ''; // Limpiar el input al tener éxito
                     } else {
                         Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
                     }
                 })
                 .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
                 .finally(() => {
+                    // 5. Rehabilitar UI
                     input.disabled = false;
                     input.placeholder = 'https://ejemplo.com';
                 });
@@ -2218,16 +2234,15 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 });
             }
             if (inputUrlLink) {
-                inputUrlLink.addEventListener('change', function() {
-                    const url = this.value.trim();
-                    if (url !== '' && (url.startsWith('http://') || url.startsWith('https://'))) {
-                        formAgregarLink.dispatchEvent(new Event('submit', {
-                            cancelable: true
-                        }));
-                    } else if (url !== '') {
-                        Swal.fire('Formato Inválido', 'Asegúrese de que el enlace sea una URL completa y válida (ej: https://ejemplo.com).', 'warning');
-                    }
-                });
+                // Evento 'change' (clic fuera) ahora llama a la función principal
+                inputUrlLink.addEventListener('change', handleAgregarLink);
+            }
+            if (formSubirArchivo) {
+                formSubirArchivo.addEventListener('submit', handleSubirArchivo);
+            }
+            if (formAgregarLink) {
+                // Evento 'submit' (Enter) ahora llama a la función principal
+                formAgregarLink.addEventListener('submit', handleAgregarLink);
             }
             if (formSubirArchivo) {
                 formSubirArchivo.addEventListener('submit', handleSubirArchivo);
