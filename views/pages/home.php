@@ -18,18 +18,18 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
 try {
 
- 
+
 
 
     // --- TAREAS PARA PRESIDENTE DE COMISIÓN (ROL 3) ---
     if ($tipoUsuario == ROL_PRESIDENTE_COMISION) {
         // Esta es la consulta CORRECTA (la que probaste y te dio '0')
         $sql_firmas = "SELECT COUNT(DISTINCT m.idMinuta)
-                       FROM t_aprobacion_minuta am
-                       JOIN t_minuta m ON am.t_minuta_idMinuta = m.idMinuta
-                       WHERE am.t_usuario_idPresidente = :idUsuario
-                       AND am.estado_firma = 'PENDIENTE'
-                       AND m.estadoMinuta NOT IN ('APROBADA', 'BORRADOR')";
+                           FROM t_aprobacion_minuta am
+                           JOIN t_minuta m ON am.t_minuta_idMinuta = m.idMinuta
+                           WHERE am.t_usuario_idPresidente = :idUsuario
+                           AND am.estado_firma = 'PENDIENTE'
+                           AND m.estadoMinuta NOT IN ('APROBADA', 'BORRADOR')";
 
         $stmt_firmas = $pdo->prepare($sql_firmas);
         $stmt_firmas->execute([':idUsuario' => $idUsuarioLogueado]);
@@ -50,13 +50,13 @@ try {
     if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) {
         // Contar votaciones activas donde este usuario NO haya votado
         $sql_votos = "SELECT COUNT(v.idVotacion) 
-                      FROM t_votacion v
-                      WHERE v.habilitada = 1
-                      AND NOT EXISTS (
-                          SELECT 1 FROM t_voto 
-                          WHERE t_votacion_idVotacion = v.idVotacion 
-                          AND t_usuario_idUsuario = :idUsuario
-                      )";
+                         FROM t_votacion v
+                         WHERE v.habilitada = 1
+                         AND NOT EXISTS (
+                             SELECT 1 FROM t_voto 
+                             WHERE t_votacion_idVotacion = v.idVotacion 
+                             AND t_usuario_idUsuario = :idUsuario
+                         )";
         $stmt_votos = $pdo->prepare($sql_votos);
         $stmt_votos->execute([':idUsuario' => $idUsuarioLogueado]);
         $conteo_votos = $stmt_votos->fetchColumn();
@@ -112,28 +112,37 @@ try {
     // --- ✅ INICIO DE LA MODIFICACIÓN ---
     if ($tipoUsuario == ROL_CONSEJERO) {
         // --- Para Consejero: Mostrar Minutas Aprobadas Recientemente ---
-        $sql_minutas_recientes = "SELECT idMinuta, fechaAprobacion, pathArchivo
-                                  FROM t_minuta
-                                  WHERE estadoMinuta = 'APROBADA'
-                                    AND fechaAprobacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-                                  ORDER BY fechaAprobacion DESC
+
+        // ---- SQL CORREGIDA: Añadimos LEFT JOIN y r.nombreReunion ----
+        $sql_minutas_recientes = "SELECT 
+                                    m.idMinuta, 
+                                    m.fechaAprobacion, 
+                                    m.pathArchivo,
+                                    r.nombreReunion
+                                  FROM t_minuta m
+                                  LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                                  WHERE m.estadoMinuta = 'APROBADA'
+                                    AND m.fechaAprobacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                                  ORDER BY m.fechaAprobacion DESC
                                   LIMIT 5";
+        // ---- FIN SQL CORREGIDA ----
+
         $stmt_minutas_recientes = $pdo->query($sql_minutas_recientes);
         $minutas_recientes_aprobadas = $stmt_minutas_recientes->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // --- Para otros roles (Admin, ST): Mostrar Timeline de Actividad ---
         $sql_actividad = "SELECT 
-                              s.fecha_hora, 
-                              s.accion, 
-                              s.detalle, 
-                              COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as usuario_nombre
-                          FROM 
-                              t_minuta_seguimiento s
-                          LEFT JOIN 
-                              t_usuario u ON s.t_usuario_idUsuario = u.idUsuario
-                          ORDER BY 
-                              s.fecha_hora DESC
-                          LIMIT 5";
+                                 s.fecha_hora, 
+                                 s.accion, 
+                                 s.detalle, 
+                                 COALESCE(TRIM(CONCAT(u.pNombre, ' ', u.aPaterno)), 'Sistema') as usuario_nombre
+                           FROM 
+                                 t_minuta_seguimiento s
+                           LEFT JOIN 
+                                 t_usuario u ON s.t_usuario_idUsuario = u.idUsuario
+                           ORDER BY 
+                                 s.fecha_hora DESC
+                           LIMIT 5";
         $stmt_actividad = $pdo->query($sql_actividad);
         $actividad_reciente = $stmt_actividad->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -143,13 +152,13 @@ try {
     // 5. OBTENER PRÓXIMAS REUNIONES (Corregido)
     // =================================================================
     $sql_reuniones = "SELECT 
-                          r.idReunion, r.nombreReunion, r.fechaInicioReunion, 
-                          c.nombreComision
-                      FROM t_reunion r
-                      LEFT JOIN t_comision c ON r.t_comision_idComision = c.idComision
-                      WHERE r.fechaInicioReunion >= NOW()
-                      ORDER BY r.fechaInicioReunion ASC
-                      LIMIT 3";
+                           r.idReunion, r.nombreReunion, r.fechaInicioReunion, 
+                           c.nombreComision
+                         FROM t_reunion r
+                         LEFT JOIN t_comision c ON r.t_comision_idComision = c.idComision
+                         WHERE r.fechaInicioReunion >= NOW()
+                         ORDER BY r.fechaInicioReunion ASC
+                         LIMIT 3";
 
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $proximas_reuniones = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
@@ -243,7 +252,7 @@ try {
 
         <div class="carousel-inner rounded shadow-sm">
             <div class="carousel-item active">
-                <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE VALPARAÍSO">
+                <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
                     <h5>PROVINCIA DE QUILLOTA</h5>
                 </div>
@@ -350,15 +359,19 @@ try {
                             <p class="text-muted text-center p-3">No hay minutas aprobadas recientemente.</p>
                         <?php else: ?>
                             <div class="list-group list-group-flush">
+
                                 <?php foreach ($minutas_recientes_aprobadas as $minuta):
                                     // Aseguramos que la ruta al PDF sea correcta
                                     $urlPdf = "/corevota/" . ltrim(htmlspecialchars($minuta['pathArchivo']), '/');
                                 ?>
                                     <a href="<?php echo $urlPdf; ?>" target="_blank" class="list-group-item list-group-item-action p-3">
-                                        <strong>Minuta N° <?php echo $minuta['idMinuta']; ?>: <?php echo htmlspecialchars($minuta['nombreMinuta'] ?? 'Ver Minuta'); ?></strong>
+
+                                        <strong><?php echo htmlspecialchars($minuta['nombreReunion'] ?? 'Minuta Aprobada (ID: ' . $minuta['idMinuta'] . ')'); ?></strong>
+
                                         <small class="d-block text-muted">
-                                            Aprobada el: <?php echo htmlspecialchars(date('d-m-Y', strtotime($minuta['fechaAprobacion']))); ?>
+                                            (Minuta N° <?php echo $minuta['idMinuta']; ?>) - Aprobada el: <?php echo htmlspecialchars(date('d-m-Y', strtotime($minuta['fechaAprobacion']))); ?>
                                         </small>
+
                                         <small class="d-block text-success fw-bold mt-1">
                                             <i class="fas fa-file-pdf me-1"></i> Ver PDF
                                         </small>
@@ -448,7 +461,7 @@ try {
 </div>
 <div class="container my-4">
     <hr class="mb-4">
-    <h2 class="h5 fw-bold mb-3"><i class="fas fa-rocket me-2 text-primary"></i> Acciones Rápidas</h2>
+    <h2 class="h5 fw-bold mb-3"> Accesos Directos</h2>
     <div class="row g-3">
 
         <?php
