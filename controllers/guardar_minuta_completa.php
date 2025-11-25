@@ -397,7 +397,7 @@ class MinutaManager extends BaseConexion
            <div class='header-logos'>
             <div class='left'>" . (!empty($logoCoreBase64) ? "<img src='data:image/png;base64,{$logoCoreBase64}' alt='Logo Core'>" : "") . "</div>
             <div class='center'>
-                <p class='header-title'>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>
+                <p class='header-title'>GOBIERNO REGIONAL REGIÓN DE VALPARAÍSO</p>
                 <p class='header-title'>CONSEJO REGIONAL</p>
             </div>
             <div class='right'>" . (!empty($logoGoreBase64) ? "<img src='data:image/png;base64,{$logoGoreBase64}' alt='Logo Gore'>" : "") . "</div>

@@ -57,10 +57,6 @@ $votaciones = $response['data'] ?? [];
 // 1. Palabra Clave (para Nombre Reunión)
 $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 
-// 2. Rango de Fecha (ELIMINADO - El controlador ya filtró por mes/año)
-// $fechaInicio_val = ...
-// $fechaTermino_val = ...
-
 /* =========================
    FILTRADO EN VISTA
    ========================= */
@@ -68,8 +64,6 @@ $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $reunionesFiltradas = $votaciones;
 
 // --- A. Filtro por Palabra Clave ---
-// Este es el único filtro que aplica la vista,
-// porque el controlador no lo está recibiendo.
 if ($q !== '') {
   $needle = mb_strtolower($q, 'UTF-8');
   $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($needle) {
@@ -78,25 +72,6 @@ if ($q !== '') {
   });
 }
 
-// --- B. Filtro por Rango de Fecha (fecha de CREACIÓN) ---
-// ¡¡ELIMINADO!!
-// Este bloque es el que causaba el error. El controlador ya
-// filtró por mes y año. No necesitamos un filtro de fecha conflictivo aquí.
-/*
-if ($fechaInicio_val && $fechaTermino_val) {
-  // ... bloque de filtro de fecha eliminado ...
-}
-*/
-
-// --- C. Filtro por Comisión ---
-// ¡¡ELIMINADO!!
-// El controlador ya filtró por $comId.
-// Hacerlo de nuevo aquí es innecesario.
-/*
-if ($comId) {
-  // ... bloque de filtro de comisión eliminado ...
-}
-*/
 $votacionesFiltradas = array_values($reunionesFiltradas);
 
 
@@ -144,14 +119,12 @@ function renderPagination($current, $pages)
       max-width: 1500px;
       margin: 1rem auto 2rem auto;
       border-top: 5px solid #1c88bf;
-      /* ESTILO: Borde de color principal */
     }
 
     .filters-card h5 {
       font-size: 1.25rem;
       color: #495057;
       border-bottom: 1px dashed #dee2e6;
-      /* ESTILO: Separador sutil */
       padding-bottom: 10px;
       margin-bottom: 15px !important;
     }
@@ -181,7 +154,6 @@ function renderPagination($current, $pages)
 
 <body>
 
-
   <nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
@@ -203,7 +175,7 @@ function renderPagination($current, $pages)
 
           <div class="col-md-2">
             <label class="form-label fw-bold">Mes</label>
-            <select name="mes" class="form-select form-select-sm">
+            <select name="mes" class="form-select form-select-sm" id="mes_select">
               <?php for ($m = 1; $m <= 12; $m++): $val = str_pad((string)$m, 2, '0', STR_PAD_LEFT); ?>
                 <option value="<?= $val ?>" <?= ($val === $mes ? 'selected' : '') ?>><?= $val ?></option>
               <?php endfor; ?>
@@ -212,7 +184,7 @@ function renderPagination($current, $pages)
 
           <div class="col-md-2">
             <label class="form-label fw-bold">Año</label>
-            <select name="anio" class="form-select form-select-sm">
+            <select name="anio" class="form-select form-select-sm" id="anio_select">
               <?php $yNow = (int)date('Y');
               for ($y = $yNow; $y >= $yNow - 3; $y--): ?>
                 <option value="<?= $y ?>" <?= ((string)$y === (string)$anio ? 'selected' : '') ?>><?= $y ?></option>
@@ -237,9 +209,7 @@ function renderPagination($current, $pages)
             <input type="text" class="form-control form-control-sm" id="q" name="q" placeholder="Buscar..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
           </div>
 
-          <div class="col-md-1">
-            <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
-          </div>
+
           <div class="col-md-1">
             <a href="menu.php?pagina=votacion_listado" class="btn btn-outline-secondary btn-sm w-100">
               <i class="fas fa-times"></i> Limpiar
@@ -271,11 +241,8 @@ function renderPagination($current, $pages)
             <tbody>
               <?php foreach ($votacionesPage as $v): ?>
                 <?php
-                // --- Cálculo de Votos Totales (SÍ + NO + ABS) ---
+                // --- Cálculo de Votos Totales ---
                 $totalVotos = (int)($v['totalSi'] ?? 0) + (int)($v['totalNo'] ?? 0) + (int)($v['totalAbstencion'] ?? 0);
-
-                // --- Cálculo de Porcentaje de Aprobación (para el modal, si se necesita) ---
-                // $porcentajeSi = ($totalVotos > 0) ? round((int)($v['totalSi'] ?? 0) / $totalVotos * 100) : 0;
                 ?>
                 <tr>
                   <td><strong><?= $v['idVotacion'] ?></strong></td>
@@ -290,7 +257,7 @@ function renderPagination($current, $pages)
 
                   <td class="text-center">
                     <?php
-                    // --- INICIO: Lógica de Resultado Unificado ---
+                    // --- Lógica de Resultado ---
                     $si = (int)($v['totalSi'] ?? 0);
                     $no = (int)($v['totalNo'] ?? 0);
                     $abs = (int)($v['totalAbstencion'] ?? 0);
@@ -299,17 +266,15 @@ function renderPagination($current, $pages)
                     $statusClass = '';
 
                     if ($si > $no) {
-                      $statusText = 'APROBADO';
+                      $statusText = 'APROBADA';
                       $statusClass = 'bg-success';
                     } elseif ($no > $si) {
-                      $statusText = 'RECHAZADO';
+                      $statusText = 'RECHAZADA';
                       $statusClass = 'bg-danger';
                     } else {
-                      // Cubre $si == $no (incluyendo 0 vs 0)
                       $statusText = 'EMPATE';
                       $statusClass = 'bg-secondary';
                     }
-                    // --- FIN: Lógica ---
                     ?>
 
                     <span class="badge <?= $statusClass ?> fw-bold" style="font-size: 0.9rem;"><?= $statusText ?></span>
@@ -321,13 +286,11 @@ function renderPagination($current, $pages)
 
                   <td style="min-width: 150px;">
                     <?php
-                    // --- INICIO: Lógica de Participación ---
+                    // --- Lógica de Participación ---
                     $porcentajeParticipacion = 0;
-                    // Usamos la variable $universoVotantes que calculamos al inicio del archivo
                     if ($universoVotantes > 0) {
                       $porcentajeParticipacion = round(($totalVotos / $universoVotantes) * 100);
                     }
-                    // --- FIN: Lógica ---
                     ?>
 
                     <small class="d-block mb-1 text-muted">Participación: <strong><?= $porcentajeParticipacion ?>%</strong></small>
@@ -362,7 +325,6 @@ function renderPagination($current, $pages)
       <?php endif; ?>
     </div>
   </div>
-  </div>
 
   <div class="modal fade" id="modalDetalleVotacion" tabindex="-1" aria-labelledby="modalDetalleVotacionLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -391,20 +353,27 @@ function renderPagination($current, $pages)
       const form = document.getElementById('filtrosForm');
       const inputQ = document.getElementById('q');
       const pHid = document.getElementById('pHidden');
+      
+      // AJUSTE 3: Capturamos los 3 selectores
       const comSelect = document.getElementById('comision_id_select');
+      const mesSelect = document.getElementById('mes_select');
+      const anioSelect = document.getElementById('anio_select');
 
       // Función para resetear la paginación a la página 1
       function toFirstPage() {
         if (pHid) pHid.value = '1';
       }
 
-      // --- 1. Filtro automático por Comisión (al cambiar) ---
-      if (comSelect && form) {
-        comSelect.addEventListener('change', () => {
-          toFirstPage();
-          form.submit();
-        });
-      }
+      // --- 1. Filtro automático para Comisión, Mes y Año ---
+      // Agregamos el listener a los 3 campos
+      [comSelect, mesSelect, anioSelect].forEach(selectElement => {
+        if (selectElement && form) {
+          selectElement.addEventListener('change', () => {
+            toFirstPage();
+            form.submit();
+          });
+        }
+      });
 
       // --- 2. Filtro debounce para Palabra Clave ---
       if (inputQ && form) {
@@ -421,18 +390,18 @@ function renderPagination($current, $pages)
         });
       }
 
-      // --- 3. Lógica para el Modal de Detalle (Nueva función) ---
+      // --- 3. Lógica para el Modal de Detalle ---
       window.mostrarDetalleVotacion = function(idVotacion, idMinuta, nombreVotacion) {
         const modal = new bootstrap.Modal(document.getElementById('modalDetalleVotacion'));
         const modalTitle = document.getElementById('modalDetalleVotacionLabel');
         const modalBody = document.getElementById('detalleVotacionContenido');
 
-        // 1. Configuración inicial
+        // Configuración inicial
         modalTitle.textContent = `Detalle de Votación: ${nombreVotacion}`;
         modalBody.innerHTML = '<p class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</p>';
         modal.show();
 
-        // 2. Llamada a la API: ENVIAMOS AMBOS IDs
+        // Llamada a la API
         fetch(`../../controllers/obtener_resultados_votacion.php?idVotacion=${encodeURIComponent(idVotacion)}&idMinuta=${encodeURIComponent(idMinuta)}`, {
             method: 'GET',
             credentials: 'same-origin'
@@ -455,46 +424,46 @@ function renderPagination($current, $pages)
           });
       };
 
-      // 4. Función de Renderizado (Hardcoded HTML para el modal)
+      // 4. Función de Renderizado
       function renderDetalleHTML(v) {
         const getVoterList = (list) => list.length > 0 ?
           `<ul class="list-unstyled mb-0 small">${list.map(name => `<li><i class="fas fa-user-check fa-fw me-1 text-primary"></i>${name}</li>`).join('')}</ul>` :
           '<em class="text-muted small ps-2">Sin votos registrados</em>';
 
         return `
-                          <div class="row text-center mb-4">
-                              <div class="col-4">
-                                  <h3 class="text-success mb-0">${v.votosSi}</h3>
-                                  <p class="mb-0 small text-uppercase">A Favor</p>
-                              </div>
-                              <div class="col-4">
-                                  <h3 class="text-danger mb-0">${v.votosNo}</h3>
-                                  <p class="mb-0 small text-uppercase">En Contra</p>
-                              </div>
-                              <div class="col-4">
-                                  <h3 class="text-warning mb-0">${v.votosAbstencion}</h3>
-                                  <p class="mb-0 small text-uppercase">Abstención</p>
-                              </div>
-                          </div>
-                          <hr>
-                          <div class="row">
-                              <div class="col-4">
-                                  <h6 class="text-success border-bottom pb-1">Votaron SÍ (${v.votosSi})</h6>
-                                  ${getVoterList(v.votosSi_nombres || [])}
-                              </div>
-                              <div class="col-4">
-                                  <h6 class="text-danger border-bottom pb-1">Votaron NO (${v.votosNo})</h6>
-                                  ${getVoterList(v.votosNo_nombres || [])}
-                              </div>
-                              <div class="col-4">
-                                  <h6 class="text-warning border-bottom pb-1">Se Abstienen (${v.votosAbstencion})</h6>
-                                  ${getVoterList(v.votosAbstencion_nombres || [])}
-                              </div>
-                          </div>
-                          <hr class="mt-4">
-                          <p class="text-muted small"><strong>Total de Asistentes Requeridos:</strong> ${v.totalPresentes}</p>
-                          <p class="text-muted small"><strong>Total de Votos Emitidos:</strong> ${v.votosSi + v.votosNo + v.votosAbstencion}</p>
-                      `;
+            <div class="row text-center mb-4">
+                <div class="col-4">
+                    <h3 class="text-success mb-0">${v.votosSi}</h3>
+                    <p class="mb-0 small text-uppercase">A Favor</p>
+                </div>
+                <div class="col-4">
+                    <h3 class="text-danger mb-0">${v.votosNo}</h3>
+                    <p class="mb-0 small text-uppercase">En Contra</p>
+                </div>
+                <div class="col-4">
+                    <h3 class="text-warning mb-0">${v.votosAbstencion}</h3>
+                    <p class="mb-0 small text-uppercase">Abstención</p>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-4">
+                    <h6 class="text-success border-bottom pb-1">Votaron SÍ (${v.votosSi})</h6>
+                    ${getVoterList(v.votosSi_nombres || [])}
+                </div>
+                <div class="col-4">
+                    <h6 class="text-danger border-bottom pb-1">Votaron NO (${v.votosNo})</h6>
+                    ${getVoterList(v.votosNo_nombres || [])}
+                </div>
+                <div class="col-4">
+                    <h6 class="text-warning border-bottom pb-1">Se Abstienen (${v.votosAbstencion})</h6>
+                    ${getVoterList(v.votosAbstencion_nombres || [])}
+                </div>
+            </div>
+            <hr class="mt-4">
+            <p class="text-muted small"><strong>Total de Asistentes Requeridos:</strong> ${v.totalPresentes}</p>
+            <p class="text-muted small"><strong>Total de Votos Emitidos:</strong> ${v.votosSi + v.votosNo + v.votosAbstencion}</p>
+        `;
       }
 
     })();

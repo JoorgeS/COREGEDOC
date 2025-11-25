@@ -34,10 +34,11 @@ function tableExists(PDO $pdo, string $table): bool
   }
 }
 
-/* ===== Filtros ===== */
+/* ===== Capturar Filtros ===== */
 $mes   = $_GET['mes']  ?? date('m');
 $anio  = $_GET['anio'] ?? date('Y');
 $comId = $_GET['comision_id'] ?? "";
+$voto  = $_GET['voto'] ?? ""; // Nuevo filtro de voto
 
 $mesInt  = (int)$mes;
 $anioInt = (int)$anio;
@@ -68,8 +69,8 @@ $whereRango = '';
 $orderBy    = 'v.idVotacion DESC';
 $fechaCampo = null;
 
+// Construcción base de la Query (Idéntica a antes)
 if ($hasTablaReunion && $hasLinkReunion) {
-  // Caso 1: hay relación con reuniones => filtrar por fecha de la reunión
   $sql = "
         SELECT 
             v.idVotacion,
@@ -95,7 +96,6 @@ if ($hasTablaReunion && $hasLinkReunion) {
   $orderBy    = " r.fechaInicioReunion DESC, v.idVotacion DESC ";
   $fechaCampo = 'fechaRef';
 } elseif ($hasFechaCreacion) {
-  // Caso 2: no hay reuniones, pero sí fechaCreacion en votación
   $sql = "
         SELECT 
             v.idVotacion,
@@ -120,7 +120,6 @@ if ($hasTablaReunion && $hasLinkReunion) {
   $orderBy    = " v.fechaCreacion DESC, v.idVotacion DESC ";
   $fechaCampo = 'fechaRef';
 } else {
-  // Caso 3: sin fecha para filtrar; mostrar todo por id
   $sql = "
         SELECT 
             v.idVotacion,
@@ -139,21 +138,44 @@ if ($hasTablaReunion && $hasLinkReunion) {
         INNER JOIN t_comision c ON c.idComision = v.idComision
         WHERE 1=1
     ";
-  $whereRango = ""; // no se puede filtrar por fecha
+  $whereRango = "";
   $orderBy    = " v.idVotacion DESC ";
   $fechaCampo = 'fechaRef';
 }
 
-/* Filtro por comisión */
+/* --- APLICACIÓN DE FILTROS --- */
+
+// 1. Filtro por comisión
 if (!empty($comId)) {
   $sql .= " AND v.idComision = :fCom ";
   $params[':fCom'] = (int)$comId;
 }
 
-/* Rango si aplica */
+// 2. Filtro por VOTO (NUEVO)
+if (!empty($voto)) {
+    if ($voto === 'NOVOTO') {
+        // Caso especial: No existe registro en t_voto para este usuario y votación
+        $sql .= " AND NOT EXISTS (
+                    SELECT 1 FROM t_voto vto 
+                    WHERE vto.t_votacion_idVotacion = v.idVotacion 
+                      AND vto.t_usuario_idUsuario = :idUsuario
+                  ) ";
+    } else {
+        // Casos: SI, NO, ABSTENCION
+        $sql .= " AND EXISTS (
+                    SELECT 1 FROM t_voto vto 
+                    WHERE vto.t_votacion_idVotacion = v.idVotacion 
+                      AND vto.t_usuario_idUsuario = :idUsuario 
+                      AND vto.opcionVoto = :valVoto
+                  ) ";
+        $params[':valVoto'] = $voto;
+    }
+}
+
+// 3. Filtro de fecha
 $sql .= $whereRango;
 
-/* Orden */
+// 4. Ordenamiento
 $sql .= " ORDER BY {$orderBy} ";
 
 $registros = [];
@@ -172,6 +194,7 @@ try {
   <meta charset="UTF-8">
   <title>Historial de Votación</title>
   <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     body.bg-light {
       background-color: #f5f5f5 !important;
@@ -203,7 +226,7 @@ try {
     }
 
     .card-narrow {
-      max-width: 980px;
+      max-width: 1100px; /* Un poco más ancho para acomodar los filtros */
       margin: 1rem auto 2rem auto;
     }
 
@@ -229,19 +252,12 @@ try {
     <div class="card-body">
       <h4 class="mb-3">Historial de votación</h4>
 
-      <!-- ================================== -->
-      <!--     INICIO DE LA MODIFICACIÓN 1    -->
-      <!-- ================================== -->
-      <!-- Añadido id="filtroHistorialForm" -->
-      <form method="get" class="row g-3" id="filtroHistorialForm">
-        <!-- ================================== -->
-        <!--       FIN DE LA MODIFICACIÓN 1     -->
-        <!-- ================================== -->
+      <form method="get" class="row g-2" id="filtroHistorialForm">
         <input type="hidden" name="pagina" value="historial_votacion">
 
         <div class="col-md-2">
-          <label class="form-label fw-bold">Mes</label>
-          <select name="mes" class="form-select form-select-sm">
+          <label class="form-label fw-bold mb-1">Mes</label>
+          <select name="mes" class="form-select form-select-sm" id="mes_select">
             <?php for ($m = 1; $m <= 12; $m++): $val = str_pad((string)$m, 2, '0', STR_PAD_LEFT); ?>
               <option value="<?= $val ?>" <?= ($val === $mes ? 'selected' : '') ?>><?= $val ?></option>
             <?php endfor; ?>
@@ -249,8 +265,8 @@ try {
         </div>
 
         <div class="col-md-2">
-          <label class="form-label fw-bold">Año</label>
-          <select name="anio" class="form-select form-select-sm">
+          <label class="form-label fw-bold mb-1">Año</label>
+          <select name="anio" class="form-select form-select-sm" id="anio_select">
             <?php $yNow = (int)date('Y');
             for ($y = $yNow; $y >= $yNow - 3; $y--): ?>
               <option value="<?= $y ?>" <?= ((string)$y === (string)$anio ? 'selected' : '') ?>><?= $y ?></option>
@@ -258,16 +274,9 @@ try {
           </select>
         </div>
 
-        <div class="col-md-4">
-          <label class="form-label fw-bold">Comisión</label>
-          <!-- ================================== -->
-          <!--     INICIO DE LA MODIFICACIÓN 2    -->
-          <!-- ================================== -->
-          <!-- Añadido id="comision_id_select" -->
+        <div class="col-md-3">
+          <label class="form-label fw-bold mb-1">Comisión</label>
           <select name="comision_id" class="form-select form-select-sm" id="comision_id_select">
-            <!-- ================================== -->
-            <!--       FIN DE LA MODIFICACIÓN 2     -->
-            <!-- ================================== -->
             <option value="">-- Todas --</option>
             <?php foreach ($listaComisiones as $c): ?>
               <option value="<?= (int)$c['idComision'] ?>" <?= ($comId == $c['idComision'] ? 'selected' : '') ?>>
@@ -277,9 +286,23 @@ try {
           </select>
         </div>
 
-        <div class="col-md-2 d-flex align-items-end">
-          <button class="btn btn-primary btn-sm w-100">Filtrar</button>
+        <div class="col-md-3">
+            <label class="form-label fw-bold mb-1">Mi Voto</label>
+            <select name="voto" class="form-select form-select-sm" id="voto_select">
+                <option value="">-- Todos --</option>
+                <option value="SI" <?= $voto === 'SI' ? 'selected' : '' ?>>Sí</option>
+                <option value="NO" <?= $voto === 'NO' ? 'selected' : '' ?>>No</option>
+                <option value="ABSTENCION" <?= $voto === 'ABSTENCION' ? 'selected' : '' ?>>Abstención</option>
+                <option value="NOVOTO" <?= $voto === 'NOVOTO' ? 'selected' : '' ?>>No Votó</option>
+            </select>
         </div>
+
+        <div class="col-md-2 d-flex align-items-end">
+            <a href="menu.php?pagina=historial_votacion" class="btn btn-outline-secondary btn-sm w-100">
+                <i class="fas fa-eraser me-1"></i> Limpiar
+            </a>
+        </div>
+
       </form>
     </div>
   </div>
@@ -326,20 +349,16 @@ try {
                   <td><?= htmlspecialchars($hora) ?></td>
                   <td>
 
-                    <?php if ($mi === 'SI'): // <-- CAMBIADO DE 'APRUEBO' 
-                    ?>
+                    <?php if ($mi === 'SI'): ?>
                       <span class="badge-voto badge-apruebo">Sí</span>
 
-                    <?php elseif ($mi === 'NO'): // <-- CAMBIADO DE 'RECHAZO' 
-                    ?>
+                    <?php elseif ($mi === 'NO'): ?>
                       <span class="badge-voto badge-rechazo">No</span>
 
-                    <?php elseif ($mi === 'ABSTENCION'): // <-- Este estaba correcto 
-                    ?>
+                    <?php elseif ($mi === 'ABSTENCION'): ?>
                       <span class="badge-voto badge-abstencion">Abstención</span>
 
-                    <?php else: // Muestra "No Votó" para NULL o cualquier otro valor 
-                    ?>
+                    <?php else: ?>
                       <span class="badge-voto badge-no-voto">No Votó</span>
                     <?php endif; ?>
                   </td>
@@ -352,32 +371,31 @@ try {
     </div>
   </div>
 
-  <!-- ================================== -->
-  <!--     INICIO DE LA MODIFICACIÓN 3    -->
-  <!-- ================================== -->
-  <!-- Añadido bloque de script para auto-filtrar -->
   <script>
-    // Aseguramos que el script se ejecute cuando el DOM esté listo
     document.addEventListener('DOMContentLoaded', function() {
 
-      // 1. Obtenemos los elementos
       const form = document.getElementById('filtroHistorialForm');
+      
+      // Capturamos los 4 selectores
+      const mesSelect = document.getElementById('mes_select');
+      const anioSelect = document.getElementById('anio_select');
       const comSelect = document.getElementById('comision_id_select');
+      const votoSelect = document.getElementById('voto_select'); // Nuevo
 
-      // 2. Verificamos que existan
-      if (form && comSelect) {
+      // Array con todos los elementos a escuchar
+      const inputs = [mesSelect, anioSelect, comSelect, votoSelect];
 
-        // 3. Añadimos el listener
-        comSelect.addEventListener('change', function() {
-          // Cuando el select cambie, enviamos el formulario.
-          form.submit();
-        });
-      }
+      inputs.forEach(input => {
+        if (input && form) {
+          input.addEventListener('change', function() {
+            // Al cambiar cualquiera, se envía el formulario
+            form.submit();
+          });
+        }
+      });
+
     });
   </script>
-  <!-- ================================== -->
-  <!--       FIN DE LA MODIFICACIÓN 3     -->
-  <!-- ================================== -->
 
 </body>
 

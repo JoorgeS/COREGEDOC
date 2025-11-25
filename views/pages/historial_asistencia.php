@@ -298,9 +298,7 @@ $reunionesParaTabla = array_slice($reuniones, $offset, $perPage);
                     </select>
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-primary w-100">Filtrar</button>
-                </div>
+
 
                 <div class="col-md-1 d-flex align-items-end">
                      <a href="menu.php?pagina=historial_asistencia" class="btn btn-outline-secondary w-100" title="Limpiar filtros">

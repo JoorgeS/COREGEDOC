@@ -199,7 +199,7 @@ function generateMinutaHtml($data, $logo_uri)
         <div class="header-box">
             <img src="' . htmlspecialchars($logo_uri) . '" class="logo" alt="Logo CORE">
             <div class="header-text">
-                <p>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>
+                <p>GOBIERNO REGIONAL REGIÓN DE VALPARAÍSO</p>
                 <p class="main-title">CONSEJO REGIONAL</p>
                 <p>COMISIÓN ' . strtoupper($comisiones) . '</p>
             </div>

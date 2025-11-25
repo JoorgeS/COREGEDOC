@@ -140,7 +140,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $firmaImgUri, $se
     $html .= '<table class="header-table"><tr>' .
         '<td class="logo-left-cell">' . ($logoGoreUri ? '<img src="' . htmlspecialchars($logoGoreUri) . '" alt="Logo GORE">' : '') . '</td>' .
         '<td class="header-center-cell">' .
-        '<p>GOBIERNO REGIONAL. REGIÓN DE VALPARAÍSO</p>' .
+        '<p>GOBIERNO REGIONAL REGIÓN DE VALPARAÍSO</p>' .
         '<p class="consejo">CONSEJO REGIONAL</p>' .
         '<p>COMISIÓN(ES): ' . strtoupper($tituloComisionesHeader) . '</p>' .
         '</td>' .
