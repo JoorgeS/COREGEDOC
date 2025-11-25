@@ -1352,73 +1352,129 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
         }
 
-        function iniciarValidacionAsistencia() {
-            const btn = document.getElementById('btnRevisarAsistencia');
-            if (!btn) return;
+        // ==================================================================
+    // --- FUNCIÓN DE VALIDACIÓN CON FILTRO INTELIGENTE ---
+    // ==================================================================
+   // ==================================================================
+    // --- FUNCIÓN DE VALIDACIÓN (CON FILTRO Y ORDEN POR NOMBRE) ---
+    // ==================================================================
+    // ==================================================================
+    // --- FUNCIÓN DE VALIDACIÓN (MODAL MÁS GRANDE) ---
+    // ==================================================================
+    function iniciarValidacionAsistencia() {
+        const btn = document.getElementById('btnRevisarAsistencia');
+        if (!btn) return;
 
-            if (!validarCamposMinuta()) {
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando cambios...';
-            detenerPollingAsistencia();
-
-            guardarBorrador(false, function(guardadoExitoso) {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-users-check"></i> Revisar y Validar Asistencia';
-
-                if (guardadoExitoso) {
-                    if (bsModalValidarAsistencia) {
-                        // ⚡ RUTA CORREGIDA (y en minúsculas)
-                        fetch(`../../controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
-                                method: 'GET',
-                                credentials: 'same-origin'
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                                const modalBody = document.querySelector('#contenidoModalAsistencia');
-                                if (data.status === 'success' && data.asistencia) {
-
-                                    // ==================================
-                                    // --- INICIO DE LA MODIFICACIÓN ---
-                                    // ==================================
-                                    // Ordenar la data por nombreCompleto usando localeCompare
-                                    data.asistencia.sort((a, b) => {
-                                        // Usar localeCompare para un orden alfabético correcto (maneja tildes, etc.)
-                                        return (a.nombreCompleto || '').localeCompare(b.nombreCompleto || '');
-                                    });
-                                    // ==================================
-                                    // ---- FIN DE LA MODIFICACIÓN ----
-                                    // ==================================
-
-                                    let html = '<table class="table table-sm table-striped table-hover"><thead><tr><th>Nombre</th><th class="text-center">Estado</th></tr></thead><tbody>';
-                                    data.asistencia.forEach(item => {
-                                        html += `<tr>
-                                        <td>${item.nombreCompleto}</td>
-                                        <td class="text-center">${item.presente ? '<span class="badge bg-success">Presente</span>' : '<span class="badge bg-secondary">Ausente</span>'}</td>
-                                        </tr>`;
-                                    });
-                                    html += '</tbody></table>';
-                                    modalBody.innerHTML = html;
-                                } else {
-                                    modalBody.innerHTML = `<p class="text-danger">Error al cargar la asistencia: ${data.message || 'No se pudo cargar la asistencia.'}</p>`;
-                                }
-                                bsModalValidarAsistencia.show();
-                            })
-                            .catch(err => {
-                                Swal.fire('Error al cargar preview', 'Error de conexión: ' + err.message, 'error');
-                                console.error("Error fetch preview asistencia:", err);
-                            });
-                    } else {
-                        Swal.fire('Error JS', 'No se pudo instanciar el modal de validación.', 'error');
-                    }
-                } else {
-                    Swal.fire('Error al Guardar', 'No se pudieron guardar los cambios. El PDF de asistencia no se pudo generar.', 'error');
-                }
-            });
+        // 1. Validar campos
+        if (typeof validarCamposMinuta === 'function' && !validarCamposMinuta()) {
+            return;
         }
 
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando...';
+        
+        if (typeof detenerPollingAsistencia === 'function') detenerPollingAsistencia();
+
+        // 2. Guardar borrador
+        guardarBorrador(false, function(guardadoExitoso) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-users-check"></i> Revisar y Validar Asistencia';
+
+            if (guardadoExitoso) {
+                if (bsModalValidarAsistencia) {
+                    
+                    // 3. Obtener vista previa
+                    fetch(`/corevota/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            const modalContainer = document.getElementById('asistenciaPreviewList') || document.querySelector('#contenidoModalAsistencia');
+                            
+                            if (!modalContainer) {
+                                Swal.fire('Error', 'No se encontró el contenedor del modal.', 'error');
+                                return;
+                            }
+
+                            if (data.status === 'success' && data.asistencia) {
+                                
+                                // ORDENAMIENTO (Mantenemos tu lógica perfecta)
+                                data.asistencia.sort((a, b) => {
+                                    const nombreA = (a.nombreCompleto || "").trim();
+                                    const nombreB = (b.nombreCompleto || "").trim();
+                                    return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+                                });
+
+                                // --- A. CONSTRUCCIÓN DEL HTML (VISUALIZACIÓN AMPLIADA) ---
+                                let html = '';
+
+                                // Input de Búsqueda
+                                html += `
+                                    <div class="mb-3 position-relative">
+                                        <div class="input-group input-group-lg"> <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                                            <input type="text" class="form-control border-start-0" id="filtroConsejerosModal" 
+                                                   placeholder="Escriba nombre para filtrar..." autocomplete="off">
+                                        </div>
+                                    </div>`;
+
+                                // Tabla con Scroll AUMENTADO (Aquí está el cambio de tamaño vertical)
+                                // Cambiamos 350px por 65vh (65% del alto de la pantalla) para que sea bien alto
+                                html += `
+                                    <div style="max-height: 65vh; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px;">
+                                        <table class="table table-striped table-hover mb-0" id="tablaPreviewConsejeros">
+                                            <thead class="table-light sticky-top" style="z-index: 1;">
+                                                <tr>
+                                                    <th class="py-3">Nombre Consejero</th>
+                                                    <th class="text-center py-3" style="width: 150px;">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+
+                                data.asistencia.forEach(item => {
+                                    const badge = item.presente 
+                                        ? '<span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-check me-1"></i>Presente</span>' 
+                                        : '<span class="badge bg-secondary rounded-pill px-3 py-2"><i class="fas fa-times me-1"></i>Ausente</span>';
+                                    
+                                    html += `<tr>
+                                                <td class="align-middle py-2 fs-6">${item.nombreCompleto}</td>
+                                                <td class="text-center align-middle">${badge}</td>
+                                             </tr>`;
+                                });
+                                html += '</tbody></table></div>';
+                                
+                                modalContainer.innerHTML = html;
+
+                                // --- B. LÓGICA DE FILTRADO (Sin cambios) ---
+                                const inputFiltro = document.getElementById('filtroConsejerosModal');
+                                const tablaFilas = document.querySelectorAll('#tablaPreviewConsejeros tbody tr');
+
+                                if (inputFiltro) {
+                                    setTimeout(() => inputFiltro.focus(), 500);
+
+                                    inputFiltro.addEventListener('keyup', function() {
+                                        const texto = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                        tablaFilas.forEach(fila => {
+                                            const nombre = fila.cells[0].textContent.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                            fila.style.display = nombre.includes(texto) ? '' : 'none';
+                                        });
+                                    });
+                                }
+
+                            } else {
+                                modalContainer.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
+                            }
+                            
+                            bsModalValidarAsistencia.show();
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            Swal.fire('Error', 'Error de conexión al cargar la vista previa.', 'error');
+                        });
+                }
+            }
+        });
+    }
         function guardarBorrador(guardarYSalir, callback = null) {
             if (!idMinutaGlobal) {
                 alert("Error Crítico: No hay ID de Minuta.");
