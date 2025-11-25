@@ -164,7 +164,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '<td class="logo-right-cell">' . ($logoCoreUri ? '<img src="' . htmlspecialchars($logoCoreUri) . '" alt="Logo CORE">' : '') . '</td>' .
         '</tr></table>' .
 
-        '<div class="titulo-minuta">BORRADOR DE MINUTA (Para Revisión)</div>' . 
+        '<div class="titulo-minuta">MINUTA (Para Revisión)</div>' . 
         '<table class="info-tabla">' .
         '<tr><td class="label">N° Minuta:</td><td>' . $idMinuta . '</td><td class="label">Secretario Técnico:</td><td>' . $secretario . '</td></tr>' .
         '<tr><td class="label">Fecha:</td><td>' . $fecha . '</td><td class="label">Hora:</td><td>' . $hora . '</td></tr>';
@@ -346,29 +346,28 @@ try {
         throw new Exception('No se encontró la minuta.');
     }
 
-    // --- 2. CARGAR DATOS PARA EL PDF (Asistentes, Temas, Votos, Comisiones) ---
-    // (Esta lógica es copiada de aprobar_minuta.php)
-
-    // =========================================================================
-    // --- ✅ INICIO DE LA CORRECCIÓN (Lógica idéntica a aprobar_minuta.php) ---
+    
+// =========================================================================
+    // --- ✅ CORRECCIÓN: Usar el usuario logueado (Si es ST) ---
     // =========================================================================
     // 2a. CARGAR INFO SECRETARIO
-    // (¡IMPORTANTE!) Buscamos al ST (rol 2) explícitamente, NO al admin (rol 6)
-    // Esto es para que el nombre en el PDF sea "Santiago" y no "Pamela"
+    // Usamos $idUsuarioLogueado que ya capturamos al inicio del script
     $sqlSec = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
               FROM t_usuario 
-              WHERE tipoUsuario_id = 2 
-              LIMIT 1");
-    $sqlSec->execute();
+              WHERE idUsuario = :idUsuario 
+              AND tipoUsuario_id = 2");
+    $sqlSec->execute([':idUsuario' => $idUsuarioLogueado]);
     $data_pdf['secretario_info'] = $sqlSec->fetch(PDO::FETCH_ASSOC);
 
-    // Si no se encuentra, se usa un placeholder
+    // Si el usuario logueado NO es ST (ej. es Admin), buscamos al último ST creado (Santiago)
     if (!$data_pdf['secretario_info']) {
-        $data_pdf['secretario_info'] = ['nombreCompleto' => 'Secretario Técnico (No Asignado)'];
+         $sqlSecBackup = $pdo->prepare("SELECT CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
+              FROM t_usuario 
+              WHERE tipoUsuario_id = 2 
+              ORDER BY idUsuario DESC LIMIT 1"); // <--- ORDER BY DESC para traer al último (Santiago)
+         $sqlSecBackup->execute();
+         $data_pdf['secretario_info'] = $sqlSecBackup->fetch(PDO::FETCH_ASSOC);
     }
-    // =========================================================================
-    // --- ✅ FIN DE LA CORRECCIÓN ---
-    // =========================================================================
 
     // 2b. CARGAR COMISIONES Y PRESIDENTES
     $getDatosComision = function ($idComision) use ($pdo) {
