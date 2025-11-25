@@ -168,7 +168,7 @@ $pdo = null; // Cerrar conexión
                     <p class="text-info"><i class="fas fa-edit"></i> Marque/desmarque los usuarios **presentes**. Se respetará el registro original de fecha y el origen de los autogestionados.</p>
                 <?php endif; ?>
 
-                <div class="table-responsive">
+                <div class="table-responsive" id="contenedorTablaAsistenciaEstado">
                     <table class="table table-hover table-sm">
                         <thead>
                             <tr>
@@ -179,6 +179,7 @@ $pdo = null; // Cerrar conexión
                         </thead>
                         <tbody>
                             <?php
+                            // Mantenemos la carga inicial de PHP para que se vea algo antes de que cargue el JS
                             if (empty($listaAsistencia)) {
                                 echo '<tr><td colspan="3" class="text-center text-danger">No se pudo cargar la lista de miembros.</td></tr>';
                             }
@@ -294,14 +295,14 @@ $pdo = null; // Cerrar conexión
     // ==================================================================
     let contadorTemas = 0;
     const contenedorTemasGlobal = document.getElementById("contenedorTemas");
-    const idMinutaGlobal = <?php echo json_encode($idMinutaActual); ?>;
-    const ID_REUNION_GLOBAL = <?php echo json_encode($idReunionActual); ?>;
+    const idMinutaGlobal = <?php echo json_encode($idMinuta); ?>;
+    const ID_REUNION_GLOBAL = <?php echo json_encode($idReunion ?? 0); ?>;
     const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
     let bsModalValidarAsistencia = null;
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
-    const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas_de_la_minuta ?? []); ?>;
-    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistencia_guardada_ids ?? []); ?>; // Se actualiza con cada fetch
-    const HORA_INICIO_REUNION = "<?php echo htmlspecialchars(date('H:i:s', strtotime($minutaData['horaMinuta'] ?? 'now'))); ?>";
+    const DATOS_TEMAS_CARGADOS = <?php echo json_encode(isset($tema) ? [$tema] : []); ?>;
+    let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistenciaActualIDs ?? []); ?>;
+    const HORA_INICIO_REUNION = "<?php echo htmlspecialchars(date('H:i:s', strtotime($minuta['horaMinuta'] ?? 'now'))); ?>";
     const ES_ST_EDITABLE = <?php echo $esSoloLectura ? 'false' : 'true'; ?>;
 
     // === Lógica de tiempo ===
@@ -313,13 +314,11 @@ $pdo = null; // Cerrar conexión
     let intervalAsistenciaID = null;
     let asistenciaModificando = false;
     let REGLAS_FEEDBACK = null;
-
-    // === ⚡ INICIO CORRECCIÓN (Variables que faltaban) ===
     let intervalListaVotacionID = null; // Para el polling de la lista
     let intervalResultadosID = null; // Para el polling de resultados
     let cacheVotacionesList = ""; // Caché para la LISTA
     let cacheResultados = ""; // Caché para los RESULTADOS
-    // === ⚡ FIN CORRECCIÓN ===
+
 
     // Elementos de UI
     const formSubirArchivo = document.getElementById('formSubirArchivo');
@@ -516,7 +515,7 @@ $pdo = null; // Cerrar conexión
 
         try {
             // ⚡ CORRECCIÓN: Se añade 'credentials'
-            const response = await fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+            const response = await fetch(`../../controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                 method: 'GET',
                 cache: 'no-store',
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
@@ -827,7 +826,7 @@ $pdo = null; // Cerrar conexión
                 formData.append('idMinuta', idMinutaGlobal);
 
                 // ⚡ CORRECCIÓN: Se añade 'credentials'
-                fetch('/COREVOTA/controllers/enviar_asistencia_validada.php', {
+                fetch('../../controllers/enviar_asistencia_validada.php', {
                         method: 'POST',
                         body: formData,
                         credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
@@ -971,85 +970,96 @@ $pdo = null; // Cerrar conexión
     // --- SECCIÓN: ASISTENCIA (CORREGIDA CON 'credentials') ---
     // ==================================================================
 
+    // Reemplaza tu función cargarTablaAsistencia completa con esta:
     function cargarTablaAsistencia(isInitialLoad) {
         const cont = document.getElementById("contenedorTablaAsistenciaEstado");
         const btnRefresh = document.getElementById("btn-refrescar-asistencia");
 
-        if (isInitialLoad) {
-            if (btnRefresh) btnRefresh.disabled = true;
-            cont.innerHTML = '<p class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando lista de consejeros y asistencia...</p>';
+        if (!cont) {
+            console.error("Error: Falta contenedor 'contenedorTablaAsistenciaEstado'");
+            return;
         }
 
-        // ⚡ CORRECCIÓN: Se añade 'credentials'
-        const fetchConsejeros = fetch("/corevota/controllers/fetch_data.php?action=asistencia_all", {
-            method: 'GET',
-            credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
-        }).then(res => res.ok ? res.json() : Promise.reject(new Error('Error fetch_data.php')));
+        if (isInitialLoad) {
+            if (btnRefresh) btnRefresh.disabled = true;
+            cont.innerHTML = '<div class="text-center py-3 text-muted"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+        }
 
-        // ⚡ CORRECCIÓN: Se añade 'credentials'
-        const fetchAsistenciaActual = fetch(`/corevota/controllers/obtener_asistencia_actual.php?idMinuta=${idMinutaGlobal}`, {
-            method: 'GET',
-            credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
-        }).then(res => res.ok ? res.json() : Promise.reject(new Error('Error obtener_asistencia_actual.php')));
+        // 1. RUTA ABSOLUTA (Crucial para que se visualice)
+        // Asegúrate que '/corevota' es el nombre real de tu carpeta
+        const BASE_URL = '/corevota/controllers';
+
+        const fetchConsejeros = fetch(`${BASE_URL}/fetch_data.php?action=asistencia_all`, {
+                credentials: 'same-origin'
+            })
+            .then(r => r.json());
+        const fetchAsistenciaActual = fetch(`${BASE_URL}/obtener_asistencia_actual.php?idMinuta=${idMinutaGlobal}`, {
+                credentials: 'same-origin'
+            })
+            .then(r => r.json());
 
         Promise.all([fetchConsejeros, fetchAsistenciaActual])
-            .then(([responseConsejeros, responseAsistencia]) => {
-                // ... (El resto de la lógica de renderizado de asistencia es igual) ...
-                if (responseConsejeros.status !== 'success' || responseAsistencia.status !== 'success') {
-                    throw new Error('No se pudo cargar la información necesaria.');
+            .then(([resConsejeros, resAsistencia]) => {
+
+                if (resConsejeros.status !== 'success' || resAsistencia.status !== 'success') {
+                    throw new Error('Error en datos del servidor.');
                 }
-                const data = responseConsejeros.data;
-                ASISTENCIA_GUARDADA_IDS = responseAsistencia.data.map(String);
-                const meetingTimeData = responseAsistencia.meeting_time;
-                const meetingDateTimeString = `${meetingTimeData.fecha} ${meetingTimeData.hora}`;
-                const meetingStartTime = new Date(meetingDateTimeString);
-                const currentTime = new Date();
-                const diffInMinutes = (currentTime.getTime() - meetingStartTime.getTime()) / (1000 * 60);
-                const autoCheckInDisabled = diffInMinutes > 30;
-                let timeWarning = '';
-                if (autoCheckInDisabled) {
-                    timeWarning = '<p class="text-danger fw-bold"><i class="fas fa-clock me-1"></i> ¡Plazo de autogestión de asistencia (30 minutos) ha expirado!</p>';
-                    timeWarning += '<p class="text-muted small">El Secretario Técnico puede seguir marcando asistencia manually.</p>';
-                } else {
-                    const remainingTime = Math.ceil(30 - diffInMinutes);
-                    timeWarning = `<p class="text-success fw-bold"><i class="fas fa-hourglass-half me-1"></i> Plazo restante: ${remainingTime} minutos (aprox.)</p>`;
-                }
-                const baseDisabledAttr = ES_ST_EDITABLE ? '' : 'disabled';
-                const baseTitleAttr = ES_ST_EDITABLE ? '' : 'title="Edición bloqueada por el estado de la minuta o su rol."';
-                const userDisabledAttr = ES_ST_EDITABLE ? baseDisabledAttr : (autoCheckInDisabled ? 'disabled' : baseDisabledAttr);
-                const userTitleAttr = ES_ST_EDITABLE ? baseTitleAttr : (autoCheckInDisabled ? 'title="El plazo de 30 minutos para la autogestión de asistencia ha expirado."' : baseTitleAttr);
+
+                // 2. DATOS (Ya vienen ordenados por PHP, no hace falta .sort aquí)
+                const data = resConsejeros.data;
+
+                ASISTENCIA_GUARDADA_IDS = resAsistencia.data.map(String);
+
+                // 3. Renderizar (Sin cambios en la lógica visual)
+                let html = `<table class="table table-sm table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Nombre Consejero</th>
+                                <th class="text-center">Presente</th>
+                                <th class="text-center">Ausente</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
 
                 if (data && data.length > 0) {
-                    let tabla = timeWarning;
-                    tabla += `<table class="table table-sm table-hover" id="tablaAsistenciaEstado"><thead><tr><th style="text-align: left;">Nombre Consejero</th><th style="width: 100px;">Presente</th><th style="width: 100px;">Ausente</th></tr></thead><tbody>`;
+                    let i = 1;
                     data.forEach(c => {
-                        const userIdString = String(c.idUsuario);
-                        const isPresent = ASISTENCIA_GUARDADA_IDS.includes(userIdString);
-                        const isAbsent = !isPresent;
-                        tabla += `<tr data-userid="${c.idUsuario}">
-                            <td style="text-align: left;"><label class="form-check-label w-100" for="present_${userIdString}">${c.nombreCompleto}</label></td>
-                            <td><input class="form-check-input asistencia-checkbox present-check" type="checkbox" id="present_${userIdString}" value="${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'present')" ${isPresent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
-                            <td><input class="form-check-input asistencia-checkbox absent-check default-absent" type="checkbox" id="absent_${userIdString}" onchange="handleAsistenciaChange('${userIdString}', 'absent')" ${isAbsent ? 'checked' : ''} ${userDisabledAttr} ${userTitleAttr}></td>
-                            </tr>`;
+                        const uid = String(c.idUsuario);
+                        const isPresent = ASISTENCIA_GUARDADA_IDS.includes(uid);
+                        const isDisabled = (typeof ES_ST_EDITABLE !== 'undefined' && !ES_ST_EDITABLE) ? 'disabled' : '';
+
+                        html += `<tr>
+                                <td>${i++}</td>
+                                <td>${c.nombreCompleto}</td>
+                                <td class="text-center">
+                                    <input class="form-check-input present-check" type="checkbox" 
+                                        id="present_${uid}" value="${uid}" 
+                                        ${isPresent ? 'checked' : ''} ${isDisabled}
+                                        onchange="handleAsistenciaChange('${uid}', 'present')">
+                                </td>
+                                <td class="text-center">
+                                    <input class="form-check-input absent-check" type="checkbox" 
+                                        id="absent_${uid}" 
+                                        ${!isPresent ? 'checked' : ''} ${isDisabled}
+                                        onchange="handleAsistenciaChange('${uid}', 'absent')">
+                                </td>
+                             </tr>`;
                     });
-                    tabla += `</tbody></table>`;
-                    cont.innerHTML = tabla;
                 } else {
-                    cont.innerHTML = '<p class="text-danger">No hay consejeros para cargar.</p>';
+                    html += '<tr><td colspan="4" class="text-center text-danger">Sin datos.</td></tr>';
                 }
+                html += '</tbody></table>';
+                cont.innerHTML = html;
             })
             .catch(err => {
-                console.error("Error carga asistencia:", err);
-                if (isInitialLoad) {
-                    cont.innerHTML = `<p class="text-danger">Error al refrescar asistencia: ${err.message}</p>`;
-                }
+                console.error(err);
+                cont.innerHTML = `<div class="alert alert-danger small">Error: ${err.message}</div>`;
             })
             .finally(() => {
                 if (btnRefresh) btnRefresh.disabled = false;
-                if (REGLAS_FEEDBACK) deshabilitarCamposSegunFeedback(REGLAS_FEEDBACK);
             });
     }
-
     // --- MODIFICADA PARA CONFIRMACIÓN ---
     async function handleAsistenciaChange(userId, changedType) {
         const present = document.getElementById(`present_${userId}`);
@@ -1197,7 +1207,7 @@ $pdo = null; // Cerrar conexión
             if (guardadoExitoso) {
                 if (bsModalValidarAsistencia) {
                     // ⚡ CORRECCIÓN: Se añade 'credentials'
-                    fetch(`/COREVOTA/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                    fetch(`../../controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                             method: 'GET',
                             credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
                         })
@@ -1285,7 +1295,7 @@ $pdo = null; // Cerrar conexión
             btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         }
 
-        fetch("/corevota/controllers/guardar_minuta_completa.php", {
+        fetch("../../controllers/guardar_minuta_completa.php", {
                 method: "POST",
                 body: formData,
                 credentials: 'same-origin'
@@ -1389,7 +1399,7 @@ $pdo = null; // Cerrar conexión
                     }
 
                     // ⚡ CORRECCIÓN: Se añade 'credentials'
-                    fetch('/corevota/controllers/enviar_aprobacion.php', {
+                    fetch('../../controllers/enviar_aprobacion.php', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1440,7 +1450,7 @@ $pdo = null; // Cerrar conexión
     async function cargarYAplicarFeedback() {
         try {
             // ⚡ CORRECCIÓN: Se añade 'credentials'
-            const response = await fetch(`/corevota/controllers/obtener_feedback_json.php?idMinuta=${idMinutaGlobal}`, {
+            const response = await fetch(`../../controllers/obtener_feedback_json.php?idMinuta=${idMinutaGlobal}`, {
                 method: 'GET',
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
             });
@@ -1600,7 +1610,7 @@ $pdo = null; // Cerrar conexión
         formData.append('idMinuta', idMinutaGlobal);
 
         // ⚡ CORRECCIÓN: Se añade 'credentials'
-        fetch('/corevota/controllers/aplicar_feedback.php', {
+        fetch('../../controllers/aplicar_feedback.php', {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
@@ -1779,7 +1789,7 @@ $pdo = null; // Cerrar conexión
         input.disabled = true;
 
         // ⚡ CORRECCIÓN: Se añade 'credentials'
-        fetch('/corevota/controllers/agregar_adjunto.php?action=upload', {
+        fetch('../../controllers/agregar_adjunto.php?action=upload', {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
@@ -1838,7 +1848,7 @@ $pdo = null; // Cerrar conexión
         formData.append('urlLink', url);
 
         // ⚡ CORRECCIÓN: Se añade 'credentials'
-        fetch('/corevota/controllers/agregar_adjunto.php?action=link', {
+        fetch('../../controllers/agregar_adjunto.php?action=link', {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
@@ -1883,7 +1893,7 @@ $pdo = null; // Cerrar conexión
         if (!idMinutaGlobal) return;
 
         // ⚡ CORRECCIÓN: Se añade 'credentials'
-        fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinutaGlobal}&_cacheBust=${new Date().getTime()}`, {
+        fetch(`../../controllers/obtener_adjuntos.php?idMinuta=${idMinutaGlobal}&_cacheBust=${new Date().getTime()}`, {
                 method: 'GET',
                 credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
             })
@@ -1964,7 +1974,7 @@ $pdo = null; // Cerrar conexión
         }).then((result) => {
             if (result.isConfirmed) {
                 // ⚡ CORRECCIÓN: Se añade 'credentials'
-                fetch(`/corevota/controllers/eliminar_adjunto.php?idAdjunto=${idAdjunto}`, {
+                fetch(`../../controllers/eliminar_adjunto.php?idAdjunto=${idAdjunto}`, {
                         method: 'GET',
                         credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
                     })

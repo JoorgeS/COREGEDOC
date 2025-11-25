@@ -44,7 +44,7 @@ function renderPaginationComisiones($current, $pages)
     for ($i = 1; $i <= $pages; $i++) {
         $active = ($i === $current) ? ' active' : '';
         $qsArr  = $_GET;
-        if (isset($_GET['tab'])) $qsArr['tab'] = $_GET['tab']; // <-- Añadir esta línea
+        if (isset($_GET['tab'])) $qsArr['tab'] = $_GET['tab'];
         $qsArr['p'] = $i;
         $qs = http_build_query($qsArr);
         echo '<li class="page-item' . $active . '"><a class="page-link" href="?' . $qs . '">' . $i . '</a></li>';
@@ -92,7 +92,6 @@ function renderPaginationComisiones($current, $pages)
             <h3 class="mb-0">Listado de Comisiones</h3>
         </div>
 
-        <!-- FORMULARIO DE FILTRO -->
         <form method="GET" class="row g-3 mb-4" action="menu.php" id="formComisiones">
             <input type="hidden" name="pagina" value="comision_listado">
             <input type="hidden" name="p" id="pHidden" value="<?php echo (int)$page; ?>">
@@ -126,7 +125,6 @@ function renderPaginationComisiones($current, $pages)
             </div>
         </form>
 
-        <!-- TABLA DE RESULTADOS -->
         <div class="table-responsive shadow-sm">
             <table class="table table-striped table-bordered align-middle">
                 <thead class="table-dark sticky-top">
@@ -141,7 +139,7 @@ function renderPaginationComisiones($current, $pages)
                 <tbody>
                     <?php if (empty($comisionesPage)): ?>
                         <tr>
-                            <td colspan="4" class="text-center py-4">No hay comisiones registradas.</td>
+                            <td colspan="5" class="text-center py-4">No hay comisiones registradas.</td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($comisionesPage as $c): ?>
@@ -155,11 +153,8 @@ function renderPaginationComisiones($current, $pages)
                                     </span>
                                 </td>
                                 <td>
-                                    <a href="menu.php?pagina=comision_editar&id=<?php echo $c['idComision']; ?>" class="btn btn-sm btn-primary me-2">Editar</a>
-                                    <a href="/corevota/controllers/ComisionController.php?action=delete&id=<?php echo $c['idComision']; ?>"
-                                        class="btn btn-sm btn-danger"
-                                        onclick="return confirm('¿Está seguro de deshabilitar esta comisión?');">
-                                        Deshabilitar
+                                    <a href="menu.php?pagina=comision_editar&id=<?php echo $c['idComision']; ?>" class="btn btn-sm btn-primary">
+                                        Editar
                                     </a>
                                 </td>
                             </tr>

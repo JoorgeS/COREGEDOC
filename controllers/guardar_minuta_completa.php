@@ -408,9 +408,8 @@ class MinutaManager extends BaseConexion
               <tr><td class='label'>Minuta N°:</td><td>{$idMinuta}</td></tr>
               <tr><td class='label'>Nombre de la Reunión:</td><td>{$nombreReunion}</td></tr>
               <tr><td class='label'>Secretario Técnico:</td><td>{$nombreSecretario}</td></tr>
-              <tr><td class='label'>Cargo:</td><td>{$cargoSecretario}</td></tr>
               <tr><td class='label'>Fecha / Hora Reunión:</td><td>{$fechaMinuta} / {$horaMinuta}</td></tr>
-              <tr><td class='label'>COMISIÓN(ES):</td><td>{$comisiones}</td></tr>
+              <tr><td class='label'>Comisión(es):</td><td>{$comisiones}</td></tr>
              </table>
              
              <h2 class='main-title'>Listado de Asistencia</h2>

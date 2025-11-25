@@ -37,7 +37,7 @@ try {
                          FROM t_usuario
                          WHERE tipoUsuario_id IN (1, 3, 7)
                          AND estado = 1
-                         ORDER BY aPaterno ASC, pNombre ASC";
+                         ORDER BY pNombre ASC, pNombre ASC";
             $stmt_pres = $pdo->query($sql_pres);
             $usuarios = $stmt_pres->fetchAll(PDO::FETCH_ASSOC);
             foreach ($usuarios as $u) {
@@ -54,7 +54,7 @@ try {
                         FROM t_usuario
                         WHERE tipoUsuario_id IN (1, 3, 7)
                         AND estado = 1
-                        ORDER BY aPaterno ASC, pNombre ASC";
+                        ORDER BY pNombre ASC";
             $stmt_vice = $pdo->query($sql_vice);
             $usuarios_vice = $stmt_vice->fetchAll(PDO::FETCH_ASSOC);
 
@@ -75,7 +75,7 @@ try {
                           FROM t_usuario
                           WHERE tipoUsuario_id IN (1, 3, 7)
                             AND estado = 1 -- <-- CORRECCIÓN: Filtro de usuario activo
-                          ORDER BY aPaterno ASC, aMaterno ASC, pNombre ASC";
+                          ORDER BY pNombre ASC, aPaterno ASC, aMaterno ASC";
             $stmt_asist = $pdo->query($sql_asist);
             $usuarios_asist = $stmt_asist->fetchAll(PDO::FETCH_ASSOC);
             foreach ($usuarios_asist as $u) {

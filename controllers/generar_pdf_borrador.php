@@ -56,6 +56,9 @@ function ImageToDataUrl(String $filename): String
 // FUNCIÓN PARA GENERAR HTML (Copiada de aprobar_minuta.php)
 // (INTEGRADO) MODIFICADA: Se añaden los sellos de validación del ST
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// FUNCIÓN PARA GENERAR HTML (Con Marca de Agua "BORRADOR")
+// -----------------------------------------------------------------------------
 function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], $selloVerdeUri = '')
 {
     // --- Preparar datos del encabezado ---
@@ -82,9 +85,27 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     if ($comision3_nombre) $tituloComisionesHeader .= " / " . $comision3_nombre;
 
 
-    // --- HTML (Estilos copiados) ---
+    // --- HTML (Estilos) ---
     $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Borrador Minuta ' . $idMinuta . '</title><style>' .
         'body{font-family:Helvetica,sans-serif;font-size:10pt;line-height:1.4;}' .
+        
+        // --- NUEVO: CSS PARA MARCA DE AGUA ---
+        '.watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            text-align: center;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            -webkit-transform: translate(-50%, -50%) rotate(-45deg); /* Soporte Dompdf antiguo */
+            font-size: 110pt;
+            font-weight: bold;
+            color: rgba(220, 220, 220, 0.4); /* Gris muy claro con transparencia */
+            z-index: -1000; /* Detrás del texto */
+            pointer-events: none;
+        }' .
+        // -------------------------------------
+
         '.header-table{width:100%; border-bottom:1px solid #ccc; padding-bottom:10px; margin-bottom:20px; border-collapse: collapse;}' .
         '.header-table .logo-left-cell{width:110px; text-align:left; vertical-align:top;}' .
         '.header-table .logo-left-cell img{height: 80px; width: auto;}' .
@@ -105,35 +126,16 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '.desarrollo-tema div{margin:0 0 8px 5px;padding-left:5px;border-left:2px solid #eee;}' .
         '.desarrollo-tema strong{display:block;margin-bottom:2px;font-size:9pt;color:#555;}' .
 
-        // --- INICIO: CSS DE VOTACIÓN MODIFICADO ---
+        // --- INICIO: CSS DE VOTACIÓN ---
         '.votacion-tabla{width:100%;border-collapse:collapse;margin-top:5px;}' .
         '.votacion-tabla th, .votacion-tabla td{border:1px solid #ccc;padding:4px 6px;}' .
         '.votacion-tabla th{background-color:#f2f2f2;text-align:center;}' .
-        '.votacion-detalle{
-      padding-left:5px; 
-      margin-top:0px; 
-      font-size: 8pt; 
-      line-height: 1.2;
-    }' .
-        '.votacion-detalle b { 
-      font-size: 9pt; 
-    }' .
-        '.comision-header { 
-      background-color: #f0f0f0; 
-      font-weight: bold; 
-      padding: 6px 8px; 
-      font-size: 10pt; 
-      border-bottom: 1px solid #ccc;
-      border-top: 1px solid #ccc;
-      color: #333;
-    }' .
-        '.votacion-nombre-indentada { 
-      padding-left: 20px !important; /* Añadimos indentación */
-      font-size: 9pt;
-    }' .
-        /* --- FIN: CSS DE VOTACIÓN MODIFICADO --- */
-
-        // (INTEGRADO) Estilos para firmas y sellos
+        '.votacion-detalle{ padding-left:5px; margin-top:0px; font-size: 8pt; line-height: 1.2; }' .
+        '.votacion-detalle b { font-size: 9pt; }' .
+        '.comision-header { background-color: #f0f0f0; font-weight: bold; padding: 6px 8px; font-size: 10pt; border-bottom: 1px solid #ccc; border-top: 1px solid #ccc; color: #333; }' .
+        '.votacion-nombre-indentada { padding-left: 20px !important; font-size: 9pt; }' .
+        
+        // --- Estilos Firmas ---
         '.signature-box-container{width:100%; margin-top:30px; padding-top: 15px; border-top: 1px solid #ccc; page-break-inside:avoid; text-align:center;}' .
         '.firma-chip{width: 220px; border: 1px solid #999; border-radius: 8px; padding: 10px; margin: 5px; display: inline-block; position: relative; overflow: hidden; background: #f9f9f9; font-size: 8pt; text-align: center; vertical-align: top; page-break-inside: avoid; }' .
         '.firma-chip p{ margin: 0; padding: 1px 0; line-height: 1.2; }' .
@@ -141,13 +143,17 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '.firma-cargo{ font-style: italic; color: #333; }' .
         '.firma-detalle{ font-size: 7pt; color: #555; margin-top: 5px; }' .
         '.firma-fecha{ font-size: 7pt; color: #555; border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px; }' .
-        '.sello-st-chip{ background-color: #e6ffed; border-color: #5cb85c; }' . // Fondo verde para sellos ST
+        '.sello-st-chip{ background-color: #e6ffed; border-color: #5cb85c; }' .
 
-        // Estilo para el pie de página de borrador
+        // Pie de página
         'footer { position: fixed; bottom: -30px; left: 0px; right: 0px; height: 50px; text-align: center; color: #999; font-size: 9pt; }' .
         '</style></head><body>';
 
-    // (Contenido HTML del PDF - Encabezado y Asistentes sin cambios)
+    // --- NUEVO: DIV MARCA DE AGUA (Se coloca justo al abrir el body) ---
+    $html .= '<div class="watermark">BORRADOR</div>';
+    // ------------------------------------------------------------------
+
+    // (Contenido HTML del PDF - Encabezado y Asistentes)
     $html .= '<table class="header-table"><tr>' .
         '<td class="logo-left-cell">' . ($logoGoreUri ? '<img src="' . htmlspecialchars($logoGoreUri) . '" alt="Logo GORE">' : '') . '</td>' .
         '<td class="header-center-cell">' .
@@ -158,7 +164,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         '<td class="logo-right-cell">' . ($logoCoreUri ? '<img src="' . htmlspecialchars($logoCoreUri) . '" alt="Logo CORE">' : '') . '</td>' .
         '</tr></table>' .
 
-        '<div class="titulo-minuta">BORRADOR DE MINUTA (Para Revisión)</div>' . // Título cambiado
+        '<div class="titulo-minuta">BORRADOR DE MINUTA (Para Revisión)</div>' . 
         '<table class="info-tabla">' .
         '<tr><td class="label">N° Minuta:</td><td>' . $idMinuta . '</td><td class="label">Secretario Técnico:</td><td>' . $secretario . '</td></tr>' .
         '<tr><td class="label">Fecha:</td><td>' . $fecha . '</td><td class="label">Hora:</td><td>' . $hora . '</td></tr>';
@@ -176,7 +182,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     }
     $html .= '</table>';
 
-    // Asistentes (Sin cambios)
+    // Asistentes
     $html .= '<div class="seccion-titulo">Asistentes:</div><div class="asistentes-lista"><ul>';
     if (!empty($data['asistentes']) && is_array($data['asistentes'])) {
         foreach ($data['asistentes'] as $asistente) {
@@ -187,7 +193,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     }
     $html .= '</ul></div>';
 
-    // Tabla de la sesión (temas título) (Sin cambios)
+    // Tabla de la sesión
     $html .= '<div class="seccion-titulo">Tabla de la sesión:</div><div><ol style="font-size:9pt;padding-left:20px;">';
     $temasExisten = false;
     if (!empty($data['temas']) && is_array($data['temas'])) {
@@ -204,7 +210,7 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
     }
     $html .= '</ol></div>';
 
-    // Desarrollo / acuerdos / compromisos (Sin cambios)
+    // Desarrollo
     $html .= '<div class="seccion-titulo">Desarrollo / Acuerdos / Compromisos:</div>';
     $temasExisten = false;
     if (!empty($data['temas']) && is_array($data['temas'])) {
@@ -224,25 +230,20 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
         $html .= '<p style="font-size:10pt;">No hay detalles registrados para los temas.</p>';
     }
 
-    // --- BLOQUE DE VOTACIONES (MODIFICADO para agrupar por comisión) ---
+    // Votaciones
     if (!empty($data['votaciones']) && is_array($data['votaciones'])) {
         $html .= '<div class="seccion-titulo">Votaciones Realizadas:</div>';
-
-        // Usamos una tabla principal para todo el bloque de votaciones
-        $html .= '<table class="votacion-tabla" style="width: 100%;">'; // Tabla principal
+        $html .= '<table class="votacion-tabla" style="width: 100%;">';
         $html .= '<thead><tr>
-          <th style="text-align: left;">Comisión / Votación</th>
-          <th style="width:80px; text-align:center;">Resultado</th>
-          <th style="width:250px; text-align: left;">Detalle de Votos</th>
-         </tr></thead>';
+                  <th style="text-align: left;">Comisión / Votación</th>
+                  <th style="width:80px; text-align:center;">Resultado</th>
+                  <th style="width:250px; text-align: left;">Detalle de Votos</th>
+                 </tr></thead>';
         $html .= '<tbody>';
 
-        $comisionActual = null; // Variable de seguimiento
+        $comisionActual = null;
 
         foreach ($data['votaciones'] as $votacion) {
-
-            // --- Lógica de Agrupación ---
-            // Si la comisión no está seteada (es NULL), la asignamos a un grupo "General"
             $nombreComision = $votacion['nombreComision'] ?? 'Votaciones Generales';
 
             if ($nombreComision !== $comisionActual) {
@@ -250,32 +251,22 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
                 $comisionActual = $nombreComision;
             }
 
-            // --- Lógica de conteo de votos ---
-            $votosSi = 0;
-            $votosNo = 0;
-            $votosAbs = 0;
-            $listaVotosSI = [];
-            $listaVotosNO = [];
-            $listaVotosABS = [];
+            $votosSi = 0; $votosNo = 0; $votosAbs = 0;
+            $listaVotosSI = []; $listaVotosNO = []; $listaVotosABS = [];
 
-            // (Importante: $votacion['votos'] viene de la consulta en la línea 334)
             if (!empty($votacion['votos'])) {
                 foreach ($votacion['votos'] as $voto) {
                     $nombreVotanteSafe = htmlspecialchars($voto['nombreVotante']);
                     if ($voto['opcionVoto'] == 'SI') {
-                        $votosSi++;
-                        $listaVotosSI[] = $nombreVotanteSafe;
+                        $votosSi++; $listaVotosSI[] = $nombreVotanteSafe;
                     } elseif ($voto['opcionVoto'] == 'NO') {
-                        $votosNo++;
-                        $listaVotosNO[] = $nombreVotanteSafe;
-                    } else { // ABSTENCION
-                        $votosAbs++;
-                        $listaVotosABS[] = $nombreVotanteSafe;
+                        $votosNo++; $listaVotosNO[] = $nombreVotanteSafe;
+                    } else {
+                        $votosAbs++; $listaVotosABS[] = $nombreVotanteSafe;
                     }
                 }
             }
 
-            // --- Determinar Resultado ---
             $totalVotos = $votosSi + $votosNo + $votosAbs;
             $resultadoStr = 'Sin Votos';
             if ($totalVotos > 0) {
@@ -284,68 +275,48 @@ function generateMinutaHtml($data, $logoGoreUri, $logoCoreUri, $sellos_st = [], 
                 else $resultadoStr = 'Empate';
             }
 
-            // --- Fila de la Votación ---
             $html .= '<tr>';
-            // Aplicamos la indentación al nombre de la votación
             $html .= '<td class="votacion-nombre-indentada" style="vertical-align: top;">' . htmlspecialchars($votacion['nombreVotacion']) . '</td>';
             $html .= '<td style="text-align:center; vertical-align: top;">' . $resultadoStr . '</td>';
-
-            // Columna de detalle (con listas separadas)
             $html .= '<td class="votacion-detalle" style="vertical-align: top;">';
             $html .= '<b>SÍ (' . $votosSi . '):</b> ' . (empty($listaVotosSI) ? '<i>-</i>' : implode(', ', $listaVotosSI)) . '<br>';
             $html .= '<b>NO (' . $votosNo . '):</b> ' . (empty($listaVotosNO) ? '<i>-</i>' : implode(', ', $listaVotosNO)) . '<br>';
             $html .= '<b>ABS (' . $votosAbs . '):</b> ' . (empty($listaVotosABS) ? '<i>-</i>' : implode(', ', $listaVotosABS));
             $html .= '</td>';
-
             $html .= '</tr>';
         }
-
         $html .= '</tbody></table>';
     }
 
-    // Pie de página de borrador
+    // Pie de página
     $html .= '<footer>Documento Borrador - Pendiente de Aprobación - Generado el ' . date('d-m-Y H:i') . '</footer>';
 
-    // --- (INTEGRADO) BLOQUE DE FIRMAS/SELLOS (AL FINAL, ANTES DE </body>) ---
+    // Firmas/Sellos
     $html .= '<div class="signature-box-container">';
-
-    // (NUEVO) Función helper para renderizar CUALQUIER tipo de firma/sello
     $generarChipFirma = function ($nombre, $cargo, $detalle, $fechaHora, $imagenUri, $claseExtra = '') {
         $chipHtml = '<div class="firma-chip ' . $claseExtra . '">';
-
-        // Imagen de fondo (sello)
         if (!empty($imagenUri)) {
-            $chipHtml .= '<img src="' . $imagenUri . '" alt="Sello" ' .
-                'style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
+            $chipHtml .= '<img src="' . $imagenUri . '" alt="Sello" style="position: absolute; top: 10px; left: 50%; margin-left: -50px; width: 100px; height: auto; opacity: 0.2; z-index: 1;">';
         }
-
-        // (INTEGRADO) Contenido del chip (texto)
-        $chipHtml .= '<div style="position: relative; z-index: 2;">'; // Contenedor para el texto
+        $chipHtml .= '<div style="position: relative; z-index: 2;">';
         $chipHtml .= '<p class="firma-nombre">' . htmlspecialchars($nombre) . '</p>';
         $chipHtml .= '<p class="firma-cargo">' . htmlspecialchars($cargo) . '</p>';
         $chipHtml .= '<p class="firma-detalle">' . htmlspecialchars($detalle) . '</p>';
         $chipHtml .= '<p class="firma-fecha">' . htmlspecialchars($fechaHora) . '</p>';
-        $chipHtml .= '</div>'; // Cierre del contenedor de texto
-
-        $chipHtml .= '</div>'; // Cierre de .firma-chip
+        $chipHtml .= '</div>';
+        $chipHtml .= '</div>';
         return $chipHtml;
     };
 
-    // (NUEVO) Renderizar Sellos de Validación ST
     if (!empty($sellos_st) && is_array($sellos_st)) {
         foreach ($sellos_st as $sello) {
             $html .= $generarChipFirma(
-                $sello['nombreSecretario'],
-                'Secretario Técnico',
-                'Validación de Feedback',
-                date('d-m-Y H:i:s', strtotime($sello['fechaValidacion'])),
-                $selloVerdeUri, // Sello verde
-                'sello-st-chip' // Clase CSS para fondo verde
+                $sello['nombreSecretario'], 'Secretario Técnico', 'Validación de Feedback',
+                date('d-m-Y H:i:s', strtotime($sello['fechaValidacion'])), $selloVerdeUri, 'sello-st-chip'
             );
         }
     }
-
-    $html .= '</div>'; // cierre signature-box-container
+    $html .= '</div>';
 
     $html .= '</body></html>';
     return $html;

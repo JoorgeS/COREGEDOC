@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../cfg/config.php';
 $tareas_pendientes = [];
 $actividad_reciente = [];
 $proximas_reuniones = [];
-$minutas_recientes_aprobadas = []; // <- NUEVA VARIABLE
+$minutas_recientes_aprobadas = [];
 
 // Obtenemos el ID del usuario logueado desde la sesión
 $idUsuarioLogueado = $_SESSION['idUsuario'] ?? 0;
@@ -18,12 +18,8 @@ $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
 try {
 
-
-
-
     // --- TAREAS PARA PRESIDENTE DE COMISIÓN (ROL 3) ---
     if ($tipoUsuario == ROL_PRESIDENTE_COMISION) {
-        // Esta es la consulta CORRECTA (la que probaste y te dio '0')
         $sql_firmas = "SELECT COUNT(DISTINCT m.idMinuta)
                            FROM t_aprobacion_minuta am
                            JOIN t_minuta m ON am.t_minuta_idMinuta = m.idMinuta
@@ -39,7 +35,7 @@ try {
             $s = $conteo_firmas > 1 ? 's' : '';
             $tareas_pendientes[] = [
                 'texto' => "Tienes <strong>{$conteo_firmas} minuta{$s}</strong> esperando tu firma.",
-                'link'  => "menu.php?pagina=minutaPendiente", // (El link está bien)
+                'link'  => "menu.php?pagina=minutaPendiente",
                 'icono' => "fa-file-signature",
                 'color' => "danger"
             ];
@@ -48,15 +44,14 @@ try {
 
     // --- TAREAS PARA CONSEJERO (ROL 1) O PRESIDENTE (ROL 3) ---
     if ($tipoUsuario == ROL_CONSEJERO || $tipoUsuario == ROL_PRESIDENTE_COMISION) {
-        // Contar votaciones activas donde este usuario NO haya votado
         $sql_votos = "SELECT COUNT(v.idVotacion) 
-                         FROM t_votacion v
-                         WHERE v.habilitada = 1
-                         AND NOT EXISTS (
-                             SELECT 1 FROM t_voto 
-                             WHERE t_votacion_idVotacion = v.idVotacion 
-                             AND t_usuario_idUsuario = :idUsuario
-                         )";
+                          FROM t_votacion v
+                          WHERE v.habilitada = 1
+                          AND NOT EXISTS (
+                              SELECT 1 FROM t_voto 
+                              WHERE t_votacion_idVotacion = v.idVotacion 
+                              AND t_usuario_idUsuario = :idUsuario
+                          )";
         $stmt_votos = $pdo->prepare($sql_votos);
         $stmt_votos->execute([':idUsuario' => $idUsuarioLogueado]);
         $conteo_votos = $stmt_votos->fetchColumn();
@@ -74,7 +69,6 @@ try {
 
     // --- TAREAS PARA SECRETARIO TÉCNICO (ROL 2) ---
     if ($tipoUsuario == ROL_SECRETARIO_TECNICO) {
-        // Contar minutas que requieren revisión (feedback)
         $sql_feedback = "SELECT COUNT(*) FROM t_minuta WHERE estadoMinuta = 'REQUIERE_REVISION'";
         $stmt_feedback = $pdo->query($sql_feedback);
         $conteo_feedback = $stmt_feedback->fetchColumn();
@@ -89,7 +83,6 @@ try {
             ];
         }
 
-        // Contar minutas en borrador
         $sql_borrador = "SELECT COUNT(*) FROM t_minuta WHERE estadoMinuta = 'BORRADOR'";
         $stmt_borrador = $pdo->query($sql_borrador);
         $conteo_borrador = $stmt_borrador->fetchColumn();
@@ -105,15 +98,8 @@ try {
         }
     }
 
-    // =================================================================
-    // 4. OBTENER ACTIVIDAD RECIENTE o MINUTAS APROBADAS (Según Rol)
-    // =================================================================
-
-    // --- ✅ INICIO DE LA MODIFICACIÓN ---
+    // --- ACTIVIDAD RECIENTE / MINUTAS APROBADAS ---
     if ($tipoUsuario == ROL_CONSEJERO) {
-        // --- Para Consejero: Mostrar Minutas Aprobadas Recientemente ---
-
-        // ---- SQL CORREGIDA: Añadimos LEFT JOIN y r.nombreReunion ----
         $sql_minutas_recientes = "SELECT 
                                     m.idMinuta, 
                                     m.fechaAprobacion, 
@@ -125,12 +111,10 @@ try {
                                     AND m.fechaAprobacion >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
                                   ORDER BY m.fechaAprobacion DESC
                                   LIMIT 5";
-        // ---- FIN SQL CORREGIDA ----
 
         $stmt_minutas_recientes = $pdo->query($sql_minutas_recientes);
         $minutas_recientes_aprobadas = $stmt_minutas_recientes->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        // --- Para otros roles (Admin, ST): Mostrar Timeline de Actividad ---
         $sql_actividad = "SELECT 
                                  s.fecha_hora, 
                                  s.accion, 
@@ -146,11 +130,8 @@ try {
         $stmt_actividad = $pdo->query($sql_actividad);
         $actividad_reciente = $stmt_actividad->fetchAll(PDO::FETCH_ASSOC);
     }
-    // --- ✅ FIN DE LA MODIFICACIÓN ---
 
-    // =================================================================
-    // 5. OBTENER PRÓXIMAS REUNIONES (Corregido)
-    // =================================================================
+    // --- PRÓXIMAS REUNIONES ---
     $sql_reuniones = "SELECT 
                            r.idReunion, r.nombreReunion, r.fechaInicioReunion, 
                            c.nombreComision
@@ -163,14 +144,13 @@ try {
     $stmt_reuniones = $pdo->query($sql_reuniones);
     $proximas_reuniones = $stmt_reuniones->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    // Manejar el error de forma silenciosa en el dashboard
     error_log("Error al cargar datos del dashboard home.php: " . $e->getMessage());
     echo "<div class='alert alert-danger'>Error al cargar el dashboard: " . $e->getMessage() . "</div>";
 }
 ?>
 
 <style>
-    /* Estilos para el Timeline de Actividad Reciente */
+    /* Estilos Timeline */
     .timeline {
         list-style: none;
         padding: 0;
@@ -223,20 +203,48 @@ try {
         font-size: 0.95rem;
     }
 
-    /* Estilos para que el Carrusel sea semi-transparente */
+    /* Estilos Carrusel */
     .carousel-image-transparent {
         opacity: 0.7;
     }
 
+    /* --- ESTILOS DEL TEXTO DEL CARRUSEL --- */
+    .carousel-caption {
+        /* Forzamos que ocupe toda la altura */
+        top: 0 !important;
+        bottom: 0 !important;
+        display: flex;
+        flex-direction: column;
+        /* Separa los elementos: uno al tope, otro al fondo */
+        justify-content: space-between;
+        
+        padding-top: 2rem;
+        /* Padding bottom en 0 para controlar la distancia con margin en el h5 */
+        padding-bottom: 0;
+    }
+
+    .carousel-caption h1 {
+        /* Título superior (Región) */
+        font-size: 2.5rem;
+        font-weight: 900;
+        color: white;
+        text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.8);
+        line-height: 1.2;
+        margin-top: 1rem;
+    }
+
     .carousel-caption h5 {
+        /* Título inferior (Provincia) */
         font-weight: bold;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        font-size: 1.5rem;
+        
+        /* Margen inferior suficiente para no tapar las barritas (indicadores) */
+        margin-bottom: 3rem; 
     }
 </style>
 
 <div class="container mt-4">
-    <h4>Nuestra querida quinta región</h4>
-
     <div id="carouselZonasRegion" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="5000">
 
         <div class="carousel-indicators">
@@ -254,42 +262,49 @@ try {
             <div class="carousel-item active">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE QUILLOTA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_2.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE MARGA MARGA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE MARGA MARGA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_1.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE VALPARAÍSO</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_4.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE SAN ANTONIO">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE SAN ANTONIO</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_5.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE LOS ANDES">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE LOS ANDES</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_6.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE PETORCA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE PETORCA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_7.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA SAN FELIPE DE ACONCAGUA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA SAN FELIPE DE ACONCAGUA</h5>
                 </div>
             </div>
@@ -299,6 +314,7 @@ try {
                     style="max-height: 400px; object-fit: cover;"
                     alt="PROVINCIA DE ISLA DE PASCUA">
                 <div class="carousel-caption d-none d-md-block">
+                    <h1>Nuestra querida quinta región</h1>
                     <h5>PROVINCIA DE ISLA DE PASCUA</h5>
                 </div>
             </div>
@@ -359,19 +375,14 @@ try {
                             <p class="text-muted text-center p-3">No hay minutas aprobadas recientemente.</p>
                         <?php else: ?>
                             <div class="list-group list-group-flush">
-
                                 <?php foreach ($minutas_recientes_aprobadas as $minuta):
-                                    // Aseguramos que la ruta al PDF sea correcta
                                     $urlPdf = "/corevota/" . ltrim(htmlspecialchars($minuta['pathArchivo']), '/');
                                 ?>
                                     <a href="<?php echo $urlPdf; ?>" target="_blank" class="list-group-item list-group-item-action p-3">
-
                                         <strong><?php echo htmlspecialchars($minuta['nombreReunion'] ?? 'Minuta Aprobada (ID: ' . $minuta['idMinuta'] . ')'); ?></strong>
-
                                         <small class="d-block text-muted">
                                             (Minuta N° <?php echo $minuta['idMinuta']; ?>) - Aprobada el: <?php echo htmlspecialchars(date('d-m-Y', strtotime($minuta['fechaAprobacion']))); ?>
                                         </small>
-
                                         <small class="d-block text-success fw-bold mt-1">
                                             <i class="fas fa-file-pdf me-1"></i> Ver PDF
                                         </small>
@@ -381,7 +392,6 @@ try {
                         <?php endif; ?>
                     </div>
                 </div>
-
             <?php else: ?>
                 <div class="card shadow-sm">
                     <div class="card-header bg-white border-0 pt-3">
@@ -463,10 +473,6 @@ try {
     <hr class="mb-4">
     <h2 class="h5 fw-bold mb-3"> Accesos Directos</h2>
     <div class="row g-3">
-
-        <?php
-        // La visibilidad de estas tarjetas depende del ROL del usuario ($tipoUsuario)
-        ?>
 
         <?php if ($tipoUsuario == ROL_SECRETARIO_TECNICO || $tipoUsuario == ROL_ADMINISTRADOR): ?>
             <div class="col-xl-3 col-md-6 mb-3">
