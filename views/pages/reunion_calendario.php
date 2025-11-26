@@ -23,7 +23,7 @@ $serverToday = date('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <title>Calendario de Reuniones</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet" />
 
     <style>
@@ -54,7 +54,7 @@ $serverToday = date('Y-m-d');
             left: 50%;
             width: 1200px;
             height: 1200px;
-            background: url("/corevota/public/img/logoCore1.png") no-repeat center center;
+            background: url("/coregedoc/public/img/logoCore1.png") no-repeat center center;
             background-size: contain;
             opacity: 0.06;
             transform: translate(-50%, -50%);
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
             allDay: allDay,
             backgroundColor: colorMap[commissionId] || '#17a2b8',
             borderColor: colorMap[commissionId] || '#17a2b8',
-            url: `/corevota/views/pages/crearReunion.php?action=edit&id=${reunion.idReunion}`
+            url: `/coregedoc/views/pages/crearReunion.php?action=edit&id=${reunion.idReunion}`
         };
         if (!isEmpty(endStr)) event.end = endStr;
 

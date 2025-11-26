@@ -30,7 +30,7 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni√
 <head>
     <meta charset="UTF-8">
     <title><?php echo $page_title; ?></title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
         .container {
@@ -138,7 +138,7 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni√
 
         <div class="card shadow-sm">
             <div class="card-body">
-                <form action="/corevota/controllers/ReunionController.php" method="POST" id="reunionForm">
+                <form action="/coregedoc/controllers/ReunionController.php" method="POST" id="reunionForm">
                     <input type="hidden" name="action" value="<?php echo $form_action; ?>">
 
                     <?php if ($isEditMode): ?>
@@ -298,7 +298,7 @@ $button_text = $isEditMode ? '<i class="fas fa-save me-1"></i> Actualizar Reuni√
         });
 
         function fetchComisiones() {
-            fetch("/corevota/controllers/fetch_data.php?action=comisiones")
+            fetch("/coregedoc/controllers/fetch_data.php?action=comisiones")
                 .then(res => res.ok ? res.json() : Promise.reject(res))
                 .then(response => {
                     if (response.status === 'success' && Array.isArray(response.data)) {

@@ -7,7 +7,7 @@
 // Detectar si estamos editando
 $is_edit = isset($comision) && !empty($comision['idComision']);
 $form_action_value = $is_edit ? 'update' : 'store';
-$controller_url = "/corevota/controllers/ComisionController.php"; // Verifica esta ruta
+$controller_url = "/coregedoc/controllers/ComisionController.php"; // Verifica esta ruta
 
 // Variables base
 $comision_id = $is_edit ? ($comision['idComision'] ?? '') : '';
@@ -24,7 +24,7 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
 <head>
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($title); ?></title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .container {
             max-width: 600px;
@@ -130,7 +130,7 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
 
         // === PRESIDENTES (tu bloque original, intacto) ===
         if (presidenteSelect) {
-            fetch("/corevota/controllers/fetch_data.php?action=presidentes")
+            fetch("/coregedoc/controllers/fetch_data.php?action=presidentes")
                 .then(res => res.ok ? res.json() : Promise.reject('Error al cargar datos'))
                 .then(response => {
                     if (response.status === 'success' && Array.isArray(response.data)) {
@@ -163,7 +163,7 @@ $title = $title ?? ($is_edit ? 'Editar Comisión' : 'Crear Comisión');
         // === VICEPRESIDENTES (trae TODOS los consejeros igual que presidentes) ===
         // Requiere que hayas agregado el <select id="vicepresidenteComision"> en el formulario.
         if (vicepresidenteSelect) {
-            fetch("/corevota/controllers/fetch_data.php?action=vicepresidentes")
+            fetch("/coregedoc/controllers/fetch_data.php?action=vicepresidentes")
                 .then(res => res.ok ? res.json() : Promise.reject('Error al cargar datos'))
                 .then(response => {
                     if (response.status === 'success' && Array.isArray(response.data)) {

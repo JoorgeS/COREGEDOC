@@ -294,7 +294,7 @@ function renderPagination($current, $pages)
                     -->
 
           <!-- 1. Restaurar botón "Ver Detalle" -->
-          <a href="/corevota/controllers/generar_pdf_borrador.php?id=<?= $idMinuta ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
+          <a href="/coregedoc/controllers/generar_pdf_borrador.php?id=<?= $idMinuta ?>" target="_blank" class="btn btn-outline-secondary btn-sm" title="Ver Borrador PDF">
             <i class="fas fa-eye"></i> Ver Minuta Borrador
           </a>
 

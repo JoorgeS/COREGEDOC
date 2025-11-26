@@ -80,7 +80,7 @@ function renderPagination($current, $pages) {
   <meta charset="UTF-8">
   <title>Listado de Votaciones</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
     /* --- MEJORAS VISUALES --- */
@@ -340,7 +340,7 @@ function renderPagination($current, $pages) {
     </div>
   </div>
 
-  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>

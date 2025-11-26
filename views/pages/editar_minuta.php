@@ -1040,8 +1040,8 @@ $pdo = null; // Cerrar conexión
         }
 
         // 1. RUTA ABSOLUTA (Crucial para que se visualice)
-        // Asegúrate que '/corevota' es el nombre real de tu carpeta
-        const BASE_URL = '/corevota/controllers';
+        // Asegúrate que '/coregedoc' es el nombre real de tu carpeta
+        const BASE_URL = '/coregedoc/controllers';
 
         const fetchConsejeros = fetch(`${BASE_URL}/fetch_data.php?action=asistencia_all`, {
                 credentials: 'same-origin'
@@ -1274,7 +1274,7 @@ $pdo = null; // Cerrar conexión
                 if (bsModalValidarAsistencia) {
 
                     // 3. Obtener vista previa
-                    fetch(`/corevota/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                    fetch(`/coregedoc/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                             method: 'GET',
                             credentials: 'same-origin'
                         })
@@ -2099,7 +2099,7 @@ $pdo = null; // Cerrar conexión
         const li = document.createElement('li');
         li.className = 'list-group-item d-flex justify-content-between align-items-center';
         const link = document.createElement('a');
-        const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/corevota/${adj.pathAdjunto}` : adj.pathAdjunto;
+        const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `/coregedoc/${adj.pathAdjunto}` : adj.pathAdjunto;
         link.href = url;
         link.target = '_blank';
         let icon = (adj.tipoAdjunto === 'link') ? '🔗' : (adj.tipoAdjunto === 'asistencia' ? '👥' : '📄');

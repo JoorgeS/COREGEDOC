@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/fetch_data.php
+// /coregedoc/controllers/fetch_data.php
 // ¡VERSIÓN ESTANDARIZADA DEFINITIVA! 
 require_once __DIR__ . '/../class/class.conectorDB.php';
 header('Content-Type: application/json');

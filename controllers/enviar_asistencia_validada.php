@@ -1,6 +1,6 @@
 <?php
 // controllers/enviar_asistencia_validada.php
-// --- VERSIÓN FINAL: Ajustada a tu estructura SQL (corevota.sql) ---
+// --- VERSIÓN FINAL: Ajustada a tu estructura SQL (coregedoc.sql) ---
 
 session_start();
 require_once __DIR__ . '/../vendor/autoload.php';

@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
 <head>
     <meta charset="UTF-8">
     <title>Restablecer Contraseña</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
         body {
@@ -213,14 +213,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_id) {
 
 <body>
 <div class="recovery-box">
-    <img src="/corevota/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
+    <img src="/coregedoc/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
     <h2>RESTABLECER CONTRASEÑA</h2>
 
     <?php if ($message): ?>
         <div class="message-box message-<?php echo htmlspecialchars($message_type); ?>">
             <?php echo $message; ?>
             <?php if ($message_type === 'success'): ?>
-                <p><a href="/corevota/views/pages/login.php" style="color:#155724;">Ir a Iniciar Sesión</a></p>
+                <p><a href="/coregedoc/views/pages/login.php" style="color:#155724;">Ir a Iniciar Sesión</a></p>
             <?php endif; ?>
         </div>
     <?php endif; ?>

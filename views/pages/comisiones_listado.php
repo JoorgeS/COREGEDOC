@@ -58,7 +58,7 @@ function renderPaginationComisiones($current, $pages)
 <head>
     <meta charset="UTF-8">
     <title>Listado de Comisiones</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .container-fluid {
             padding: 20px;

@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/aprobar_minuta.php
+// /coregedoc/controllers/aprobar_minuta.php
 header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // Errores a log, no a la pantalla
@@ -642,7 +642,7 @@ try {
     // URL de verificación (DINÁMICA)
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost'; // Usa el host del servidor
-    $urlValidacion = $protocol . '://' . $host . "/corevota/public/validar.php?hash={$hashValidacion}";
+    $urlValidacion = $protocol . '://' . $host . "/coregedoc/public/validar.php?hash={$hashValidacion}";
 
 
     // --- INICIO: SOLUCIÓN (Usar API Externa, evita problemas de GD/SVG) ---

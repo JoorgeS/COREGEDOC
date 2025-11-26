@@ -69,11 +69,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mail->Port       = 587;
                 $mail->CharSet    = 'UTF-8';
 
-                $mail->setFrom('no-responder@corevota.cl', 'COREGEDOC');
+                $mail->setFrom('no-responder@coregedoc.cl', 'COREGEDOC');
                 $mail->addAddress($user_data['correo']);
 
                 // URL del link de restablecimiento
-                $reset_link = "http://localhost/corevota/views/pages/restablecer_contrasena.php?token=" . urlencode($token);
+                $reset_link = "http://localhost/coregedoc/views/pages/restablecer_contrasena.php?token=" . urlencode($token);
 
                 $mail->isHTML(true);
                 $mail->Subject = 'Recuperación de Contraseña COREGEDOC';
@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="background-overlay"></div>
     <div class="recovery-box">
-        <img src="/corevota/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
+        <img src="/coregedoc/public/img/logoCore1.png" alt="CORE Vota Logo" class="logo">
         <h2>RECUPERACIÓN DE CONTRASEÑA</h2>
         <p>¿HAS OLVIDADO TU CONTRASEÑA?</p>
 
@@ -158,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="actions-row">
                 <button type="submit" class="btn-black" style="width:48%;">RECUPERAR</button>
-                <a href="/corevota/views/pages/login.php" class="btn-white" style="width:48%; line-height:2.2;">VOLVER</a>
+                <a href="/coregedoc/views/pages/login.php" class="btn-white" style="width:48%; line-height:2.2;">VOLVER</a>
             </div>
         </form>
     </div>

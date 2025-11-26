@@ -130,7 +130,7 @@ if (!$EMBED): ?>
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($titulo); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body.bg-light { background-color: #f8f9fa !important; }
     </style>
@@ -283,7 +283,7 @@ if (!$EMBED): ?>
 
 <?php if (!$EMBED): ?>
 </div>
-<script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <?php endif; ?>
 
 <script>

@@ -42,7 +42,7 @@ $resultado  = false;
 $mensaje    = "Error al realizar la operación.";
 
 // Base para redirigir SIEMPRE por el menú (con sidebar)
-$menuBase = '/corevota/views/pages/menu.php';
+$menuBase = '/coregedoc/views/pages/menu.php';
 $destino  = $menuBase . '?pagina=usuarios_listado';
 
 try {

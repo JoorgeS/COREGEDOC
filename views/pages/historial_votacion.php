@@ -193,7 +193,7 @@ try {
 <head>
   <meta charset="UTF-8">
   <title>Historial de Votación</title>
-  <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
     body.bg-light {

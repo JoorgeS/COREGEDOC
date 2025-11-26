@@ -192,8 +192,8 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
     <meta charset="UTF-8">
     <title>Gestión de Minuta #<?php echo htmlspecialchars($idMinutaActual); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/corevota/public/css/style.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
@@ -883,7 +883,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             }
 
             try {
-                // ⚡ RUTA CORREGIDA: De '/corevota/...' a '../../...'
+                // ⚡ RUTA CORREGIDA: De '/coregedoc/...' a '../../...'
                 const response = await fetch(`../../controllers/obtener_resultados_votacion.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                     method: 'GET',
                     cache: 'no-store',
@@ -1384,7 +1384,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
                 if (bsModalValidarAsistencia) {
                     
                     // 3. Obtener vista previa
-                    fetch(`/corevota/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
+                    fetch(`/coregedoc/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                             method: 'GET',
                             credentials: 'same-origin'
                         })
@@ -2178,7 +2178,7 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
             const li = document.createElement('li');
             li.className = 'list-group-item d-flex justify-content-between align-items-center';
             const link = document.createElement('a');
-            // ⚡ RUTA CORREGIDA: Quitamos '/corevota/'
+            // ⚡ RUTA CORREGIDA: Quitamos '/coregedoc/'
             const url = (adj.tipoAdjunto === 'file' || adj.tipoAdjunto === 'asistencia') ? `../../${adj.pathAdjunto}` : adj.pathAdjunto;
             link.href = url;
             link.target = '_blank';

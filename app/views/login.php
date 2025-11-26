@@ -1,13 +1,18 @@
 <?php
-// /corevota/views/pages/login.php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// /coregedoc/views/login.php
 
-$error_message = '';
+// 1. BORRA O COMENTA ESTAS LÍNEAS PARA QUE NO PISE LA VARIABLE DEL CONTROLADOR
+/* $error_message = '';
 if (isset($_SESSION['error_message'])) {
     $error_message = $_SESSION['error_message'];
-    unset($_SESSION['error_message']); // Clear message after reading
+    unset($_SESSION['error_message']); 
+}
+*/
+
+// 2. AGREGA ESTO EN SU LUGAR:
+// Aseguramos que la variable exista, pero respetamos si el controlador ya le puso texto.
+if (!isset($error_message)) {
+    $error_message = '';
 }
 ?>
 <!DOCTYPE html>
@@ -16,10 +21,10 @@ if (isset($_SESSION['error_message'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CORE Vota - Login</title>
+    <title>COREGEDOC - Login</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/corevota/public/css/login_style.css">
+    <link rel="stylesheet" href="/coregedoc/public/css/login_style.css">
 </head>
 
 <body>
@@ -30,14 +35,14 @@ if (isset($_SESSION['error_message'])) {
         <div class="login-box">
 
             <div class="text-center mb-3">
-                <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE Valparaíso" class="login-logo">
+                <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE Valparaíso" class="login-logo">
             </div>
 
             <h5 class="text-center fw-bold mb-1">Plataforma Gestión Documental</h5>
             <p class="text-center subtitle mb-4">Consejo Regional de Valparaíso</p>
 
 
-            <form action="/corevota/controllers/LoginController.php" method="POST">
+            <form action="index.php?action=login" method="POST">
 
                 <div class="mb-3">
                     <label for="correo" class="form-label small">USUARIO</label>
@@ -57,7 +62,7 @@ if (isset($_SESSION['error_message'])) {
                 <?php endif; ?>
 
                 <div class="recover-link mb-4">
-                    <a href="/corevota/views/pages/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
+                    <a href="/coregedoc/views/pages/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
                 </div>
 
                 <button type="submit" class="btn btn-submit">INGRESAR</button>

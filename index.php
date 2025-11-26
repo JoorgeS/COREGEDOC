@@ -1,102 +1,206 @@
 <?php
+require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/app/config/Constants.php';
 
-// ====================================================
-// 0. INICIO DEL SCRIPT Y GESTIÓN DE SESIÓN
-// ====================================================
+use App\Controllers\AuthController;
+use App\Controllers\HomeController;
+use App\Controllers\MinutaController;
+use App\Controllers\VotacionController;
+use App\Controllers\AdjuntoController;
+use App\Controllers\AsistenciaController;
+use App\Controllers\ReunionController;
+use App\Controllers\UserController;
+use App\Controllers\ComisionController;
+
+
 session_start();
 
-// ----------------------------------------------------
-// 1. INCLUSIONES Y CONFIGURACIÓN INICIAL
-// ----------------------------------------------------
-// Rutas relativas a la raíz
-require_once __DIR__ . '/cfg/config.php';
-require_once __DIR__ . '/class/class.conectorDB.php';
+$action = $_GET['action'] ?? $_POST['action'] ?? 'login';
 
-// Variable para el mensaje de error de login
-$error_message = '';
+$authController = new AuthController();
+$homeController = new HomeController();
+$minutaController = new MinutaController();
+$votacionController = new VotacionController();
+$adjuntoController = new AdjuntoController();
+$asistenciaController = new AsistenciaController();
+$reunionController = new ReunionController();
+$userController = new UserController();
+$comisionController = new ComisionController();
 
-// ====================================================
-// 2. LÓGICA DE PROCESAMIENTO DEL LOGIN (Método POST)
-// ====================================================
-// CRÍTICO: Se corrige el error sintáctico aquí (de 'e' a solo el operador '===').
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+try {
+    switch ($action) {
+        case 'login':
+            $authController->login();
+            break;
+        case 'logout':
+            $authController->logout();
+            break;
+        case 'home':
+            $homeController->index();
+            break;
 
-    // Saneamiento y recolección de datos
-    $usuario = isset($_POST['usuario']) ? trim($_POST['usuario']) : '';
-    $clave = isset($_POST['password']) ? $_POST['password'] : '';
+        case 'minutas_dashboard':
+            $minutaController->dashboard();
+            break;
 
-    if (empty($usuario) || empty($clave)) {
-        $_SESSION['login_error'] = 'Por favor, ingrese usuario y contraseña.';
-    } else {
-        // CÓDIGO CORREGIDO (Pégalo en index.php)
-        try {
-            // Conexión a la base de datos
-            $conector = new conectorDB();
-            $db = $conector->getDatabase(); 
+        case 'minutas_pendientes':
+            $minutaController->pendientes();
+            break;
 
-            // 1. MODIFICACIÓN: Pedir TODOS los datos que menu.php necesita
-            $sql = 'SELECT idUsuario, correo, contrasena, pNombre, aPaterno, tipoUsuario_id 
-                    FROM t_usuario 
-                    WHERE correo = :user_input';
+        case 'minutas_aprobadas':
+            $minutaController->aprobadas();
 
-            $stmt = $db->prepare($sql);
-            $stmt->execute([':user_input' => $usuario]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        case 'minuta_gestionar':
+            $minutaController->gestionar();
+            break;
 
-            if ($user && password_verify($clave, $user['contrasena'])) {
-                
-                // ✅ ÉXITO: Iniciar la sesión
-                
-                // 2. MODIFICACIÓN: Guardar TODAS las variables que menu.php usa
-                $_SESSION['idUsuario'] = $user['idUsuario'];      // Clave correcta para menu.php
-                $_SESSION['pNombre'] = $user['pNombre'];          // Clave correcta para menu.php
-                $_SESSION['aPaterno'] = $user['aPaterno'];       // Clave correcta para menu.php
-                $_SESSION['correo'] = $user['correo'];
-                $_SESSION['tipoUsuario_id'] = $user['tipoUsuario_id']; // ¡La clave que faltaba!
+        case 'api_guardar_asistencia':
+            $minutaController->apiGuardarAsistencia();
+            break;
 
-                header('Location: /COREVOTA/index.php');
-                exit(); // CRÍTICO: Detiene el script después de la redirección.
+        case 'api_guardar_borrador':
+            $minutaController->apiGuardarBorrador();
+            break;
 
-            } else {
-                // Fallo: Credenciales incorrectas
-                $_SESSION['login_error'] = 'Credenciales incorrectas.';
-            }
-            
-        } catch (PDOException $e) {
+        case 'api_enviar_aprobacion':
+            $minutaController->apiEnviarAprobacion();
+            break;
 
-            // Error de conexión o consulta
-            // No exponer detalles del error al usuario final.
-            $_SESSION['login_error'] = 'Error interno en el sistema. Intente de nuevo.';
-        }
+        case 'api_firmar_minuta':
+            $minutaController->apiFirmarMinuta();
+            break;
+
+        case 'api_enviar_feedback':
+            $minutaController->apiEnviarFeedback();
+            break;
+
+        case 'api_votacion_crear':
+            $votacionController->apiCrear();
+            break;
+        case 'api_votacion_listar':
+            $votacionController->apiListar();
+            break;
+        case 'api_votacion_estado':
+            $votacionController->apiCambiarEstado();
+            break;
+        case 'api_votacion_resultados':
+            $votacionController->apiResultados();
+            break;
+
+        case 'voto_autogestion':
+            $votacionController->sala();
+            break;
+
+        case 'api_voto_check':
+            $votacionController->apiCheckActive();
+            break;
+
+        case 'api_voto_emitir':
+            $votacionController->apiEmitirVoto();
+            break;
+
+        case 'api_adjunto_listar':
+            $adjuntoController->apiListar();
+            break;
+        case 'api_adjunto_subir':
+            $adjuntoController->apiSubir();
+            break;
+        case 'api_adjunto_link':
+            $adjuntoController->apiAgregarLink();
+            break;
+        case 'api_adjunto_eliminar':
+            $adjuntoController->apiEliminar();
+            break;
+        case 'asistencia_sala':
+            $asistenciaController->sala();
+            break;
+        case 'api_asistencia_check':
+            $asistenciaController->apiCheck();
+            break;
+        case 'api_asistencia_marcar':
+            $asistenciaController->apiMarcar();
+            break;
+
+        case 'reuniones_dashboard': // Listado
+            $reunionController->index();
+            break;
+
+        case 'reunion_form': // Formulario de creación
+            $reunionController->create();
+            break;
+
+        case 'store_reunion': // Acción de guardar (POST)
+            $reunionController->store();
+            break;
+
+        case 'reunion_editar': // Formulario de edición
+            $reunionController->edit();
+            break;
+
+        case 'update_reunion': // Acción de actualizar (POST)
+            $reunionController->update();
+            break;
+
+        case 'reunion_eliminar': // Acción de borrar
+            $reunionController->delete();
+            break;
+
+        case 'reunion_iniciar_minuta': // Acción mágica
+            $reunionController->iniciarMinuta();
+            break;
+
+        case 'minuta_ver_historial': // <--- ESTA ES LA RUTA
+            $minutaController->verHistorial();
+            break;
+
+
+        case 'reunion_calendario':
+            $reunionController->calendario();
+            break;
+        case 'usuarios_dashboard':
+            $userController->index();
+            break;
+        case 'usuario_crear':
+            $userController->form(); // Formulario vacío
+            break;
+        case 'usuario_editar':
+            $userController->form(); // Formulario con datos (detecta $_GET['id'])
+            break;
+        case 'usuario_guardar':
+            $userController->store();
+            break;
+        case 'usuario_eliminar':
+            $userController->delete();
+            break;
+        case 'comisiones_dashboard':
+            $comisionController->index();
+            break;
+        case 'comision_crear':
+            $comisionController->form();
+            break;
+        case 'comision_editar':
+            $comisionController->form();
+            break;
+        case 'comision_guardar':
+            $comisionController->store();
+            break;
+        case 'comision_eliminar':
+            $comisionController->delete();
+            break;
+
+        case 'seguimiento_general':
+            $minutaController->seguimientoGeneral();
+            break;
+
+        case 'api_validar_asistencia':
+            $minutaController->apiValidarAsistencia();
+            break;
+
+
+        default:
+            header('Location: index.php?action=login');
+            exit();
     }
-
-    // Redirige siempre después de un POST para evitar el reenvío del formulario
-    header('Location: /COREVOTA/index.php');
-    exit();
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage();
 }
-
-// ====================================================
-// 3. CONTROL DE ACCESO Y RENDERIZADO (Método GET)
-// ====================================================
-
-// 1. Gestionar y limpiar el mensaje de error de la sesión
-if (isset($_SESSION['login_error'])) {
-    $error_message = $_SESSION['login_error'];
-    unset($_SESSION['login_error']);
-}
-
-if (isset($_SESSION['user_id'])) {
-    // Usuario logueado: Mostrar vista principal
-    include __DIR__ . '/views/pages/home.php';
-} else {
-    // Usuario NO logueado: Mostrar formulario de login
-
-    // Headers de Seguridad: Evita el caché para la página de login
-    header("Cache-Control: no-cache, no-store, must-revalidate");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-
-    // Incluir la vista de login. $error_message estará disponible aquí.
-    include __DIR__ . '/views/pages/login.php';
-}
-// Fin del script PHP

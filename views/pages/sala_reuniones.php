@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if (!isset($_SESSION['idUsuario'])) {
-    header("Location: /corevota/views/pages/login.php");
+    header("Location: /coregedoc/views/pages/login.php");
     exit;
 }
 
@@ -208,7 +208,7 @@ try {
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registrando...';
 
-        fetch("/corevota/controllers/AsistenciaController.php", {
+        fetch("/coregedoc/controllers/AsistenciaController.php", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -263,7 +263,7 @@ try {
 
         async function verificarReunionNueva() {
             try {
-                const response = await fetch(`/corevota/controllers/verificar_reunion_activa.php`);
+                const response = await fetch(`/coregedoc/controllers/verificar_reunion_activa.php`);
                 if (!response.ok) {
                     console.warn("Error chequeando nueva reunión, se reintentará.");
                     return;

@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/verificar_reunion_activa.php
+// /coregedoc/controllers/verificar_reunion_activa.php
 header('Content-Type: application/json');
 
 if (session_status() === PHP_SESSION_NONE) {

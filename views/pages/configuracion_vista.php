@@ -21,7 +21,7 @@ if (!isset($tipoUsuario) || $tipoUsuario != ROL_ADMINISTRADOR) {
 <head>
     <meta charset="UTF-8">
     <title>Configuración de la Vista</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <style>
         /* CSS simulado para aplicar el tema/fuente (se requeriría JS para la funcionalidad real) */
         .card-body button { margin-right: 10px; }

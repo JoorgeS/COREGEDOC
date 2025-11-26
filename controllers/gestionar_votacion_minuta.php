@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/gestionar_votacion_minuta.php
+// /coregedoc/controllers/gestionar_votacion_minuta.php
 // --- VERSIÓN CORREGIDA (sin PDF) ---
 
 header('Content-Type: application/json');

@@ -45,7 +45,7 @@ class LoginController extends BaseConexion
                     $_SESSION["tipoUsuario_id"] = $usuario["tipoUsuario_id"];
 
                     // Redirigir al menú
-                    header("Location: /corevota/views/pages/menu.php");
+                    header("Location: /coregedoc/views/pages/menu.php");
                     exit;
                 } else {
                     // FALLO: Contraseña incorrecta
@@ -71,8 +71,8 @@ class LoginController extends BaseConexion
         $_SESSION["error_message"] = $message;
 
         // Redirigir de vuelta a la página de login
-        // NOTA: Asumo que tu login está en la raíz de /corevota/ o en /corevota/login.php
-        header("Location: /corevota/views/pages/login.php");
+        // NOTA: Asumo que tu login está en la raíz de /coregedoc/ o en /coregedoc/login.php
+        header("Location: /coregedoc/views/pages/login.php");
         exit;
     }
 }

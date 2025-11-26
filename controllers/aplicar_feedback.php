@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/aplicar_feedback.php
+// /coregedoc/controllers/aplicar_feedback.php
 header('Content-Type: application/json');
 ini_set('display_errors', 0); // No mostrar errores, pero sí loguear
 ini_set('log_errors', 1);

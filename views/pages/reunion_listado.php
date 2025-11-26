@@ -80,7 +80,7 @@ function renderPagination($current, $pages)
 <head>
     <meta charset="UTF-8">
     <title>Listado de Reuniones</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
         /* --- ESTILOS DEL NUEVO DISEÑO --- */
@@ -262,7 +262,7 @@ function renderPagination($current, $pages)
                                                 <?php
                                                 } else {
                                                 ?>
-                                                    <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary shadow-sm" title="Crear e iniciar la edición de la minuta">
+                                                    <a href="/coregedoc/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary shadow-sm" title="Crear e iniciar la edición de la minuta">
                                                         <i class="fas fa-play me-1"></i> Iniciar Reunión
                                                     </a>
                                                 <?php
@@ -272,7 +272,7 @@ function renderPagination($current, $pages)
                                                 <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-outline-secondary btn-sm ms-1 rounded-circle" title="Editar Detalles">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
-                                                <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>" class="btn btn-outline-danger btn-sm ms-1 rounded-circle" title="Eliminar">
+                                                <a href="/coregedoc/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>" class="btn btn-outline-danger btn-sm ms-1 rounded-circle" title="Eliminar">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             <?php
@@ -331,7 +331,7 @@ function renderPagination($current, $pages)
         </div>
     </div>
 
-    <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>

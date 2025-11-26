@@ -4,12 +4,12 @@ if (!isset($_POST['pdf_data'])) {
     die("Error: No se recibieron datos para generar el PDF.");
 }
 
-// 2. Definir la ruta raíz del proyecto (corevota/)
+// 2. Definir la ruta raíz del proyecto (coregedoc/)
 // Subimos desde 'controllers' (../) para llegar a la raíz del proyecto.
 // Es crucial que esta ruta NO TERMINE en una barra.
 define('ROOT_PATH', __DIR__ . '/../');
 
-// Incluir el autoload de Dompdf (Ruta corregida: Subimos un nivel a corevota/ y entramos a vendor)
+// Incluir el autoload de Dompdf (Ruta corregida: Subimos un nivel a coregedoc/ y entramos a vendor)
 require_once ROOT_PATH . 'vendor/autoload.php';
 
 use Dompdf\Dompdf;
@@ -36,7 +36,7 @@ $dompdf = new Dompdf($options);
 
 // OBTENER RUTAS DEL LOGO (USANDO RUTA RELATIVA AL CHROOT)
 // OBTENER RUTA ABSOLUTA DEL LOGO Y CONVERTIR A DATA URI
-$logo_filesystem_path = ROOT_PATH . 'public/img/ojo.jpg'; // Construye la ruta C:/xampp/htdocs/corevota/public/img/ojo.jpg
+$logo_filesystem_path = ROOT_PATH . 'public/img/ojo.jpg'; // Construye la ruta C:/xampp/htdocs/coregedoc/public/img/ojo.jpg
 $logo_uri = ''; // Inicializar por si falla
 
 try {

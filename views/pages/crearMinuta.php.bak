@@ -282,7 +282,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
                   id="btnExportarExcel"
                   role="button"
                   <?php echo $idMinutaActual ? 'data-idminuta="' . $idMinutaActual . '"' : ''; ?>
-                  <?php echo ($existeAsistenciaGuardada && $idMinutaActual) ? 'href="/corevota/controllers/exportar_asistencia_excel.php?idMinuta=' . $idMinutaActual . '"' : 'href="#"'; ?>>
+                  <?php echo ($existeAsistenciaGuardada && $idMinutaActual) ? 'href="/coregedoc/controllers/exportar_asistencia_excel.php?idMinuta=' . $idMinutaActual . '"' : 'href="#"'; ?>>
                   <i class="fas fa-file-excel me-1"></i> Exportar Asistencia (Excel)
                 </a>
               </div>
@@ -436,7 +436,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
     // --- Funciones de Carga de Datos (FETCH - SOLO ASISTENCIA) ---
     function cargarTablaAsistencia() {
       // (Función sin cambios)
-      fetch("/corevota/controllers/fetch_data.php?action=asistencia_all")
+      fetch("/coregedoc/controllers/fetch_data.php?action=asistencia_all")
         .then(res => res.ok ? res.json() : Promise.reject(res))
         .then(response => {
           const cont = document.getElementById("contenedorTablaAsistenciaEstado");
@@ -505,7 +505,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
         btnExportarExcelGlobal.href = '#';
       }
 
-      fetch("/corevota/controllers/guardar_asistencia.php", {
+      fetch("/coregedoc/controllers/guardar_asistencia.php", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -521,7 +521,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             ASISTENCIA_GUARDADA_IDS = asistenciaIDs.map(String);
             if (idMinutaGlobal && btnExportarExcelGlobal) {
               btnExportarExcelGlobal.classList.remove('disabled');
-              btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
+              btnExportarExcelGlobal.href = `/coregedoc/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
             }
             setTimeout(() => {
               status.textContent = '';
@@ -699,7 +699,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       console.log('  temas:', formData.get('temas'));
       // Ya no enviamos archivos ni enlace aquí
 
-      fetch("/corevota/controllers/guardar_minuta_completa.php", {
+      fetch("/coregedoc/controllers/guardar_minuta_completa.php", {
           method: "POST",
           body: formData
         })
@@ -727,7 +727,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
             if (btnExportarExcelGlobal) {
               if (asistenciaIDs.length > 0) {
                 btnExportarExcelGlobal.classList.remove('disabled');
-                btnExportarExcelGlobal.href = `/corevota/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
+                btnExportarExcelGlobal.href = `/coregedoc/controllers/exportar_asistencia_excel.php?idMinuta=${idMinutaGlobal}`;
               } else {
                 btnExportarExcelGlobal.classList.add('disabled');
                 btnExportarExcelGlobal.href = '#';
@@ -758,7 +758,7 @@ $jsIdPresidenteAsignado = json_encode($minutaData['t_usuario_idPresidente'] ?? n
       }
       if (!confirm("¿FIRMAR y APROBAR esta minuta? Esta acción es irreversible.")) return;
 
-      fetch("/corevota/controllers/aprobar_minuta.php", {
+      fetch("/coregedoc/controllers/aprobar_minuta.php", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"

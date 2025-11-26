@@ -1,11 +1,11 @@
 <?php
-// /corevota/views/pages/tablaVotacion.php
+// /coregedoc/views/pages/tablaVotacion.php
 
 if (session_status() === PHP_SESSION_NONE) {
       session_start();
 }
 if (!isset($_SESSION['idUsuario'])) {
-      header("Location: /corevota/views/pages/login.php");
+      header("Location: /coregedoc/views/pages/login.php");
       exit;
 }
 
@@ -182,7 +182,7 @@ if (!$error) {
             async function actualizarResultados() {
                   try {
                         // 1. Llamamos al API (¡mucho más ligero que recargar todo el HTML!)
-                        const response = await fetch(`/corevota/controllers/obtener_resultados_votacion.php?idMinuta=${idMinuta}`);
+                        const response = await fetch(`/coregedoc/controllers/obtener_resultados_votacion.php?idMinuta=${idMinuta}`);
                         if (!response.ok) throw new Error('Error de red al consultar API');
 
                         const resultadoAPI = await response.json();
