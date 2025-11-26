@@ -218,7 +218,7 @@ class MinutaManager extends BaseConexion
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-        $urlValidacion = $protocol . '://' . $host . "/corevota/public/validar.php?hash={$hashAsistencia}";
+        $urlValidacion = $protocol . '://' . $host . "/coregedoc/public/validar.php?hash={$hashAsistencia}";
 
         $qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=' . urlencode($urlValidacion);
 

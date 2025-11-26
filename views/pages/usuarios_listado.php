@@ -229,7 +229,7 @@ $msg    = $_GET['msg'] ?? '';
 <head>
     <meta charset="UTF-8">
     <title>Listado de Usuarios</title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
         .tabla-scroll { position: relative; max-height: 70vh; overflow-y: auto; overflow-x: auto; }

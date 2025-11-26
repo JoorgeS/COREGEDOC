@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // SEGURIDAD: Redirigir si el usuario no está logueado
 if (!isset($_SESSION['idUsuario'])) {
-  header("Location: /corevota/views/pages/login.php");
+  header("Location: /coregedoc/views/pages/login.php");
   exit;
 }
 ?>
@@ -17,8 +17,8 @@ if (!isset($_SESSION['idUsuario'])) {
   <meta charset="UTF-8">
   <title>CORE Vota - Menú Principal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/corevota/public/css/style.css" rel="stylesheet">
+  <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/coregedoc/public/css/style.css" rel="stylesheet">
 
   <style>
     /* VARIABLES DE LAYOUT */
@@ -158,7 +158,7 @@ if (!isset($_SESSION['idUsuario'])) {
     <nav class="sidebar d-flex flex-column flex-shrink-0 border-end">
 
       <div class="sidebar-header-box d-flex align-items-center">
-        <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo">
+        <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo">
         B CORE Vota
       </div>
 
@@ -170,9 +170,9 @@ if (!isset($_SESSION['idUsuario'])) {
         </div>
         <div class="collapse show" id="hogar-collapse">
           <div class="sidebar-sub-menu">
-            <a href="/corevota/views/pages/dashboard.php" target="content-frame">Descripción general</a>
-            <a href="/corevota/views/pages/actualizaciones.php" target="content-frame">Actualizaciones</a>
-            <a href="/corevota/views/pages/informes.php" target="content-frame">Informes</a>
+            <a href="/coregedoc/views/pages/dashboard.php" target="content-frame">Descripción general</a>
+            <a href="/coregedoc/views/pages/actualizaciones.php" target="content-frame">Actualizaciones</a>
+            <a href="/coregedoc/views/pages/informes.php" target="content-frame">Informes</a>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ if (!isset($_SESSION['idUsuario'])) {
 
 
       <div class="sidebar-footer">
-        <a href="/corevota/logout.php" class="btn btn-danger w-100 fw-bold">Cerrar Sesión</a>
+        <a href="/coregedoc/logout.php" class="btn btn-danger w-100 fw-bold">Cerrar Sesión</a>
       </div>
     </nav>
 
@@ -227,19 +227,19 @@ if (!isset($_SESSION['idUsuario'])) {
             <li>
               <hr class="dropdown-divider">
             </li>
-            <li><a class="dropdown-item text-danger" href="/corevota/logout.php">Cerrar sesión</a></li>
+            <li><a class="dropdown-item text-danger" href="/coregedoc/logout.php">Cerrar sesión</a></li>
           </ul>
         </div>
       </div>
     </header>
 
     <main>
-      <iframe src="/corevota/views/pages/crearMinuta.php" name="content-frame"></iframe>
+      <iframe src="/coregedoc/views/pages/crearMinuta.php" name="content-frame"></iframe>
     </main>
 
   </div>
 
-  <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

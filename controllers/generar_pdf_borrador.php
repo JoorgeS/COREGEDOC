@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/generar_pdf_borrador.php
+// /coregedoc/controllers/generar_pdf_borrador.php
 // Este script genera una VISTA PREVIA de la minuta en PDF,
 // (AJUSTADO) AHORA INCLUYE LOS SELLOS DE VALIDACIÓN DEL ST.
 

@@ -12,7 +12,7 @@ free disk space   : (C:) 233,61 GB
 display mode      : 1536x960, 32 bit
 process id        : $1014
 allocated memory  : 23,89 MB
-command line      : "C:\xampp\sendmail\sendmail.exe" -t -oi -fsistema.corevota@gobiernovalparaiso.cl -t
+command line      : "C:\xampp\sendmail\sendmail.exe" -t -oi -fsistema.coregedoc@gobiernovalparaiso.cl -t
 executable        : sendmail.exe
 exec. date/time   : 2012-04-16 14:30
 compiled with     : Delphi 2006/07

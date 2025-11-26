@@ -210,7 +210,7 @@ try {
                         modalTitle.textContent = 'Seguimiento Minuta N° ' + minutaId;
                         modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
 
-                        fetch('/corevota/controllers/obtener_preview_seguimiento.php?id=' + minutaId)
+                        fetch('/coregedoc/controllers/obtener_preview_seguimiento.php?id=' + minutaId)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error('Error en la red: ' + response.statusText);

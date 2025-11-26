@@ -8,7 +8,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $model = new ComisionModel();
 $action = $_POST['action'] ?? $_GET['action'] ?? 'list';
-$redirectUrl = '/corevota/views/pages/menu.php?pagina=comision_listado';
+$redirectUrl = '/coregedoc/views/pages/menu.php?pagina=comision_listado';
 
 switch ($action) {
 
@@ -40,7 +40,7 @@ switch ($action) {
 
         if (empty($nombre)) {
             $_SESSION['error'] = 'El nombre de la comisión es obligatorio.';
-            header('Location: /corevota/views/pages/menu.php?pagina=comision_crear');
+            header('Location: /coregedoc/views/pages/menu.php?pagina=comision_crear');
             exit;
         }
 
@@ -84,7 +84,7 @@ switch ($action) {
 
         if (empty($nombre) || $id === 0) {
             $_SESSION['error'] = 'Datos incompletos para actualizar.';
-            header('Location: /corevota/views/pages/menu.php?pagina=comision_editar&id=' . $id);
+            header('Location: /coregedoc/views/pages/menu.php?pagina=comision_editar&id=' . $id);
             exit;
         }
 

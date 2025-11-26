@@ -1,102 +1,41 @@
 <?php
 
-// ====================================================
-// 0. INICIO DEL SCRIPT Y GESTIÓN DE SESIÓN
-// ====================================================
+// 1. Cargar el Autoloader de Composer (Carga automática de clases)
+require_once __DIR__ . '/vendor/autoload.php';
+
+
+use App\Controllers\AuthController;
+use App\Controllers\HomeController;
+
+// 2. Iniciar la sesión globalmente para toda la app
 session_start();
 
-// ----------------------------------------------------
-// 1. INCLUSIONES Y CONFIGURACIÓN INICIAL
-// ----------------------------------------------------
-// Rutas relativas a la raíz
-require_once __DIR__ . '/cfg/config.php';
-require_once __DIR__ . '/class/class.conectorDB.php';
+// 3. Enrutador Básico
+// Verificamos si hay una acción específica en la URL (ej: index.php?action=logout)
+$action = isset($_GET['action']) ? $_GET['action'] : 'index';
 
-// Variable para el mensaje de error de login
-$error_message = '';
+// Instanciamos el controlador de autenticación
+$auth = new AuthController();
 
-// ====================================================
-// 2. LÓGICA DE PROCESAMIENTO DEL LOGIN (Método POST)
-// ====================================================
-// CRÍTICO: Se corrige el error sintáctico aquí (de 'e' a solo el operador '===').
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+switch ($action) {
+    case 'logout':
+        // Acción de cerrar sesión
+        $auth->logout();
+        break;
 
-    // Saneamiento y recolección de datos
-    $usuario = isset($_POST['usuario']) ? trim($_POST['usuario']) : '';
-    $clave = isset($_POST['password']) ? $_POST['password'] : '';
+    case 'login':
+        // Procesar formulario o mostrar vista de login
+        $auth->login();
+        break;
 
-    if (empty($usuario) || empty($clave)) {
-        $_SESSION['login_error'] = 'Por favor, ingrese usuario y contraseña.';
-    } else {
-        // CÓDIGO CORREGIDO (Pégalo en index.php)
-        try {
-            // Conexión a la base de datos
-            $conector = new conectorDB();
-            $db = $conector->getDatabase(); 
-
-            // 1. MODIFICACIÓN: Pedir TODOS los datos que menu.php necesita
-            $sql = 'SELECT idUsuario, correo, contrasena, pNombre, aPaterno, tipoUsuario_id 
-                    FROM t_usuario 
-                    WHERE correo = :user_input';
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute([':user_input' => $usuario]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && password_verify($clave, $user['contrasena'])) {
-                
-                // ✅ ÉXITO: Iniciar la sesión
-                
-                // 2. MODIFICACIÓN: Guardar TODAS las variables que menu.php usa
-                $_SESSION['idUsuario'] = $user['idUsuario'];      // Clave correcta para menu.php
-                $_SESSION['pNombre'] = $user['pNombre'];          // Clave correcta para menu.php
-                $_SESSION['aPaterno'] = $user['aPaterno'];       // Clave correcta para menu.php
-                $_SESSION['correo'] = $user['correo'];
-                $_SESSION['tipoUsuario_id'] = $user['tipoUsuario_id']; // ¡La clave que faltaba!
-
-                header('Location: /COREVOTA/index.php');
-                exit(); // CRÍTICO: Detiene el script después de la redirección.
-
-            } else {
-                // Fallo: Credenciales incorrectas
-                $_SESSION['login_error'] = 'Credenciales incorrectas.';
-            }
-            
-        } catch (PDOException $e) {
-
-            // Error de conexión o consulta
-            // No exponer detalles del error al usuario final.
-            $_SESSION['login_error'] = 'Error interno en el sistema. Intente de nuevo.';
+    default:
+        // Lógica principal (Home o Login)
+        if (isset($_SESSION['idUsuario'])) {
+            // ✅ NUEVO: Usar el HomeController en lugar de incluir archivo directo
+            $home = new HomeController();
+            $home->index();
+        } else {
+            $auth->login();
         }
-    }
-
-    // Redirige siempre después de un POST para evitar el reenvío del formulario
-    header('Location: /COREVOTA/index.php');
-    exit();
+        break;
 }
-
-// ====================================================
-// 3. CONTROL DE ACCESO Y RENDERIZADO (Método GET)
-// ====================================================
-
-// 1. Gestionar y limpiar el mensaje de error de la sesión
-if (isset($_SESSION['login_error'])) {
-    $error_message = $_SESSION['login_error'];
-    unset($_SESSION['login_error']);
-}
-
-if (isset($_SESSION['user_id'])) {
-    // Usuario logueado: Mostrar vista principal
-    include __DIR__ . '/views/pages/home.php';
-} else {
-    // Usuario NO logueado: Mostrar formulario de login
-
-    // Headers de Seguridad: Evita el caché para la página de login
-    header("Cache-Control: no-cache, no-store, must-revalidate");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-
-    // Incluir la vista de login. $error_message estará disponible aquí.
-    include __DIR__ . '/views/pages/login.php';
-}
-// Fin del script PHP

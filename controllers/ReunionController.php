@@ -406,9 +406,9 @@ if (session_status() === PHP_SESSION_NONE) {
 $action = $_POST['action'] ?? $_GET['action'] ?? null;
 $manager = new ReunionManager();
 
-$listRedirectUrl = '/corevota/views/pages/menu.php?pagina=reunion_listado';
-$homeRedirectUrl = '/corevota/views/pages/menu.php?pagina=home';
-$reunionFormUrl = '/corevota/views/pages/menu.php?pagina=reunion_form'; // Crear
+$listRedirectUrl = '/coregedoc/views/pages/menu.php?pagina=reunion_listado';
+$homeRedirectUrl = '/coregedoc/views/pages/menu.php?pagina=home';
+$reunionFormUrl = '/coregedoc/views/pages/menu.php?pagina=reunion_form'; // Crear
 
 try {
     // --- ACCIONES POST (Formularios) ---
@@ -438,7 +438,7 @@ try {
             } else {
                 $_SESSION['error'] = $response['message'];
                 // Volver al formulario de edición si hay error
-                header('Location: /corevota/views/pages/menu.php?pagina=reunion_editar&id=' . $idReunion);
+                header('Location: /coregedoc/views/pages/menu.php?pagina=reunion_editar&id=' . $idReunion);
             }
             exit;
         }
@@ -510,7 +510,7 @@ try {
             if ($response['status'] === 'success') {
                 $_SESSION['success'] = $response['message'];
                 // Redirigir a editar_minuta con el ID de la nueva minuta:
-                header('Location: /corevota/views/pages/menu.php?pagina=editar_minuta&id=' . $response['idMinuta']);
+                header('Location: /coregedoc/views/pages/menu.php?pagina=editar_minuta&id=' . $response['idMinuta']);
             } else {
                 $_SESSION['error'] = $response['message'];
                 header('Location: ' . $listRedirectUrl);

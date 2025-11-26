@@ -9,7 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // SEGURIDAD: Redirigir si el usuario no está logueado
 if (!isset($_SESSION['idUsuario'])) {
-    header("Location: /corevota/views/pages/login.php");
+    header("Location: /coregedoc/views/pages/login.php");
     exit;
 }
 
@@ -141,13 +141,13 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
     <meta charset="UTF-8">
     <title>COREGEDOC</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/corevota/public/css/style.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/css/style.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
-    <script src="/corevota/public/vendor/jquery/jquery-3.7.1.min.js"></script>
+    <script src="/coregedoc/public/vendor/jquery/jquery-3.7.1.min.js"></script>
 
 
     <style>
@@ -397,7 +397,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
         <nav class="sidebar d-flex flex-column flex-shrink-0">
             <div class="sidebar-header-box">
-                <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo">
+                <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo">
             </div>
 
             <div class="flex-grow-1 overflow-auto">
@@ -493,7 +493,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         </a>
                     </li>
 
-                    <li class="nav-item mt-auto"> <a href="/corevota/logout.php" class="nav-link nav-link-logout">
+                    <li class="nav-item mt-auto"> <a href="/coregedoc/logout.php" class="nav-link nav-link-logout">
                             <i class="fas fa-sign-out-alt fa-fw"></i>
                             Cerrar Sesión
                         </a>
@@ -548,7 +548,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         <li>
                             <hr class="dropdown-divider">
                         </li>
-                        <li><a class="dropdown-item text-danger" href="/corevota/logout.php"><i class="fas fa-sign-out-alt fa-fw me-2"></i>Cerrar sesión</a></li>
+                        <li><a class="dropdown-item text-danger" href="/coregedoc/logout.php"><i class="fas fa-sign-out-alt fa-fw me-2"></i>Cerrar sesión</a></li>
                     </ul>
                 </div>
             </div>
@@ -739,7 +739,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 
-    <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
     <script>
         /**
@@ -760,7 +760,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
             modal.show();
 
             // 3. Usar fetch para llamar a tu nuevo archivo PHP
-            fetch('/corevota/controllers/obtener_adjuntos.php', {
+            fetch('/coregedoc/controllers/obtener_adjuntos.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -834,7 +834,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 btnLink.disabled = true;
                 btnLink.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Añadiendo...';
 
-                fetch('/corevota/controllers/agregar_adjunto.php', {
+                fetch('/coregedoc/controllers/agregar_adjunto.php', {
                         method: 'POST',
                         body: formData
                     })
@@ -889,7 +889,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                         }
                     });
 
-                    fetch('/corevota/controllers/aprobar_minuta.php', { //
+                    fetch('/coregedoc/controllers/aprobar_minuta.php', { //
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1070,7 +1070,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
                 // Asegúrate que la ruta a logout.php sea correcta desde la raíz.
                 // Usamos la variable $url_base que está definida en config.php (asumiendo que se incluye)
                 // Si no, usamos la ruta absoluta.
-                window.location.href = '/corevota/logout.php';
+                window.location.href = '/coregedoc/logout.php';
             }
 
             function resetTimer() {

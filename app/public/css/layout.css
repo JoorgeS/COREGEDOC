@@ -1,0 +1,177 @@
+/* ============================================================
+   ESTILOS GENERALES Y VARIABLES
+============================================================ */
+:root {
+    --sidebar-width: 300px;
+    --header-height: 65px;
+    --core-blue: #1C88BF; /* Azul Institucional */
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.app-container {
+    height: 100vh;
+}
+
+main {
+    margin-top: var(--header-height);
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+    height: calc(100vh - var(--header-height));
+    overflow-y: auto;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+}
+
+/* ============================================================
+   SIDEBAR (BARRA LATERAL)
+============================================================ */
+nav.sidebar {
+    width: var(--sidebar-width);
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1030;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+    overflow-y: auto;
+    padding: 0 !important;
+    background-color: #ffffff;
+    border-right: 1px solid #dee2e6;
+}
+
+.sidebar-header-box {
+    padding: 20px 10px;
+    border-bottom: 1px solid #dee2e6;
+    text-align: center;
+}
+
+.sidebar-logo {
+    max-width: 300px;
+    height: auto;
+    margin: 0 auto;
+    display: block;
+}
+
+.sidebar .nav-link {
+    color: #333;
+    font-weight: 500;
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.sidebar .nav-link i {
+    width: 25px;
+    text-align: center;
+    margin-right: 10px;
+    font-size: 0.9rem;
+}
+
+.sidebar .nav-link:hover {
+    background-color: #e7f1ff;
+    color: var(--core-blue);
+}
+
+.sidebar .nav-link.active {
+    background-color: var(--core-blue);
+    color: #ffffff;
+}
+
+.sidebar-footer {
+    padding: 1rem 0.5rem;
+    border-top: 1px solid #dee2e6;
+    background-color: #ffffff;
+}
+
+.nav-link-logout {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+.nav-link-logout:hover {
+    background-color: #bb2d3b !important;
+}
+
+/* ============================================================
+   HEADER (BARRA SUPERIOR)
+============================================================ */
+.core-header {
+    height: var(--header-height);
+    width: calc(100% - var(--sidebar-width));
+    margin-left: var(--sidebar-width);
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 1020;
+    background-color: var(--core-blue);
+    color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+}
+
+.core-header .titulo-sistema {
+    color: #ffffff !important;
+    font-weight: 500;
+}
+
+.core-header .usuario {
+    color: #ffffff;
+}
+
+.core-header .dropdown-toggle::after {
+    color: #ffffff;
+}
+
+.rrss-icon-link {
+    color: #ffffff;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.rrss-icon-link:hover {
+    opacity: 1;
+}
+
+/* ============================================================
+   DASHBOARD CARDS
+============================================================ */
+.dashboard-card {
+    display: block;
+    padding: 2rem 1.5rem;
+    text-decoration: none;
+    color: #333;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, .075);
+    transition: all 0.2s ease-in-out;
+    text-align: center;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, .15);
+    color: var(--core-blue);
+}
+
+.dashboard-card i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--core-blue);
+}
+
+.dashboard-card h5 {
+    font-weight: 600;
+}

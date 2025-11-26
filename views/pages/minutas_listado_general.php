@@ -492,7 +492,7 @@ function renderPaginationListado($current, $pages)
                             <td class="text-center" style="white-space: nowrap;">
 
                                 <?php if ($estado === 'APROBADA'): ?>
-                                    <a href="/corevota/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
+                                    <a href="/coregedoc/<?php echo htmlspecialchars($minuta['pathArchivo']); ?>" target="_blank" class="btn btn-success btn-sm" title="Ver PDF Aprobado">
                                         <i class="fas fa-file-pdf"></i> Ver PDF Final
                                     </a>
                                 <?php else: // Si NO está APROBADA 
@@ -595,7 +595,7 @@ function renderPaginationListado($current, $pages)
             modalList.innerHTML = '<li class="list-group-item text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando...</li>';
             modal.show();
 
-            fetch(`/corevota/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
+            fetch(`/coregedoc/controllers/obtener_adjuntos.php?idMinuta=${idMinuta}&_cacheBust=${Date.now()}`)
                 .then(r => {
                     if (!r.ok) {
                         return r.text().then(text => Promise.reject(`Error HTTP ${r.status}: ${text.substring(0, 50)}...`));

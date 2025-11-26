@@ -1,5 +1,5 @@
 <?php
-// /corevota/views/pages/login.php
+// /coregedoc/views/pages/login.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -19,7 +19,7 @@ if (isset($_SESSION['error_message'])) {
     <title>CORE Vota - Login</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/corevota/public/css/login_style.css">
+    <link rel="stylesheet" href="/coregedoc/public/css/login_style.css">
 </head>
 
 <body>
@@ -30,14 +30,14 @@ if (isset($_SESSION['error_message'])) {
         <div class="login-box">
 
             <div class="text-center mb-3">
-                <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE Valparaíso" class="login-logo">
+                <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE Valparaíso" class="login-logo">
             </div>
 
             <h5 class="text-center fw-bold mb-1">Plataforma Gestión Documental</h5>
             <p class="text-center subtitle mb-4">Consejo Regional de Valparaíso</p>
 
 
-            <form action="/corevota/controllers/LoginController.php" method="POST">
+            <form action="/coregedoc/controllers/LoginController.php" method="POST">
 
                 <div class="mb-3">
                     <label for="correo" class="form-label small">USUARIO</label>
@@ -57,7 +57,7 @@ if (isset($_SESSION['error_message'])) {
                 <?php endif; ?>
 
                 <div class="recover-link mb-4">
-                    <a href="/corevota/views/pages/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
+                    <a href="/coregedoc/views/pages/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
                 </div>
 
                 <button type="submit" class="btn btn-submit">INGRESAR</button>

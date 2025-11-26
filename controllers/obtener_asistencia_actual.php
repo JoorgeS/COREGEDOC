@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/obtener_asistencia_actual.php
+// /coregedoc/controllers/obtener_asistencia_actual.php
 header('Content-Type: application/json');
 error_reporting(0);
 ini_set('display_errors', 0);

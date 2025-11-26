@@ -48,7 +48,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
 <head>
     <meta charset="UTF-8">
     <title><?php echo ($reunionData ? 'Editar Reunión' : 'Crear Nueva Reunión'); ?></title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body>
@@ -91,13 +91,13 @@ if ($managerExists && $action === 'edit' && $reunionId) {
         <div id="mensaje" class="mt-3"></div>
     </div>
 
-    <script src="/corevota/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="/coregedoc/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script>
         // --- FUNCIÓN DE CARGA DE COMISIONES (ASÍNCRONA) ---
         async function cargarComisiones(selectId) {
             try {
                 const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($idSecretarioLogueado); ?>;
-                const response = await fetch("/corevota/controllers/fetch_data.php?action=comisiones");
+                const response = await fetch("/coregedoc/controllers/fetch_data.php?action=comisiones");
                 const data = await response.json();
                 const select = document.getElementById(selectId);
                 select.innerHTML = '<option selected disabled value="">Seleccione...</option>';
@@ -156,7 +156,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
                 idSecretario: ID_SECRETARIO_LOGUEADO
             };
 
-            fetch("/corevota/controllers/ReunionController.php?action=create", {
+            fetch("/coregedoc/controllers/ReunionController.php?action=create", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
@@ -188,7 +188,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
         }
 
         function eliminarReunion(idReunion) {
-            fetch(`/corevota/controllers/ReunionController.php?action=delete&id=${idReunion}`, {
+            fetch(`/coregedoc/controllers/ReunionController.php?action=delete&id=${idReunion}`, {
                     method: 'POST', // Usamos POST para la acción de eliminación
                     headers: {
                         'Content-Type': 'application/json'
@@ -244,7 +244,7 @@ if ($managerExists && $action === 'edit' && $reunionId) {
                 vigente: 1
             };
 
-            fetch("/corevota/controllers/ReunionController.php?action=update", {
+            fetch("/coregedoc/controllers/ReunionController.php?action=update", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"

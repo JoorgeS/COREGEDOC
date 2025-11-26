@@ -1,7 +1,7 @@
 <?php
 // views/pages/asistencia_autogestion.php
 
-// 1. CORRECCIÓN DE RUTA: Subir DOS niveles a /corevota/
+// 1. CORRECCIÓN DE RUTA: Subir DOS niveles a /coregedoc/
 require_once __DIR__ . '/../../class/class.conectorDB.php';
 
 // 2. ELIMINACIÓN: El session_start() se borra de aquí.
@@ -135,7 +135,7 @@ $ahora = new DateTime();
         button.disabled = true;
         button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registrando...';
 
-        fetch("/corevota/controllers/AsistenciaController.php", {
+        fetch("/coregedoc/controllers/AsistenciaController.php", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

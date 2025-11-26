@@ -321,16 +321,16 @@ class Usuario
         $fileName = 'user_' . $idUsuario . '_' . time() . '.' . $extension;
         
         // RUTA WEB (la que se debe guardar en la BD)
-        // ej: /corevota/public/img/perfiles/user_41_12345.jpg
-        $webPath = '/corevota/public/img/perfiles/' . $fileName;
+        // ej: /coregedoc/public/img/perfiles/user_41_12345.jpg
+        $webPath = '/coregedoc/public/img/perfiles/' . $fileName;
 
         // RUTA FÍSICA (donde se moverá el archivo)
-        // __DIR__ es la carpeta de Usuario.php (ej: C:/xampp/htdocs/corevota)
+        // __DIR__ es la carpeta de Usuario.php (ej: C:/xampp/htdocs/coregedoc)
         $serverSavePath = __DIR__ . '/public/img/perfiles/' . $fileName;
         
         // --- 3. Obtener foto antigua para borrarla ---
         $usuarioActual = $this->obtenerUsuario($idUsuario);
-        $oldDbPath = $usuarioActual['foto_perfil'] ?? null; // Puede ser la ruta C: (error) o la ruta /corevota/ (correcto)
+        $oldDbPath = $usuarioActual['foto_perfil'] ?? null; // Puede ser la ruta C: (error) o la ruta /coregedoc/ (correcto)
 
         // --- 4. Mover el nuevo archivo ---
         if (move_uploaded_file($fileData['tmp_name'], $serverSavePath)) {
@@ -355,7 +355,7 @@ class Usuario
                     if (strpos($oldDbPath, 'C:') === 0 || strpos($oldDbPath, '/xampp/') !== false) {
                         $oldServerPath = $oldDbPath; // Ya es una ruta de servidor
                     } else {
-                        // Es una ruta web (ej: /corevota/public/...)
+                        // Es una ruta web (ej: /coregedoc/public/...)
                         // La convertimos a ruta de servidor
                         $oldServerPath = $_SERVER['DOCUMENT_ROOT'] . $oldDbPath;
                     }

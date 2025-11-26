@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/obtener_estado_votacion_usuario.php
+// /coregedoc/controllers/obtener_estado_votacion_usuario.php
 
 header('Content-Type: application/json');
 error_reporting(E_ALL);

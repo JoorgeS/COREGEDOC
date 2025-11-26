@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if (!isset($_SESSION['idUsuario'])) {
-    header("Location: /corevota/views/pages/login.php");
+    header("Location: /coregedoc/views/pages/login.php");
     exit;
 }
 
@@ -303,7 +303,7 @@ if ($votacionVigente) {
     async function actualizarSala() {
         try {
             // 1. Fetch de datos sin caché
-            const response = await fetch(`/corevota/controllers/obtener_estado_sala_votante.php?_t=${new Date().getTime()}`, {
+            const response = await fetch(`/coregedoc/controllers/obtener_estado_sala_votante.php?_t=${new Date().getTime()}`, {
                 method: 'GET',
                 cache: 'no-store'
             });

@@ -1,5 +1,5 @@
 <?php
-// /corevota/controllers/obtener_adjuntos.php
+// /coregedoc/controllers/obtener_adjuntos.php
 // --- VERSIÓN CORREGIDA Y ROBUSTA (Maneja GET y POST) ---
 
 header('Content-Type: application/json');
@@ -79,7 +79,7 @@ try {
             }
 
             // Construir la URL absoluta para el navegador
-            $pathWebFinal = '/corevota/' . $pathCorregido;
+            $pathWebFinal = '/coregedoc/' . $pathCorregido;
             $nombreArchivo = basename($pathOriginal) . $extensionFaltante; // Aseguramos que el nombre mostrado también tenga la extensión
 
             // ----------------------------------------------------

@@ -8,7 +8,7 @@
 <head>
     <meta charset="UTF-8">
     <title><?php echo htmlspecialchars($title); ?></title>
-    <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/coregedoc/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .container { max-width: 900px; }
         textarea { min-height: 120px; }
