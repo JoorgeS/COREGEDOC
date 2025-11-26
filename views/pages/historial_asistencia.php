@@ -143,14 +143,25 @@ foreach ($reunionesAsc as $r) {
     }
 }
 
-// 2. Calcular porcentaje acumulado por día
+// 2. Calcular porcentaje acumulado por día (SOLO HASTA HOY si es el mes actual)
 $diasDelMes = cal_days_in_month(CAL_GREGORIAN, $mesInt, $anioInt);
+
+// Si estamos viendo el mes/año actual, cortamos el gráfico en el día de hoy
+$diaLimite = $diasDelMes;
+$hoyDia = (int)date('d');
+$hoyMes = (int)date('m');
+$hoyAnio = (int)date('Y');
+
+if ($mesInt === $hoyMes && $anioInt === $hoyAnio) {
+    $diaLimite = $hoyDia;
+}
+
 $chartLabels = [];
 $chartDataPoints = [];
 $totalAsistidasAcumulado = 0;
 $totalReunionesAcumulado = 0;
 
-for ($dia = 1; $dia <= $diasDelMes; $dia++) {
+for ($dia = 1; $dia <= $diaLimite; $dia++) {
     $chartLabels[] = sprintf('%02d-%s', $dia, $mesSeleccionado);
 
     if (isset($reunionesPorDia[$dia])) {
@@ -172,11 +183,9 @@ $chartData = [
     'data'   => $chartDataPoints,
     'totalReuniones' => $totalReunionesAcumulado 
 ];
-
 // ===============================================
 // --- FIN: CÁLCULOS PARA EL GRÁFICO DE LÍNEAS ---
 // ===============================================
-
 
 // ===============================================
 // --- INICIO: CÁLCULO DE PAGINACIÓN ---

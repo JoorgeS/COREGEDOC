@@ -505,7 +505,7 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
         <header class="core-header d-flex justify-content-between align-items-center p-3">
             <h6 class="titulo-sistema mb-0 fw-bold text-muted">
-                Gestión Documental de Consejo Regional de Valparaíso
+                Gestor Documental del Consejo Regional de la región de Valparaíso
             </h6>
             <div class="d-flex align-items-center gap-3">
 
