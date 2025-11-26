@@ -1,5 +1,5 @@
 <?php
-// Extraer variables para fácil uso en la vista
+// /coregedoc/views/home.php
 $tareas = $data['tareas_pendientes'];
 $reuniones = $data['proximas_reuniones'];
 $actividad = $data['actividad_reciente'];

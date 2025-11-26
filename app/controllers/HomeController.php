@@ -20,12 +20,13 @@ class HomeController {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-
+// Comenta o borra temporalmente esta redirección para probar
+        /*
         if (!isset($_SESSION['idUsuario'])) {
             header('Location: index.php?action=login');
             exit();
         }
-
+        */
         // 2. Preparar variables de usuario
         $idUsuarioLogueado = $_SESSION['idUsuario'];
         $tipoUsuario = $_SESSION['tipoUsuario_id'];
