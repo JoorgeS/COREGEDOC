@@ -209,7 +209,9 @@ function renderPagination($current, $pages)
             <input type="text" class="form-control form-control-sm" id="q" name="q" placeholder="Buscar..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
           </div>
 
-
+          <div class="col-md-1">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Filtrar</button>
+          </div>
           <div class="col-md-1">
             <a href="menu.php?pagina=votacion_listado" class="btn btn-outline-secondary btn-sm w-100">
               <i class="fas fa-times"></i> Limpiar
@@ -278,10 +280,6 @@ function renderPagination($current, $pages)
                     ?>
 
                     <span class="badge <?= $statusClass ?> fw-bold" style="font-size: 0.9rem;"><?= $statusText ?></span>
-
-                    <div class="small text-muted mt-1" style="white-space: nowrap;">
-                      (Sí: <?= $si ?>, No: <?= $no ?>, Abs: <?= $abs ?>)
-                    </div>
                   </td>
 
                   <td style="min-width: 150px;">

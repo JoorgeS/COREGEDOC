@@ -125,7 +125,7 @@ if ($votacionVigente) {
                         <?php if (empty($votacionVigente)): ?>
                             <div class="alert alert-info text-center mb-0">
                                 <i class="fas fa-spinner fa-spin me-2"></i>
-                                No hay votaciones habilitadas en este momento. Esperando...
+                                No hay votaciones habilitadas en este momento.
                             </div>
                         <?php else: ?>
                             <h2 id="tituloVotacion" class="fw-bold mb-2 text-dark text-center">
@@ -349,7 +349,7 @@ if ($votacionVigente) {
             contenedorPrincipal.innerHTML = `
         <div class="alert alert-info text-center mb-0">
           <i class="fas fa-spinner fa-spin me-2"></i>
-          No hay votaciones habilitadas en este momento. Esperando...
+          No hay votaciones habilitadas en este momento.
         </div>`;
             return;
         }

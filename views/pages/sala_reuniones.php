@@ -96,7 +96,7 @@ try {
                     <?php if (empty($reunionesParaMostrar)): ?>
                         <div class="alert alert-info text-center mb-0">
                             <i class="fas fa-spinner fa-spin me-2"></i>
-                            No hay reuniones habilitadas para registrar asistencia en este momento. Esperando...
+                            No hay reuniones habilitadas para registrar asistencia en este momento.
                         </div>
                     <?php else: ?>
                         <div class="list-group">
