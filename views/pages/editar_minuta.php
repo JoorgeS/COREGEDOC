@@ -33,13 +33,17 @@ try {
     }
 
     // Carga del primer tema (asumiendo que los temas son arrays en tu app real)
-    $stmtTema = $pdo->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :idMinuta LIMIT 1");
-    $stmtTema->execute([':idMinuta' => $idMinuta]);
-    $tema = $stmtTema->fetch(PDO::FETCH_ASSOC);
+   $stmtTemas = $pdo->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :idMinuta ORDER BY idTema ASC");
+    $stmtTemas->execute([':idMinuta' => $idMinuta]);
+    $temas = $stmtTemas->fetchAll(PDO::FETCH_ASSOC);
 
-    $nombreTemas = $tema['nombreTema'] ?? 'Temas de ejemplo...';
-    $objetivos = $tema['objetivo'] ?? 'Objetivos de ejemplo...';
-    $acuerdos = $tema['compromiso'] ?? 'Acuerdos de ejemplo...'; // Asumo que compromiso es acuerdo
+    // Si no hay temas, inicializamos el array vacío para que JS lo maneje
+    if (!$temas) {
+        $temas = [];
+    }
+    
+    // Ya no necesitamos asignar $nombreTemas, $objetivos, etc. individualmente
+    // porque JS se encargará de renderizar el array completo.
 
 } catch (Exception $e) {
     echo "<div class='alert alert-danger'>Error al conectar o cargar datos: " . $e->getMessage() . "</div>";
@@ -288,7 +292,57 @@ $pdo = null; // Cerrar conexión
 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="../../public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+
 <template id="plantilla-tema">
+    <div class="card mb-3 tema-block border-start border-4 border-primary shadow-sm">
+        <div class="card-body position-relative">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="card-title text-primary fw-bold m-0 titulo-tema">Tema Nuevo</h6>
+                
+                <div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#collapseTema_ID_" aria-expanded="true" aria-controls="collapseTema_ID_">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <?php if (!$esSoloLectura): ?>
+                    <button type="button" class="btn btn-outline-danger btn-sm eliminar-tema" onclick="eliminarTema(this)" title="Eliminar tema">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="collapse show" id="collapseTema_ID_">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small text-muted fw-bold">Tema / Título</label>
+                        <textarea class="form-control editable-area bg-white" rows="1" placeholder="Ej: Revisión de presupuesto..."></textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small text-muted fw-bold">Objetivo</label>
+                        <textarea class="form-control editable-area bg-white" rows="2" placeholder="Qué se busca lograr con este tema..."></textarea>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted fw-bold">Desarrollo / Discusión</label>
+                        <textarea class="form-control editable-area bg-white" rows="4" placeholder="Resumen de lo conversado..."></textarea>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted fw-bold text-success">Acuerdos / Compromisos</label>
+                        <textarea class="form-control editable-area bg-white border-success border-opacity-25" rows="4" placeholder="Acuerdos tomados..."></textarea>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label class="form-label small text-muted fw-bold">Observaciones Adicionales</label>
+                        <textarea class="form-control editable-area bg-white" rows="2" placeholder="Notas al margen..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
 <script>
     // ==================================================================
     // --- VARIABLES GLOBALES JAVASCRIPT ---
@@ -300,7 +354,7 @@ $pdo = null; // Cerrar conexión
     const ID_SECRETARIO_LOGUEADO = <?php echo json_encode($_SESSION['idUsuario'] ?? 0); ?>;
     let bsModalValidarAsistencia = null;
     const ESTADO_MINUTA_ACTUAL = <?php echo json_encode($estadoMinuta); ?>;
-    const DATOS_TEMAS_CARGADOS = <?php echo json_encode(isset($tema) ? [$tema] : []); ?>;
+    const DATOS_TEMAS_CARGADOS = <?php echo json_encode($temas); ?>;
     let ASISTENCIA_GUARDADA_IDS = <?php echo json_encode($asistenciaActualIDs ?? []); ?>;
     const HORA_INICIO_REUNION = "<?php echo htmlspecialchars(date('H:i:s', strtotime($minuta['horaMinuta'] ?? 'now'))); ?>";
     const ES_ST_EDITABLE = <?php echo $esSoloLectura ? 'false' : 'true'; ?>;
