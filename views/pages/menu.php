@@ -868,8 +868,8 @@ function esActivo($grupo, $paginaActual, $gruposPaginas)
 
         function aprobarMinuta(idMinuta) {
             Swal.fire({
-                title: '¿Confirmar Firma?',
-                text: '¿Desea firmar y aprobar esta minuta? Esta acción es irreversible.',
+                title: '¿Está seguro de firmar esta minuta?',
+                text: 'Esta acción es irreversible.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Sí, firmar',

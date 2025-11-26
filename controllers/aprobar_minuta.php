@@ -468,7 +468,7 @@ try {
 
 
         $faltan = $totalRequeridos - $totalAprobaciones;
-        $mensaje = "Firma registrada. Falta(n) {$faltan} firma(s) más.";
+        $mensaje = "Falta(n) {$faltan} firma(s) más.";
         echo json_encode([
             'status' => 'success_partial',
             'message' => $mensaje,

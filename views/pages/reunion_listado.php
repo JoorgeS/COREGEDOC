@@ -2,15 +2,13 @@
 // views/pages/reunion_listado.php
 // La variable $reuniones es provista por ReunionController.php?action=list
 if (!isset($reuniones) || !is_array($reuniones)) {
-    $reuniones = []; // Asegura que la variable exista si se accede directamente
+    $reuniones = []; 
 }
 
-// Los mensajes de sesión ahora se manejan en menu.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Asegurar $now si no viene desde el controlador
 if (!isset($now)) {
     $now = time();
 }
@@ -19,10 +17,7 @@ if (!isset($now)) {
    PROCESAMIENTO DE FILTROS
    ========================= */
 
-// 1. Palabra Clave (para Nombre Reunión)
 $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-
-// 2. Rango de Fecha (con valores por defecto)
 $fechaInicio_val = isset($_GET['fecha_inicio']) && !empty($_GET['fecha_inicio']) ? $_GET['fecha_inicio'] : date('Y-m-01');
 $fechaTermino_val = isset($_GET['fecha_termino']) && !empty($_GET['fecha_termino']) ? $_GET['fecha_termino'] : date('Y-m-d');
 
@@ -36,21 +31,18 @@ $reunionesFiltradas = $reuniones;
 if ($q !== '') {
     $needle = mb_strtolower($q, 'UTF-8');
     $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($needle) {
-        // Búsqueda solo en Nombre Reunión, como se solicitó
         $nombre = mb_strtolower((string)($r['nombreReunion'] ?? ''), 'UTF-8');
         return (strpos($nombre, $needle) !== false);
     });
 }
 
-// --- B. Filtro por Rango de Fecha (sobre la fecha de INICIO de la reunión) ---
-// (Solo filtra si ambas fechas están presentes)
+// --- B. Filtro por Rango de Fecha ---
 if ($fechaInicio_val && $fechaTermino_val) {
     $inicioTimestamp = strtotime($fechaInicio_val . ' 00:00:00');
     $terminoTimestamp = strtotime($fechaTermino_val . ' 23:59:59');
 
     $reunionesFiltradas = array_filter($reunionesFiltradas, function ($r) use ($inicioTimestamp, $terminoTimestamp) {
         $reunionTimestamp = strtotime($r['fechaInicioReunion']);
-        // Comprobar que la fecha de la reunión esté DENTRO del rango
         return ($reunionTimestamp >= $inicioTimestamp) && ($reunionTimestamp <= $terminoTimestamp);
     });
 }
@@ -59,25 +51,20 @@ if ($fechaInicio_val && $fechaTermino_val) {
 /* =========================
    PAGINACIÓN
    ========================= */
-$perPage = 10; // Se elimina el dropdown, se fija en 10 (o el valor que prefieras)
-
+$perPage = 10; 
 $total  = count($reunionesFiltradas);
 $pages  = max(1, (int)ceil($total / $perPage));
 $page   = isset($_GET['p']) ? (int)$_GET['p'] : 1;
 $page   = max(1, min($page, $pages));
 $offset = ($page - 1) * $perPage;
-
-// Subconjunto a mostrar
 $reunionesPage = array_slice($reunionesFiltradas, $offset, $perPage);
 
-// Helper para paginación
 function renderPagination($current, $pages)
 {
     if ($pages <= 1) return;
-    // Preservar querystring existente (incluyendo filtros)
-    echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0">';
+    echo '<nav aria-label="Paginación"><ul class="pagination pagination-sm mb-0 justify-content-end">';
     for ($i = 1; $i <= $pages; $i++) {
-        $qsArr = $_GET; // Mantiene 'pagina', 'q', 'fecha_inicio', 'fecha_termino'
+        $qsArr = $_GET; 
         $qsArr['p'] = $i;
         $qs = http_build_query($qsArr);
         $active = ($i === $current) ? ' active' : '';
@@ -96,95 +83,170 @@ function renderPagination($current, $pages)
     <link href="/corevota/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
-        .table-responsive {
-            margin-top: 20px;
+        /* --- ESTILOS DEL NUEVO DISEÑO --- */
+        body {
+            background-color: #f4f6f9;
         }
 
-        .table th,
-        .table td {
-            vertical-align: middle;
+        .card-narrow {
+            max-width: 1500px;
+            margin: 1.5rem auto;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
 
         .filters-card {
-            border: 1px solid #e5e7eb;
-            border-radius: .5rem;
-            background: #f8fafc
+            background: #ffffff;
+            border-left: 5px solid #0d6efd;
+            transition: all 0.3s ease;
+        }
+        
+        .filters-card:hover {
+            box-shadow: 0 8px 15px rgba(0,0,0,0.08);
+        }
+
+        .form-label-custom {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #6c757d;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .form-control-custom {
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            font-size: 0.95rem;
+        }
+
+        .form-control-custom:focus {
+            border-color: #86b7fe;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+        }
+
+        .btn-clean {
+            border-radius: 6px;
+            font-weight: 500;
+            padding: 8px 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+            transition: all 0.2s;
+        }
+
+        .btn-clean:hover {
+            background-color: #e2e6ea;
+            color: #212529;
+            border-color: #adb5bd;
+        }
+
+        .table-card {
+            border-top: 5px solid #198754;
+        }
+
+        .table thead th {
+            background-color: #343a40;
+            color: white;
+            font-weight: 500;
+            border: none;
+            vertical-align: middle;
         }
 
         .sticky-th thead th {
             position: sticky;
             top: 0;
-            z-index: 1
+            z-index: 10;
         }
     </style>
 </head>
 
 <body>
-    <div class="container-fluid mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="mb-0">Reuniones Registradas</h3>
+    
+    <nav aria-label="breadcrumb" class="mb-4 ms-3 mt-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="menu.php?pagina=home" class="text-decoration-none">Home</a></li>
+            <li class="breadcrumb-item"><a href="menu.php?pagina=reuniones_dashboard" class="text-decoration-none">Módulo de Reuniones</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Listado</li>
+        </ol>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <h3 class="mb-4 text-dark fw-bold"><i class="fas fa-users-cog me-2 text-primary"></i>Gestión de Reuniones</h3>
+
+        <div class="card card-narrow filters-card mb-4">
+            <div class="card-body p-4">
+                <h6 class="mb-3 text-primary fw-bold"><i class="fas fa-filter me-2"></i>Filtros de Búsqueda</h6>
+
+                <form id="filtrosForm" method="GET" class="row g-3 align-items-end">
+                    <input type="hidden" name="pagina" value="<?php echo htmlspecialchars($_GET['pagina'] ?? 'reunion_listado', ENT_QUOTES, 'UTF-8'); ?>">
+                    <input type="hidden" name="p" id="pHidden" value="1">
+
+                    <div class="col-md-4">
+                        <label for="q" class="form-label-custom"><i class="fas fa-search me-1"></i> Palabra Clave</label>
+                        <input type="text" class="form-control form-control-custom" id="q" name="q" 
+                               placeholder="Buscar por nombre de reunión..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="fecha_inicio" class="form-label-custom"><i class="far fa-calendar-alt me-1"></i> Desde</label>
+                        <input type="date" class="form-control form-control-custom" id="fecha_inicio" name="fecha_inicio" 
+                               value="<?php echo htmlspecialchars($fechaInicio_val); ?>">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="fecha_termino" class="form-label-custom"><i class="far fa-calendar-check me-1"></i> Hasta</label>
+                        <input type="date" class="form-control form-control-custom" id="fecha_termino" name="fecha_termino" 
+                               value="<?php echo htmlspecialchars($fechaTermino_val); ?>">
+                    </div>
+
+                    <div class="col-md-2">
+                        <button type="button" id="btnClear" class="btn btn-clean w-100">
+                            <i class="fas fa-eraser me-1 text-danger"></i> Limpiar
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <form id="filtrosForm" method="GET" class="mb-3 p-3 filters-card">
-            <input type="hidden" name="pagina" value="<?php echo htmlspecialchars($_GET['pagina'] ?? 'reunion_listado', ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="p" id="pHidden" value="1">
-            <div class="row g-3 align-items-end">
-
-                <div class="col-md-5">
-                    <label for="q" class="form-label">Palabra Clave (Nombre Reunión)</label>
-                    <input type="text" class="form-control form-control-sm" id="q" name="q" placeholder="Buscar por nombre..." value="<?php echo htmlspecialchars($q, ENT_QUOTES, 'UTF-8'); ?>">
-                </div>
-
-                <div class="col-md-3">
-                    <label for="fecha_inicio" class="form-label">Desde</label>
-                    <input type="date" class="form-control form-control-sm" id="fecha_inicio" name="fecha_inicio" value="<?php echo htmlspecialchars($fechaInicio_val); ?>">
-                </div>
-
-                <div class="col-md-3">
-                    <label for="fecha_termino" class="form-label">Hasta</label>
-                    <input type="date" class="form-control form-control-sm" id="fecha_termino" name="fecha_termino" value="<?php echo htmlspecialchars($fechaTermino_val); ?>">
-                </div>
-
-                <div class="col-md-1">
-                    <button type="submit" class="btn btn-sm btn-primary w-100">Filtrar</button>
-                </div>
-            </div>
-        </form>
-
-        <div class="card shadow-sm">
-            <div class="card-body">
+        <div class="card card-narrow table-card shadow-sm">
+            <div class="card-body p-0">
                 <div class="table-responsive">
                     <?php if (empty($reunionesPage)) : ?>
-                        <div class="alert alert-info">No se encontraron reuniones con esos criterios.</div>
+                        <div class="p-5 text-center">
+                            <div class="mb-3"><i class="fas fa-folder-open fa-3x text-muted"></i></div>
+                            <h5 class="text-muted">No se encontraron reuniones.</h5>
+                            <p class="text-muted small">Intenta ajustar los filtros de búsqueda.</p>
+                        </div>
                     <?php else : ?>
-                        <table class="table table-striped table-hover sticky-th">
-                            <thead class="table-dark">
+                        <table class="table table-hover mb-0 align-middle sticky-th">
+                            <thead>
                                 <tr>
-                                    <th>N° Reunión</th>
+                                    <th class="ps-4">N° Reunión</th>
                                     <th>Nombre</th>
                                     <th>Comisión</th>
                                     <th>Fecha y hora</th>
                                     <th>Estado</th>
-
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($reunionesPage as $reunion) : ?>
                                     <?php
-                                    // Variables para esta fila
                                     $idReunion  = $reunion['idReunion'];
-                                    $idMinuta   = $reunion['t_minuta_idMinuta']; // puede ser NULL
-                                    $estadoMinuta = $reunion['estadoMinuta'];     // NULL, 'BORRADOR', 'PENDIENTE', 'APROBADA'
+                                    $idMinuta   = $reunion['t_minuta_idMinuta'];
+                                    $estadoMinuta = $reunion['estadoMinuta'];
                                     $meetingStartTime = strtotime($reunion['fechaInicioReunion']);
                                     ?>
                                     <tr>
-                                        <td><strong><?php echo htmlspecialchars($idMinuta); ?></strong></td>
+                                        <td class="ps-4 fw-bold text-secondary">#<?php echo htmlspecialchars($idMinuta ?? '-'); ?></td>
 
-                                        <td><?php echo htmlspecialchars($reunion['nombreReunion']); ?></td>
+                                        <td class="fw-semibold"><?php echo htmlspecialchars($reunion['nombreReunion']); ?></td>
 
-                                        <td><?php echo htmlspecialchars($reunion['nombreComision']); ?></td>
+                                        <td><span class="badge bg-light text-dark border"><?php echo htmlspecialchars($reunion['nombreComision']); ?></span></td>
 
-                                        <td><?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($reunion['fechaInicioReunion']))); ?></td>
+                                        <td class="small text-muted"><i class="far fa-clock me-1"></i><?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($reunion['fechaInicioReunion']))); ?></td>
 
                                         <td style="white-space: nowrap;">
                                             <?php
@@ -200,17 +262,17 @@ function renderPagination($current, $pages)
                                                 <?php
                                                 } else {
                                                 ?>
-                                                    <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary" title="Crear e iniciar la edición de la minuta">
+                                                    <a href="/corevota/controllers/ReunionController.php?action=iniciarMinuta&idReunion=<?php echo $idReunion; ?>" class="btn btn-sm btn-primary shadow-sm" title="Crear e iniciar la edición de la minuta">
                                                         <i class="fas fa-play me-1"></i> Iniciar Reunión
                                                     </a>
                                                 <?php
                                                 }
-                                                // Botones de EDITAR y BORRAR
+                                                // Botones de EDITAR y BORRAR (Restaurados)
                                                 ?>
-                                                <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-secondary btn-sm ms-1" title="Editar Detalles de la Reunión (horario, nombre, etc.)">
+                                                <a href="menu.php?pagina=reunion_editar&id=<?php echo $idReunion; ?>" class="btn btn-outline-secondary btn-sm ms-1 rounded-circle" title="Editar Detalles">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
-                                                <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>" class="btn btn-sm btn-danger ms-1" title="Deshabilitar Reunión">
+                                                <a href="/corevota/controllers/ReunionController.php?action=delete&id=<?php echo $idReunion; ?>" class="btn btn-outline-danger btn-sm ms-1 rounded-circle" title="Eliminar">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             <?php
@@ -237,16 +299,15 @@ function renderPagination($current, $pages)
                                                 </span>
                                             <?php
                                             } elseif ($estadoMinuta === 'PARCIAL') {
-                                                // --- 4. ESTADO APROBADA (Finalizada real) ---
+                                                // --- 5. ESTADO PARCIAL ---
                                             ?>
                                                 <span title="La minuta fue guardada como borrador y está pendiente de aprobación por más de un Presidente.">
-                                                    <i class="fas fa-clock me-1 text-warning"></i></i> Finalizada esperando aprobación de minuta
+                                                    <i class="fas fa-clock me-1 text-warning"></i> Finalizada esperando aprobación de minuta
                                                 </span>
                                             <?php
 
-
                                             } else {
-                                                // --- 5. ESTADO INVÁLIDO (Fallback) ---
+                                                // --- 6. ESTADO INVÁLIDO (Fallback) ---
                                             ?>
                                                 <span class="text-danger" title="Estado de minuta desconocido: <?php echo htmlspecialchars($estadoMinuta); ?>">
                                                     <i class="fas fa-exclamation-circle me-1"></i> Estado Inválido
@@ -260,7 +321,8 @@ function renderPagination($current, $pages)
                             </tbody>
                         </table>
 
-                        <div class="d-flex justify-content-end">
+                        <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+                            <small class="text-muted">Mostrando <?php echo count($reunionesPage); ?> registros</small>
                             <?php renderPagination($page, $pages); ?>
                         </div>
                     <?php endif; ?>
@@ -274,18 +336,18 @@ function renderPagination($current, $pages)
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const deleteLinks = document.querySelectorAll('a.btn-danger[href*="ReunionController.php?action=delete"]');
+            const deleteLinks = document.querySelectorAll('a.btn-outline-danger[href*="ReunionController.php?action=delete"]');
             deleteLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
                     const url = this.getAttribute('href');
                     Swal.fire({
-                        title: '¿Estás seguro?',
-                        text: "Esta acción eliminará la reunión del listado activo.",
+                        title: '¿Eliminar reunión?',
+                        text: "Esta acción no se puede deshacer.",
                         icon: 'warning',
                         showCancelButton: true,
-                        confirmButtonColor: '#d33',
-                        cancelButtonColor: '#3085d6',
+                        confirmButtonColor: '#dc3545',
+                        cancelButtonColor: '#6c757d',
                         confirmButtonText: 'Sí, eliminar',
                         cancelButtonText: 'Cancelar'
                     }).then((result) => {
@@ -296,47 +358,43 @@ function renderPagination($current, $pages)
                 });
             });
         });
-    </script>
 
-    <script>
         (function() {
-            // Obtener los elementos del DOM
             const form = document.getElementById('filtrosForm');
             const inputQ = document.getElementById('q');
+            const inputInicio = document.getElementById('fecha_inicio');
+            const inputTermino = document.getElementById('fecha_termino');
+            const btnClear = document.getElementById('btnClear');
             const pHid = document.getElementById('pHidden');
 
-            // Función para resetear la paginación a la página 1
-            function toFirstPage() {
-                if (pHid) pHid.value = '1';
+            function toFirstPage() { if (pHid) pHid.value = '1'; }
+            function submitForm() { toFirstPage(); form.submit(); }
+
+            if (inputInicio) inputInicio.addEventListener('change', submitForm);
+            if (inputTermino) inputTermino.addEventListener('change', submitForm);
+
+            if (btnClear) {
+                btnClear.addEventListener('click', function() {
+                    if (inputQ) inputQ.value = '';
+                    if (inputInicio) inputInicio.value = '';
+                    if (inputTermino) inputTermino.value = '';
+                    submitForm();
+                });
             }
 
-            // Variable para guardar el temporizador (para debounce)
             let searchTimer = null;
-
-            // Escuchar el evento 'input' (cada vez que el usuario teclea)
             if (inputQ && form) {
                 inputQ.addEventListener('input', () => {
-                    // Limpiar el temporizador anterior
                     clearTimeout(searchTimer);
-
-                    // Iniciar un nuevo temporizador
                     searchTimer = setTimeout(() => {
                         const val = (inputQ.value || '').trim();
-
-                        // Si el texto tiene 4 o más caracteres, O si está vacío, filtrar.
                         if (val.length >= 4 || val.length === 0) {
-                            toFirstPage(); // Volver a la página 1
-                            form.submit(); // Enviar el formulario
+                            submitForm();
                         }
-                    }, 400); // Espera 400ms después de la última tecla antes de buscar
+                    }, 400);
                 });
             }
         })();
     </script>
-
-
-
-
 </body>
-
 </html>

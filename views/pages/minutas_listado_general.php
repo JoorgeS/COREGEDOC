@@ -381,11 +381,11 @@ function renderPaginationListado($current, $pages)
 
         <div class="row g-3">
             <div class="col-md-3">
-                <label for="startDate" class="form-label">Fecha Creación Desde:</label>
+                <label for="startDate" class="form-label">Fecha desde:</label>
                 <input type="date" class="form-control form-control-sm" id="startDate" name="startDate" value="<?php echo htmlspecialchars($currentStartDate); ?>">
             </div>
             <div class="col-md-3">
-                <label for="endDate" class="form-label">Fecha Creación Hasta:</label>
+                <label for="endDate" class="form-label">Fecha hasta:</label>
                 <input type="date" class="form-control form-control-sm" id="endDate" name="endDate" value="<?php echo htmlspecialchars($currentEndDate); ?>">
             </div>
 
@@ -407,7 +407,7 @@ function renderPaginationListado($current, $pages)
             </div>
 
             <div class="col-md-4">
-                <label for="themeName" class="form-label">Buscar por palabra clave (Reunión / Tema / Objetivo)</label>
+                <label for="themeName" class="form-label">Busca por palabra clave contenida en el nombre de una reunión, tema u objetivo</label>
                 <input
                     type="text"
                     class="form-control form-control-sm"
@@ -419,7 +419,9 @@ function renderPaginationListado($current, $pages)
 
 
             <div class="col-12">
-                <button type="button" id="btnClearAll" class="btn btn-outline-secondary btn-sm mt-2">Limpiar todos los filtros</button>
+                <button type="button" id="btnClearAll" class="btn btn-outline-secondary btn-sm mt-2">
+                    <i class="fas fa-eraser me-1"></i> Limpiar
+                </button>
             </div>
         </div>
     </form>
@@ -432,7 +434,7 @@ function renderPaginationListado($current, $pages)
                     <th scope="col">Nombre Reunión</th>
                     <th scope="col">Comisión</th>
                     <th scope="col">Nombre(s) del Tema</th>
-                    <th scope="col">Fecha Creación</th>
+                    <th scope="col">Fecha de Reunión</th>
                     <th scope="col" class="text-center">Adjuntos</th>
                     <th scope="col" class="text-center">Acciones</th>
                 </tr>

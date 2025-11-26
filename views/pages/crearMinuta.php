@@ -2049,69 +2049,79 @@ $readonlyAttr = $esSoloLectura ? 'readonly' : '';
         }
 
         // --- FUNCIÓN MODIFICADA PARA MANEJAR 'submit' y 'change' ---
-        function handleAgregarLink(event) {
-            // Prevenir el envío si es un evento 'submit' (tecla Enter)
-            if (event) {
-                event.preventDefault();
-            }
+       function handleAgregarLink(e) {
+        e.preventDefault();
+        const input = document.getElementById('inputUrlLink');
+        
+        // 1. Obtenemos el valor y usamos 'let' para poder modificarlo
+        let url = input.value.trim();
 
-            const input = document.getElementById('inputUrlLink');
-            const url = input.value.trim();
-
-            // 1. Validar la URL
-            if (!url || !filterUrl(url)) {
-                // Si el campo no está vacío pero es inválido, mostrar advertencia
-                if (url !== '') {
-                    Swal.fire('Error', 'La URL proporcionada no es válida. Asegúrese que empiece con http:// o https://', 'warning');
-                }
-                // Si está vacío, simplemente no hacer nada (no guardar)
-                return;
-            }
-
-            // 2. Validar permisos
-            if (!ES_ST_EDITABLE) {
-                Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
-                return;
-            }
-
-            // 3. Deshabilitar UI y preparar datos
-            input.disabled = true;
-            input.placeholder = 'Añadiendo...';
-            const formData = new FormData();
-            formData.append('idMinuta', idMinutaGlobal);
-            formData.append('urlLink', url);
-
-            // 4. Hacer el fetch (esta lógica es la misma que tenías)
-            fetch('../../controllers/agregar_adjunto.php?action=link', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                })
-                .then(res => {
-                    if (res.ok) {
-                        return res.json();
-                    }
-                    return res.text().then(text => {
-                        console.error("Respuesta de error del servidor (link):", text);
-                        throw new Error("El servidor respondió con un error (ver consola).");
-                    });
-                })
-                .then(data => {
-                    if (data.status === 'success') {
-                        Swal.fire('Éxito', 'Enlace agregado correctamente.', 'success');
-                        agregarAdjuntoALista(data.data);
-                        input.value = ''; // Limpiar el input al tener éxito
-                    } else {
-                        Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
-                    }
-                })
-                .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
-                .finally(() => {
-                    // 5. Rehabilitar UI
-                    input.disabled = false;
-                    input.placeholder = 'https://ejemplo.com';
-                });
+        // 2. CORRECCIÓN AUTOMÁTICA: Si no tiene protocolo, agregamos https://
+        // Esto evita el error 400 del servidor
+        if (url.length > 0 && !/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
         }
+
+        // 3. Validamos la URL ya corregida
+        if (!url || !filterUrl(url)) {
+            Swal.fire('Formato Inválido', 'La URL no es válida. Intente con: ejemplo.com', 'warning');
+            return;
+        }
+
+        if (!ES_ST_EDITABLE) {
+            Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
+            return;
+        }
+
+        input.disabled = true;
+        input.placeholder = 'Añadiendo...';
+        
+        const formData = new FormData();
+        formData.append('idMinuta', idMinutaGlobal);
+        formData.append('urlLink', url); // Enviamos la URL corregida con https://
+
+        // ⚡ CORRECCIÓN: Se añade 'credentials'
+        fetch('../../controllers/agregar_adjunto.php?action=link', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(res => {
+                if (res.ok) {
+                    return res.json();
+                }
+                // Manejo de errores HTTP (como el 400 que tenías)
+                return res.text().then(text => {
+                    let errorMsg = "Error desconocido.";
+                    try {
+                        // Intentamos parsear el JSON de error del servidor si existe
+                        const jsonErr = JSON.parse(text);
+                        if(jsonErr.message) errorMsg = jsonErr.message;
+                    } catch(e) {
+                        // Si no es JSON, usamos un texto genérico o el del status
+                        errorMsg = `Error del servidor (${res.status}).`;
+                    }
+                    throw new Error(errorMsg);
+                });
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire('Éxito', 'Enlace agregado correctamente.', 'success');
+                    agregarAdjuntoALista(data.data);
+                    input.value = '';
+                } else {
+                    Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', err.message, 'error');
+            })
+            .finally(() => {
+                input.disabled = false;
+                input.placeholder = 'https://ejemplo.com';
+            });
+    }
 
         function filterUrl(str) {
             const pattern = new RegExp('^(https?:\\/\\/)?' +

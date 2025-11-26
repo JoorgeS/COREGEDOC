@@ -157,7 +157,7 @@ $serverToday = date('Y-m-d');
 <body>
 
 <div class="container mt-4">
-    <h3 class="calendar-title">Calendario General de Reuniones Vigentes</h3>
+    <h3 class="calendar-title">Reuniones Vigentes</h3>
     <div id="fullCalendarContainer"></div>
 </div>
 

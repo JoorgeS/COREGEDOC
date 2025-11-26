@@ -139,21 +139,20 @@ $pdo = null; // Cerrar conexión
         <input type="hidden" id="idMinuta" name="idMinuta" value="<?php echo $idMinuta; ?>">
 
         <div class="card shadow-sm mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Detalles de la Minuta</h5>
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <h5 class="mb-0 text-primary"><i class="fas fa-list-alt me-2"></i>Temas de la Minuta</h5>
+                
+                <?php if (!$esSoloLectura): ?>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="agregarTema()">
+                        <i class="fas fa-plus-circle me-1"></i> Añadir Tema
+                    </button>
+                <?php endif; ?>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="minutaTemas" class="form-label">Nombre(s) del Tema</label>
-                    <textarea class="form-control" id="minutaTemas" name="temas[0][nombre]" rows="3" <?php echo $readonlyAttr; ?>><?php echo htmlspecialchars($nombreTemas); ?></textarea>
-                </div>
-                <div class="mb-3">
-                    <label for="minutaObjetivos" class="form-label">Objetivo(s)</label>
-                    <textarea class="form-control" id="minutaObjetivos" name="temas[0][objetivo]" rows="3" <?php echo $readonlyAttr; ?>><?php echo htmlspecialchars($objetivos); ?></textarea>
-                </div>
-                <div class="mb-3">
-                    <label for="minutaAcuerdos" class="form-label">Acuerdos (Compromisos)</label>
-                    <textarea class="form-control" id="minutaAcuerdos" name="temas[0][acuerdo]" rows="5" <?php echo $readonlyAttr; ?>><?php echo htmlspecialchars($acuerdos); ?></textarea>
+            <div class="card-body bg-light bg-opacity-10">
+                <div id="contenedorTemas"></div>
+                
+                <div class="text-center text-muted small mt-2" id="msgSinTemas" style="display:none;">
+                    No hay temas registrados. Pulsa "Añadir Tema" para comenzar.
                 </div>
             </div>
         </div>
@@ -289,6 +288,7 @@ $pdo = null; // Cerrar conexión
 <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="../../public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<template id="plantilla-tema">
 <script>
     // ==================================================================
     // --- VARIABLES GLOBALES JAVASCRIPT ---
@@ -1191,7 +1191,7 @@ $pdo = null; // Cerrar conexión
     // ==================================================================
     // --- FUNCIÓN DE VALIDACIÓN CON FILTRO INTELIGENTE ---
     // ==================================================================
-   // ==================================================================
+    // ==================================================================
     // --- FUNCIÓN DE VALIDACIÓN (CON FILTRO Y ORDEN POR NOMBRE) ---
     // ==================================================================
     // ==================================================================
@@ -1208,7 +1208,7 @@ $pdo = null; // Cerrar conexión
 
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando...';
-        
+
         if (typeof detenerPollingAsistencia === 'function') detenerPollingAsistencia();
 
         // 2. Guardar borrador
@@ -1218,7 +1218,7 @@ $pdo = null; // Cerrar conexión
 
             if (guardadoExitoso) {
                 if (bsModalValidarAsistencia) {
-                    
+
                     // 3. Obtener vista previa
                     fetch(`/corevota/controllers/obtener_preview_asistencia.php?idMinuta=${encodeURIComponent(idMinutaGlobal)}`, {
                             method: 'GET',
@@ -1227,19 +1227,21 @@ $pdo = null; // Cerrar conexión
                         .then(response => response.json())
                         .then(data => {
                             const modalContainer = document.getElementById('asistenciaPreviewList') || document.querySelector('#contenidoModalAsistencia');
-                            
+
                             if (!modalContainer) {
                                 Swal.fire('Error', 'No se encontró el contenedor del modal.', 'error');
                                 return;
                             }
 
                             if (data.status === 'success' && data.asistencia) {
-                                
+
                                 // ORDENAMIENTO (Mantenemos tu lógica perfecta)
                                 data.asistencia.sort((a, b) => {
                                     const nombreA = (a.nombreCompleto || "").trim();
                                     const nombreB = (b.nombreCompleto || "").trim();
-                                    return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+                                    return nombreA.localeCompare(nombreB, 'es', {
+                                        sensitivity: 'base'
+                                    });
                                 });
 
                                 // --- A. CONSTRUCCIÓN DEL HTML (VISUALIZACIÓN AMPLIADA) ---
@@ -1268,17 +1270,17 @@ $pdo = null; // Cerrar conexión
                                             <tbody>`;
 
                                 data.asistencia.forEach(item => {
-                                    const badge = item.presente 
-                                        ? '<span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-check me-1"></i>Presente</span>' 
-                                        : '<span class="badge bg-secondary rounded-pill px-3 py-2"><i class="fas fa-times me-1"></i>Ausente</span>';
-                                    
+                                    const badge = item.presente ?
+                                        '<span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-check me-1"></i>Presente</span>' :
+                                        '<span class="badge bg-secondary rounded-pill px-3 py-2"><i class="fas fa-times me-1"></i>Ausente</span>';
+
                                     html += `<tr>
                                                 <td class="align-middle py-2 fs-6">${item.nombreCompleto}</td>
                                                 <td class="text-center align-middle">${badge}</td>
                                              </tr>`;
                                 });
                                 html += '</tbody></table></div>';
-                                
+
                                 modalContainer.innerHTML = html;
 
                                 // --- B. LÓGICA DE FILTRADO (Sin cambios) ---
@@ -1300,7 +1302,7 @@ $pdo = null; // Cerrar conexión
                             } else {
                                 modalContainer.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
                             }
-                            
+
                             bsModalValidarAsistencia.show();
                         })
                         .catch(err => {
@@ -1313,8 +1315,9 @@ $pdo = null; // Cerrar conexión
     }
 
     function guardarBorrador(guardarYSalir, callback = null) {
+        // 1. Validaciones previas
         if (!idMinutaGlobal) {
-            alert("Error Crítico: No hay ID de Minuta.");
+            Swal.fire("Error Crítico", "No hay ID de Minuta.", "error");
             if (callback) callback(false);
             return;
         }
@@ -1324,47 +1327,57 @@ $pdo = null; // Cerrar conexión
             return;
         }
 
-        const asistenciaIDs = recolectarAsistencia();
+        // 2. Recolectar Asistencia
+        const asistenciaIDs = (typeof recolectarAsistencia === 'function') ? recolectarAsistencia() : [];
+
+        // 3. RECOLECCIÓN DE TEMAS (NUEVO: Usando .value para textareas)
         const bloques = document.querySelectorAll("#contenedorTemas .tema-block");
         const temasData = [];
 
         bloques.forEach(b => {
             const c = b.querySelectorAll(".editable-area");
-            temasData.push({
-                nombreTema: c[0]?.innerHTML.trim() || "",
-                objetivo: c[1]?.innerHTML.trim() || "",
-                descAcuerdo: c[2]?.innerHTML.trim() || "",
-                compromiso: c[3]?.innerHTML.trim() || "",
-                observacion: c[4]?.innerHTML.trim() || "",
-                idTema: b.dataset.idTema || null
-            });
+            // Aseguramos que existan los inputs antes de leer
+            if (c.length >= 5) {
+                temasData.push({
+                    nombreTema: c[0].value.trim(),
+                    objetivo: c[1].value.trim(),
+                    descAcuerdo: c[2].value.trim(),
+                    compromiso: c[3].value.trim(),
+                    observacion: c[4].value.trim(),
+                    idTema: b.dataset.idTema || null
+                });
+            }
         });
 
+        // 4. Preparar FormData
         const formData = new FormData();
         formData.append('idMinuta', idMinutaGlobal);
         formData.append('asistencia', JSON.stringify(asistenciaIDs));
         formData.append('temas', JSON.stringify(temasData));
 
-        // Corrección de ID para editar_minuta.php
+        // 5. UI: Bloquear botones
         const btnGuardar = document.getElementById('btn-guardar-borrador');
-        const btnEnviar = document.getElementById('btnEnviarAprobacion');
+        const btnEnviar = document.getElementById('btnEnviarAprobacion'); // Ojo: Verifica si este ID es correcto en tu HTML
 
-        if (btnGuardar) btnGuardar.disabled = true;
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        }
         if (btnEnviar) btnEnviar.disabled = true;
 
+        // 6. Feedback visual si no es callback silencioso
         if (!callback) {
             Swal.fire({
-                title: 'Guardando borrador.',
-                text: 'Por favor espere...',
+                title: 'Guardando borrador...',
+                text: 'Por favor espere',
                 allowOutsideClick: false,
                 didOpen: () => {
                     Swal.showLoading();
                 }
             });
-        } else if (btnGuardar) {
-            btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
         }
 
+        // 7. Enviar al servidor
         fetch("../../controllers/guardar_minuta_completa.php", {
                 method: "POST",
                 body: formData,
@@ -1386,7 +1399,7 @@ $pdo = null; // Cerrar conexión
                     } else {
                         Swal.fire({
                             title: '¡Guardado!',
-                            text: 'Minuta borrador guardada',
+                            text: 'Minuta borrador guardada correctamente',
                             icon: 'success',
                             timer: 2000,
                             showConfirmButton: false
@@ -1394,10 +1407,7 @@ $pdo = null; // Cerrar conexión
 
                         if (guardarYSalir) {
                             setTimeout(() => {
-                                // --- ÚNICO CAMBIO EN ESTA VERSIÓN ---
-                                // Redirige a minutas pendientes en lugar de borradores
                                 window.location.href = 'menu.php?pagina=minutas_pendientes';
-                                // --- FIN DEL CAMBIO ---
                             }, 2000);
                         }
                     }
@@ -1414,12 +1424,16 @@ $pdo = null; // Cerrar conexión
                 console.error("Error fetch-guardar borrador:", err);
             })
             .finally(() => {
+                // 8. Restaurar botones
                 if (!callback) {
                     if (btnGuardar) {
                         btnGuardar.disabled = false;
                         btnGuardar.innerHTML = '<i class="fas fa-save"></i> Guardar Borrador';
                     }
-                    if (btnEnviar && <?php echo json_encode($puedeEnviar); ?>) {
+                    // Restaurar btnEnviar solo si es posible enviar (variable PHP inyectada)
+                    if (btnEnviar && typeof PUEDE_ENVIAR !== 'undefined' && PUEDE_ENVIAR) {
+                        btnEnviar.disabled = false;
+                    } else if (btnEnviar && <?php echo json_encode($puedeEnviar ?? false); ?>) {
                         btnEnviar.disabled = false;
                     }
                 }
@@ -1774,45 +1788,45 @@ $pdo = null; // Cerrar conexión
     function crearBloqueTema(tema = null) {
         contadorTemas++;
         const plantilla = document.getElementById("plantilla-tema");
-        if (!plantilla || !plantilla.content) return;
-        const nuevo = plantilla.content.cloneNode(true);
-        const div = nuevo.querySelector('.tema-block');
-        if (!div) return;
-        const h6 = nuevo.querySelector('h6');
-        if (h6) h6.innerText = `Tema ${contadorTemas}`;
-        nuevo.querySelectorAll('[data-bs-target]').forEach(el => {
-            let target = el.getAttribute('data-bs-target').replace('_ID_', `_${contadorTemas}_`);
-            el.setAttribute('data-bs-target', target);
-            el.setAttribute('aria-controls', target.substring(1));
-        });
-        nuevo.querySelectorAll('.collapse').forEach(el => {
-            el.id = el.id.replace('_ID_', `_${contadorTemas}_`);
-        });
-        const areas = nuevo.querySelectorAll('.editable-area');
-        if (tema) {
-            if (areas[0]) areas[0].innerHTML = tema.nombreTema || '';
-            if (areas[1]) areas[1].innerHTML = tema.objetivo || '';
-            if (areas[2]) areas[2].innerHTML = tema.descAcuerdo || '';
-            if (areas[3]) areas[3].innerHTML = tema.compromiso || '';
-            if (areas[4]) areas[4].innerHTML = tema.observacion || '';
+        const contenedor = document.getElementById("contenedorTemas");
+        const msg = document.getElementById("msgSinTemas");
+
+        if (!plantilla || !contenedor) return;
+
+        // Clonar plantilla
+        const clone = plantilla.content.cloneNode(true);
+        const div = clone.querySelector('.tema-block');
+
+        // Actualizar título (Tema 1, Tema 2...)
+        const titulo = clone.querySelector('.titulo-tema');
+        if (titulo) titulo.textContent = `Tema ${contadorTemas}`;
+
+        // Asignar ID de base de datos si existe
+        if (tema && tema.idTema) {
             div.dataset.idTema = tema.idTema;
         }
-        const btnEliminar = nuevo.querySelector('.eliminar-tema');
-        if (btnEliminar) btnEliminar.style.display = (contadorTemas > 1) ? 'inline-block' : 'none';
-        contenedorTemasGlobal.appendChild(nuevo);
-        if (!ES_ST_EDITABLE) {
-            div.querySelectorAll('input, select, textarea, button, .editable-area').forEach(el => {
-                el.disabled = true;
-                el.contentEditable = false;
-                el.style.cursor = 'not-allowed';
-                el.style.backgroundColor = '#e9ecef';
-            });
-            div.querySelectorAll('.bb-editor-toolbar').forEach(toolbar => {
-                toolbar.style.display = 'none';
-            });
-            if (btnEliminar) btnEliminar.style.display = 'none';
+
+        // Llenar datos (USANDO .value PARA TEXTAREAS)
+        const inputs = div.querySelectorAll('.editable-area');
+        if (tema) {
+            if (inputs[0]) inputs[0].value = tema.nombreTema || '';
+            if (inputs[1]) inputs[1].value = tema.objetivo || '';
+            if (inputs[2]) inputs[2].value = tema.descAcuerdo || '';
+            if (inputs[3]) inputs[3].value = tema.compromiso || '';
+            if (inputs[4]) inputs[4].value = tema.observacion || '';
         }
-        actualizarNumerosDeTema();
+
+        // Manejo de permisos (Solo lectura)
+        if (!ES_ST_EDITABLE) {
+            inputs.forEach(el => el.disabled = true);
+            const btnDel = div.querySelector('.eliminar-tema');
+            if (btnDel) btnDel.remove();
+        }
+
+        contenedor.appendChild(clone);
+        if (msg) msg.style.display = 'none';
+
+        actualizarNumerosDeTema(); // Reordenar índices visuales
     }
 
     function eliminarTema(btn) {
@@ -1902,34 +1916,56 @@ $pdo = null; // Cerrar conexión
     function handleAgregarLink(e) {
         e.preventDefault();
         const input = document.getElementById('inputUrlLink');
-        const url = input.value.trim();
+
+        // 1. Obtenemos el valor y usamos 'let' para poder modificarlo
+        let url = input.value.trim();
+
+        // 2. CORRECCIÓN AUTOMÁTICA: Si no tiene protocolo, agregamos https://
+        // Esto evita el error 400 del servidor
+        if (url.length > 0 && !/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+        }
+
+        // 3. Validamos la URL ya corregida
         if (!url || !filterUrl(url)) {
-            Swal.fire('Error', 'La URL proporcionada no es válida.', 'warning');
+            Swal.fire('Formato Inválido', 'La URL no es válida. Intente con: ejemplo.com', 'warning');
             return;
         }
+
         if (!ES_ST_EDITABLE) {
             Swal.fire('Prohibido', 'No puede agregar enlaces en este estado.', 'error');
             return;
         }
+
         input.disabled = true;
         input.placeholder = 'Añadiendo...';
+
         const formData = new FormData();
         formData.append('idMinuta', idMinutaGlobal);
-        formData.append('urlLink', url);
+        formData.append('urlLink', url); // Enviamos la URL corregida con https://
 
         // ⚡ CORRECCIÓN: Se añade 'credentials'
         fetch('../../controllers/agregar_adjunto.php?action=link', {
                 method: 'POST',
                 body: formData,
-                credentials: 'same-origin' // ⚡ CORRECCIÓN DE SESIÓN
+                credentials: 'same-origin'
             })
             .then(res => {
                 if (res.ok) {
                     return res.json();
                 }
+                // Manejo de errores HTTP (como el 400 que tenías)
                 return res.text().then(text => {
-                    console.error("Respuesta de error del servidor (link):", text);
-                    throw new Error("El servidor respondió con un error (ver consola).");
+                    let errorMsg = "Error desconocido.";
+                    try {
+                        // Intentamos parsear el JSON de error del servidor si existe
+                        const jsonErr = JSON.parse(text);
+                        if (jsonErr.message) errorMsg = jsonErr.message;
+                    } catch (e) {
+                        // Si no es JSON, usamos un texto genérico o el del status
+                        errorMsg = `Error del servidor (${res.status}).`;
+                    }
+                    throw new Error(errorMsg);
                 });
             })
             .then(data => {
@@ -1941,7 +1977,10 @@ $pdo = null; // Cerrar conexión
                     Swal.fire('Error', data.message || 'No se pudo agregar el enlace.', 'error');
                 }
             })
-            .catch(err => Swal.fire('Error', 'Error de conexión al agregar enlace: ' + err.message, 'error'))
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', err.message, 'error');
+            })
             .finally(() => {
                 input.disabled = false;
                 input.placeholder = 'https://ejemplo.com';

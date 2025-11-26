@@ -262,49 +262,49 @@ try {
             <div class="carousel-item active">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_3.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE QUILLOTA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_2.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE MARGA MARGA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE MARGA MARGA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_1.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE QUILLOTA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE VALPARAÍSO</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_4.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE SAN ANTONIO">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE SAN ANTONIO</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_5.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE LOS ANDES">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE LOS ANDES</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_6.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA DE PETORCA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE PETORCA</h5>
                 </div>
             </div>
             <div class="carousel-item">
                 <img src="/corevota/public/img/zonas_region/imagen_zona_7.jpg" class="d-block w-100 carousel-image-transparent" style="max-height: 400px; object-fit: cover;" alt="PROVINCIA SAN FELIPE DE ACONCAGUA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA SAN FELIPE DE ACONCAGUA</h5>
                 </div>
             </div>
@@ -314,7 +314,7 @@ try {
                     style="max-height: 400px; object-fit: cover;"
                     alt="PROVINCIA DE ISLA DE PASCUA">
                 <div class="carousel-caption d-none d-md-block">
-                    <h1>Nuestra querida quinta región</h1>
+                    <h1>Región de Valparaíso</h1>
                     <h5>PROVINCIA DE ISLA DE PASCUA</h5>
                 </div>
             </div>

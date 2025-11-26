@@ -196,13 +196,13 @@ function renderPagination($current, $pages)
 
 <div class="container mt-4">
 
-<nav aria-label="breadcrumb" class="mb-2">
+  <nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
-        <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Minutas Pendientes de Aprobación</li>
+      <li class="breadcrumb-item"><a href="menu.php?pagina=home">Home</a></li>
+      <li class="breadcrumb-item"><a href="menu.php?pagina=minutas_dashboard">Módulo de Minutas</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Minutas Pendientes de Aprobación</li>
     </ol>
-</nav>
+  </nav>
   <h4 class="fw-bold mb-4">Minutas Pendientes de Aprobación</h4>
 
   <?php if (!empty($minutas)) : ?>
@@ -323,16 +323,16 @@ function renderPagination($current, $pages)
             <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
             <script>
               // Escucha todos los botones de firma generados dinámicamente
-              document.addEventListener('DOMContentLoaded', function () {
+              document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('[id^="btn-aprobar-"]').forEach(btn => {
-                  btn.addEventListener('click', function (e) {
+                  btn.addEventListener('click', function(e) {
                     e.preventDefault();
 
                     const id = this.id.split('-')[2];
 
                     Swal.fire({
-                      title: '¿Confirmar Firma?',
-                      text: '¿Deseas firmar esta minuta?',
+                      title: '¿Está seguro de firmar esta minuta?',
+                      text: 'Esta acción es irreversible.',
                       icon: 'warning',
                       showCancelButton: true,
                       confirmButtonText: 'Sí, firmar',
@@ -354,7 +354,7 @@ function renderPagination($current, $pages)
                   });
                 });
               });
-</script>
+            </script>
 
             <!-- Caso 4: Otro (Ej. $esPresidenteRequerido falló, aunque no debería) -->
             <span class="text-warning fw-bold ms-2">
@@ -484,7 +484,7 @@ function renderPagination($current, $pages)
 
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" value="Temas" id="fb_temas">
-                    <label class="form-check-label" for="fb_temas">Temas Tratados (Objetivos, Acuerdos, etc.)</label>
+                    <label class="form-check-label" for="fb_temas">Temas Tratados (Objetivos, acuerdos, compromisos u observaciones)</label>
                     <textarea id="fb_temas_text" class="form-control" placeholder="Escriba su observación sobre los temas..."></textarea>
                 </div>
 
