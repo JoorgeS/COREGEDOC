@@ -15,7 +15,7 @@ use App\Controllers\ComisionController;
 
 session_start();
 
-$action = $_GET['action'] ?? $_POST['action'] ?? 'login';
+$action = $_GET['action'] ?? $_POST['action'] ?? 'login'; 
 
 $authController = new AuthController();
 $homeController = new HomeController();
