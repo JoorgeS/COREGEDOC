@@ -1,2 +1,2 @@
-# CoreVota
-Repositorio para toda la documentación de CAPSTONE COREVOTA
+# COREGEDOC
+Repositorio para toda la documentación de CAPSTONE COREGEDOC

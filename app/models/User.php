@@ -1,5 +1,7 @@
 <?php
 namespace App\Models;
+use Exception;   
+use PDOException;
 
 use App\Config\Database;
 use PDO;

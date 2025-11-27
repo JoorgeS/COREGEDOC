@@ -1,5 +1,5 @@
 <?php
-// /coregedoc/public/validar.php
+// /corevota/public/validar.php
 require_once __DIR__ . '/../class/class.conectorDB.php';
 
 // 1. LIMPIEZA CRÍTICA: Quitamos espacios en blanco que rompen la búsqueda
@@ -28,8 +28,8 @@ $hash = isset($_GET['hash']) ? trim($_GET['hash']) : '';
     <div class="container">
         <div class="card p-4 mx-auto" style="max-width: 600px;">
             <div class="header">
-                <img src="/coregedoc/public/img/logo2.png" alt="Logo GORE" class="me-2">
-                <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE">
+                <img src="/corevota/public/img/logo2.png" alt="Logo GORE" class="me-2">
+                <img src="/corevota/public/img/logoCore1.png" alt="Logo CORE">
                 <h4 class="mt-3">Consejo Regional de Valparaíso</h4>
                 <h6>Validación de Autenticidad de Documentos</h6>
             </div>
@@ -147,7 +147,7 @@ $hash = isset($_GET['hash']) ? trim($_GET['hash']) : '';
                         
                         echo $docInfo['extra_html'];
                         
-                        echo '<a href="/coregedoc/' . htmlspecialchars($docInfo['path']) . '" target="_blank" class="btn btn-success mt-3">📄 Ver Documento Original</a>';
+                        echo '<a href="/corevota/' . htmlspecialchars($docInfo['path']) . '" target="_blank" class="btn btn-success mt-3">📄 Ver Documento Original</a>';
                         echo '</div>';
                     } else {
                         // DEBUG: Si sigue fallando, descomenta la línea de abajo para ver qué hash está recibiendo el servidor realmente

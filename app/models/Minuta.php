@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Models;
+use Exception;   
+
 
 use App\Config\Database;
 

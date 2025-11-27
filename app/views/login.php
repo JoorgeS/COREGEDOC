@@ -1,16 +1,6 @@
 <?php
 // /coregedoc/views/login.php
 
-// 1. BORRA O COMENTA ESTAS LÍNEAS PARA QUE NO PISE LA VARIABLE DEL CONTROLADOR
-/* $error_message = '';
-if (isset($_SESSION['error_message'])) {
-    $error_message = $_SESSION['error_message'];
-    unset($_SESSION['error_message']); 
-}
-*/
-
-// 2. AGREGA ESTO EN SU LUGAR:
-// Aseguramos que la variable exista, pero respetamos si el controlador ya le puso texto.
 if (!isset($error_message)) {
     $error_message = '';
 }
