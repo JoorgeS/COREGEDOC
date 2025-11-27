@@ -20,6 +20,6 @@ if (ini_get("session.use_cookies")) {
 session_destroy();
 
 // 5. Redirige al login (el punto de entrada index.php)
-header("Location: /COREVOTA/index.php");
+header("Location: /coregedoc/index.php");
 exit;
 ?>

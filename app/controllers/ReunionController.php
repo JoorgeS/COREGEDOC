@@ -4,6 +4,8 @@ namespace App\Controllers;
 use App\Models\Reunion;
 use App\Models\Minuta;
 use App\Models\Comision;
+use App\Models\User;
+use App\Models\Adjunto;
 use App\Config\Database;
 
 class ReunionController
@@ -144,10 +146,6 @@ class ReunionController
                 // Manejo de error si no hay presidente asignado
                 die("Error: La comisión no tiene presidente asignado."); 
             }
-
-            // 2. Usar SQL directo o un método en Minuta para crearla
-            // (Aquí simplificamos insertando directamente para no modificar más el modelo Minuta, 
-            // pero lo ideal sería Minuta::crear($datos))
             
             $db = new Database();
             $conn = $db->getConnection();
@@ -180,14 +178,12 @@ class ReunionController
         }
     }
 
-    // ... dentro de la clase ReunionController ...
 
     public function calendario()
     {
         $this->verificarSesion();
         $modelo = new Reunion();
         
-        // Reutilizamos el método listar() que ya trae todas las reuniones vigentes
         $reuniones = $modelo->listar();
 
         $data = [

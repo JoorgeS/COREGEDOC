@@ -205,12 +205,6 @@ if ($hora >= 5 && $hora < 12) {
             <div class="card-header py-3 bg-white border-bottom-info">
                 <h6 class="m-0 fw-bold text-info"><i class="far fa-calendar-alt me-2"></i> Próximas Reuniones</h6>
             </div>
-
-            <div class="card-footer bg-white text-center border-0 pb-3">
-                <a href="index.php?action=reunion_calendario" class="small text-decoration-none fw-bold text-info">
-                    Ver Calendario Completo <i class="fas fa-arrow-right ms-1"></i>
-                </a>
-            </div>
             
             <div class="card-body p-0">
                 <?php if (empty($reuniones)): ?>

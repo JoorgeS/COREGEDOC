@@ -1,0 +1,159 @@
+/* ============================================================
+   1. VARIABLES GLOBALES Y RESET
+============================================================ */
+:root {
+    --sidebar-width: 260px;
+    --header-height: 60px;
+    --core-blue: #1C88BF;
+    --core-green: #009640;
+    --core-yellow: #FFCD00;
+
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f5f7fa;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden; /* Prevenir scroll horizontal accidental */
+}
+
+/* ============================================================
+   2. ESTRUCTURA PRINCIPAL (LAYOUT)
+============================================================ */
+#wrapper {
+    display: flex;
+    width: 100%;
+    transition: all 0.25s ease;
+}
+
+#sidebar-wrapper {
+    min-height: 100vh;
+    width: var(--sidebar-width);
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1030; /* Sidebar sobre el contenido */
+    background-color: #fff;
+    border-right: 1px solid #dee2e6;
+    transition: margin 0.25s ease-out;
+}
+
+#page-content-wrapper {
+    width: 100%;
+    margin-left: var(--sidebar-width);
+    transition: margin 0.25s ease-out;
+    padding-top: var(--header-height); /* Espacio para el navbar fixed */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex-grow: 1;
+    padding: 1.5rem;
+}
+
+/* ============================================================
+   3. NAVBAR (HEADER) - CORREGIDO
+============================================================ */
+.core-header {
+    height: var(--header-height);
+    position: fixed;
+    top: 0;
+    right: 0;
+    /* Ancho dinámico: 100% menos el sidebar */
+    width: calc(100% - var(--sidebar-width));
+    /* Comienza donde termina el sidebar */
+    left: var(--sidebar-width); 
+    z-index: 1020;
+    
+    /* COLOR DE RESPALDO: Si falla el degradado, se verá Azul (no blanco) */
+    background-color: var(--core-blue); 
+    
+    /* DEGRADADO INSTITUCIONAL */
+    background-image: linear-gradient(90deg, 
+            var(--core-green) 0%, 
+            var(--core-blue) 50%, 
+            var(--core-yellow) 100%
+    );
+    
+    color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.25s ease-out; /* Suaviza la animación al togglear */
+}
+
+/* Texto con sombra */
+.core-header h6, 
+.core-header span,
+.core-header i {
+    text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   4. RESPONSIVIDAD Y TOGGLE
+============================================================ */
+
+/* Cuando el sidebar está oculto (Toggled) */
+body.sb-sidenav-toggled #sidebar-wrapper {
+    margin-left: calc(-1 * var(--sidebar-width));
+}
+
+body.sb-sidenav-toggled #page-content-wrapper {
+    margin-left: 0;
+}
+
+/* El navbar debe crecer para ocupar todo el ancho */
+body.sb-sidenav-toggled .core-header {
+    left: 0;
+    width: 100%;
+}
+
+/* MÓVILES (Pantallas < 768px) */
+@media (max-width: 768px) {
+    /* Por defecto en móvil, sidebar oculto */
+    #sidebar-wrapper {
+        margin-left: calc(-1 * var(--sidebar-width));
+    }
+    
+    #page-content-wrapper {
+        margin-left: 0;
+    }
+
+    /* Navbar ocupa 100% en móvil */
+    .core-header {
+        left: 0;
+        width: 100%;
+    }
+
+    /* Al activar toggle en móvil, mostramos sidebar */
+    body.sb-sidenav-toggled #sidebar-wrapper {
+        margin-left: 0;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+    }
+}
+
+/* Sidebar Links (Conserva tus estilos) */
+.sidebar .nav-link {
+    color: #495057;
+    font-weight: 500;
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.sidebar .nav-link:hover {
+    background-color: #e7f1ff;
+    color: var(--core-blue);
+}
+.sidebar .nav-link.active {
+    background-color: var(--core-blue);
+    color: #ffffff;
+    box-shadow: 0 2px 5px rgba(28, 136, 191, 0.3);
+}
