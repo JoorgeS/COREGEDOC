@@ -25,12 +25,12 @@ function esActivo($grupo, $actual) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>COREGEDOC - Gestión Documental</title>
     
-    <link href="<?= BASE_URL ?>/app/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="<?= BASE_URL ?>/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
-    <link href="<?= BASE_URL ?>/app/public/css/layout.css" rel="stylesheet">
-    <link href="<?= BASE_URL ?>/app/public/css/dashboard.css" rel="stylesheet">
+    <link href="<?= BASE_URL ?>/public/css/layout.css" rel="stylesheet">
+    <link href="<?= BASE_URL ?>/public/css/dashboard.css" rel="stylesheet">
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
@@ -59,13 +59,13 @@ function esActivo($grupo, $actual) {
         </div>
     </div>
 
-    <script src="<?= BASE_URL ?>/app/public/vendor/jquery/jquery-3.7.1.min.js"></script>
+    <script src="<?= BASE_URL ?>/public/vendor/jquery/jquery-3.7.1.min.js"></script>
     
-    <script src="<?= BASE_URL ?>/app/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="<?= BASE_URL ?>/public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <script src="<?= BASE_URL ?>/app/public/js/main.js"></script>
+    <script src="<?= BASE_URL ?>/public/js/main.js"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
