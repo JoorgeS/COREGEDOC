@@ -1,25 +1,74 @@
 <?php
 // app/views/pages/home.php
 
-// Extraemos los datos para facilitar el uso en la vista
+// Extraemos los datos que deben ser provistos por el controlador (HomeController.php)
 $tareas = $data['tareas_pendientes'] ?? [];
 $reuniones = $data['proximas_reuniones'] ?? [];
 $actividad = $data['actividad_reciente'] ?? [];
 $minutasRecientes = $data['minutas_recientes_aprobadas'] ?? [];
 $usuarioNombre = htmlspecialchars($data['usuario']['nombre'] ?? 'Usuario');
 
-// Definimos un saludo según la hora
-$hora = date('G');
-if ($hora >= 5 && $hora < 12) {
-    $saludo = "Buenos días";
-} elseif ($hora >= 12 && $hora < 19) {
-    $saludo = "Buenas tardes";
-} else {
-    $saludo = "Buenas noches";
-}
+// Datos del carrusel y saludo movidos al controlador
+$saludo = $data['saludo'] ?? 'Hola'; 
+$imagenesZonas = $data['imagenes_zonas'] ?? []; 
 ?>
 
-<!-- Encabezado de Bienvenida -->
+<style>
+    /* Hace que la transición del carrusel sea más lenta */
+    .carousel-fade .carousel-item {
+        transition: opacity 2s ease-in-out;
+    }
+    
+    /* Estilos para el overlay de texto centrado */
+    .carousel-overlay {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        text-align: center;
+        color: white; /* Color de texto para el contraste */
+        /* Centrado con flexbox */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        /* Sombra de texto para mejorar la visibilidad sobre la imagen */
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); 
+    }
+    
+    /* Contenedor del icono y el título para el fondo gris transparente */
+    .carousel-content-box {
+        background-color: rgba(90, 90, 90, 0.4); /* Gris semi-transparente */
+        padding: 20px 30px; /* Espaciado interno */
+        border-radius: 10px; /* Bordes ligeramente redondeados */
+        display: flex; /* Asegura el flexbox para centrar dentro de la caja */
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 80%; /* Ancho máximo para que no ocupe todo */
+    }
+
+    /* Ajustes para el icono */
+    .carousel-content-box i {
+        font-size: 3rem; /* Tamaño grande para el icono */
+        margin-bottom: 0.5rem;
+    }
+
+    /* Opcional: Aumentar el tamaño del título para el impacto visual */
+    .carousel-content-box h3 {
+        font-size: 1.75rem; 
+        font-weight: bold;
+        margin-bottom: 0; /* Elimina el margen inferior por defecto de h3 */
+    }
+
+    /* Se asegura que el caption inferior se oculte si no se usa */
+    .carousel-caption {
+        display: none !important;
+    }
+
+</style>
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
     <div>
         <h1 class="h3 mb-0 text-gray-800"><?php echo $saludo; ?>, <?php echo $usuarioNombre; ?></h1>
@@ -32,67 +81,37 @@ if ($hora >= 5 && $hora < 12) {
     </div>
 </div>
 
-<!-- Fila Principal: Carrusel y Novedades -->
 <div class="row g-4 mb-4">
     
-    <!-- Columna Izquierda: Carrusel Informativo -->
     <div class="col-lg-8">
         <div class="card shadow mb-4 h-100">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
                 <h6 class="m-0 fw-bold text-primary"><i class="fas fa-images me-2"></i> Galería Regional</h6>
             </div>
             <div class="card-body p-0">
-                <div id="carouselZonasRegion" class="carousel slide carousel-fade h-100" data-bs-ride="carousel">
-                    <!-- Indicadores -->
+                <div id="carouselZonasRegion" class="carousel slide carousel-fade" data-bs-ride="carousel" style="height: 350px !important;">
                     <div class="carousel-indicators">
-                        <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
-                        <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="1" aria-label="Slide 2"></button>
-                        <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="2" aria-label="Slide 3"></button>
+                        <?php foreach ($imagenesZonas as $index => $imagen): ?>
+                            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="<?php echo $index; ?>" class="<?php echo $index === 0 ? 'active' : ''; ?>" aria-current="<?php echo $index === 0 ? 'true' : 'false'; ?>" aria-label="Slide <?php echo $index + 1; ?>"></button>
+                        <?php endforeach; ?>
                     </div>
 
-                    <!-- Slides -->
                     <div class="carousel-inner h-100 rounded-bottom">
-                        <!-- Slide 1 -->
-                        <div class="carousel-item active h-100">
-                            <div class="d-flex align-items-center justify-content-center bg-dark text-white h-100 position-relative" 
-                                 style="min-height: 300px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
-                                <!-- Si tienes imágenes reales, usa: <img src="..." class="d-block w-100 h-100 object-fit-cover" alt="..."> -->
-                                <div class="text-center p-5">
-                                    <i class="fas fa-building fa-4x mb-3 text-white-50"></i>
-                                    <h3>Gestión Transparente</h3>
-                                    <p class="lead">Plataforma oficial para la gestión de actas y votaciones.</p>
+                        <?php foreach ($imagenesZonas as $index => $imagen): ?>
+                            <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>" style="height: 350px !important;">
+                                <img src="<?php echo htmlspecialchars($imagen['file']); ?>" class="d-block w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($imagen['title']); ?>" style="opacity: 0.7;">
+                                
+                                <div class="carousel-overlay">
+                                    <div class="carousel-content-box">
+                                        <i class="<?php echo htmlspecialchars($imagen['icon']); ?> mb-3"></i>
+                                        <h3 class="mb-0"><?php echo htmlspecialchars($imagen['title']); ?></h3>
+                                    </div>
                                 </div>
+                                
                             </div>
-                            <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded p-2">
-                                <h5>Consejo Regional</h5>
-                                <p>Compromiso con el desarrollo regional.</p>
-                            </div>
-                        </div>
-                        <!-- Slide 2 -->
-                        <div class="carousel-item h-100">
-                            <div class="d-flex align-items-center justify-content-center bg-secondary text-white h-100" 
-                                 style="min-height: 300px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                <div class="text-center p-5">
-                                    <i class="fas fa-users fa-4x mb-3 text-white-50"></i>
-                                    <h3>Participación Activa</h3>
-                                    <p class="lead">Facilitando la labor de los consejeros.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Slide 3 -->
-                        <div class="carousel-item h-100">
-                            <div class="d-flex align-items-center justify-content-center bg-success text-white h-100" 
-                                 style="min-height: 300px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
-                                <div class="text-center p-5">
-                                    <i class="fas fa-file-signature fa-4x mb-3 text-white-50"></i>
-                                    <h3>Firma Digital</h3>
-                                    <p class="lead">Procesos más rápidos y seguros.</p>
-                                </div>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
                     
-                    <!-- Controles -->
                     <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="prev">
                         <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                         <span class="visually-hidden">Anterior</span>
@@ -106,9 +125,7 @@ if ($hora >= 5 && $hora < 12) {
         </div>
     </div>
 
-    <!-- Columna Derecha: Novedades y Accesos Rápidos -->
     <div class="col-lg-4">
-        <!-- Panel de Novedades -->
         <div class="card shadow mb-4">
             <div class="card-header py-3 bg-warning bg-opacity-10 border-bottom-warning">
                 <h6 class="m-0 fw-bold text-dark"><i class="fas fa-bullhorn me-2 text-warning"></i> Novedades</h6>
@@ -140,7 +157,6 @@ if ($hora >= 5 && $hora < 12) {
             </div>
         </div>
 
-        <!-- Widget de Clima (Placeholder) -->
         <div class="card shadow mb-4 bg-info text-white border-0">
             <div class="card-body d-flex align-items-center justify-content-between">
                 <div>
@@ -156,10 +172,8 @@ if ($hora >= 5 && $hora < 12) {
     </div>
 </div>
 
-<!-- Fila Secundaria: Tareas y Actividad -->
 <div class="row g-4">
     
-    <!-- Columna: Mis Tareas Pendientes -->
     <div class="col-lg-6">
         <div class="card shadow mb-4 h-100">
             <div class="card-header py-3 bg-white border-bottom-primary d-flex justify-content-between align-items-center">
@@ -199,11 +213,16 @@ if ($hora >= 5 && $hora < 12) {
         </div>
     </div>
 
-    <!-- Columna: Próximas Reuniones -->
     <div class="col-lg-6">
         <div class="card shadow mb-4 h-100">
             <div class="card-header py-3 bg-white border-bottom-info">
                 <h6 class="m-0 fw-bold text-info"><i class="far fa-calendar-alt me-2"></i> Próximas Reuniones</h6>
+            </div>
+
+            <div class="card-footer bg-white text-center border-0 pb-3">
+                <a href="index.php?action=reunion_calendario" class="small text-decoration-none fw-bold text-info">
+                    Ver Calendario Completo <i class="fas fa-arrow-right ms-1"></i>
+                </a>
             </div>
             
             <div class="card-body p-0">
@@ -249,7 +268,6 @@ if ($hora >= 5 && $hora < 12) {
 
 </div>
 
-<!-- Fila Terciaria: Actividad Reciente (Opcional, si hay datos) -->
 <?php if (!empty($actividad)): ?>
 <div class="row">
     <div class="col-12">

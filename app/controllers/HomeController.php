@@ -48,7 +48,43 @@ class HomeController {
             'pagina_actual' => 'home' // Para activar el menú
         ];
 
-        // --- LOGICA DE NEGOCIO (Extraída de tu antiguo home.php) ---
+        // --- INICIO: LÓGICA DE VISTA REFACTORIZADA (MOVIDA DESDE home.php) ---
+
+        // A. Definir un saludo según la hora (Lógica movida)
+        $hora = date('G');
+        if ($hora >= 5 && $hora < 12) {
+            $saludo = "Buenos días";
+        } elseif ($hora >= 12 && $hora < 19) {
+            $saludo = "Buenas tardes";
+        } else {
+            $saludo = "Buenas noches";
+        }
+        $data['saludo'] = $saludo;
+        
+        // B. Definir el array de imágenes de zonas a mostrar en el carrusel (Datos movidos)
+        $imagenesZonas = [
+            // Mensaje 1: Enfoque en la eficiencia de la gestión documental
+            ['file' => 'public/img/zonas_region/imagen_zona_1.jpg', 'title' => 'Decisiones ágiles, impacto regional', 'icon' => 'fas fa-gavel'],
+            // Mensaje 2: Enfoque en la transparencia y rendición de cuentas
+            ['file' => 'public/img/zonas_region/imagen_zona_2.jpg', 'title' => 'Acceso a la información en tiempo real', 'icon' => 'fas fa-eye'],
+            // Mensaje 3: Enfoque en la modernización y procesos sin papel
+            ['file' => 'public/img/zonas_region/imagen_zona_3.jpg', 'title' => 'Compromiso digital, eficiencia ecológica', 'icon' => 'fas fa-leaf'],
+            // Mensaje 4: Enfoque en el desarrollo y la inversión territorial
+            ['file' => 'public/img/zonas_region/imagen_zona_4.jpg', 'title' => 'Impulsando proyectos comunitarios', 'icon' => 'fas fa-city'],
+            // Mensaje 5: Enfoque en la colaboración entre comisiones
+            ['file' => 'public/img/zonas_region/imagen_zona_5.jpg', 'title' => 'Coordinación intersectorial eficaz', 'icon' => 'fas fa-sitemap'],
+            // Mensaje 6: Enfoque en el seguimiento de acuerdos y promesas
+            ['file' => 'public/img/zonas_region/imagen_zona_6.jpg', 'title' => 'Acuerdos controlados, promesas cumplidas', 'icon' => 'fas fa-check-double'],
+            // Mensaje 7: Enfoque en la participación y el consejero
+            ['file' => 'public/img/zonas_region/imagen_zona_7.jpg', 'title' => 'Eficiencia y eficacia en las aprobaciones de minutas', 'icon' => 'fas fa-user-tie'],
+            // Mensaje 8: Enfoque en la historia y la memoria institucional
+            ['file' => 'public/img/zonas_region/imagen_zona_8.jpg', 'title' => 'Disponibilidad de datos históricos', 'icon' => 'fas fa-scroll'],
+        ];
+        $data['imagenes_zonas'] = $imagenesZonas;
+
+        // --- FIN: LÓGICA DE VISTA REFACTORIZADA ---
+
+        // --- LOGICA DE NEGOCIO (Consulta a BD) ---
 
         try {
             // A. Tareas para Presidente (Firmas pendientes)
