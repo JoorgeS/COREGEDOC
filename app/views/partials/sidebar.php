@@ -1,10 +1,12 @@
 <nav class="sidebar d-flex flex-column flex-shrink-0 bg-white border-end" id="sidebar-wrapper">
-    <div class="sidebar-header-box border-bottom p-3 text-center">
-        <img src="/coregedoc/public/img/logoCore1.png" alt="Logo CORE" class="sidebar-logo img-fluid" style="max-height: 80px;">
+    
+    <div class="sidebar-heading text-center py-3 border-bottom">
+        <img src="public/img/logoCore1.png" alt="Logo CORE" class="img-fluid" style="max-width: 250px; height: auto;">
     </div>
 
     <div class="flex-grow-1 overflow-auto custom-scrollbar">
         <ul class="nav nav-pills flex-column mb-auto p-3 gap-1">
+            
             <li class="nav-item">
                 <a href="index.php?action=home" class="nav-link <?php echo esActivo('home', $paginaActual) ? 'active' : ''; ?>">
                     <i class="fas fa-home fa-fw me-2"></i> Inicio
@@ -14,7 +16,6 @@
             <?php if (in_array($tipoUsuario, [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO])): ?>
 
                 <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Gestión</li>
-
 
                 <li class="nav-item">
                     <a href="index.php?action=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual) ? 'active' : ''; ?>">
@@ -30,7 +31,8 @@
                 </li>
 
                 <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
-                    <li class="nav-item mt-2"> <a href="index.php?action=usuarios_dashboard" class="nav-link <?php echo ($paginaActual == 'usuarios_dashboard') ? 'active' : ''; ?>">
+                    <li class="nav-item mt-2"> 
+                        <a href="index.php?action=usuarios_dashboard" class="nav-link <?php echo ($paginaActual == 'usuarios_dashboard') ? 'active' : ''; ?>">
                             <i class="fas fa-users-cog fa-fw me-2"></i> Usuarios
                         </a>
                     </li>
@@ -52,7 +54,8 @@
                 </li>
             <?php endif; ?>
 
-            <?php if (in_array($tipoUsuario, [1, 3, 7])): ?> <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Sala Virtual</li>
+            <?php if (in_array($tipoUsuario, [1, 3, 7])): ?> 
+                <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Sala Virtual</li>
 
                 <li class="nav-item">
                     <a href="index.php?action=asistencia_sala" class="nav-link <?php echo ($paginaActual == 'sala_reuniones') ? 'active' : ''; ?>">

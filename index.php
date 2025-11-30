@@ -355,7 +355,30 @@ try {
             $controller->listar();
             break;
 
-        // --- FIN DEL ARREGLO ---
+        case 'perfil':
+            $controller = new App\Controllers\UserController();
+            $controller->perfil();
+            break;
+
+        case 'update_perfil':
+            $controller = new App\Controllers\UserController();
+            $controller->update_perfil();
+            break;
+
+        case 'configuracion':
+            $controller = new App\Controllers\UserController();
+            $controller->configuracion();
+            break;
+
+        case 'update_password':
+            $controller = new App\Controllers\UserController();
+            $controller->update_password();
+            break;
+
+        case 'logout':
+            $controller = new App\Controllers\UserController();
+            $controller->logout();
+            break;
 
         default:
             // Si la acción no existe, manda al login

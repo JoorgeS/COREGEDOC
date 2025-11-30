@@ -208,7 +208,7 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             </div>
 
             <div class="footer">
-                Documento oficial generado por Sistema CoreVota el ' . date('d/m/Y H:i:s') . '
+                Documento oficial generado por Sistema COREGEDOC el ' . date('d/m/Y H:i:s') . '
             </div>
         </body>
         </html>';

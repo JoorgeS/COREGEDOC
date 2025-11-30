@@ -23,6 +23,27 @@ class HomeController
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+
+        // --- INICIO: CONTROL DE INACTIVIDAD (60 MINUTOS) ---
+        $tiempoLimite = 3600; // 60 minutos * 60 segundos
+
+        if (isset($_SESSION['ultima_actividad'])) {
+            $segundosInactivo = time() - $_SESSION['ultima_actividad'];
+
+            if ($segundosInactivo > $tiempoLimite) {
+                // Si pasó el tiempo, borramos todo y redirigimos
+                session_unset();
+                session_destroy();
+                header('Location: index.php?action=login&msg=sesion_expirada');
+                exit();
+            }
+        }
+
+        // Actualizamos la marca de tiempo a "ahora" para la próxima comprobación
+        $_SESSION['ultima_actividad'] = time();
+        // --- FIN: CONTROL DE INACTIVIDAD ---
+
+
         // Comenta o borra temporalmente esta redirección para probar
         /*
         if (!isset($_SESSION['idUsuario'])) {
@@ -30,9 +51,12 @@ class HomeController
             exit();
         }
         */
+        
         // 2. Preparar variables de usuario
-        $idUsuarioLogueado = $_SESSION['idUsuario'];
-        $tipoUsuario = $_SESSION['tipoUsuario_id'];
+        // NOTA: Si la sesión expiró arriba, estas líneas darían error si no hay redirección,
+        // pero el exit() de arriba lo previene.
+        $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null; 
+        $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
         // Cargar constantes si no están cargadas
         require_once __DIR__ . '/../config/Constants.php';
@@ -81,7 +105,7 @@ class HomeController
                 'icon' => 'fas fa-chart-line'
             ],
 
-            // 3. PROCESOS SIN PAPEL (Versión final acordada: Participación Activa)
+            // 3. PROCESOS SIN PAPEL
             [
                 'file' => 'public/img/zonas_region/imagen_zona_3.jpg',
                 'title' => 'Participación Activa',
@@ -89,7 +113,7 @@ class HomeController
                 'icon' => 'fas fa-hands-helping'
             ],
 
-            // 4. PROYECTOS COMUNITARIOS (MEJORADO)
+            // 4. PROYECTOS COMUNITARIOS
             [
                 'file' => 'public/img/zonas_region/imagen_zona_4.jpg',
                 'title' => 'Registro de Proyectos',
@@ -121,16 +145,13 @@ class HomeController
                 'icon' => 'fas fa-gavel'
             ],
 
-            // 8. DATOS HISTÓRICOS (Versión final acordada: Base de Datos)
+            // 8. DATOS HISTÓRICOS
             [
                 'file' => 'public/img/zonas_region/imagen_zona_8.jpg',
                 'title' => 'Base de Datos Documental',
                 'subtitle' => 'Acceso y búsqueda rápida a todos los registros históricos.',
                 'icon' => 'fas fa-database'
             ],
-
-
-
         ];
         $data['imagenes_zonas'] = $imagenesZonas;
 
@@ -151,7 +172,7 @@ class HomeController
                     $s = $conteo > 1 ? 's' : '';
                     $data['tareas_pendientes'][] = [
                         'texto' => "Tienes <strong>{$conteo} minuta{$s}</strong> esperando tu firma.",
-                        'link'  => "index.php?action=minutaPendiente", // Ruta actualizada
+                        'link'  => "index.php?action=minutaPendiente",
                         'icono' => "fa-file-signature",
                         'color' => "danger"
                     ];
@@ -237,17 +258,11 @@ class HomeController
                     ORDER BY r.fechaInicioReunion ASC LIMIT 3";
             $data['proximas_reuniones'] = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
-            // En un sistema real, loguear el error
             // error_log($e->getMessage());
         }
 
         // 4. Cargar la Vista dentro del Layout
-        // Pasamos $data a las vistas para que puedan usar las variables
-
-        // Definimos qué vista interna se cargará
         $childView = __DIR__ . '/../views/home.php';
-
-        // Cargamos el layout principal, que a su vez incluirá $childView
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 }

@@ -167,7 +167,7 @@ if ($hash) {
         <?php endif; ?>
 
         <div class="card-footer bg-light text-center py-3">
-            <small class="text-muted">&copy; <?= date('Y') ?> CoreVota</small>
+            <small class="text-muted">&copy; <?= date('Y') ?> COREGEDOC</small>
         </div>
     </div>
 </div>

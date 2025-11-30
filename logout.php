@@ -1,5 +1,5 @@
 <?php
-// /COREVOTA/logout.php
+// /COREGEDOC/logout.php
 
 // 1. Inicia la sesión
 session_start();
