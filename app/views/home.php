@@ -1,19 +1,41 @@
 <?php
-// app/views/pages/home.php
+// --- INICIO DE SESIÓN Y DATOS DEL USUARIO ---
+$nombreUser = htmlspecialchars($_SESSION['pNombre'] ?? 'Consejero');
+$apellidoUser = htmlspecialchars($_SESSION['aPaterno'] ?? '');
+$rolUser = $_SESSION['tipoUsuario_id'] ?? 0;
+$fotoPerfil = !empty($_SESSION['rutaImagenPerfil']) && file_exists($_SESSION['rutaImagenPerfil']) 
+    ? $_SESSION['rutaImagenPerfil'] 
+    : 'public/img/user_placeholder.png';
 
-// Extraemos los datos que deben ser provistos por el controlador (HomeController.php)
-$tareas = $data['tareas_pendientes'] ?? [];
-$reuniones = $data['proximas_reuniones'] ?? [];
-$actividad = $data['actividad_reciente'] ?? [];
-$minutasRecientes = $data['minutas_recientes_aprobadas'] ?? [];
-$usuarioNombre = htmlspecialchars($data['usuario']['nombre'] ?? 'Usuario');
-
-// Datos del carrusel y saludo movidos al controlador
-$saludo = $data['saludo'] ?? 'Hola';
-$imagenesZonas = $data['imagenes_zonas'] ?? [];
+// Rol en texto
+$nombreRol = 'Usuario';
+if ($rolUser == 1) $nombreRol = 'Consejero Regional';
+if ($rolUser == 2) $nombreUser = 'Secretario Técnico';
+if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
 ?>
 
 <style>
+    /* Paleta Institucional */
+    .c-naranja-dark { color: #e87b00 !important; }
+    .bg-naranja-dark { background-color: #e87b00 !important; }
+    
+    .c-naranja { color: #f7931e !important; }
+    .bg-naranja { background-color: #f7931e !important; }
+    
+    .c-verde { color: #00a650 !important; }
+    .bg-verde { background-color: #00a650 !important; }
+    .border-verde { border-color: #00a650 !important; }
+
+    .c-azul { color: #0071bc !important; }
+    .bg-azul { background-color: #0071bc !important; }
+    
+    .c-gris { color: #808080 !important; }
+    
+    /* Ajustes generales */
+    .card-hover:hover { transition: transform 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+
+    /* --- ESTILOS DEL CARRUSEL --- */
     /* Hace que la transición del carrusel sea más lenta */
     .carousel-fade .carousel-item {
         transition: opacity 5s ease-in-out;
@@ -28,39 +50,32 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
         left: 0;
         text-align: center;
         color: white;
-        /* Color de texto para el contraste */
-        /* Centrado con flexbox */
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         z-index: 10;
-        /* Sombra de texto para mejorar la visibilidad sobre la imagen */
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
     }
 
     /* Contenedor del icono y el título para el fondo gris transparente */
     .carousel-content-box {
-        background-color: rgba(90, 90, 90, 0.4);
-        /* Gris semi-transparente */
+        background-color: rgba(90, 90, 90, 0.7); /* Transparencia del cuadro de texto */
+        backdrop-filter: blur(2px);
         padding: 20px 30px;
-        /* Espaciado interno */
         border-radius: 10px;
-        /* Bordes ligeramente redondeados */
         display: flex;
-        /* Asegura el flexbox para centrar dentro de la caja */
         flex-direction: column;
         align-items: center;
         justify-content: center;
         max-width: 80%;
-        /* Ancho máximo para que no ocupe todo */
     }
 
-    /* Ajustes para el icono */
+    /* Ajustes para el icono usando la paleta Naranja Claro */
     .carousel-content-box i {
         font-size: 3rem;
-        /* Tamaño grande para el icono */
         margin-bottom: 0.5rem;
+        color: #f7931e; /* Naranja Claro */
     }
 
     /* Opcional: Aumentar el tamaño del título para el impacto visual */
@@ -68,19 +83,14 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
         font-size: 1.75rem;
         font-weight: bold;
         margin-bottom: 0;
-        /* Elimina el margen inferior por defecto de h3 */
     }
 
     .carousel-content-box p.carousel-subtitle {
         font-size: 1.25rem;
-        /* Tamaño más grande para impacto */
         font-weight: normal;
         color: #fff;
-        /* Asegura color blanco */
         opacity: 0.9;
-        /* Ligeramente transparente */
         margin-top: 5px;
-        /* Pequeño espacio entre título y subtítulo */
         margin-bottom: 0;
     }
 
@@ -89,249 +99,215 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
         display: none !important;
     }
 </style>
-<div class="d-sm-flex align-items-center justify-content-between mb-4">
-    <div>
-        <h1 class="h3 mb-0 text-gray-800"><?php echo $saludo; ?> <?php echo $usuarioNombre; ?></h1>
-        <p class="mb-0 text-muted">Bienvenido al Gestor Documental del CORE Valparaíso.</p>
-    </div>
-    <div class="d-none d-sm-inline-block">
-        <a href="index.php?action=minutas_dashboard" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
-            <i class="fas fa-file-alt fa-sm text-white-50 me-1"></i> Ir a Minutas
-        </a>
-    </div>
-</div>
 
-<div class="row g-4 mb-4">
+<div class="container-fluid p-4">
 
-    <div class="col-lg-8">
-        <div class="card shadow mb-4 h-100">
-            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-                <h6 class="m-0 fw-bold text-primary"></h6>
-            </div>
-            <div class="card-body p-0">
-                <div id="carouselZonasRegion" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000" style="height: 350px !important;">
-                    <div class="carousel-indicators">
-                        <?php foreach ($imagenesZonas as $index => $imagen): ?>
-                            <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="<?php echo $index; ?>" class="<?php echo $index === 0 ? 'active' : ''; ?>" aria-current="<?php echo $index === 0 ? 'true' : 'false'; ?>" aria-label="Slide <?php echo $index + 1; ?>"></button>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <div class="carousel-inner h-100 rounded-bottom">
-                        <?php foreach ($imagenesZonas as $index => $imagen): ?>
-                            <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>" style="height: 350px !important;">
-                                <img src="<?php echo htmlspecialchars($imagen['file']); ?>" class="d-block w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($imagen['title']); ?>" style="opacity: 0.7;">
-
-                                
-                                <div class="carousel-overlay">
-                                    <div class="carousel-content-box">
-                                        <i class="<?php echo htmlspecialchars($imagen['icon']); ?> mb-3"></i>
-                                        <h3 class="mb-0"><?php echo htmlspecialchars($imagen['title']); ?></h3>
-
-                                        <?php if (isset($imagen['subtitle'])): ?>
-                                            <p class="carousel-subtitle mt-2 mb-0">
-                                                <?php echo htmlspecialchars($imagen['subtitle']); ?>
-                                            </p>
-                                        <?php endif; ?>
-
-                                    </div>
-                                </div>
-                                
-
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Anterior</span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Siguiente</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="card shadow mb-4">
-            <div class="card-header py-3 bg-warning bg-opacity-10 border-bottom-warning">
-                <h6 class="m-0 fw-bold text-dark"><i class="fas fa-bullhorn me-2 text-warning"></i> Novedades</h6>
-            </div>
-            <div class="card-body">
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item px-0">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-primary">Módulo de Votación v2.0</h6>
-                            <small class="text-muted">Hace 2 días</small>
+    <div class="row mb-4 align-items-stretch">
+        
+        <div class="col-lg-8 mb-3 mb-lg-0">
+            <div class="card shadow-sm border-0 h-100 overflow-hidden">
+                <div class="card-body p-0 d-flex align-items-center bg-white">
+                    <div class="bg-azul h-100" style="width: 10px;"></div>
+                    
+                    <div class="p-4 d-flex align-items-center w-100">
+                        <div class="me-4 flex-shrink-0">
+                            <img src="<?php echo $fotoPerfil; ?>" 
+                                 alt="Foto Perfil" 
+                                 class="rounded shadow border border-3 border-light"
+                                 style="height: 110px; width: auto; max-width: 100%;">
                         </div>
-                        <p class="mb-1 small text-muted">Ahora los presidentes pueden ver resultados en tiempo real durante las sesiones.</p>
-                    </div>
-                    <div class="list-group-item px-0">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-success">Firma Digital Activa</h6>
-                            <small class="text-muted">Hace 1 semana</small>
+                        
+                        <div>
+                            <h2 class="fw-bold text-dark mb-1">
+                                <?php echo $data['saludo'] . ' ' . $nombreUser . ' ' . $apellidoUser; ?>
+                            </h2>
+                            <span class="badge bg-light c-azul border border-primary rounded-pill px-3 py-2">
+                                <i class="fas fa-user-tie me-1"></i> <?php echo $nombreRol; ?>
+                            </span>
+                            <p class="c-gris mt-3 mb-0 small">
+                                <i class="far fa-clock me-1"></i> Último acceso: <?php echo date('d/m/Y H:i'); ?>
+                            </p>
                         </div>
-                        <p class="mb-1 small text-muted">El sistema de firma electrónica avanzada ya está operativo para todas las actas.</p>
-                    </div>
-                    <div class="list-group-item px-0 border-bottom-0">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold text-info">Autogestión de Asistencia</h6>
-                            <small class="text-muted">Nuevo</small>
-                        </div>
-                        <p class="mb-1 small text-muted">Recuerda marcar tu asistencia desde el menú lateral al ingresar a la sala.</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow mb-4 bg-info text-white border-0">
-            <div class="card-body d-flex align-items-center justify-content-between">
-                <div>
-                    <h6 class="fw-bold mb-1">Valparaíso</h6>
-                    <small id="fecha-actual"><?php echo date('d/m/Y'); ?></small>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 h-100 bg-white">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    
+                    <h5 class="fw-bold mb-0 text-uppercase ls-1 c-gris">
+                        Valparaíso
+                    </h5>
+                    
+                    <div class="d-flex align-items-center justify-content-center my-3">
+                        <i class="fas fa-sun fa-3x me-3 c-naranja"></i>
+                        <span class="display-4 fw-bold text-dark">18°</span>
+                    </div>
+
+                    <div class="d-flex align-items-center small c-gris">
+                        <span class="me-3"><i class="fas fa-wind me-1"></i> 12 km/h</span>
+                        <span><i class="fas fa-tint me-1"></i> 45%</span>
+                    </div>
+
                 </div>
-                <div class="text-end">
-                    <span class="h4 fw-bold mb-0" id="temperatura-actual">--°C</span>
-                    <i class="fas fa-cloud-sun fa-lg ms-2"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-4">
-
-    <div class="col-lg-6">
-        <div class="card shadow mb-4 h-100">
-            <div class="card-header py-3 bg-white border-bottom-primary d-flex justify-content-between align-items-center">
-                <h6 class="m-0 fw-bold text-primary"><i class="fas fa-tasks me-2"></i> Mis Tareas Pendientes</h6>
-                <?php if (!empty($tareas)): ?>
-                    <span class="badge bg-danger rounded-pill"><?php echo count($tareas); ?></span>
-                <?php endif; ?>
-            </div>
-            <div class="card-body p-0">
-                <?php if (empty($tareas)): ?>
-                    <div class="text-center py-5">
-                        <div class="mb-3">
-                            <i class="fas fa-check-circle fa-4x text-success opacity-50"></i>
-                        </div>
-                        <h5 class="text-muted fw-normal">¡Todo al día!</h5>
-                        <p class="text-muted small mb-0">No tienes tareas pendientes por ahora.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="list-group list-group-flush">
-                        <?php foreach ($tareas as $t): ?>
-                            <a href="<?php echo $t['link']; ?>" class="list-group-item list-group-item-action p-3 border-start-0 border-end-0 d-flex align-items-center">
-                                <div class="me-3">
-                                    <div class="icon-circle bg-light text-<?php echo $t['color']; ?> rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                        <i class="fas <?php echo $t['icono']; ?>"></i>
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold text-dark mb-1"><?php echo $t['texto']; ?></div>
-                                    <small class="text-muted">Requiere tu atención inmediata.</small>
-                                </div>
-                                <i class="fas fa-chevron-right text-muted small"></i>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <div class="col-lg-6">
-        <div class="card shadow mb-4 h-100">
-            <div class="card-header py-3 bg-white border-bottom-info">
-                <h6 class="m-0 fw-bold text-info"><i class="far fa-calendar-alt me-2"></i> Próximas Reuniones</h6>
-            </div>
-
-            <div class="card-footer bg-white text-center border-0 pb-3">
-                <a href="index.php?action=reunion_calendario" class="small text-decoration-none fw-bold text-info">
-                    Ver Calendario Completo <i class="fas fa-arrow-right ms-1"></i>
-                </a>
-            </div>
-
-            <div class="card-body p-0">
-                <?php if (empty($reuniones)): ?>
-                    <div class="text-center py-5 text-muted">
-                        <p class="mb-0">No hay reuniones programadas próximamente.</p>
-                    </div>
-                <?php else: ?>
-                    <ul class="list-group list-group-flush">
-                        <?php foreach ($reuniones as $r): ?>
-                            <?php
-                            $fechaReu = new DateTime($r['fechaInicioReunion']);
-                            $esHoy = $fechaReu->format('Y-m-d') === date('Y-m-d');
-                            ?>
-                            <li class="list-group-item p-3 border-start-0 border-end-0">
-                                <div class="d-flex w-100 justify-content-between align-items-center mb-1">
-                                    <h6 class="mb-0 fw-bold text-dark">
-                                        <?php echo htmlspecialchars($r['nombreReunion']); ?>
-                                    </h6>
-                                    <?php if ($esHoy): ?>
-                                        <span class="badge bg-danger">HOY</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-secondary"><?php echo $fechaReu->format('d/m'); ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <p class="mb-1 small text-muted">
-                                    <i class="far fa-clock me-1"></i> <?php echo $fechaReu->format('H:i'); ?> hrs
-                                    &nbsp;|&nbsp;
-                                    <i class="fas fa-users me-1"></i> <?php echo htmlspecialchars($r['nombreComision'] ?? 'Comisión'); ?>
-                                </p>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<?php if (!empty($actividad)): ?>
-    <div class="row">
+    <div class="row mb-5">
         <div class="col-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-white">
-                    <h6 class="m-0 fw-bold text-secondary"><i class="fas fa-history me-2"></i> Actividad Reciente del Sistema</h6>
+            <div class="card shadow border-0 overflow-hidden">
+                <div class="card-header bg-white border-0 py-3">
+                     <h5 class="mb-0 fw-bold c-azul"><i class="fas fa-map-marked-alt me-2"></i>Ejes de Gestión Regional</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="carouselZonas" class="carousel slide" data-bs-interval="5000" style="height: 400px;">
+                        
+                        <div class="carousel-indicators">
+                            <?php foreach ($data['imagenes_zonas'] as $index => $zona): ?>
+                                <button type="button" data-bs-target="#carouselZonas" data-bs-slide-to="<?php echo $index; ?>" 
+                                        class="<?php echo $index === 0 ? 'active' : ''; ?>" aria-current="<?php echo $index === 0 ? 'true' : 'false'; ?>" aria-label="Slide <?php echo $index + 1; ?>"></button>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <div class="carousel-inner h-100 rounded-bottom">
+                            <?php foreach ($data['imagenes_zonas'] as $index => $zona): ?>
+                                <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>" style="height: 400px !important;">
+                                    
+                                    <img src="<?php echo htmlspecialchars($zona['file']); ?>" class="d-block w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($zona['title']); ?>" style="opacity: 0.8;">
+
+                                    <div class="carousel-overlay">
+                                        <div class="carousel-content-box">
+                                            <i class="<?php echo htmlspecialchars($zona['icon']); ?> mb-3"></i>
+                                            <h3 class="mb-0"><?php echo htmlspecialchars($zona['title']); ?></h3>
+
+                                            <?php if (isset($zona['subtitle'])): ?>
+                                                <p class="carousel-subtitle mt-2 mb-0">
+                                                    <?php echo htmlspecialchars($zona['subtitle']); ?>
+                                                </p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonas" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carouselZonas" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Siguiente</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold c-naranja-dark">
+                        <i class="fas fa-exclamation-circle me-2"></i>Tareas Pendientes
+                    </h5>
+                    <span class="badge bg-naranja-dark rounded-pill"><?php echo count($data['tareas_pendientes']); ?></span>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-borderless mb-0 align-middle">
-                            <tbody>
-                                <?php foreach (array_slice($actividad, 0, 5) as $a): ?>
-                                    <tr class="border-bottom">
-                                        <td style="width: 50px;" class="text-center text-muted">
-                                            <i class="fas fa-circle fa-xs"></i>
-                                        </td>
-                                        <td>
-                                            <span class="fw-bold text-dark"><?php echo htmlspecialchars($a['usuario_nombre']); ?></span>
-                                            <span class="text-muted"><?php echo htmlspecialchars($a['detalle']); ?></span>
-                                        </td>
-                                        <td class="text-end text-muted small" style="width: 150px;">
-                                            <?php echo date('d/m H:i', strtotime($a['fecha_hora'])); ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <?php if (empty($data['tareas_pendientes'])): ?>
+                        <div class="text-center py-5 c-gris">
+                            <i class="fas fa-check-circle fa-3x mb-3 c-verde opacity-50"></i>
+                            <p class="mb-0">¡Excelente! No tienes tareas pendientes.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="list-group list-group-flush">
+                            <?php foreach ($data['tareas_pendientes'] as $tarea): ?>
+                                <a href="<?php echo $tarea['link']; ?>" class="list-group-item list-group-item-action d-flex gap-3 py-3 border-0 border-bottom" aria-current="true">
+                                    <div class="d-flex gap-2 w-100 justify-content-between">
+                                        <div>
+                                            <div class="mb-1 text-dark">
+                                                <i class="fas <?php echo $tarea['icono']; ?> c-naranja-dark me-2"></i>
+                                                <?php echo $tarea['texto']; ?>
+                                            </div>
+                                            <small class="c-gris">Acción requerida inmediatamente</small>
+                                        </div>
+                                        <small class="opacity-50 text-nowrap"><i class="fas fa-chevron-right"></i></small>
+                                    </div>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold c-azul">
+                        <i class="fas fa-calendar-alt me-2"></i>Próximas Reuniones
+                    </h5>
+                    <a href="index.php?action=calendario" class="btn btn-sm btn-outline-primary" style="border-color: #0071bc; color: #0071bc;">Ver Calendario</a>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($data['proximas_reuniones'])): ?>
+                        <div class="text-center py-5 c-gris">
+                            <i class="far fa-calendar-times fa-3x mb-3 opacity-25"></i>
+                            <p class="mb-0">No hay reuniones programadas próximamente.</p>
+                        </div>
+                    <?php else: ?>
+                        <ul class="list-group list-group-flush">
+                            <?php foreach ($data['proximas_reuniones'] as $reunion): 
+                                $fecha = new DateTime($reunion['fechaInicioReunion']);
+                            ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="text-center bg-light rounded p-2 me-3 border border-verde" style="min-width: 60px;">
+                                            <div class="small text-uppercase fw-bold c-verde"><?php echo $fecha->format('M'); ?></div>
+                                            <div class="h4 mb-0 fw-bold text-dark"><?php echo $fecha->format('d'); ?></div>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1 fw-bold text-dark"><?php echo htmlspecialchars($reunion['nombreReunion']); ?></h6>
+                                            <small class="c-gris">
+                                                <i class="far fa-clock me-1"></i> <?php echo $fecha->format('H:i'); ?> hrs
+                                                &nbsp;|&nbsp; 
+                                                <i class="fas fa-users me-1"></i> <?php echo htmlspecialchars($reunion['nombreComision']); ?>
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <a href="index.php?action=reunion_gestionar&id=<?php echo $reunion['idReunion']; ?>" class="btn btn-sm btn-light c-azul">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
-<?php endif; ?>
+
+</div>
 
 <script>
-    // Script simple para simular carga de clima (puedes conectarlo a una API real luego)
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(() => {
-            const tempEl = document.getElementById('temperatura-actual');
-            if (tempEl) tempEl.innerText = '19°C'; // Valor simulado
-        }, 1000);
-    });
+    // Usamos window.onload para asegurar que todos los elementos HTML se hayan cargado.
+    window.onload = function() {
+        const carouselElement = document.getElementById('carouselZonas');
+        
+        // Verificamos si la clase Carousel de Bootstrap existe
+        if (carouselElement && typeof bootstrap !== 'undefined' && bootstrap.Carousel) {
+            
+            // Inicialización explícita, que ahora es la ÚNICA inicialización.
+            const carousel = new bootstrap.Carousel(carouselElement, {
+                interval: 5000, // Ajusta el intervalo automático
+                ride: false // Desactiva la auto-reproducción si el usuario interactúa
+            });
+            console.log("Carrusel inicializado por script, listo para interacción manual.");
+        }
+    };
 </script>

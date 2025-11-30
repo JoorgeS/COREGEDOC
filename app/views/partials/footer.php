@@ -4,12 +4,13 @@
             
             <div class="col-md-4 col-lg-5">
                 <div class="d-flex align-items-center mb-3">
-                    <h6 class="fw-bold text-primary mb-0 text-uppercase">Consejo Regional de Valparaíso</h6>
+                    <h6 class="fw-bold text-primary mb-0 text-uppercase">Acerca del Consejo Regional</h6>
                 </div>
                 <p class="text-muted small mb-2">
-                    La administración superior de la Región de Valparaíso está radicada en el Gobierno Regional, 
+                    La administración superior de la Región de Valparaíso radica en el Gobierno Regional, 
                     que tiene por objetivo el desarrollo social, cultural y económico de la misma.
-                    El Consejo Regional tendrá por finalidad hacer efectiva la participación de la comunidad regional 
+
+                    El Consejo Regional tendrá por finalidad hacer efectiva la participación de la comunidad 
                     y está investido de facultades normativas, resolutivas y fiscalizadoras.
                 </p>
             </div>
@@ -19,11 +20,11 @@
                 <ul class="list-unstyled small text-muted mb-0">
                     <li class="mb-2">
                         <i class="fas fa-map-marker-alt fa-fw me-2 text-primary"></i> 
-                        Melgarejo 669, Valparaíso, Chile
+                        Condell 1530, piso 3, Valparaíso, Chile
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-phone fa-fw me-2 text-primary"></i>
-                        +56 32 212 3456
+                        (32) 2655260 — (32) 2655344 — (32) 2655262
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-envelope fa-fw me-2 text-primary"></i>
@@ -33,7 +34,7 @@
             </div>
 
             <div class="col-md-4 col-lg-3">
-                <h6 class="fw-bold text-dark mb-3">Síguenos</h6>
+                <h6 class="fw-bold text-dark mb-3">Redes Sociales</h6>
                 <div class="d-flex gap-3">
                     <a href="https://www.facebook.com/GOREValparaiso/" class="text-secondary text-decoration-none fs-5 link-hover-primary"><i class="fab fa-facebook"></i></a>
                     <a href="https://x.com/GOREValparaiso" class="text-secondary text-decoration-none fs-5 link-hover-primary"><i class="fa-solid fa-x"></i></a>

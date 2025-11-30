@@ -1,34 +1,83 @@
-<header class="core-header bg-gradient-core-dark d-flex justify-content-between align-items-center px-4 py-3 shadow-sm">
-    
-    <div class="d-flex align-items-center">
-        <button class="btn btn-link text-white me-3 d-md-none p-0 border-0" id="sidebarToggle">
-            <i class="fas fa-bars fa-lg"></i>
-        </button>
-        <div class="d-flex flex-column">
-            <h6 class="m-0 fw-bold text-uppercase letter-spacing-1 d-none d-sm-block">Gestor Documental CORE Valparaíso</h6>
-            <h6 class="m-0 fw-bold text-uppercase d-block d-sm-none">COREGEDOC</h6>
-        </div>
-    </div>
-    
-    <div class="d-flex align-items-center gap-3">
-        <div class="d-none d-md-flex flex-column text-end lh-1">
-            <span class="fw-bold small"><?php echo isset($nombreUsuario) ? htmlspecialchars($nombreUsuario) : 'Usuario'; ?></span>
-            <span class="small text-white-50" style="font-size: 0.75rem;">
-                <?php 
-                // Match para roles
-                echo match($tipoUsuario ?? 0) {
-                    6 => 'Administrador',
-                    2 => 'Secretario Téc.',
-                    3 => 'Pdte. Comisión',
-                    1 => 'Consejero',
-                    default => 'Usuario'
-                }; 
-                ?>
-            </span>
-        </div>
+<style>
+    .bg-gradient-core-dark {
+        /* Fallback para navegadores antiguos */
+        background: #000000; 
         
-        <div class="rounded-circle bg-white text-dark d-flex align-items-center justify-content-center shadow-sm" style="width: 40px; height: 40px;">
-            <i class="fas fa-user text-dark"></i>
+        /* Degradado de 5 colores: Azul -> Verde -> Amarillo -> Gris -> Negro */
+        background: linear-gradient(
+            90deg, 
+            #0071bc 20%,   /* Azul (Inicio) */
+            #00a650 40%,   /* Verde */
+            #f7931e 60%,   /* Amarillo */
+            #6D6A75 80%,   /* Gris */
+            #000000 100%   /* Negro (Fin) */
+        );
+        
+        border-bottom: 1px solid #333;
+    }
+</style>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-gradient-core-dark shadow fixed-top">
+    <div class="container-fluid">
+        
+        <button class="btn btn-link text-white me-3" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <a class="navbar-brand fw-bold text-white" href="index.php?action=home">
+            </i>CONSEJO REGIONAL<span class="text-white-50"> REGIÓN DE VALPARAÍSO</span>
+        </a>
+
+        <div class="ms-auto d-flex align-items-center">
+            
+            <div class="dropdown">
+                <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle text-white" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <?php 
+                        // Lógica de imagen de perfil segura
+                        $imgPerfil = !empty($_SESSION['rutaImagenPerfil']) && file_exists($_SESSION['rutaImagenPerfil']) 
+                            ? $_SESSION['rutaImagenPerfil'] 
+                            : 'public/img/user_placeholder.png'; 
+                    ?>
+                    <img src="<?php echo $imgPerfil; ?>" alt="Perfil" width="32" height="32" class="rounded-circle me-2 border border-white" style="object-fit: cover;">
+                    
+                    <span class="d-none d-md-inline fw-medium">
+                        <?php 
+                            echo htmlspecialchars(($_SESSION['pNombre'] ?? 'Usuario') . ' ' . ($_SESSION['aPaterno'] ?? '')); 
+                        ?>
+                    </span>
+                </a>
+                
+                <ul class="dropdown-menu dropdown-menu-end shadow animate__animated animate__fadeIn" aria-labelledby="userDropdown">
+                    <li>
+                        <div class="dropdown-header text-center">
+                            <strong><?php echo htmlspecialchars($_SESSION['pNombre'] ?? 'Usuario'); ?></strong><br>
+                            <small class="text-muted">
+                                <?php echo htmlspecialchars($_SESSION['email'] ?? $_SESSION['correo'] ?? 'Sin correo'); ?>
+                            </small>
+                        </div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    
+                    <li>
+                        <a class="dropdown-item" href="index.php?action=perfil">
+                            <i class="fas fa-user fa-fw me-2 text-primary"></i> Ver mi Perfil
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="index.php?action=configuracion">
+                            <i class="fas fa-cog fa-fw me-2 text-secondary"></i> Configuración
+                        </a>
+                    </li>
+                    
+                    <li><hr class="dropdown-divider"></li>
+                    
+                    <li>
+                        <a class="dropdown-item text-danger" href="index.php?action=logout">
+                            <i class="fas fa-sign-out-alt fa-fw me-2"></i> Cerrar Sesión
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
-</header>
+</nav>

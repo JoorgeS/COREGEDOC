@@ -20,7 +20,7 @@ class User
     }
 
     // ============================================================
-    // 🔑 MÉTODO CRÍTICO PARA LOGIN (Este es el que faltaba)
+    // 🔑 MÉTODO CRÍTICO PARA LOGIN
     // ============================================================
     public function findByEmail($email)
     {
@@ -57,10 +57,30 @@ class User
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    // Alias para getById (usado en el perfil)
+   // En app/models/User.php
+
+public function getUserById($id)
+{
+    // Hacemos LEFT JOIN para traer los nombres en lugar de solo los IDs
+    $sql = "SELECT u.*, 
+                   p.nombrePartido, 
+                   prov.nombreProvincia,
+                   t.descTipoUsuario
+            FROM " . $this->table . " u
+            LEFT JOIN t_partido p ON u.partido_id = p.idPartido
+            LEFT JOIN t_provincia prov ON u.provincia_id = prov.idProvincia
+            LEFT JOIN t_tipousuario t ON u.tipoUsuario_id = t.idTipoUsuario
+            WHERE u.idUsuario = :id LIMIT 1";
+
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([':id' => $id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
     // Crear Usuario
     public function create($data)
     {
-        // Nota: t_partido_nombrePartido se inserta vacío por defecto o según tu lógica
         $sql = "INSERT INTO " . $this->table . " 
                 (pNombre, sNombre, aPaterno, aMaterno, correo, contrasena, tipoUsuario_id, partido_id, provincia_id, estado, t_partido_nombrePartido) 
                 VALUES (:pNombre, :sNombre, :aPaterno, :aMaterno, :correo, :contrasena, :rol, :partido, :provincia, 1, '')";
@@ -75,7 +95,7 @@ class User
             ':sNombre' => $data['sNombre'] ?? '',
             ':aPaterno' => $data['aPaterno'],
             ':aMaterno' => $data['aMaterno'] ?? '',
-            ':correo'  => $data['correo'],
+            ':correo'   => $data['correo'],
             ':contrasena' => $hash,
             ':rol'     => $data['tipoUsuario_id'],
             ':partido' => !empty($data['partido_id']) ? $data['partido_id'] : null,
@@ -83,10 +103,9 @@ class User
         ]);
     }
 
-    // Actualizar Usuario
+    // Actualizar Usuario (Administración)
     public function update($id, $data)
     {
-        // Solo actualizamos la contraseña si el usuario escribió una nueva
         $sqlPass = !empty($data['contrasena']) ? ", contrasena = :contrasena" : "";
 
         $sql = "UPDATE " . $this->table . " SET 
@@ -108,7 +127,7 @@ class User
             ':sNombre' => $data['sNombre'] ?? '',
             ':aPaterno' => $data['aPaterno'],
             ':aMaterno' => $data['aMaterno'] ?? '',
-            ':correo'  => $data['correo'],
+            ':correo'   => $data['correo'],
             ':rol'     => $data['tipoUsuario_id'],
             ':partido' => !empty($data['partido_id']) ? $data['partido_id'] : null,
             ':provincia' => !empty($data['provincia_id']) ? $data['provincia_id'] : 0,
@@ -143,14 +162,17 @@ class User
     {
         return $this->conn->query("SELECT * FROM t_provincia ORDER BY nombreProvincia")->fetchAll(PDO::FETCH_ASSOC);
     }
-   public function guardarTokenRecuperacion($email, $token)
+    
+    // ============================================================
+    // 🔄 RECUPERACIÓN DE CONTRASEÑA (Token)
+    // ============================================================
+
+    public function guardarTokenRecuperacion($email, $token)
     {
-        // 1. Verificar que el correo exista y esté activo
         $stmt = $this->conn->prepare("SELECT idUsuario FROM t_usuario WHERE correo = :email AND estado = 1");
         $stmt->execute([':email' => $email]);
         if (!$stmt->fetch()) return false; 
 
-        // 2. Guardar token (Validez: 1 hora)
         $expira = date("Y-m-d H:i:s", time() + 3600);
         $sql = "UPDATE t_usuario SET reset_token = :token, reset_expira = :expira WHERE correo = :email";
         
@@ -164,7 +186,6 @@ class User
 
     public function verificarToken($token)
     {
-        // Busca usuario con ese token y que NO haya expirado
         $sql = "SELECT idUsuario FROM t_usuario WHERE reset_token = :token AND reset_expira > NOW() AND estado = 1";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':token' => $token]);
@@ -173,9 +194,53 @@ class User
 
     public function actualizarPassword($idUsuario, $hashPassword)
     {
-        // Actualiza clave y borra el token usado
         $sql = "UPDATE t_usuario SET contrasena = :pass, reset_token = NULL, reset_expira = NULL WHERE idUsuario = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([':pass' => $hashPassword, ':id' => $idUsuario]);
+    }
+
+    // ============================================================
+    // 👤 PERFIL Y CONFIGURACIÓN (Corregidos)
+    // ============================================================
+
+// app/models/User.php
+
+public function updateProfilePhoto($id, $path)
+{
+    // Usamos 'foto_perfil' que es como se llama en tu base de datos
+    $query = "UPDATE " . $this->table . " SET foto_perfil = :path WHERE idUsuario = :id";
+    
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':path', $path);
+    $stmt->bindParam(':id', $id);
+    return $stmt->execute();
+}
+
+    // Método para cambiar la contraseña (Desde Configuración)
+    public function updatePassword($id, $newHash)
+    {
+        // CORREGIDO: campo 'contrasena', no 'password'
+        $query = "UPDATE " . $this->table . " SET contrasena = :pass WHERE idUsuario = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':pass', $newHash);
+        $stmt->bindParam(':id', $id);
+        return $stmt->execute();
+    }
+
+    // Método para verificar la contraseña actual
+    public function verifyPassword($id, $password)
+    {
+        // CORREGIDO: selecciona 'contrasena'
+        $query = "SELECT contrasena FROM " . $this->table . " WHERE idUsuario = :id LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $id);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // CORREGIDO: verifica contra $row['contrasena']
+        if($row && password_verify($password, $row['contrasena'])) {
+            return true;
+        }
+        return false;
     }
 }
