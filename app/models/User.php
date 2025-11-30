@@ -1,16 +1,20 @@
 <?php
+
 namespace App\Models;
-use Exception;   
+
+use Exception;
 use PDOException;
 
 use App\Config\Database;
 use PDO;
 
-class User {
+class User
+{
     private $conn;
     private $table = 't_usuario';
 
-    public function __construct() {
+    public function __construct()
+    {
         $database = new Database();
         $this->conn = $database->getConnection();
     }
@@ -18,7 +22,8 @@ class User {
     // ============================================================
     // 🔑 MÉTODO CRÍTICO PARA LOGIN (Este es el que faltaba)
     // ============================================================
-    public function findByEmail($email) {
+    public function findByEmail($email)
+    {
         $query = "SELECT * FROM " . $this->table . " WHERE correo = :email LIMIT 1";
         $stmt = $this->conn->prepare($query);
         $stmt->execute([':email' => $email]);
@@ -30,7 +35,8 @@ class User {
     // ============================================================
 
     // Listar todos (Activos)
-    public function getAll() {
+    public function getAll()
+    {
         $sql = "SELECT u.*, t.descTipoUsuario, p.nombrePartido 
                 FROM t_usuario u
                 LEFT JOIN t_tipousuario t ON u.tipoUsuario_id = t.idTipoUsuario
@@ -43,7 +49,8 @@ class User {
     }
 
     // Obtener uno por ID
-    public function getById($id) {
+    public function getById($id)
+    {
         $sql = "SELECT * FROM " . $this->table . " WHERE idUsuario = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -51,22 +58,23 @@ class User {
     }
 
     // Crear Usuario
-    public function create($data) {
+    public function create($data)
+    {
         // Nota: t_partido_nombrePartido se inserta vacío por defecto o según tu lógica
         $sql = "INSERT INTO " . $this->table . " 
                 (pNombre, sNombre, aPaterno, aMaterno, correo, contrasena, tipoUsuario_id, partido_id, provincia_id, estado, t_partido_nombrePartido) 
                 VALUES (:pNombre, :sNombre, :aPaterno, :aMaterno, :correo, :contrasena, :rol, :partido, :provincia, 1, '')";
-        
+
         $stmt = $this->conn->prepare($sql);
-        
+
         // Encriptar contraseña
         $hash = password_hash($data['contrasena'], PASSWORD_DEFAULT);
 
         return $stmt->execute([
             ':pNombre' => $data['pNombre'],
             ':sNombre' => $data['sNombre'] ?? '',
-            ':aPaterno'=> $data['aPaterno'],
-            ':aMaterno'=> $data['aMaterno'] ?? '',
+            ':aPaterno' => $data['aPaterno'],
+            ':aMaterno' => $data['aMaterno'] ?? '',
             ':correo'  => $data['correo'],
             ':contrasena' => $hash,
             ':rol'     => $data['tipoUsuario_id'],
@@ -76,10 +84,11 @@ class User {
     }
 
     // Actualizar Usuario
-    public function update($id, $data) {
+    public function update($id, $data)
+    {
         // Solo actualizamos la contraseña si el usuario escribió una nueva
         $sqlPass = !empty($data['contrasena']) ? ", contrasena = :contrasena" : "";
-        
+
         $sql = "UPDATE " . $this->table . " SET 
                     pNombre = :pNombre, 
                     sNombre = :sNombre, 
@@ -93,12 +102,12 @@ class User {
                 WHERE idUsuario = :id";
 
         $stmt = $this->conn->prepare($sql);
-        
+
         $params = [
             ':pNombre' => $data['pNombre'],
             ':sNombre' => $data['sNombre'] ?? '',
-            ':aPaterno'=> $data['aPaterno'],
-            ':aMaterno'=> $data['aMaterno'] ?? '',
+            ':aPaterno' => $data['aPaterno'],
+            ':aMaterno' => $data['aMaterno'] ?? '',
             ':correo'  => $data['correo'],
             ':rol'     => $data['tipoUsuario_id'],
             ':partido' => !empty($data['partido_id']) ? $data['partido_id'] : null,
@@ -114,20 +123,59 @@ class User {
     }
 
     // Eliminar (Lógico)
-    public function delete($id) {
+    public function delete($id)
+    {
         $sql = "UPDATE " . $this->table . " SET estado = 0 WHERE idUsuario = :id";
         $stmt = $this->conn->prepare($sql);
         return $stmt->execute([':id' => $id]);
     }
 
     // --- Helpers para los Selects ---
-    public function getRoles() {
+    public function getRoles()
+    {
         return $this->conn->query("SELECT * FROM t_tipousuario ORDER BY descTipoUsuario")->fetchAll(PDO::FETCH_ASSOC);
     }
-    public function getPartidos() {
+    public function getPartidos()
+    {
         return $this->conn->query("SELECT * FROM t_partido ORDER BY nombrePartido")->fetchAll(PDO::FETCH_ASSOC);
     }
-    public function getProvincias() {
+    public function getProvincias()
+    {
         return $this->conn->query("SELECT * FROM t_provincia ORDER BY nombreProvincia")->fetchAll(PDO::FETCH_ASSOC);
+    }
+   public function guardarTokenRecuperacion($email, $token)
+    {
+        // 1. Verificar que el correo exista y esté activo
+        $stmt = $this->conn->prepare("SELECT idUsuario FROM t_usuario WHERE correo = :email AND estado = 1");
+        $stmt->execute([':email' => $email]);
+        if (!$stmt->fetch()) return false; 
+
+        // 2. Guardar token (Validez: 1 hora)
+        $expira = date("Y-m-d H:i:s", time() + 3600);
+        $sql = "UPDATE t_usuario SET reset_token = :token, reset_expira = :expira WHERE correo = :email";
+        
+        $stmtUpd = $this->conn->prepare($sql);
+        return $stmtUpd->execute([
+            ':token' => $token, 
+            ':expira' => $expira, 
+            ':email' => $email
+        ]);
+    }
+
+    public function verificarToken($token)
+    {
+        // Busca usuario con ese token y que NO haya expirado
+        $sql = "SELECT idUsuario FROM t_usuario WHERE reset_token = :token AND reset_expira > NOW() AND estado = 1";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':token' => $token]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function actualizarPassword($idUsuario, $hashPassword)
+    {
+        // Actualiza clave y borra el token usado
+        $sql = "UPDATE t_usuario SET contrasena = :pass, reset_token = NULL, reset_expira = NULL WHERE idUsuario = :id";
+        $stmt = $this->conn->prepare($sql);
+        return $stmt->execute([':pass' => $hashPassword, ':id' => $idUsuario]);
     }
 }

@@ -1,4 +1,11 @@
 <?php
+
+// 1. Zona Horaria: Santiago de Chile (UTC-3 / UTC-4 según época)
+date_default_timezone_set('America/Santiago');
+
+// 2. Idioma local (Opcional pero recomendado): Para que strftime o fechas salgan en español
+setlocale(LC_TIME, 'es_CL.UTF-8', 'es_CL', 'esp');
+ob_start();
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/app/config/Constants.php';
 
@@ -11,11 +18,12 @@ use App\Controllers\AsistenciaController;
 use App\Controllers\ReunionController;
 use App\Controllers\UserController;
 use App\Controllers\ComisionController;
+use App\Controllers\PublicController;
 
 
 session_start();
 
-$action = $_GET['action'] ?? $_POST['action'] ?? 'login'; 
+$action = $_GET['action'] ?? $_POST['action'] ?? 'login';
 
 $authController = new AuthController();
 $homeController = new HomeController();
@@ -48,7 +56,24 @@ try {
             break;
 
         case 'minutas_aprobadas':
-            $minutaController->aprobadas();
+            $controller = new App\Controllers\MinutaController();
+            $controller->aprobadas();
+            break;
+
+        case 'api_filtrar_aprobadas': // <--- AGREGAR ESTO
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiFiltrarAprobadas();
+            break;
+
+        case 'api_filtrar_pendientes':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiFiltrarPendientes();
+            break;
+
+        case 'api_ver_adjuntos_minuta': // <--- Y ESTO
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiVerAdjuntosMinuta();
+            break;
 
         case 'minuta_gestionar':
             $minutaController->gestionar();
@@ -121,38 +146,37 @@ try {
             $asistenciaController->apiMarcar();
             break;
 
-        case 'reuniones_dashboard': // Listado
+        case 'reuniones_dashboard':
             $reunionController->index();
             break;
 
-        case 'reunion_form': // Formulario de creación
-            $reunionController->create();
-            break;
 
-        case 'store_reunion': // Acción de guardar (POST)
+
+        case 'store_reunion':
             $reunionController->store();
             break;
 
-        case 'reunion_editar': // Formulario de edición
-            $reunionController->edit();
-            break;
 
-        case 'update_reunion': // Acción de actualizar (POST)
+
+        case 'update_reunion':
             $reunionController->update();
             break;
 
-        case 'reunion_eliminar': // Acción de borrar
+        case 'reunion_eliminar':
             $reunionController->delete();
             break;
 
-        case 'reunion_iniciar_minuta': // Acción mágica
+        case 'reunion_guardar':
+            $reunionController->store();
+            break;
+
+        case 'reunion_iniciar_minuta':
             $reunionController->iniciarMinuta();
             break;
 
-        case 'minuta_ver_historial': // <--- ESTA ES LA RUTA
+        case 'minuta_ver_historial':
             $minutaController->verHistorial();
             break;
-
 
         case 'reunion_calendario':
             $reunionController->calendario();
@@ -161,10 +185,10 @@ try {
             $userController->index();
             break;
         case 'usuario_crear':
-            $userController->form(); // Formulario vacío
+            $userController->form();
             break;
         case 'usuario_editar':
-            $userController->form(); // Formulario con datos (detecta $_GET['id'])
+            $userController->form();
             break;
         case 'usuario_guardar':
             $userController->store();
@@ -196,11 +220,149 @@ try {
             $minutaController->apiValidarAsistencia();
             break;
 
+        case 'validar':
+            $controller = new PublicController();
+            $controller->validarDocumento();
+            break;
+
+        case 'ver_archivo_adjunto': // <--- NUEVA RUTA
+            $controller = new App\Controllers\MinutaController();
+            $controller->verArchivoAdjunto();
+            break;
+
+        // ---------------------------------------------------------
+        // RUTAS API - GESTIÓN DE MINUTA (Desarrollo, Asistencia, Votos)
+        // ---------------------------------------------------------
+
+        // 1. DESARROLLO (Auto-Save de Temas)
+        case 'api_guardar_borrador':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiGuardarBorrador();
+            break;
+
+        // 2. ASISTENCIA (Tiempo Real)
+        case 'api_get_asistencia':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiGetAsistencia();
+            break;
+
+        case 'api_alternar_asistencia':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiAlternarAsistencia();
+            break;
+
+        // 3. VOTACIONES
+        case 'api_crear_votacion':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiCrearVotacion();
+            break;
+
+        case 'api_cerrar_votacion':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiCerrarVotacion();
+            break;
+
+        case 'api_get_votaciones':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiGetVotaciones();
+            break;
+
+        case 'api_get_detalle_voto':
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiGetDetalleVoto();
+            break;
+        case 'api_guardar_borrador':
+            $minutaController->apiGuardarBorrador();
+            break;
+
+        case 'api_finalizar_reunion':
+            $minutaController->apiFinalizarReunion();
+            break;
+        case 'reunion_form':      // <--- ESTA ES LA QUE TE FALTA O FALLA
+            $controller = new ReunionController();
+            if (isset($_GET['id'])) {
+                $controller->edit();  // Si hay ID, es editar
+            } else {
+                $controller->create(); // Si no, es crear nueva
+            }
+            break;
+
+        case 'store_reunion':     // Guardar nueva
+            $controller = new ReunionController();
+            $controller->store();
+            break;
+
+        case 'update_reunion':    // Guardar edición
+            $controller = new ReunionController();
+            $controller->update();
+            break;
+
+        case 'reunion_eliminar':
+            $controller = new ReunionController();
+            $controller->delete();
+            break;
+        case 'reuniones_dashboard':
+            $controller = new ReunionController();
+            $controller->index();
+            break;
+
+        case 'reunion_calendario':
+            $controller = new ReunionController();
+            $controller->calendario();
+            break;
+
+        case 'reunion_iniciar_minuta': // La acción mágica de iniciar
+            $controller = new ReunionController();
+            $controller->iniciarMinuta();
+            break;
+
+
+        case 'ver_minuta_borrador':
+            $minutaController->verBorrador();
+            break;
+
+        case 'api_ver_feedback':
+            $minutaController->apiVerFeedback();
+            break;
+
+
+
+        case 'recuperar_password':
+            $authController->recuperarPassword();
+            break;
+
+        case 'restablecer_password':
+            $authController->restablecerPassword();
+            break;
+
+        case 'api_iniciar_reunion':
+            $minutaController->apiIniciarReunion();
+            break;
+
+        // --- AQUI ARREGLAMOS EL ERROR ---
+
+        // El dashboard (Menu de tarjetas)
+        case 'reuniones_dashboard':
+            // Nota: Si ya tienes este case definido más arriba, bórralo de aquí. 
+            // Si no, déjalo. Lo importante es no tener duplicados.
+            $controller = new ReunionController();
+            $controller->index();
+            break;
+
+        // ESTE ES EL QUE FALTABA EN EL SWITCH PRINCIPAL
+        case 'reunion_listado':
+            $controller = new ReunionController();
+            $controller->listar();
+            break;
+
+        // --- FIN DEL ARREGLO ---
 
         default:
+            // Si la acción no existe, manda al login
             header('Location: index.php?action=login');
             exit();
-    }
+    } // Fin del switch principal
+
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage();
 }

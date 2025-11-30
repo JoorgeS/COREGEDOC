@@ -5,22 +5,25 @@ namespace App\Controllers;
 use App\Config\Database;
 use PDO;
 
-class HomeController {
-    
+class HomeController
+{
+
     private $db;
 
-    public function __construct() {
+    public function __construct()
+    {
         // Conexión a la BD
         $database = new Database();
         $this->db = $database->getConnection();
     }
 
-    public function index() {
+    public function index()
+    {
         // 1. Verificar sesión (Seguridad básica)
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-// Comenta o borra temporalmente esta redirección para probar
+        // Comenta o borra temporalmente esta redirección para probar
         /*
         if (!isset($_SESSION['idUsuario'])) {
             header('Location: index.php?action=login');
@@ -30,7 +33,7 @@ class HomeController {
         // 2. Preparar variables de usuario
         $idUsuarioLogueado = $_SESSION['idUsuario'];
         $tipoUsuario = $_SESSION['tipoUsuario_id'];
-        
+
         // Cargar constantes si no están cargadas
         require_once __DIR__ . '/../config/Constants.php';
 
@@ -60,31 +63,76 @@ class HomeController {
             $saludo = "Buenas noches";
         }
         $data['saludo'] = $saludo;
-        
-        // B. Definir el array de imágenes de zonas a mostrar en el carrusel (Datos movidos)
+
         $imagenesZonas = [
-            // Mensaje 1: Enfoque en la eficiencia de la gestión documental
-            ['file' => 'public/img/zonas_region/imagen_zona_1.jpg', 'title' => 'Decisiones ágiles, impacto regional', 'icon' => 'fas fa-gavel'],
-            // Mensaje 2: Enfoque en la transparencia y rendición de cuentas
-            ['file' => 'public/img/zonas_region/imagen_zona_2.jpg', 'title' => 'Acceso a la información en tiempo real', 'icon' => 'fas fa-eye'],
-            // Mensaje 3: Enfoque en la modernización y procesos sin papel
-            ['file' => 'public/img/zonas_region/imagen_zona_3.jpg', 'title' => 'Compromiso digital, eficiencia ecológica', 'icon' => 'fas fa-leaf'],
-            // Mensaje 4: Enfoque en el desarrollo y la inversión territorial
-            ['file' => 'public/img/zonas_region/imagen_zona_4.jpg', 'title' => 'Impulsando proyectos comunitarios', 'icon' => 'fas fa-city'],
-            // Mensaje 5: Enfoque en la colaboración entre comisiones
-            ['file' => 'public/img/zonas_region/imagen_zona_5.jpg', 'title' => 'Coordinación intersectorial eficaz', 'icon' => 'fas fa-sitemap'],
-            // Mensaje 6: Enfoque en el seguimiento de acuerdos y promesas
-            ['file' => 'public/img/zonas_region/imagen_zona_6.jpg', 'title' => 'Acuerdos controlados, promesas cumplidas', 'icon' => 'fas fa-check-double'],
-            // Mensaje 7: Enfoque en la participación y el consejero
-            ['file' => 'public/img/zonas_region/imagen_zona_7.jpg', 'title' => 'Eficiencia y eficacia en las aprobaciones de minutas', 'icon' => 'fas fa-user-tie'],
-            // Mensaje 8: Enfoque en la historia y la memoria institucional
-            ['file' => 'public/img/zonas_region/imagen_zona_8.jpg', 'title' => 'Disponibilidad de datos históricos', 'icon' => 'fas fa-scroll'],
+            // 1. FIRMA DIGITAL
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_1.jpg',
+                'title' => 'Firma Digital Avanzada',
+                'subtitle' => 'Procesos de validación documental más rápidos y seguros.',
+                'icon' => 'fas fa-file-signature'
+            ],
+
+            // 2. ACCESO A LA INFORMACIÓN
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_2.jpg',
+                'title' => 'Información en Tiempo Real',
+                'subtitle' => 'Transparencia y rendición de cuentas inmediata del CORE.',
+                'icon' => 'fas fa-chart-line'
+            ],
+
+            // 3. PROCESOS SIN PAPEL (Versión final acordada: Participación Activa)
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_3.jpg',
+                'title' => 'Participación Activa',
+                'subtitle' => 'Facilitando y optimizando la labor de los Consejeros.',
+                'icon' => 'fas fa-hands-helping'
+            ],
+
+            // 4. PROYECTOS COMUNITARIOS (MEJORADO)
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_4.jpg',
+                'title' => 'Registro de Proyectos',
+                'subtitle' => 'Trazabilidad y seguimiento de proyectos de desarrollo regional.',
+                'icon' => 'fas fa-city'
+            ],
+
+            // 5. COORDINACIÓN
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_5.jpg',
+                'title' => 'Coordinación Intersectorial',
+                'subtitle' => 'Unificando procesos y optimizando la colaboración entre áreas.',
+                'icon' => 'fas fa-link'
+            ],
+
+            // 6. SEGUIMIENTO DE ACUERDOS
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_6.jpg',
+                'title' => 'Seguimiento de Acuerdos',
+                'subtitle' => 'Monitoreo automatizado del avance de compromisos y tareas.',
+                'icon' => 'fas fa-chart-bar'
+            ],
+
+            // 7. APROBACIÓN DE MINUTAS
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_7.jpg',
+                'title' => 'Aprobación Rápida de Minutas',
+                'subtitle' => 'Ciclos de revisión y sanción documental eficientes y cortos.',
+                'icon' => 'fas fa-gavel'
+            ],
+
+            // 8. DATOS HISTÓRICOS (Versión final acordada: Base de Datos)
+            [
+                'file' => 'public/img/zonas_region/imagen_zona_8.jpg',
+                'title' => 'Base de Datos Documental',
+                'subtitle' => 'Acceso y búsqueda rápida a todos los registros históricos.',
+                'icon' => 'fas fa-database'
+            ],
+
+
+
         ];
         $data['imagenes_zonas'] = $imagenesZonas;
-
-        // --- FIN: LÓGICA DE VISTA REFACTORIZADA ---
-
-        // --- LOGICA DE NEGOCIO (Consulta a BD) ---
 
         try {
             // A. Tareas para Presidente (Firmas pendientes)
@@ -188,7 +236,6 @@ class HomeController {
                     WHERE r.fechaInicioReunion >= NOW()
                     ORDER BY r.fechaInicioReunion ASC LIMIT 3";
             $data['proximas_reuniones'] = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-
         } catch (\Exception $e) {
             // En un sistema real, loguear el error
             // error_log($e->getMessage());
@@ -196,10 +243,10 @@ class HomeController {
 
         // 4. Cargar la Vista dentro del Layout
         // Pasamos $data a las vistas para que puedan usar las variables
-        
+
         // Definimos qué vista interna se cargará
-        $childView = __DIR__ . '/../views/home.php'; 
-        
+        $childView = __DIR__ . '/../views/home.php';
+
         // Cargamos el layout principal, que a su vez incluirá $childView
         require_once __DIR__ . '/../views/layouts/main.php';
     }

@@ -8,8 +8,14 @@ if (!defined('ROL_PRESIDENTE_COMISION')) define('ROL_PRESIDENTE_COMISION', 3);
 if (!defined('ROL_CONSEJERO')) define('ROL_CONSEJERO', 1);
 
 // Variables de vista
-$paginaActual = $data['pagina_actual'] ?? 'home';
-$nombreUsuario = isset($data['usuario']) ? ($data['usuario']['nombre'] . ' ' . $data['usuario']['apellido']) : 'Invitado';
+$paginaActual = $data['pagina_actual'] ?? 'home';// --- CORRECCIÓN AQUÍ ---
+// Usamos ?? para evitar el "Undefined array key"
+$u = $data['usuario'] ?? [];
+$nombreUsuario = trim(($u['nombre'] ?? '') . ' ' . ($u['apellido'] ?? ''));
+if (empty($nombreUsuario)) {
+    $nombreUsuario = 'Usuario Invitado';
+}
+// -----------------------
 $tipoUsuario = $data['usuario']['rol'] ?? 0;
 
 // Helper Menu Activo (Opcional, para lógica de visualización)
@@ -27,7 +33,7 @@ function esActivo($grupo, $actual) {
     
     <link href="<?= BASE_URL ?>/public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <link href="<?= BASE_URL ?>/public/css/layout.css" rel="stylesheet">
     <link href="<?= BASE_URL ?>/public/css/dashboard.css" rel="stylesheet">

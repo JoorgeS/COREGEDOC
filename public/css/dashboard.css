@@ -121,9 +121,9 @@
     background: linear-gradient(
         90deg, 
        
-        #007BFF 20%,    /* Azul (Inicio) */
-        #00B050 40%,   /* Verde */
-        #F5B80A 60%,   /* Amarillo */
+        #0071bc 20%,    /* Azul (Inicio) */
+        #00a650 40%,   /* Verde */
+        #f7931e 60%,   /* Amarillo */
         #6D6A75 80%,   /* Gris */
         #000000 100%   /* Negro (Fin) */
     );

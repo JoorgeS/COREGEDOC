@@ -1,54 +1,200 @@
 <?php
+
 namespace App\Services;
+
+// Cargar autoloader si es necesario
+$autoloadPath = __DIR__ . '/../../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-class MailService {
+class MailService
+{
+    // DATOS DE CONFIGURACIÓN (GMAIL)
+    private $host = 'smtp.gmail.com';
+    private $username = 'equiposieteduocuc@gmail.com';
+    private $password = 'iohe aszm lkfl ucsq'; // Tu App Password
+    private $port = 587;
+    private $fromEmail = 'equiposieteduocuc@gmail.com';
     
-    public function enviarAsistencia($destinatario, $rutaPdf, $datosReunion) {
+    // CAMBIO 1: Nombre del sistema actualizado
+    private $fromName = 'Sistema COREGEDOC';
+
+    /**
+     * Configuración centralizada de PHPMailer
+     */
+    private function getConfiguredMailer()
+    {
         $mail = new PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host       = $this->host;
+        $mail->SMTPAuth   = true;
+        $mail->Username   = $this->username;
+        $mail->Password   = $this->password;
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = $this->port;
+        $mail->CharSet    = 'UTF-8';
+        
+        // Evitar problemas de certificados SSL en desarrollo local
+        $mail->SMTPOptions = array(
+            'ssl' => array(
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            )
+        );
 
+        $mail->setFrom($this->fromEmail, $this->fromName);
+        return $mail;
+    }
+
+    /**
+     * Correo 1: Envío de Asistencia (Con PDF adjunto)
+     */
+    public function enviarAsistencia($destinatario, $rutaArchivo, $infoReunion)
+    {
         try {
-            // Configuración del Servidor (Toma los datos de tu config/database.ini o settings.php)
-            // Aquí hardcodeamos los datos seguros de tu prompt inicial para que funcione ya.
-            $mail->isSMTP();
-            $mail->Host       = 'smtp.gmail.com';
-            $mail->SMTPAuth   = true;
-            $mail->Username   = 'equiposieteduocuc@gmail.com';
-            $mail->Password   = 'ioheaszmlkflucsq'; // Tu clave de aplicación
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $mail->Port       = 587;
-            $mail->CharSet    = 'UTF-8';
+            $mail = $this->getConfiguredMailer();
+            $mail->addAddress($destinatario);
 
-            // Remitente y Destinatario
-            $mail->setFrom('equiposieteduocuc@gmail.com', 'Sistema COREGEDOC');
-            $mail->addAddress($destinatario); 
+            $idMinuta = $infoReunion['idMinuta'] ?? 'S/N';
+            $nombreReunion = $infoReunion['nombreReunion'] ?? 'Reunión';
+            
+            $mail->Subject = "Validación de Asistencia - Minuta N° {$idMinuta}";
 
-            // Adjunto
-            $mail->addAttachment($rutaPdf);
+            // Preparar firma
+            $firmaTag = $this->obtenerTagFirma($mail);
 
-            // Contenido
             $mail->isHTML(true);
-            $mail->Subject = 'Validación de Asistencia - Minuta #' . $datosReunion['idMinuta'];
-            $mail->Body    = "
-                <h3>Reporte de Asistencia Validada</h3>
-                <p>Estimada Gestión,</p>
-                <p>El Secretario Técnico ha validado la asistencia para la siguiente reunión:</p>
-                <ul>
-                    <li><strong>Reunión:</strong> {$datosReunion['nombreReunion']}</li>
-                    <li><strong>Comisión:</strong> {$datosReunion['nombreComision']}</li>
-                    <li><strong>Fecha:</strong> {$datosReunion['fecha']}</li>
-                </ul>
-                <p>Se adjunta el documento PDF con el detalle.</p>
-                <hr>
-                <small>Sistema de Gestión Documental CORE</small>
-            ";
+            $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; color: #333;'>
+                <h3 style='color: #0056b3;'>Reporte de Asistencia Finalizado</h3>
+                <p>Estimada,</p>
+                <p>Se adjunta el certificado de asistencia validado para la <strong>Minuta N° {$idMinuta}</strong> ($nombreReunion).</p>
+                <p>Este documento incluye la hora exacta de registro de cada consejero y las validaciones del Secretario Técnico.</p>
+                <br>
+                <p>Atentamente,<br><strong>Sistema COREGEDOC</strong></p>
+                {$firmaTag}
+            </body>
+            </html>";
+
+            if (file_exists($rutaArchivo)) {
+                $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
+            }
+
+            $mail->send();
+            return true;
+
+        } catch (Exception $e) {
+            error_log("MailService Error (Asistencia): " . $mail->ErrorInfo);
+            // Fallback: Guardar log local si falla el envío real
+            $this->logLocal($destinatario, "Error enviando asistencia: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Correo 2: Notificación a Presidentes (Solicitud de Firma)
+     */
+    public function notificarFirma($destinatario, $nombreUsuario, $idMinuta)
+    {
+        try {
+            $mail = $this->getConfiguredMailer();
+            $mail->addAddress($destinatario);
+
+            $mail->Subject = "Acción Requerida: Firma de Minuta N° {$idMinuta}";
+
+            // Preparar firma
+            $firmaTag = $this->obtenerTagFirma($mail);
+
+            $mail->isHTML(true);
+            $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; color: #333;'>
+                <h3 style='color: #28a745;'>Solicitud de Aprobación Electrónica</h3>
+                <p>Estimado(a) <strong>$nombreUsuario</strong>,</p>
+                <p>Le informamos que la <strong>Minuta N° {$idMinuta}</strong> ya se encuentra disponible en la plataforma <strong>COREGEDOC</strong> para su revisión y firma.</p>
+                <div style='background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0;'>
+                    <strong>Instrucciones:</strong><br>
+                    1. Ingrese al sistema con sus credenciales.<br>
+                    2. Diríjase a la sección de 'Minutas Pendientes'.<br>
+                    3. Revise el contenido y presione el botón 'Firmar Minuta'.
+                </div>
+                <p>Agradecemos su pronta gestión para finalizar el proceso administrativo.</p>
+                <br>
+                <p>Atentamente,<br><strong>Sistema COREGEDOC</strong></p>
+                {$firmaTag}
+            </body>
+            </html>";
+
+            $mail->send();
+            return true;
+
+        } catch (Exception $e) {
+            error_log("MailService Error (Firma): " . $mail->ErrorInfo);
+            $this->logLocal($destinatario, "Error notificando firma: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Helpers privados
+
+    private function obtenerTagFirma($mail) {
+        $rootPath = __DIR__ . '/../../';
+        $firmaPath = $rootPath . 'public/img/firma.jpeg';
+        
+        if (file_exists($firmaPath)) {
+            $mail->AddEmbeddedImage($firmaPath, 'firma_inst', 'firma.jpeg');
+            
+            // CAMBIO 2: Aumenté el ancho a 500px para mayor legibilidad del logo COREGEDOC
+            return "<br><br><img src=\"cid:firma_inst\" alt=\"Firma Institucional\" style=\"width:500px; max-width:100%; height:auto;\">";
+        }
+        return "";
+    }
+
+    private function logLocal($to, $msg) {
+        $logDir = __DIR__ . '/../../public/docs/emails_enviados/';
+        if (!is_dir($logDir)) mkdir($logDir, 0777, true);
+        file_put_contents($logDir . 'error_log_' . date('Ymd') . '.txt', date('H:i:s') . " - To: $to - Msg: $msg\n", FILE_APPEND);
+    }
+
+    // ... dentro de MailService ...
+
+    public function enviarInstruccionesRecuperacion($email, $token)
+    {
+        try {
+            $mail = $this->getConfiguredMailer();
+            $mail->addAddress($email);
+            $mail->Subject = 'Recuperación de Contraseña - COREGEDOC';
+            $mail->isHTML(true);
+
+            // Construir enlace MVC
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            // Apuntamos al router principal
+            $link = "{$protocol}://{$host}/coregedoc/index.php?action=restablecer_password&token={$token}";
+
+            $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; color: #333;'>
+                <h3>Solicitud de Restablecimiento</h3>
+                <p>Hemos recibido una solicitud para restablecer tu contraseña en <strong>COREGEDOC</strong>.</p>
+                <p>Haz clic en el siguiente enlace para crear una nueva clave (vence en 1 hora):</p>
+                <p style='margin: 20px 0;'>
+                    <a href='{$link}' style='background-color: #000; color: #fff; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;'>RESTABLECER CONTRASEÑA</a>
+                </p>
+                <p><small>Si no fuiste tú, ignora este mensaje.</small></p>
+            </body>
+            </html>";
 
             $mail->send();
             return true;
         } catch (Exception $e) {
-            error_log("Error Mailer: {$mail->ErrorInfo}");
+            error_log("Error Mail Recuperación: " . $mail->ErrorInfo);
             return false;
         }
     }

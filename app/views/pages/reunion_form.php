@@ -1,4 +1,6 @@
 <?php
+
+
 // Variables predefinidas para facilitar la lectura en el HTML
 $isEdit = isset($reunion_data) && !empty($reunion_data);
 $titulo = $isEdit ? 'Editar Reunión #' . $reunion_data['idReunion'] : 'Nueva Reunión';
@@ -10,8 +12,14 @@ $idCom1 = $isEdit ? $reunion_data['t_comision_idComision'] : '';
 $idCom2 = $isEdit ? $reunion_data['t_comision_idComision_mixta'] : '';
 $idCom3 = $isEdit ? $reunion_data['t_comision_idComision_mixta2'] : '';
 
-// Formato fecha para input datetime-local (Y-m-d\TH:i)
-$ini = $isEdit ? date('Y-m-d\TH:i', strtotime($reunion_data['fechaInicioReunion'])) : date('Y-m-d\TH:i');
+// --- Lógica de Fechas ajustada con Zona Horaria ---
+// Obtenemos la fecha/hora actual de Chile
+$now = date('Y-m-d\TH:i');
+
+// Si es edición, usa la fecha de la base de datos. 
+// Si es nueva, usa $now (hora actual Chile) para Inicio
+// Para término, sumamos 1 hora por defecto para comodidad
+$ini = $isEdit ? date('Y-m-d\TH:i', strtotime($reunion_data['fechaInicioReunion'])) : $now;
 $fin = $isEdit ? date('Y-m-d\TH:i', strtotime($reunion_data['fechaTerminoReunion'])) : date('Y-m-d\TH:i', strtotime('+1 hour'));
 
 $comisiones = $data['comisiones']; // Viene del controlador
@@ -21,27 +29,27 @@ $comisiones = $data['comisiones']; // Viene del controlador
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3><?php echo $titulo; ?></h3>
         <a href="index.php?action=reuniones_dashboard" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Volver
+            <i class="fas fa-arrow-left"></i> Volver al Menú
         </a>
     </div>
 
     <div class="card shadow-sm">
         <div class="card-body p-4">
-            
+
             <form action="index.php" method="POST" id="formReunion">
                 <input type="hidden" name="action" value="<?php echo $action; ?>">
-                <?php if($isEdit): ?>
+                <?php if ($isEdit): ?>
                     <input type="hidden" name="idReunion" value="<?php echo $reunion_data['idReunion']; ?>">
                 <?php endif; ?>
 
                 <div class="mb-4 p-3 bg-light rounded border">
                     <h5 class="mb-3 text-primary"><i class="fas fa-users me-2"></i>Comisiones</h5>
-                    
+
                     <div class="mb-3">
                         <label class="form-label fw-bold">Comisión Principal *</label>
                         <select name="t_comision_idComision" id="selectCom1" class="form-select" required onchange="verificarMixta()">
                             <option value="">-- Seleccione --</option>
-                            <?php foreach($comisiones as $c): ?>
+                            <?php foreach ($comisiones as $c): ?>
                                 <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom1 == $c['idComision']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($c['nombreComision']); ?>
                                 </option>
@@ -59,19 +67,19 @@ $comisiones = $data['comisiones']; // Viene del controlador
                             <label class="form-label">Segunda Comisión</label>
                             <select name="t_comision_idComision_mixta" id="selectCom2" class="form-select">
                                 <option value="">-- Seleccione --</option>
-                                <?php foreach($comisiones as $c): ?>
+                                <?php foreach ($comisiones as $c): ?>
                                     <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom2 == $c['idComision']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($c['nombreComision']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Tercera Comisión (Opcional)</label>
                             <select name="t_comision_idComision_mixta2" id="selectCom3" class="form-select">
                                 <option value="">-- Seleccione --</option>
-                                <?php foreach($comisiones as $c): ?>
+                                <?php foreach ($comisiones as $c): ?>
                                     <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom3 == $c['idComision']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($c['nombreComision']); ?>
                                     </option>
@@ -83,7 +91,13 @@ $comisiones = $data['comisiones']; // Viene del controlador
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Nombre de la Reunión *</label>
-                    <input type="text" name="nombreReunion" class="form-control" required value="<?php echo $nombre; ?>" placeholder="Ej: Reunión Ordinaria N° 15">
+                    <input type="text"
+                        name="nombreReunion"
+                        class="form-control"
+                        required
+                        value="<?php echo $nombre; ?>"
+                        placeholder="Ej: Reunión Ordinaria N° 15"
+                        onblur="capitalizarInput(this)">
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -108,11 +122,19 @@ $comisiones = $data['comisiones']; // Viene del controlador
 </div>
 
 <script>
-    // Lógica simple para mostrar/ocultar campos de mixta
+    // Función para Mayúscula en la primera letra
+    function capitalizarInput(input) {
+        let valor = input.value;
+        if (valor.length > 0) {
+            input.value = valor.charAt(0).toUpperCase() + valor.slice(1);
+        }
+    }
+
+    // Lógica para mostrar/ocultar campos de mixta
     function verificarMixta() {
         const com1 = document.getElementById('selectCom1').value;
         const divCheck = document.getElementById('divCheckMixta');
-        
+
         if (com1) {
             divCheck.style.display = 'block';
         } else {
@@ -126,7 +148,7 @@ $comisiones = $data['comisiones']; // Viene del controlador
         const isChecked = document.getElementById('checkMixta').checked;
         const bloque = document.getElementById('bloqueMixta');
         const sel2 = document.getElementById('selectCom2');
-        
+
         if (isChecked) {
             bloque.style.display = 'block';
             sel2.required = true;

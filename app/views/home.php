@@ -9,16 +9,16 @@ $minutasRecientes = $data['minutas_recientes_aprobadas'] ?? [];
 $usuarioNombre = htmlspecialchars($data['usuario']['nombre'] ?? 'Usuario');
 
 // Datos del carrusel y saludo movidos al controlador
-$saludo = $data['saludo'] ?? 'Hola'; 
-$imagenesZonas = $data['imagenes_zonas'] ?? []; 
+$saludo = $data['saludo'] ?? 'Hola';
+$imagenesZonas = $data['imagenes_zonas'] ?? [];
 ?>
 
 <style>
     /* Hace que la transición del carrusel sea más lenta */
     .carousel-fade .carousel-item {
-        transition: opacity 2s ease-in-out;
+        transition: opacity 5s ease-in-out;
     }
-    
+
     /* Estilos para el overlay de texto centrado */
     .carousel-overlay {
         position: absolute;
@@ -27,7 +27,8 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
         bottom: 0;
         left: 0;
         text-align: center;
-        color: white; /* Color de texto para el contraste */
+        color: white;
+        /* Color de texto para el contraste */
         /* Centrado con flexbox */
         display: flex;
         flex-direction: column;
@@ -35,44 +36,63 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
         justify-content: center;
         z-index: 10;
         /* Sombra de texto para mejorar la visibilidad sobre la imagen */
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); 
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
     }
-    
+
     /* Contenedor del icono y el título para el fondo gris transparente */
     .carousel-content-box {
-        background-color: rgba(90, 90, 90, 0.4); /* Gris semi-transparente */
-        padding: 20px 30px; /* Espaciado interno */
-        border-radius: 10px; /* Bordes ligeramente redondeados */
-        display: flex; /* Asegura el flexbox para centrar dentro de la caja */
+        background-color: rgba(90, 90, 90, 0.4);
+        /* Gris semi-transparente */
+        padding: 20px 30px;
+        /* Espaciado interno */
+        border-radius: 10px;
+        /* Bordes ligeramente redondeados */
+        display: flex;
+        /* Asegura el flexbox para centrar dentro de la caja */
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        max-width: 80%; /* Ancho máximo para que no ocupe todo */
+        max-width: 80%;
+        /* Ancho máximo para que no ocupe todo */
     }
 
     /* Ajustes para el icono */
     .carousel-content-box i {
-        font-size: 3rem; /* Tamaño grande para el icono */
+        font-size: 3rem;
+        /* Tamaño grande para el icono */
         margin-bottom: 0.5rem;
     }
 
     /* Opcional: Aumentar el tamaño del título para el impacto visual */
     .carousel-content-box h3 {
-        font-size: 1.75rem; 
+        font-size: 1.75rem;
         font-weight: bold;
-        margin-bottom: 0; /* Elimina el margen inferior por defecto de h3 */
+        margin-bottom: 0;
+        /* Elimina el margen inferior por defecto de h3 */
+    }
+
+    .carousel-content-box p.carousel-subtitle {
+        font-size: 1.25rem;
+        /* Tamaño más grande para impacto */
+        font-weight: normal;
+        color: #fff;
+        /* Asegura color blanco */
+        opacity: 0.9;
+        /* Ligeramente transparente */
+        margin-top: 5px;
+        /* Pequeño espacio entre título y subtítulo */
+        margin-bottom: 0;
     }
 
     /* Se asegura que el caption inferior se oculte si no se usa */
     .carousel-caption {
         display: none !important;
     }
-
 </style>
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
     <div>
-        <h1 class="h3 mb-0 text-gray-800"><?php echo $saludo; ?>, <?php echo $usuarioNombre; ?></h1>
-        <p class="mb-0 text-muted">Bienvenido al Panel de Gestión Documental del CORE.</p>
+        <h1 class="h3 mb-0 text-gray-800"><?php echo $saludo; ?> <?php echo $usuarioNombre; ?></h1>
+        <p class="mb-0 text-muted">Bienvenido al Gestor Documental del CORE Valparaíso.</p>
     </div>
     <div class="d-none d-sm-inline-block">
         <a href="index.php?action=minutas_dashboard" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm">
@@ -82,14 +102,14 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
 </div>
 
 <div class="row g-4 mb-4">
-    
+
     <div class="col-lg-8">
         <div class="card shadow mb-4 h-100">
             <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-                <h6 class="m-0 fw-bold text-primary"><i class="fas fa-images me-2"></i> Galería Regional</h6>
+                <h6 class="m-0 fw-bold text-primary"></h6>
             </div>
             <div class="card-body p-0">
-                <div id="carouselZonasRegion" class="carousel slide carousel-fade" data-bs-ride="carousel" style="height: 350px !important;">
+                <div id="carouselZonasRegion" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000" style="height: 350px !important;">
                     <div class="carousel-indicators">
                         <?php foreach ($imagenesZonas as $index => $imagen): ?>
                             <button type="button" data-bs-target="#carouselZonasRegion" data-bs-slide-to="<?php echo $index; ?>" class="<?php echo $index === 0 ? 'active' : ''; ?>" aria-current="<?php echo $index === 0 ? 'true' : 'false'; ?>" aria-label="Slide <?php echo $index + 1; ?>"></button>
@@ -100,18 +120,27 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                         <?php foreach ($imagenesZonas as $index => $imagen): ?>
                             <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>" style="height: 350px !important;">
                                 <img src="<?php echo htmlspecialchars($imagen['file']); ?>" class="d-block w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($imagen['title']); ?>" style="opacity: 0.7;">
+
                                 
                                 <div class="carousel-overlay">
                                     <div class="carousel-content-box">
                                         <i class="<?php echo htmlspecialchars($imagen['icon']); ?> mb-3"></i>
                                         <h3 class="mb-0"><?php echo htmlspecialchars($imagen['title']); ?></h3>
+
+                                        <?php if (isset($imagen['subtitle'])): ?>
+                                            <p class="carousel-subtitle mt-2 mb-0">
+                                                <?php echo htmlspecialchars($imagen['subtitle']); ?>
+                                            </p>
+                                        <?php endif; ?>
+
                                     </div>
                                 </div>
                                 
+
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    
+
                     <button class="carousel-control-prev" type="button" data-bs-target="#carouselZonasRegion" data-bs-slide="prev">
                         <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                         <span class="visually-hidden">Anterior</span>
@@ -146,7 +175,7 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                         </div>
                         <p class="mb-1 small text-muted">El sistema de firma electrónica avanzada ya está operativo para todas las actas.</p>
                     </div>
-                     <div class="list-group-item px-0 border-bottom-0">
+                    <div class="list-group-item px-0 border-bottom-0">
                         <div class="d-flex w-100 justify-content-between">
                             <h6 class="mb-1 fw-bold text-info">Autogestión de Asistencia</h6>
                             <small class="text-muted">Nuevo</small>
@@ -173,7 +202,7 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
 </div>
 
 <div class="row g-4">
-    
+
     <div class="col-lg-6">
         <div class="card shadow mb-4 h-100">
             <div class="card-header py-3 bg-white border-bottom-primary d-flex justify-content-between align-items-center">
@@ -224,7 +253,7 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                     Ver Calendario Completo <i class="fas fa-arrow-right ms-1"></i>
                 </a>
             </div>
-            
+
             <div class="card-body p-0">
                 <?php if (empty($reuniones)): ?>
                     <div class="text-center py-5 text-muted">
@@ -233,9 +262,9 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                 <?php else: ?>
                     <ul class="list-group list-group-flush">
                         <?php foreach ($reuniones as $r): ?>
-                            <?php 
-                                $fechaReu = new DateTime($r['fechaInicioReunion']);
-                                $esHoy = $fechaReu->format('Y-m-d') === date('Y-m-d');
+                            <?php
+                            $fechaReu = new DateTime($r['fechaInicioReunion']);
+                            $esHoy = $fechaReu->format('Y-m-d') === date('Y-m-d');
                             ?>
                             <li class="list-group-item p-3 border-start-0 border-end-0">
                                 <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -250,7 +279,7 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                                 </div>
                                 <p class="mb-1 small text-muted">
                                     <i class="far fa-clock me-1"></i> <?php echo $fechaReu->format('H:i'); ?> hrs
-                                    &nbsp;|&nbsp; 
+                                    &nbsp;|&nbsp;
                                     <i class="fas fa-users me-1"></i> <?php echo htmlspecialchars($r['nombreComision'] ?? 'Comisión'); ?>
                                 </p>
                             </li>
@@ -258,48 +287,43 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
                     </ul>
                 <?php endif; ?>
             </div>
-             <div class="card-footer bg-white text-center border-0 pb-3">
-                <a href="index.php?action=reuniones_dashboard" class="small text-decoration-none fw-bold text-info">
-                    Ver Calendario Completo <i class="fas fa-arrow-right ms-1"></i>
-                </a>
-            </div>
         </div>
     </div>
 
 </div>
 
 <?php if (!empty($actividad)): ?>
-<div class="row">
-    <div class="col-12">
-        <div class="card shadow mb-4">
-             <div class="card-header py-3 bg-white">
-                <h6 class="m-0 fw-bold text-secondary"><i class="fas fa-history me-2"></i> Actividad Reciente del Sistema</h6>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm table-borderless mb-0 align-middle">
-                        <tbody>
-                            <?php foreach (array_slice($actividad, 0, 5) as $a): ?>
-                                <tr class="border-bottom">
-                                    <td style="width: 50px;" class="text-center text-muted">
-                                        <i class="fas fa-circle fa-xs"></i>
-                                    </td>
-                                    <td>
-                                        <span class="fw-bold text-dark"><?php echo htmlspecialchars($a['usuario_nombre']); ?></span>
-                                        <span class="text-muted"><?php echo htmlspecialchars($a['detalle']); ?></span>
-                                    </td>
-                                    <td class="text-end text-muted small" style="width: 150px;">
-                                        <?php echo date('d/m H:i', strtotime($a['fecha_hora'])); ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 fw-bold text-secondary"><i class="fas fa-history me-2"></i> Actividad Reciente del Sistema</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-borderless mb-0 align-middle">
+                            <tbody>
+                                <?php foreach (array_slice($actividad, 0, 5) as $a): ?>
+                                    <tr class="border-bottom">
+                                        <td style="width: 50px;" class="text-center text-muted">
+                                            <i class="fas fa-circle fa-xs"></i>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold text-dark"><?php echo htmlspecialchars($a['usuario_nombre']); ?></span>
+                                            <span class="text-muted"><?php echo htmlspecialchars($a['detalle']); ?></span>
+                                        </td>
+                                        <td class="text-end text-muted small" style="width: 150px;">
+                                            <?php echo date('d/m H:i', strtotime($a['fecha_hora'])); ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 <?php endif; ?>
 
 <script>
@@ -307,7 +331,7 @@ $imagenesZonas = $data['imagenes_zonas'] ?? [];
     document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             const tempEl = document.getElementById('temperatura-actual');
-            if(tempEl) tempEl.innerText = '19°C'; // Valor simulado
+            if (tempEl) tempEl.innerText = '19°C'; // Valor simulado
         }, 1000);
     });
 </script>

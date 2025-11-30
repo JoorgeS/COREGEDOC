@@ -5,9 +5,15 @@
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-calendar-check me-2 text-primary"></i> Gestión de Reuniones</h2>
-        <a href="index.php?action=reunion_form" class="btn btn-success">
-            <i class="fas fa-plus"></i> Nueva Reunión
-        </a>
+
+        <div>
+            <a href="index.php?action=reuniones_dashboard" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left"></i> Volver al Menú
+            </a>
+            <a href="index.php?action=reunion_form" class="btn btn-success">
+                <i class="fas fa-plus"></i> Nueva Reunión
+            </a>
+        </div>
     </div>
 
     <div class="card shadow-sm">
@@ -16,7 +22,7 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
+                            <th>Folio / N°</th>
                             <th>Reunión</th>
                             <th>Comisión</th>
                             <th>Fecha Inicio</th>
@@ -34,31 +40,41 @@
                             </tr>
                         <?php else: ?>
                             <?php foreach ($reuniones as $r): ?>
-                                <?php 
-                                    // Detectar si ya tiene minuta sincronizada
-                                    $tieneMinuta = !empty($r['t_minuta_idMinuta']);
-                                    $fechaInicio = strtotime($r['fechaInicioReunion']);
-                                    $esHoy = date('Y-m-d', $fechaInicio) === date('Y-m-d');
+                                <?php
+                                // Detectar si ya tiene minuta (ID OFICIAL)
+                                $idOficial = $r['t_minuta_idMinuta']; // Si es null, no ha iniciado
+                                $tieneMinuta = !empty($idOficial);
+
+                                $fechaInicio = strtotime($r['fechaInicioReunion']);
+                                $esHoy = date('Y-m-d', $fechaInicio) === date('Y-m-d');
                                 ?>
                                 <tr>
-                                    <td>#<?php echo $r['idReunion']; ?></td>
+                                    <td>
+                                        <?php if ($tieneMinuta): ?>
+                                            <span class="badge bg-dark fs-6" style="min-width: 40px;">
+                                                #<?php echo $idOficial; ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge bg-light text-muted border border-secondary border-dashed">
+                                                <i class="fas fa-hourglass-start"></i> Pendiente
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+
                                     <td>
                                         <strong><?php echo htmlspecialchars($r['nombreReunion']); ?></strong>
-                                        <?php if($esHoy): ?>
+                                        <?php if ($esHoy): ?>
                                             <span class="badge bg-info text-dark ms-2">HOY</span>
                                         <?php endif; ?>
                                     </td>
                                     <td><?php echo htmlspecialchars($r['nombreComision']); ?></td>
                                     <td>
-                                        <i class="far fa-clock text-muted"></i> 
+                                        <i class="far fa-clock text-muted"></i>
                                         <?php echo date('d/m/Y H:i', $fechaInicio); ?>
                                     </td>
                                     <td>
                                         <?php if ($tieneMinuta): ?>
-                                            <span class="badge bg-success"><i class="fas fa-check"></i> Iniciada</span>
-                                            <div style="font-size: 0.75rem;" class="text-muted">
-                                                Minuta #<?php echo $r['t_minuta_idMinuta']; ?>
-                                            </div>
+                                            <span class="badge bg-success"><i class="fas fa-check"></i> En curso / Finalizada</span>
                                         <?php else: ?>
                                             <span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> Programada</span>
                                         <?php endif; ?>
@@ -66,24 +82,24 @@
                                     <td class="text-end">
                                         <div class="btn-group">
                                             <?php if (!$tieneMinuta): ?>
-                                                <button type="button" class="btn btn-sm btn-primary" 
-                                                        onclick="iniciarReunion(<?php echo $r['idReunion']; ?>, '<?php echo htmlspecialchars($r['nombreReunion']); ?>')">
-                                                    <i class="fas fa-play"></i> Iniciar
+                                                <button type="button" class="btn btn-sm btn-primary"
+                                                    onclick="iniciarReunion(<?php echo $r['idReunion']; ?>, '<?php echo htmlspecialchars($r['nombreReunion']); ?>')">
+                                                    <i class="fas fa-play"></i> Asignar Folio e Iniciar
                                                 </button>
-                                                
-                                                <a href="index.php?action=reunion_editar&id=<?php echo $r['idReunion']; ?>" 
-                                                   class="btn btn-sm btn-outline-secondary" title="Editar datos">
+
+                                                <a href="index.php?action=reunion_form&id=<?php echo $r['idReunion']; ?>"
+                                                    class="btn btn-sm btn-outline-secondary" title="Editar">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
 
-                                                <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                        onclick="eliminarReunion(<?php echo $r['idReunion']; ?>)">
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    onclick="eliminarReunion(<?php echo $r['idReunion']; ?>)">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
 
                                             <?php else: ?>
-                                                <a href="index.php?action=minuta_gestionar&id=<?php echo $r['t_minuta_idMinuta']; ?>" 
-                                                   class="btn btn-sm btn-success">
+                                                <a href="index.php?action=minuta_gestionar&id=<?php echo $r['t_minuta_idMinuta']; ?>"
+                                                    class="btn btn-sm btn-success">
                                                     <i class="fas fa-file-signature"></i> Gestionar Minuta
                                                 </a>
                                             <?php endif; ?>
@@ -130,5 +146,55 @@
                 window.location.href = `index.php?action=reunion_eliminar&id=${id}`;
             }
         });
+    }
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Obtenemos los parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const msg = urlParams.get('msg');
+
+        if (msg) {
+            let title = '';
+            let text = '';
+            let icon = 'success';
+
+            // Personalizamos el mensaje según la acción
+            if (msg === 'guardado') {
+                title = '¡Reunión Creada!';
+                text = 'La reunión ha sido programada exitosamente.';
+            } else if (msg === 'editado') {
+                title = '¡Cambios Guardados!';
+                text = 'La información de la reunión ha sido actualizada.';
+            } else if (msg === 'eliminado') {
+                title = '¡Eliminado!';
+                text = 'La reunión ha sido eliminada del listado.';
+                icon = 'warning'; // Un ícono diferente para eliminar
+            }
+
+            // Disparamos el SweetAlert
+            if (title) {
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: icon,
+                    confirmButtonText: 'Aceptar',
+                    confirmButtonColor: '#0d6efd',
+                    timer: 3000, // Se cierra solo a los 3 segundos
+                    timerProgressBar: true
+                }).then(() => {
+                    // OPCIONAL: Limpiar la URL para que si recargas no salga el mensaje de nuevo
+                    cleanUrl();
+                });
+            }
+        }
+    });
+
+    function cleanUrl() {
+        // Esta función quita el "?msg=..." de la barra de direcciones sin recargar
+        const url = new URL(window.location);
+        url.searchParams.delete('msg');
+        window.history.replaceState({}, '', url);
     }
 </script>

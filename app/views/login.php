@@ -52,7 +52,7 @@ if (!isset($error_message)) {
                 <?php endif; ?>
 
                 <div class="recover-link mb-4">
-                    <a href="/coregedoc/views/pages/recuperar_contrasena.php">RECUPERAR CONTRASEÑA</a>
+                    <a href="index.php?action=recuperar_password">RECUPERAR CONTRASEÑA</a>
                 </div>
 
                 <button type="submit" class="btn btn-submit">INGRESAR</button>

@@ -1,835 +1,1473 @@
-<?php
-$m = $data['minuta'];
-$permisos = $data['permisos'];
-$readonly = $permisos['esSoloLectura'] ? 'readonly' : '';
-$disabled = $permisos['esSoloLectura'] ? 'disabled' : '';
-?>
+<div class="container-fluid py-4">
 
-<div class="container-fluid">
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="index.php?action=minutas_dashboard">Minutas</a></li>
-            <li class="breadcrumb-item"><a href="index.php?action=minutas_pendientes">Pendientes</a></li>
-            <li class="breadcrumb-item active">Gestionar #<?php echo $m['idMinuta']; ?></li>
-        </ol>
-    </nav>
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+            <h6 class="mb-0 fw-bold text-uppercase"><i class="fas fa-file-alt me-2"></i>Gestión de la Minuta</h6>
+            <span class="badge bg-light text-primary fw-bold px-3 border border-white">
+                ESTADO: <?= strtoupper($data['minuta']['estadoMinuta']) ?>
+            </span>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>
-            <?php echo $permisos['esSecretario'] ? 'Editar' : 'Revisar'; ?> Minuta N° <?php echo $m['idMinuta']; ?>
-            <span class="badge bg-secondary ms-2 text-uppercase"><?php echo $m['estadoMinuta']; ?></span>
-        </h3>
-    </div>
+        </div>
+        <!-- BARRA DE ACCIONES SUPERIOR -->
+        <div class="bg-light p-3 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+                <span class="text-muted small text-uppercase fw-bold">Estado de Sesión:</span>
 
-    <form id="form-crear-minuta">
-        <input type="hidden" id="idMinuta" value="<?php echo $m['idMinuta']; ?>">
+                <?php
+                $st = $data['estado_reunion'];
+                // 1. EN CURSO (Vigente=1)
+                if ($st['vigente'] == 1): ?>
+                    <span class="badge bg-success ms-2 shadow-sm"><i class="fas fa-circle fa-beat-fade me-1" style="--fa-animation-duration: 2s;"></i> EN CURSO</span>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-primary"><i class="fas fa-list-alt me-2"></i>Temas</h5>
-                <?php if (!$permisos['esSoloLectura']): ?>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="agregarTema()">
-                        <i class="fas fa-plus-circle"></i> Añadir Tema
-                    </button>
+                <?php // 2. FINALIZADA (Validada=1) 
+                elseif ($st['asistencia_validada'] == 1): ?>
+                    <span class="badge bg-secondary ms-2">FINALIZADA</span>
+
+                <?php // 3. ESPERA (Ni vigente ni validada)
+                else: ?>
+                    <span class="badge bg-warning text-dark ms-2 border border-warning">ESPERANDO INICIO</span>
                 <?php endif; ?>
             </div>
-            <div class="card-body bg-light bg-opacity-10">
-                <div id="contenedorTemas"></div>
-                <div class="text-center text-muted small mt-2" id="msgSinTemas" style="display:none;">
-                    No hay temas.
-                </div>
-            </div>
-        </div>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-users me-2"></i> Asistencia</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th class="text-center">Presente</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($data['asistencia'] as $asistente): ?>
-                                <tr>
-                                    <td><?php echo $asistente['nombreCompleto']; ?></td>
-                                    <td class="text-center">
-                                        <input class="form-check-input" type="checkbox"
-                                            value="<?php echo $asistente['idUsuario']; ?>"
-                                            <?php echo $asistente['presente'] ? 'checked' : ''; ?>
-                                            <?php echo $disabled; ?>>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php if (!$permisos['esSoloLectura']): ?>
-                    <div class="d-flex justify-content-end gap-2 mt-3">
-                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="guardarAsistencia()">
-                            <i class="fas fa-save"></i> Guardar Cambios
-                        </button>
+            <div class="d-flex gap-2">
+                <?php if ($data['permisos']['esSecretario']): ?>
 
-                        <?php if (empty($m['asistencia_validada'])): ?>
-                            <button type="button" class="btn btn-warning btn-sm text-dark" onclick="validarYEnviarAsistencia()">
-                                <i class="fas fa-envelope"></i> Validar y Enviar a Gestión
-                            </button>
-                        <?php else: ?>
-                            <span class="badge bg-success"><i class="fas fa-check"></i> Asistencia Validada</span>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
-
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-dark"><i class="fas fa-vote-yea me-2"></i> Votaciones</h5>
-            </div>
-            <div class="card-body">
-                <?php if ($permisos['esSecretario'] && !$permisos['esSoloLectura']): ?>
-                    <div class="input-group mb-3">
-                        <input type="text" id="nombreNuevaVotacion" class="form-control" placeholder="Nombre del acuerdo a votar...">
-                        <button class="btn btn-primary" type="button" onclick="crearVotacion()">
-                            <i class="fas fa-plus"></i> Crear Votación
-                        </button>
-                    </div>
-                <?php endif; ?>
-
-                <div id="listaVotaciones" class="list-group mb-4">
-                </div>
-
-                <h6 class="text-muted border-bottom pb-2">Resultados en Vivo</h6>
-                <div id="resultadosVotaciones" class="row g-3">
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-light">
-                <h5 class="mb-0"><i class="fas fa-paperclip me-2"></i> Documentos Adjuntos</h5>
-            </div>
-            <div class="card-body">
-                <?php if (!$permisos['esSoloLectura']): ?>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <div class="d-flex"> <input type="file" id="inputArchivo" class="form-control me-2">
-                                <button type="button" class="btn btn-primary" onclick="subirArchivo()">
-                                    <i class="fas fa-upload"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex"> <input type="url" id="inputUrlLink" class="form-control me-2" placeholder="https://ejemplo.com">
-                                <button type="button" class="btn btn-info text-white" onclick="agregarLink()">
-                                    <i class="fas fa-link"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-                <ul id="listaAdjuntos" class="list-group list-group-flush">
-                </ul>
-            </div>
-        </div>
-
-        <div class="card shadow-sm mb-5">
-            <div class="card-body text-end">
-
-                <?php if ($permisos['esSecretario']): ?>
-                    <?php if ($m['estadoMinuta'] !== 'APROBADA' && $m['estadoMinuta'] !== 'PENDIENTE'): ?>
-                        <button type="button" class="btn btn-secondary me-2" onclick="guardarBorrador()">
-                            <i class="fas fa-save"></i> Guardar Borrador
-                        </button>
-
-                        <?php if (empty($m['asistencia_validada'])): ?>
-                            <span class="d-inline-block" tabindex="0" data-bs-toggle="tooltip" title="Debe validar y enviar la asistencia primero">
-                                <button type="button" class="btn btn-danger" disabled>
-                                    <i class="fas fa-lock"></i> Enviar para Aprobación
-                                </button>
-                            </span>
-                        <?php else: ?>
-                            <button type="button" class="btn btn-danger" onclick="confirmarEnvio()">
-                                <i class="fas fa-paper-plane"></i> Enviar para Aprobación
-                            </button>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <span class="text-muted">Minuta en proceso de firma o finalizada.</span>
-                    <?php endif; ?>
-
-                <?php elseif ($permisos['esPresidente']): ?>
-                    <?php if ($permisos['haFirmado']): ?>
-                        <div class="alert alert-success m-0"><i class="fas fa-check-circle"></i> Ya has firmado esta minuta.</div>
-                    <?php elseif ($permisos['haEnviadoFeedback']): ?>
-                        <div class="alert alert-warning m-0"><i class="fas fa-clock"></i> Esperando correcciones del Secretario.</div>
-                    <?php else: ?>
-                        <div id="areaFeedback" class="mb-3 text-start" style="display:none;">
-                            <label class="form-label fw-bold text-danger">Indique las correcciones necesarias:</label>
-                            <textarea id="txtFeedback" class="form-control" rows="3" placeholder="Ej: Corregir el nombre del consejero en el tema 2..."></textarea>
-                            <div class="mt-2 text-end">
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="cancelarFeedback()">Cancelar</button>
-                                <button type="button" class="btn btn-danger btn-sm" onclick="enviarFeedbackReal()">Enviar Observaciones</button>
-                            </div>
-                        </div>
-
-                        <div id="botonesPresidente">
-                            <button type="button" class="btn btn-outline-danger me-2" onclick="mostrarFeedback()">
-                                <i class="fas fa-times-circle"></i> Rechazar / Pedir Cambios
-                            </button>
-                            <button type="button" class="btn btn-success btn-lg" onclick="firmarMinuta()">
-                                <i class="fas fa-file-signature"></i> Firmar Minuta
-                            </button>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
-
-            </div>
-        </div>
-
-    </form>
-</div>
-
-<template id="plantilla-tema">
-    <div class="card mb-3 tema-block border-start border-4 border-primary shadow-sm">
-        <div class="card-body">
-            <div class="d-flex justify-content-between mb-2">
-                <h6 class="titulo-tema fw-bold text-primary">Tema Nuevo</h6>
-                <?php if (!$permisos['esSoloLectura']): ?>
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.tema-block').remove()"><i class="fas fa-trash"></i></button>
-                <?php endif; ?>
-            </div>
-            <input type="text" class="form-control mb-2 editable-area" placeholder="Título del tema" <?php echo $readonly; ?>>
-            <textarea class="form-control mb-2 editable-area" rows="2" placeholder="Objetivo" <?php echo $readonly; ?>></textarea>
-            <textarea class="form-control mb-2 editable-area" rows="3" placeholder="Desarrollo" <?php echo $readonly; ?>></textarea>
-        </div>
-    </div>
-</template>
-
-<script>
-    // Recuperamos los temas pasados desde PHP
-    const TEMAS_INICIALES = <?php echo json_encode($data['temas']); ?>;
-
-    document.addEventListener("DOMContentLoaded", () => {
-        if (TEMAS_INICIALES && TEMAS_INICIALES.length > 0) {
-            TEMAS_INICIALES.forEach(t => crearBloqueTema(t));
-        } else {
-            crearBloqueTema(); // Uno vacío por defecto
-        }
-    });
-
-    function crearBloqueTema(data = null) {
-        const tpl = document.getElementById('plantilla-tema');
-        const clon = tpl.content.cloneNode(true);
-        const inputs = clon.querySelectorAll('.editable-area');
-
-        if (data) {
-            inputs[0].value = data.nombreTema || '';
-            inputs[1].value = data.objetivo || '';
-
-            // CAMBIO AQUÍ: Leemos 'compromiso' para llenar el tercer input
-            if (inputs[2]) inputs[2].value = data.compromiso || '';
-        }
-
-        document.getElementById('contenedorTemas').appendChild(clon);
-    }
-
-    // --- FUNCION: Guardar Asistencia ---
-    function guardarAsistencia() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const checks = document.querySelectorAll('input[type="checkbox"]:checked');
-        const ids = Array.from(checks).map(c => c.value).filter(val => val !== 'on'); // Filtramos valores basura
-
-        fetch('index.php?action=api_guardar_asistencia', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinuta,
-                    asistencia: ids
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Usamos SweetAlert si lo tienes, o un alert nativo
-                    if (typeof Swal !== 'undefined') Swal.fire('¡Guardado!', data.message, 'success');
-                    else alert(data.message);
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(err => console.error('Error:', err));
-    }
-
-    // --- FUNCION: Guardar Borrador (Temas) ---
-    // --- FUNCION CORREGIDA: Guardar Borrador ---
-    function guardarBorrador() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const bloques = document.querySelectorAll('.tema-block');
-        const temas = [];
-
-        bloques.forEach(bloque => {
-            const inputs = bloque.querySelectorAll('.editable-area');
-
-            // Validamos que el bloque tenga inputs para evitar errores
-            if (inputs.length > 0) {
-                temas.push({
-                    // Mapeamos los inputs visuales a las columnas de la BD
-                    nombreTema: inputs[0].value, // Primer input -> nombreTema
-                    objetivo: inputs[1] ? inputs[1].value : '', // Segundo -> objetivo
-                    compromiso: inputs[2] ? inputs[2].value : '', // Tercero -> compromiso (Usado como Desarrollo)
-                    observacion: '' // Dejamos vacío u opcional si agregas un 4to input
-                });
-            }
-        });
-
-        // Envío de datos...
-        fetch('index.php?action=api_guardar_borrador', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinuta,
-                    temas: temas
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    if (typeof Swal !== 'undefined') Swal.fire('¡Guardado!', 'Borrador actualizado correctamente.', 'success');
-                    else alert('Borrador guardado.');
-
-                    // Opcional: Recargar para verificar visualmente
-                    // location.reload(); 
-                } else {
-                    alert('Error del servidor: ' + data.message);
-                }
-            })
-            .catch(err => console.error('Error:', err));
-    }
-
-    function agregarTema() {
-        crearBloqueTema();
-    }
-
-    function confirmarEnvio() {
-        const idMinuta = document.getElementById('idMinuta').value;
-
-        // Usamos SweetAlert para confirmar (se ve más profesional)
-        // Si no tienes SweetAlert cargado, usa un confirm() normal
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                title: '¿Enviar a Firma?',
-                text: "La minuta pasará a estado PENDIENTE y se notificará al Presidente. No podrás editarla después.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Sí, enviar',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    procesarEnvio(idMinuta);
-                }
-            });
-        } else {
-            if (confirm("¿Seguro que desea enviar la minuta a firma? Ya no podrá editarla.")) {
-                procesarEnvio(idMinuta);
-            }
-        }
-    }
-
-    function procesarEnvio(idMinuta) {
-        // Mostrar feedback visual
-        const btn = document.querySelector('.btn-danger');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-        }
-
-        fetch('index.php?action=api_enviar_aprobacion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinuta
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire('¡Enviada!', data.message, 'success').then(() => {
-                            window.location.href = 'index.php?action=minutas_pendientes'; // Volver al listado
-                        });
+                    <!-- BOTÓN DE CONTROL DE SESIÓN (Dinámico) -->
+                    <?php
+                    if ($st['vigente'] == 1) {
+                        // ESTADO: EN CURSO -> Mostrar FINALIZAR
+                        echo '<button id="btnFinalizar" class="btn btn-danger btn-sm text-white shadow-sm" onclick="finalizarReunion()">
+                            <i class="fas fa-stop-circle me-1"></i> Finalizar Reunión y Enviar Asistencia
+                          </button>';
+                    } elseif ($st['asistencia_validada'] == 1) {
+                        // ESTADO: FINALIZADA -> Mostrar BLOQUEADO
+                        echo '<button class="btn btn-secondary btn-sm text-white" disabled>
+                            <i class="fas fa-check-circle me-1"></i> Reunión Cerrada
+                          </button>';
                     } else {
-                        alert(data.message);
-                        window.location.href = 'index.php?action=minutas_pendientes';
+                        // ESTADO: ESPERA -> Mostrar INICIAR
+                        echo '<button id="btnIniciar" class="btn btn-primary btn-sm text-white shadow-sm" onclick="iniciarReunion()">
+                            <i class="fas fa-play me-1"></i> Habilitar / Iniciar Reunión
+                          </button>';
                     }
-                } else {
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', data.message, 'error');
-                    else alert('Error: ' + data.message);
+                    ?>
 
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerText = 'Enviar para Aprobación';
+                    <!-- BOTÓN ENVIAR A FIRMA (Lógica existente) -->
+                    <?php
+                    $estadoMin = $data['minuta']['estadoMinuta'];
+                    $puedeEnviar = ($estadoMin === 'BORRADOR' || $estadoMin === 'REQUIERE_REVISION');
+                    $listoParaEnviar = ($st['vigente'] == 0 && $st['asistencia_validada'] == 1); // Solo si terminó
+
+                    if (!$puedeEnviar) {
+                        echo '<button class="btn btn-secondary btn-sm" disabled><i class="fas fa-check-double me-1"></i> En Proceso de Firma</button>';
+                    } else {
+                        $claseBtn = $listoParaEnviar ? 'btn-success text-white' : 'btn-secondary';
+                        $estadoBtn = $listoParaEnviar ? '' : 'disabled';
+                        $textoBtn = ($estadoMin === 'REQUIERE_REVISION') ? 'Reenviar a Firma' : 'Enviar a Firma';
+                        $iconoBtn = ($estadoMin === 'REQUIERE_REVISION') ? 'fa-sync-alt' : 'fa-paper-plane';
+
+                        echo '<button id="btnEnviarFirma" class="btn ' . $claseBtn . ' btn-sm" onclick="enviarAFirma()" ' . $estadoBtn . '>
+                            <i class="fas ' . $iconoBtn . ' me-1"></i> <span id="lblBtnFirma">' . $textoBtn . '</span>
+                          </button>';
                     }
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Error de conexión');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerText = 'Enviar para Aprobación';
-                }
-            });
-    }
+                    ?>
 
-    // --- FUNCIONES PRESIDENTE ---
-    function firmarMinuta() {
-        const idMinuta = document.getElementById('idMinuta').value;
-
-        Swal.fire({
-            title: '¿Firmar Minuta?',
-            text: "Esta acción es definitiva y generará el documento oficial.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, Firmar',
-            confirmButtonColor: '#198754'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Mostrar indicador de carga
-                Swal.fire({
-                    title: 'Firmando...',
-                    didOpen: () => Swal.showLoading()
-                });
-
-                fetch('index.php?action=api_firmar_minuta', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            idMinuta: idMinuta
-                        })
-                    })
-                    .then(response => response.text()) // 1. Obtenemos texto primero para ver qué llega
-                    .then(text => {
-                        try {
-                            return JSON.parse(text); // 2. Intentamos convertir a JSON
-                        } catch (e) {
-                            console.error("Respuesta del servidor no válida:", text);
-                            throw new Error("El servidor devolvió un error no esperado (ver consola).");
-                        }
-                    })
-                    .then(data => {
-                        if (data.status === 'success') {
-                            Swal.fire('¡Firmado!', data.message, 'success').then(() => location.reload());
-                        } else {
-                            Swal.fire('Error', data.message, 'error');
-                        }
-                    })
-                    .catch(error => {
-                        console.error(error);
-                        Swal.fire('Error Crítico', error.message, 'error');
-                    });
-            }
-        });
-    }
-
-    function mostrarFeedback() {
-        document.getElementById('botonesPresidente').style.display = 'none';
-        document.getElementById('areaFeedback').style.display = 'block';
-        document.getElementById('txtFeedback').focus();
-    }
-
-    function cancelarFeedback() {
-        document.getElementById('areaFeedback').style.display = 'none';
-        document.getElementById('botonesPresidente').style.display = 'block';
-        document.getElementById('txtFeedback').value = '';
-    }
-
-    function enviarFeedbackReal() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const texto = document.getElementById('txtFeedback').value.trim();
-
-        if (texto === '') {
-            Swal.fire('Atención', 'Debe escribir el motivo del rechazo.', 'warning');
-            return;
-        }
-
-        Swal.fire({
-            title: 'Enviando...',
-            didOpen: () => Swal.showLoading()
-        });
-
-        fetch('index.php?action=api_enviar_feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinuta,
-                    feedback: texto
-                })
-            })
-            .then(response => response.text())
-            .then(text => {
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error("Respuesta del servidor no válida:", text);
-                    throw new Error("El servidor devolvió un error no esperado.");
-                }
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    Swal.fire('Enviado', 'Observaciones enviadas.', 'success').then(() => location.reload());
-                } else {
-                    Swal.fire('Error', data.message, 'error');
-                }
-            })
-            .catch(error => {
-                Swal.fire('Error Crítico', error.message, 'error');
-            });
-    }
-
-    // --- FUNCIONES DE VOTACION ---
-
-    // Cargar lista al iniciar
-    document.addEventListener("DOMContentLoaded", () => {
-        // ... tu código existente ...
-        cargarVotaciones();
-        setInterval(cargarResultados, 3000); // Polling cada 3s para ver votos en vivo
-    });
-
-    function crearVotacion() {
-        const nombre = document.getElementById('nombreNuevaVotacion').value.trim();
-        const idMinuta = document.getElementById('idMinuta').value;
-
-        if (!nombre) return Swal.fire('Error', 'Escribe un nombre.', 'warning');
-
-        fetch('index.php?action=api_votacion_crear', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinuta,
-                    nombre: nombre
-                })
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.status === 'success') {
-                    document.getElementById('nombreNuevaVotacion').value = '';
-                    cargarVotaciones();
-                    Swal.fire('Creada', 'Votación lista.', 'success');
-                } else {
-                    Swal.fire('Error', d.message, 'error');
-                }
-            });
-    }
-
-    function cargarVotaciones() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        fetch(`index.php?action=api_votacion_listar&idMinuta=${idMinuta}`)
-            .then(r => r.json())
-            .then(d => {
-                const contenedor = document.getElementById('listaVotaciones');
-                contenedor.innerHTML = '';
-
-                if (d.data.length === 0) {
-                    contenedor.innerHTML = '<div class="text-center text-muted py-2">No hay votaciones creadas.</div>';
-                    return;
-                }
-
-                d.data.forEach(v => {
-                    // CORRECCIÓN AQUÍ: Agregamos type="button" para evitar que envíe el formulario
-                    const estadoBtn = v.habilitada == 1 ?
-                        `<button type="button" class="btn btn-sm btn-danger" onclick="cambiarEstadoVotacion(${v.idVotacion}, 0)">Cerrar Votación</button>` :
-                        `<button type="button" class="btn btn-sm btn-success" onclick="cambiarEstadoVotacion(${v.idVotacion}, 1)">Habilitar (Abrir)</button>`;
-
-                    const badge = v.habilitada == 1 ?
-                        '<span class="badge bg-success">ABIERTA</span>' :
-                        '<span class="badge bg-secondary">CERRADA</span>';
-
-                    contenedor.innerHTML += `
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${v.nombreVotacion}</strong> ${badge}
-                        </div>
-                        <div>${estadoBtn}</div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="card-body bg-white">
+            <div class="row g-3">
+                <div class="col-md-6 border-end">
+                    <div class="row mb-1">
+                        <div class="col-4 fw-bold text-end text-secondary">N° Minuta:</div>
+                        <div class="col-8 text-dark fw-bold fs-5"><?= $data['minuta']['idMinuta'] ?></div>
                     </div>
-                `;
-                });
-                // Actualizamos también los resultados visuales
-                cargarResultados();
-            });
-    }
+                    <div class="row mb-1">
+                        <div class="col-4 fw-bold text-end text-secondary">Reunión:</div>
+                        <div class="col-8 text-primary fw-bold text-uppercase" style="font-size: 0.9rem;">
+                            <?= $data['header_info']['nombre_reunion'] ?>
+                        </div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 fw-bold text-end text-secondary">Fecha:</div>
+                        <div class="col-8"><?= $data['header_info']['fecha_formateada'] ?></div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-4 fw-bold text-end text-secondary">Hora:</div>
+                        <div class="col-8"><?= $data['header_info']['hora_formateada'] ?></div>
+                    </div>
+                </div>
 
-    function cambiarEstadoVotacion(id, estado) {
-        fetch('index.php?action=api_votacion_estado', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idVotacion: id,
-                    estado: estado
-                })
-            })
-            .then(r => r.json())
-            .then(() => cargarVotaciones());
-    }
+                <div class="col-md-6">
+                    <div class="row mb-1">
+                        <div class="col-3 fw-bold text-end text-secondary">Comisión:</div>
+                        <div class="col-9 fw-bold text-dark"><?= $data['header_info']['comisiones_str'] ?></div>
+                    </div>
+                    <div class="row mb-1">
+                        <div class="col-3 fw-bold text-end text-secondary">Presidente:</div>
+                        <div class="col-9 text-dark"><?= $data['header_info']['presidente_completo'] ?></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-3 fw-bold text-end text-secondary">Secretario:</div>
+                        <div class="col-9 text-secondary"><?= $data['header_info']['secretario_completo'] ?></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    function cargarResultados() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const contenedor = document.getElementById('resultadosVotaciones');
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom-0 pt-3 px-3">
+            <ul class="nav nav-tabs card-header-tabs" id="minutaTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-bold" id="desarrollo-tab" data-bs-toggle="tab" data-bs-target="#desarrollo" type="button" role="tab">
+                        <i class="fas fa-edit me-2 text-primary"></i>Desarrollo
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="asistencia-tab" data-bs-toggle="tab" data-bs-target="#asistencia" type="button" role="tab">
+                        <i class="fas fa-users me-2 text-info"></i>Asistencia
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="votaciones-tab" data-bs-toggle="tab" data-bs-target="#votaciones" type="button" role="tab">
+                        <i class="fas fa-vote-yea me-2 text-success"></i>Votaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold" id="adjuntos-tab" data-bs-toggle="tab" data-bs-target="#adjuntos" type="button" role="tab">
+                        <i class="fas fa-paperclip me-2 text-secondary"></i>Adjuntos
+                    </button>
+                </li>
+            </ul>
+        </div>
 
-        // No limpiamos el contenedor si no es necesario para evitar parpadeo, 
-        // pero por simplicidad en este paso lo haremos así.
+        <div class="card-body bg-white min-vh-50">
+            <div class="tab-content" id="minutaTabsContent">
 
-        fetch(`index.php?action=api_votacion_resultados&idMinuta=${idMinuta}`)
-            .then(r => r.json())
-            .then(d => {
-                let html = '';
-                d.data.forEach(v => {
-                    html += `
-                    <div class="col-md-6">
-                        <div class="card h-100 border-${v.habilitada == 1 ? 'success' : 'secondary'}">
-                            <div class="card-body text-center">
-                                <h6 class="card-title">${v.nombre}</h6>
-                                <div class="row mt-3">
-                                    <div class="col-4"><h3 class="text-success">${v.votos.SI}</h3><small>APRUEBO</small></div>
-                                    <div class="col-4"><h3 class="text-danger">${v.votos.NO}</h3><small>RECHAZO</small></div>
-                                    <div class="col-4"><h3 class="text-secondary">${v.votos.ABSTENCION}</h3><small>ABST.</small></div>
+                <div class="tab-pane fade show active" id="desarrollo" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="alert alert-light border-start border-primary border-4 py-2 mb-0 w-75">
+                            <h6 class="text-primary mb-1"><i class="fas fa-edit"></i> Desarrollo de la Reunión</h6>
+                            <small class="text-muted">Agregue los temas tratados. El contenido se guarda automáticamente.</small>
+                        </div>
+                        <div id="statusGuardado" class="text-muted fw-bold small">
+                            <i class="fas fa-check-circle text-success"></i> Todo al día
+                        </div>
+                    </div>
+
+                    <div class="accordion mb-4" id="accordionTemas">
+                    </div>
+
+                    <button class="btn btn-outline-primary btn-sm mb-5" onclick="agregarNuevoTema()">
+                        <i class="fas fa-plus"></i> Agregar Nuevo Tema
+                    </button>
+                </div>
+
+                <div class="tab-pane fade" id="asistencia" role="tabpanel">
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-md-8">
+                            <div class="alert alert-info border-start border-info border-4 py-2 mb-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="spinner-grow text-info spinner-grow-sm me-2" role="status"></div>
+                                    <div>
+                                        <strong>Monitoreo en Vivo:</strong> La lista se actualiza cada segundo.
+                                        <small class="d-block">Los consejeros tienen 30 min desde el inicio para auto-registrarse.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="card bg-light border-0">
+                                <div class="card-body py-2 px-3">
+                                    <small class="text-muted fw-bold">RESUMEN</small>
+                                    <h4 class="mb-0 text-primary" id="contadorAsistencia">0 / 0</h4>
                                 </div>
                             </div>
                         </div>
                     </div>
-                `;
-                });
-                contenedor.innerHTML = html;
-            });
-    }
 
-    document.addEventListener("DOMContentLoaded", () => {
-        // ... (tus otros inits) ...
-        cargarAdjuntos();
+                    <div class="table-responsive shadow-sm border rounded">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th width="40%">Consejero</th>
+                                    <th width="20%">Hora Registro</th>
+                                    <th width="20%">Estado</th>
+                                    <th width="20%" class="text-center">Acción (Secretario)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaAsistenciaBody">
+                                <tr>
+                                    <td colspan="4" class="text-center py-4">Cargando lista...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-        // Listeners para formularios
-        const formFile = document.getElementById('formSubirArchivo');
-        if (formFile) formFile.addEventListener('submit', subirArchivo);
+                <div class="tab-pane fade" id="votaciones" role="tabpanel">
+                    <div class="border-top border-primary border-4 pt-3 mt-2">
+                        <h6 class="mb-3 text-dark fw-bold">Crear Nueva Votación</h6>
 
-        const formLink = document.getElementById('formAgregarLink');
-        if (formLink) formLink.addEventListener('submit', agregarLink);
+                        <div class="row g-2 align-items-center mb-4">
+                            <div class="col-md-9">
+                                <label class="form-label small text-muted">Nombre de la Votación:</label>
+                                <input type="text" id="inputNombreVotacion" class="form-control" placeholder="Ej: Aprobar fondos para...">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label d-none d-md-block">&nbsp;</label>
+                                <button type="button" class="btn btn-success w-100 text-white" onclick="crearVotacion()">
+                                    <i class="fas fa-plus me-1"></i> Crear Votación
+                                </button>
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3 text-dark fw-bold">Votaciones Creadas (Historial)</h6>
+
+                        <div id="contenedorVotaciones">
+                            <div class="p-4 text-center bg-light rounded text-muted">
+                                <small class="d-block mb-2">No hay votaciones registradas.</small>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="adjuntos" role="tabpanel">
+                    <div class="alert alert-light border-start border-secondary border-4">
+                        <h6 class="text-secondary mb-1"><i class="fas fa-folder-open"></i> Documentos y Enlaces</h6>
+                        <small class="text-muted">Soporta: PDF, Word, Excel, PowerPoint, Videos (MP4, AVI) y Enlaces Web.</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="card bg-light border-2 border-dashed h-100" id="dropZoneAdjuntos" style="border-style: dashed !important;">
+                                <div class="card-body text-center d-flex flex-column justify-content-center py-5">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-secondary mb-3"></i>
+                                    <h6 class="fw-bold text-secondary">Arrastre archivos aquí</h6>
+                                    <span class="text-muted small mb-3">o</span>
+
+                                    <button class="btn btn-primary btn-sm mx-auto px-4" onclick="document.getElementById('inputArchivoOculto').click()">
+                                        <i class="fas fa-file-upload me-1"></i> Subir Archivo
+                                    </button>
+                                    <input type="file" id="inputArchivoOculto" class="d-none" multiple onchange="subirArchivos(this.files)">
+
+                                    <hr class="w-50 mx-auto my-3 text-muted">
+
+                                    <button class="btn btn-outline-dark btn-sm mx-auto px-4" data-bs-toggle="modal" data-bs-target="#modalNuevoLink">
+                                        <i class="fas fa-link me-1"></i> Agregar Enlace Web
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-7">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold mb-0">Archivos Cargados</h6>
+                                <button class="btn btn-link btn-sm text-decoration-none p-0" onclick="cargarAdjuntos()">
+                                    <i class="fas fa-sync-alt"></i> Actualizar
+                                </button>
+                            </div>
+
+                            <div class="card border-0 shadow-sm">
+                                <ul class="list-group list-group-flush" id="listaAdjuntosUl">
+                                    <li class="list-group-item text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm"></div> Cargando...
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="modalNuevoLink" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fas fa-link me-2"></i>Nuevo Enlace</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Nombre del Enlace</label>
+                                    <input type="text" id="linkNombre" class="form-control" placeholder="Ej: Carpeta Drive Compartida">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">URL (Dirección Web)</label>
+                                    <input type="url" id="linkUrl" class="form-control" placeholder="https://...">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-primary" onclick="guardarLink()">Guardar Enlace</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="modalDetalleVoto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-list-ol me-2"></i>Detalle de la Votación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th class="ps-4">Consejero</th>
+                            <th class="text-center">Opción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaDetalleVoto">
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer py-1">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    // ============================================
+    //  LÓGICA PESTAÑA: ADJUNTOS
+    // ============================================
+
+    // 1. Inicializar al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        configurarDragDrop();
+        // Cargar lista inicial si estamos en la tab (o esperar al click)
+        const tabAdjuntos = document.getElementById('adjuntos-tab');
+        if (tabAdjuntos) {
+            tabAdjuntos.addEventListener('shown.bs.tab', cargarAdjuntos);
+        }
     });
 
+    // 2. Cargar Lista desde el Servidor
     function cargarAdjuntos() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        fetch(`index.php?action=api_adjunto_listar&idMinuta=${idMinuta}`)
+        const ul = document.getElementById('listaAdjuntosUl');
+        ul.innerHTML = '<li class="list-group-item text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-primary"></div></li>';
+
+        fetch(`index.php?action=api_adjunto_listar&id=${idMinutaGlobal}`)
             .then(r => r.json())
-            .then(d => {
-                const ul = document.getElementById('listaAdjuntos');
-                ul.innerHTML = '';
-                if (d.data.length === 0) {
-                    ul.innerHTML = '<li class="list-group-item text-muted text-center">Sin adjuntos.</li>';
-                    return;
+            .then(resp => {
+                if (resp.status === 'success') {
+                    renderizarListaAdjuntos(resp.data);
+                } else {
+                    ul.innerHTML = '<li class="list-group-item text-danger">Error al cargar adjuntos.</li>';
                 }
-                d.data.forEach(a => {
-                    let icono = a.tipoAdjunto === 'link' ? 'fa-link' : 'fa-file-alt';
-                    let contenido = a.tipoAdjunto === 'link' ?
-                        `<a href="${a.pathAdjunto}" target="_blank">${a.pathAdjunto}</a>` :
-                        `<a href="${a.pathAdjunto}" target="_blank" download>Descargar Documento</a>`;
-
-                    // Botón eliminar (solo si no es solo lectura - verificamos si existe el form)
-                    let btnEliminar = document.getElementById('formSubirArchivo') ?
-                        `<button class="btn btn-sm btn-outline-danger float-end" onclick="eliminarAdjunto(${a.idAdjunto})"><i class="fas fa-trash"></i></button>` :
-                        '';
-
-                    ul.innerHTML += `
-                    <li class="list-group-item">
-                        <i class="fas ${icono} me-2 text-muted"></i> ${contenido}
-                        ${btnEliminar}
-                    </li>
-                `;
-                });
-            });
+            })
+            .catch(e => console.error(e));
     }
 
-    function subirArchivo() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const input = document.getElementById('inputArchivo');
-        const file = input.files[0];
+    const btnReenviar = document.getElementById('btnReenviarFirma');
 
-        if (!file) {
-            Swal.fire('Atención', 'Selecciona un archivo primero.', 'warning');
+    // Solo activamos la lógica si estamos en modo "REQUIERE_REVISION" (el botón existe)
+    if (btnReenviar) {
+
+        // Función que "Enciende" el botón
+        const activarBotonReenvio = () => {
+            if (btnReenviar.disabled) {
+                btnReenviar.disabled = false;
+                btnReenviar.classList.remove('btn-secondary');
+                btnReenviar.classList.add('btn-warning', 'text-dark', 'fa-beat-fade'); // Efecto visual
+
+                // Cambiar texto e icono
+                const label = document.getElementById('lblBtnFirma');
+                if (label) label.innerText = "Aplicar Correcciones y Reenviar";
+
+                // Quitar animación después de unos segundos para no molestar
+                setTimeout(() => {
+                    btnReenviar.classList.remove('fa-beat-fade');
+                }, 1500);
+            }
+        };
+
+        // Escuchar cambios en todos los campos de texto del editor
+        // Usamos 'delegación de eventos' para capturar incluso campos nuevos dinámicos
+        document.body.addEventListener('input', function(e) {
+            // Si el elemento editado es un textarea o input dentro del área de desarrollo
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                activarBotonReenvio();
+            }
+        });
+
+        // Escuchar cambios en checkboxes o selects si los hubiera
+        document.body.addEventListener('change', function(e) {
+            if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') {
+                activarBotonReenvio();
+            }
+        });
+
+        console.log("Sistema de detección de correcciones activado.");
+    }
+
+    function renderizarListaAdjuntos(data) {
+        const ul = document.getElementById('listaAdjuntosUl');
+        ul.innerHTML = '';
+
+        if (data.length === 0) {
+            ul.innerHTML = '<li class="list-group-item text-center text-muted fst-italic py-4">No hay archivos ni enlaces adjuntos.</li>';
             return;
         }
 
-        const formData = new FormData();
-        formData.append('idMinuta', idMinuta);
-        formData.append('archivo', file);
+        data.forEach(file => {
+            let icon = '<i class="fas fa-file text-secondary"></i>';
+            let nombre = file.nombreArchivo;
+            let badge = '';
 
-        Swal.fire({
-            title: 'Subiendo...',
-            didOpen: () => Swal.showLoading()
+            // Detectar tipo para icono
+            if (file.tipoAdjunto === 'link') {
+                icon = '<i class="fas fa-link text-primary"></i>';
+                badge = '<span class="badge bg-light text-primary border ms-2">LINK</span>';
+            } else {
+                const ext = nombre.split('.').pop().toLowerCase();
+                if (['pdf'].includes(ext)) icon = '<i class="fas fa-file-pdf text-danger"></i>';
+                if (['doc', 'docx'].includes(ext)) icon = '<i class="fas fa-file-word text-primary"></i>';
+                if (['xls', 'xlsx'].includes(ext)) icon = '<i class="fas fa-file-excel text-success"></i>';
+                if (['ppt', 'pptx'].includes(ext)) icon = '<i class="fas fa-file-powerpoint text-warning"></i>';
+                if (['mp4', 'avi', 'flv', 'mov'].includes(ext)) icon = '<i class="fas fa-file-video text-info"></i>';
+            }
+
+            const item = `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center text-truncate">
+                        <div class="me-3 fs-5">${icon}</div>
+                        <div class="text-truncate">
+                            <span class="fw-bold text-dark">${nombre}</span>
+                            ${badge}
+                            <div class="small text-muted">${file.fechaSubida || 'Reciente'}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="eliminarAdjunto(${file.idAdjunto})" title="Eliminar">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </li>
+            `;
+            ul.innerHTML += item;
         });
+    }
+
+    // 3. Subir Archivo (Físico)
+    function subirArchivos(files) {
+        if (files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('idMinuta', idMinutaGlobal);
+
+        // Soporte para múltiples archivos a la vez
+        for (let i = 0; i < files.length; i++) {
+            formData.append('archivos[]', files[i]);
+        }
+
+        // Mostrar carga
+        const ul = document.getElementById('listaAdjuntosUl');
+        ul.innerHTML = '<li class="list-group-item text-center py-3"><div class="spinner-border text-primary"></div> Subiendo archivos...</li>';
 
         fetch('index.php?action=api_adjunto_subir', {
                 method: 'POST',
                 body: formData
             })
             .then(r => r.json())
-            .then(d => {
-                if (d.status === 'success') {
-                    input.value = ''; // Limpiar input
+            .then(resp => {
+                if (resp.status === 'success') {
                     cargarAdjuntos(); // Recargar lista
-                    Swal.close(); // Cerrar loading
-                    const Toast = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-                    Toast.fire({
-                        icon: 'success',
-                        title: 'Archivo subido'
-                    });
                 } else {
-                    Swal.fire('Error', d.message, 'error');
+                    alert('Error al subir: ' + resp.message);
+                    cargarAdjuntos();
                 }
             })
             .catch(err => {
                 console.error(err);
-                Swal.fire('Error', 'Error de conexión', 'error');
+                alert('Error de conexión al subir archivo.');
             });
     }
 
-    function agregarLink() {
-        const idMinuta = document.getElementById('idMinuta').value;
-        const input = document.getElementById('inputUrlLink');
-        const url = input.value.trim();
+    // 4. Guardar Link (Enlace)
+    function guardarLink() {
+        const nombre = document.getElementById('linkNombre').value;
+        const url = document.getElementById('linkUrl').value;
 
-        if (!url) {
-            Swal.fire('Atención', 'Escribe una URL válida.', 'warning');
+        if (!nombre || !url) {
+            alert("Debe completar nombre y URL");
             return;
         }
 
-        const formData = new FormData();
-        formData.append('idMinuta', idMinuta);
-        formData.append('urlLink', url);
-
-        // Mostrar carga
-        const btn = event.target.closest('button'); // Referencia visual opcional
-        if (btn) btn.disabled = true;
+        const payload = {
+            idMinuta: idMinutaGlobal,
+            nombre: nombre,
+            url: url
+        };
 
         fetch('index.php?action=api_adjunto_link', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
             })
             .then(r => r.json())
-            .then(d => {
-                if (d.status === 'success') {
-                    input.value = '';
+            .then(resp => {
+                if (resp.status === 'success') {
+                    // Cerrar modal
+                    const modalEl = document.getElementById('modalNuevoLink');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+
+                    // Limpiar inputs
+                    document.getElementById('linkNombre').value = '';
+                    document.getElementById('linkUrl').value = '';
+
                     cargarAdjuntos();
-                    const Toast = Swal.mixin({
-                        toast: true,
-                        position: 'top-end',
-                        showConfirmButton: false,
-                        timer: 3000
-                    });
-                    Toast.fire({
-                        icon: 'success',
-                        title: 'Enlace agregado'
-                    });
                 } else {
-                    Swal.fire('Error', d.message, 'error');
+                    alert(resp.message);
                 }
             })
-            .catch(err => Swal.fire('Error', err.message, 'error'))
-            .finally(() => {
-                if (btn) btn.disabled = false;
+            .catch(err => console.error(err));
+    }
+
+    // 5. Eliminar Adjunto
+    function eliminarAdjunto(idAdjunto) {
+        if (!confirm('¿Estás seguro de eliminar este adjunto?')) return;
+
+        fetch('index.php?action=api_adjunto_eliminar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idAdjunto: idAdjunto
+                })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') cargarAdjuntos();
+                else alert(resp.message);
             });
     }
 
-    function eliminarAdjunto(id) {
-        Swal.fire({
-            title: '¿Eliminar?',
-            text: "No podrás recuperarlo.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Sí, eliminar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const formData = new FormData();
-                formData.append('idAdjunto', id);
+    // 6. Configuración Visual Drag & Drop
+    function configurarDragDrop() {
+        const dropZone = document.getElementById('dropZoneAdjuntos');
+        const input = document.getElementById('inputArchivoOculto');
 
-                fetch('index.php?action=api_adjunto_eliminar', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(r => r.json())
-                    .then(d => {
-                        if (d.status === 'success') {
-                            cargarAdjuntos();
-                            Swal.fire('Eliminado', '', 'success');
-                        }
-                    });
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('bg-white', 'border-primary'));
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('bg-white', 'border-primary'));
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            subirArchivos(files);
+        });
+    }
+    // ============================================
+    //  VARIABLES GLOBALES
+    // ============================================
+    const idMinutaGlobal = <?php echo isset($idMinuta) ? $idMinuta : 'null'; ?>;
+    const idComisionGlobal = <?php echo isset($idComision) ? $idComision : 'null'; ?>;
+
+    // -- Desarrollo (AutoSave) --
+    let timerGuardado;
+    let contadorTemas = 0;
+    const statusDiv = document.getElementById('statusGuardado');
+    const temasIniciales = <?= json_encode($data['temas']) ?>;
+
+    // -- Asistencia (Tiempo Real) --
+    let intervaloAsistencia;
+    const VELOCIDAD_REFRESCO = 1000; // 1 Segundo exacto
+
+    // ============================================
+    //  INICIALIZACIÓN
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cargar Temas
+        if (temasIniciales && temasIniciales.length > 0) {
+            temasIniciales.forEach(tema => {
+                renderizarTema(tema);
+            });
+        } else {
+            agregarNuevoTema();
+        }
+
+
+
+
+    });
+
+    // ============================================
+    //  LÓGICA PESTAÑA: DESARROLLO (Temas + AutoSave)
+    // ============================================
+    function agregarNuevoTema() {
+        renderizarTema({});
+        triggerAutoSave();
+    }
+
+    function renderizarTema(data) {
+        contadorTemas++;
+        const contenedor = document.getElementById('accordionTemas');
+
+        const collapseId = `collapseTema${contadorTemas}`;
+        const headingId = `headingTema${contadorTemas}`;
+
+        const nombre = data.nombreTema || '';
+        const objetivo = data.objetivo || '';
+        const acuerdos = data.acuerdos || '';
+        const compromiso = data.compromiso || '';
+        const observacion = data.observacion || '';
+
+        const itemHTML = `
+            <div class="accordion-item mb-3 border shadow-sm item-tema">
+                <h2 class="accordion-header" id="${headingId}">
+                    <button class="accordion-button ${contadorTemas > 1 ? 'collapsed' : ''} fw-bold text-primary bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${contadorTemas === 1 ? 'true' : 'false'}" aria-controls="${collapseId}">
+                        <i class="fas fa-list-ul me-2"></i> Tema ${contadorTemas}
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${contadorTemas === 1 ? 'show' : ''}" aria-labelledby="${headingId}" data-bs-parent="#accordionTemas">
+                    <div class="accordion-body bg-white">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary">TEMA TRATADO</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-heading"></i></span>
+                                <textarea class="form-control input-tema auto-expand" rows="2" placeholder="Escribe el tema tratado...">${nombre}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary">OBJETIVO</label>
+                            <textarea class="form-control input-objetivo auto-expand" rows="2" placeholder="Describa el objetivo...">${objetivo}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary">ACUERDOS ADOPTADOS</label>
+                            <textarea class="form-control input-acuerdos auto-expand" rows="2" placeholder="Liste los acuerdos...">${acuerdos}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary">COMPROMISOS Y RESPONSABLES</label>
+                            <textarea class="form-control input-compromiso auto-expand" rows="2" placeholder="Indique compromisos y responsables...">${compromiso}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary">OBSERVACIONES Y COMENTARIOS</label>
+                            <textarea class="form-control input-observacion auto-expand" rows="2" placeholder="Observaciones adicionales...">${observacion}</textarea>
+                        </div>
+
+                        <div class="text-end border-top pt-2">
+                            <button class="btn btn-sm btn-outline-danger btn-eliminar-tema">
+                                <i class="fas fa-trash-alt me-1"></i> Eliminar Tema
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        `;
+
+        contenedor.insertAdjacentHTML('beforeend', itemHTML);
+        activarListeners();
+    }
+
+    document.getElementById('accordionTemas').addEventListener('click', function(e) {
+        if (e.target.closest('.btn-eliminar-tema')) {
+            if (confirm('¿Estás seguro de eliminar este bloque de tema?')) {
+                e.target.closest('.item-tema').remove();
+                triggerAutoSave();
             }
+        }
+    });
+
+    function activarListeners() {
+        const inputs = document.querySelectorAll('.item-tema textarea');
+        inputs.forEach(input => {
+            input.removeEventListener('input', handleInput);
+            input.addEventListener('input', handleInput);
         });
     }
 
-    function validarYEnviarAsistencia() {
-        const idMinuta = document.getElementById('idMinuta').value;
+    function handleInput(e) {
+        const input = e.target;
+        // Mayúscula Inicial
+        let val = input.value;
+        if (val.length > 0) {
+            const firstChar = val.charAt(0);
+            if (firstChar !== firstChar.toUpperCase()) {
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                input.value = firstChar.toUpperCase() + val.slice(1);
+                input.setSelectionRange(start, end);
+            }
+        }
+        triggerAutoSave();
+    }
 
+    function triggerAutoSave() {
+        statusDiv.innerHTML = '<span class="text-warning"><i class="fas fa-sync fa-spin"></i> Guardando...</span>';
+        clearTimeout(timerGuardado);
+        timerGuardado = setTimeout(guardarDatosEnServidor, 1000);
+    }
+
+    function guardarDatosEnServidor() {
+        const bloques = document.querySelectorAll('.item-tema');
+        let datosTemas = [];
+
+        bloques.forEach(bloque => {
+            const tema = bloque.querySelector('.input-tema').value;
+            const objetivo = bloque.querySelector('.input-objetivo').value;
+            const acuerdos = bloque.querySelector('.input-acuerdos').value;
+            const compromiso = bloque.querySelector('.input-compromiso').value;
+            const observacion = bloque.querySelector('.input-observacion').value;
+
+            if (tema.trim() || objetivo.trim() || acuerdos.trim() || compromiso.trim() || observacion.trim()) {
+                datosTemas.push({
+                    nombreTema: tema,
+                    objetivo: objetivo,
+                    acuerdos: acuerdos,
+                    compromiso: compromiso,
+                    observacion: observacion
+                });
+            }
+        });
+
+        fetch('index.php?action=api_guardar_borrador', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: idMinutaGlobal,
+                    temas: datosTemas
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    statusDiv.innerHTML = '<span class="text-success"><i class="fas fa-check-double"></i> Guardado</span>';
+                    setTimeout(() => {
+                        statusDiv.innerHTML = '<span class="text-muted"><i class="fas fa-check-circle"></i> Todo al día</span>';
+                    }, 2000);
+                } else {
+                    statusDiv.innerHTML = '<span class="text-danger">Error al guardar</span>';
+                }
+            })
+            .catch(e => console.error(e));
+    }
+
+    // ============================================
+    //  LÓGICA PESTAÑA: ASISTENCIA (Tiempo Real)
+    // ============================================
+
+    // Iniciar monitoreo al entrar
+    document.getElementById('asistencia-tab').addEventListener('shown.bs.tab', function() {
+        cargarAsistencia();
+        intervaloAsistencia = setInterval(cargarAsistencia, VELOCIDAD_REFRESCO);
+    });
+
+    // Detener monitoreo al salir
+    document.getElementById('asistencia-tab').addEventListener('hidden.bs.tab', function() {
+        clearInterval(intervaloAsistencia);
+    });
+
+    function cargarAsistencia() {
+        // TRUCO: Agregamos timestamp para evitar caché y forzar recarga
+        fetch(`index.php?action=api_get_asistencia&id=${idMinutaGlobal}&t=${Date.now()}`)
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    renderizarTablaAsistencia(resp.data);
+                }
+            })
+            .catch(e => console.error("Error polling asistencia", e));
+    }
+
+    function renderizarTablaAsistencia(data) {
+        const tbody = document.getElementById('tablaAsistenciaBody');
+        const contador = document.getElementById('contadorAsistencia');
+        const lista = data.asistentes;
+
+        let html = '';
+        let presentes = 0;
+
+        lista.forEach(user => {
+            const esPresente = parseInt(user.estaPresente) === 1;
+            if (esPresente) presentes++;
+
+            let horaDisplay = '--:--';
+            let badgeEstado = '<span class="badge bg-secondary text-white-50">Ausente</span>';
+            let claseFila = '';
+
+            if (esPresente) {
+                const fechaRaw = user.fechaRegistroAsistencia ? user.fechaRegistroAsistencia.replace(/-/g, '/') : null;
+                if (fechaRaw) {
+                    const fechaObj = new Date(fechaRaw);
+                    horaDisplay = fechaObj.toLocaleTimeString('es-CL', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+
+                if (user.estado_visual === 'manual') {
+                    badgeEstado = '<span class="badge bg-primary"><i class="fas fa-user-edit me-1"></i>Manual (ST)</span>';
+                    claseFila = 'bg-success bg-opacity-10';
+                } else if (user.estado_visual === 'atrasado') {
+                    badgeEstado = '<span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Atrasado</span>';
+                    claseFila = 'bg-warning bg-opacity-10';
+                } else {
+                    badgeEstado = '<span class="badge bg-success"><i class="fas fa-check me-1"></i>Presente</span>';
+                    claseFila = 'bg-success bg-opacity-10';
+                }
+            }
+
+            const checked = esPresente ? 'checked' : '';
+
+            // AGREGAMOS IDs ÚNICOS: id="tr-user-..." y id="td-estado-..."
+            html += `
+                <tr id="tr-user-${user.idUsuario}" class="${claseFila}">
+                    <td>
+                        <div class="fw-bold text-dark">${user.pNombre} ${user.aPaterno}</div>
+                        <small class="text-muted">Consejero Regional</small>
+                    </td>
+                    <td>${horaDisplay}</td>
+                    <td id="td-estado-${user.idUsuario}">${badgeEstado}</td>
+                    <td class="text-center">
+                        <div class="form-check form-switch d-flex justify-content-center">
+                            <input class="form-check-input" type="checkbox" role="switch" 
+                                   ${checked} onchange="toggleAsistencia(${user.idUsuario}, this.checked)">
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        if (document.activeElement.type !== 'checkbox') {
+            tbody.innerHTML = html;
+        }
+        contador.innerText = `${presentes} / ${lista.length}`;
+    }
+
+    function toggleAsistencia(idUsuario, nuevoEstado) {
+        // 1. CAMBIO VISUAL INMEDIATO (Optimistic UI)
+        const fila = document.getElementById(`tr-user-${idUsuario}`);
+        const celdaEstado = document.getElementById(`td-estado-${idUsuario}`);
+
+        if (fila && celdaEstado) {
+            if (nuevoEstado) {
+                // Si activamos: Ponemos verde y badge azul de Manual
+                fila.className = 'bg-success bg-opacity-10';
+                celdaEstado.innerHTML = '<span class="badge bg-primary"><i class="fas fa-user-edit me-1"></i>Manual (ST)</span>';
+            } else {
+                // Si desactivamos: Quitamos color y ponemos Ausente
+                fila.className = '';
+                celdaEstado.innerHTML = '<span class="badge bg-secondary text-white-50">Ausente</span>';
+            }
+        }
+
+        // 2. Detener polling para que no sobrescriba nuestro cambio visual
+        clearInterval(intervaloAsistencia);
+
+        // 3. Enviar cambio al servidor en segundo plano
+        fetch('index.php?action=api_alternar_asistencia', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: idMinutaGlobal,
+                    idUsuario: idUsuario,
+                    estado: nuevoEstado
+                })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    // Opcional: Recargar datos reales para asegurar sincronía
+                    // cargarAsistencia(); 
+                    // Nota: Como ya hicimos el cambio visual, no es estrictamente urgente recargar YA,
+                    // el polling lo hará en unos segundos.
+                } else {
+                    alert('Error al guardar: ' + resp.message);
+                    cargarAsistencia(); // Si falló, recargamos para revertir el color
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                cargarAsistencia(); // Revertir si hay error de red
+            })
+            .finally(() => {
+                // 4. Reactivar el monitoreo automático
+                intervaloAsistencia = setInterval(cargarAsistencia, VELOCIDAD_REFRESCO);
+            });
+    }
+
+    // ============================================
+    //  LÓGICA PESTAÑA: VOTACIONES (Tiempo Real)
+    // ============================================
+    let intervaloVotaciones;
+
+    document.getElementById('votaciones-tab').addEventListener('shown.bs.tab', function() {
+        cargarVotaciones();
+        intervaloVotaciones = setInterval(cargarVotaciones, 1000); // 1 segundo
+        // Mostrar indicador de "en vivo" si existe en el HTML
+        const indicador = document.getElementById('liveIndicator');
+        if (indicador) indicador.classList.remove('d-none');
+    });
+
+    document.getElementById('votaciones-tab').addEventListener('hidden.bs.tab', function() {
+        clearInterval(intervaloVotaciones);
+        const indicador = document.getElementById('liveIndicator');
+        if (indicador) indicador.classList.add('d-none');
+    });
+
+    // ============================================
+    //  FUNCIONES DE VOTACIÓN (SECRETARIO)
+    // ============================================
+
+    function crearVotacion() {
+        console.log("Botón presionado: Iniciando creación...");
+
+        const inputNombre = document.getElementById('inputNombreVotacion');
+
+        // 1. Validar nombre
+        if (!inputNombre || inputNombre.value.trim() === '') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Falta información',
+                text: 'Por favor, debe escribir el Tema o Moción para la votación.'
+            });
+            return;
+        }
+
+        // 2. Preparar datos
+        const idComisionParaEnviar = idComisionGlobal ? idComisionGlobal : null;
+
+        const payload = {
+            idMinuta: idMinutaGlobal,
+            nombre: inputNombre.value.trim(),
+            idComision: idComisionParaEnviar
+        };
+
+        // 3. Enviar al servidor
+        fetch('index.php?action=api_crear_votacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+
+                    // --- POPUP: VOTACIÓN HABILITADA ---
+                    Swal.fire({
+                        title: '¡Votación Habilitada!',
+                        text: 'Los consejeros ya pueden votar.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+
+                    inputNombre.value = '';
+                    cargarVotaciones(); // Actualizar la lista visual
+
+                } else {
+                    Swal.fire('Error', resp.message, 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Error de conexión con el servidor', 'error');
+            });
+    }
+
+    function cerrarVotacion(idVotacion) {
+        // --- POPUP: CONFIRMACIÓN DE CIERRE ---
         Swal.fire({
-            title: '¿Validar Asistencia?',
-            text: "Se generará un PDF con la asistencia actual y se enviará por correo a Gestión (Génesis). Esto es requisito para poder enviar la minuta a firma.",
-            icon: 'info',
+            title: '¿Cerrar Votación?',
+            text: "Se dejarán de recibir votos y se calcularán los resultados finales.",
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Sí, Validar y Enviar',
-            confirmButtonColor: '#ffc107' // Amarillo warning
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, cerrar votación',
+            cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed) {
-                Swal.fire({
-                    title: 'Enviando correo...',
-                    text: 'Esto puede tardar unos segundos.',
-                    didOpen: () => Swal.showLoading()
-                });
 
-                fetch('index.php?action=api_validar_asistencia', {
+                // Si confirma, enviamos la petición
+                fetch('index.php?action=api_cerrar_votacion', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            idMinuta: idMinuta
+                            idVotacion: idVotacion
                         })
                     })
                     .then(r => r.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            Swal.fire('¡Enviado!', data.message, 'success').then(() => location.reload());
+                    .then(resp => {
+                        if (resp.status === 'success') {
+
+                            // --- POPUP: ÉXITO AL CERRAR ---
+                            Swal.fire(
+                                '¡Cerrada!',
+                                'La votación ha finalizado correctamente.',
+                                'success'
+                            );
+                            cargarVotaciones(); // Actualizar para ver gráfico final
                         } else {
-                            Swal.fire('Error', data.message, 'error');
+                            Swal.fire('Error', resp.message, 'error');
                         }
+                    });
+            }
+        });
+    }
+
+
+    function cargarVotaciones() {
+        fetch(`index.php?action=api_get_votaciones&id=${idMinutaGlobal}&t=${Date.now()}`)
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    renderizarVotaciones(resp.data);
+                }
+            })
+            .catch(e => console.error(e));
+    }
+
+    function renderizarVotaciones(data) {
+        const container = document.getElementById('contenedorVotaciones');
+        let html = '';
+
+        if (data.length === 0) {
+            html = '<div class="text-center py-5 text-muted"><p>No hay votaciones registradas.</p></div>';
+        } else {
+            data.forEach(v => {
+                const esAbierta = (v.habilitada == 1);
+
+                // 1. Determinar Colores según Resultado (Solo si está CERRADA)
+                let colorTema = 'secondary'; // Gris por defecto (SIN DATOS)
+                let textClass = 'text-white'; // Texto blanco para la mayoría
+
+                if (!esAbierta) {
+                    if (v.resultado === 'APROBADO') {
+                        colorTema = 'success'; // Verde
+                    } else if (v.resultado === 'RECHAZADO') {
+                        colorTema = 'danger'; // Rojo
+                    } else if (v.resultado === 'EMPATE') {
+                        colorTema = 'warning'; // Amarillo
+                        textClass = 'text-dark'; // Texto oscuro para que se lea bien en amarillo
+                    }
+                } else {
+                    colorTema = 'primary'; // Azul para EN CURSO (para no confundir con aprobado)
+                }
+
+                // 2. Configurar Clases CSS
+                // El borde sigue el color del tema
+                const claseBorde = `border-${colorTema}`;
+
+                // El Badge
+                const animacion = esAbierta ? 'fa-beat-fade' : '';
+                const badgeEstado = esAbierta ?
+                    `<span class="badge bg-primary"><i class="fas fa-circle ${animacion} me-1"></i>EN CURSO</span>` :
+                    `<span class="badge bg-${colorTema} ${textClass}">CERRADA: ${v.resultado}</span>`;
+
+                const btnCerrar = esAbierta ?
+                    `<button class="btn btn-sm btn-outline-danger" onclick="cerrarVotacion(${v.idVotacion})">Cerrar Votación</button>` :
+                    '';
+
+                // 3. Generar Grilla de Asistentes
+                let gridHtml = '<div class="row g-2 mt-2">';
+                if (v.detalle_asistentes && v.detalle_asistentes.length > 0) {
+                    v.detalle_asistentes.forEach(persona => {
+                        let icon = '<i class="fas fa-clock"></i>';
+                        if (persona.voto === 'SI') icon = '<i class="fas fa-thumbs-up"></i>';
+                        if (persona.voto === 'NO') icon = '<i class="fas fa-thumbs-down"></i>';
+                        if (persona.voto === 'ABSTENCION') icon = '<i class="fas fa-minus-circle"></i>';
+
+                        gridHtml += `
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="p-2 rounded border small fw-bold d-flex justify-content-between align-items-center ${persona.clase}" title="${persona.voto}">
+                                    <span class="text-truncate me-2">${persona.nombre}</span>
+                                    <span>${icon}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    gridHtml += '<div class="col-12 text-muted fst-italic">No hay asistentes registrados.</div>';
+                }
+                gridHtml += '</div>';
+
+                // 4. Armar HTML Final
+                html += `
+                <div class="card mb-3 shadow-sm border-start border-4 ${claseBorde}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="card-title fw-bold mb-0 text-dark">${v.nombreVotacion}</h5>
+                                <small class="text-muted">
+                                    ${v.nombreComision || 'Comisión'} • ${new Date(v.fechaCreacion).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                ${badgeEstado}
+                                <div class="mt-2">${btnCerrar}</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-3 text-muted small fw-bold border-bottom pb-2 mb-2">
+                            <span><i class="fas fa-check text-success"></i> SÍ: ${v.contadores.SI}</span>
+                            <span><i class="fas fa-times text-danger"></i> NO: ${v.contadores.NO}</span>
+                            <span><i class="fas fa-minus text-warning"></i> ABS: ${v.contadores.ABS}</span>
+                            <span class="${v.contadores.PEND > 0 ? 'text-primary' : ''}"><i class="fas fa-user-clock"></i> PEND: ${v.contadores.PEND}</span>
+                        </div>
+                        
+                        ${gridHtml}
+
+                    </div>
+                </div>`;
+            });
+        }
+
+        if (container) container.innerHTML = html;
+    }
+
+    function verDetalleVoto(idVotacion) {
+        const tbody = document.getElementById('tablaDetalleVoto');
+        // Asegúrate de agregar el MODAL al final de tu archivo HTML si no lo has hecho
+        const modalEl = document.getElementById('modalDetalleVoto');
+        if (!modalEl) return; // Seguridad
+
+        tbody.innerHTML = '<tr><td colspan="2" class="text-center">Cargando...</td></tr>';
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+
+        fetch(`index.php?action=api_get_detalle_voto&id=${idVotacion}`)
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    let html = '';
+                    resp.data.forEach(v => {
+                        let color = 'text-dark';
+                        if (v.opcionVoto === 'SI') color = 'text-success fw-bold';
+                        if (v.opcionVoto === 'NO') color = 'text-danger fw-bold';
+                        if (v.opcionVoto === 'ABSTENCION') color = 'text-warning fw-bold';
+
+                        html += `<tr>
+                            <td>${v.pNombre} ${v.aPaterno}</td>
+                            <td class="${color}">${v.opcionVoto}</td>
+                        </tr>`;
+                    });
+                    tbody.innerHTML = html || '<tr><td colspan="2" class="text-center text-muted">Nadie ha votado aún.</td></tr>';
+                }
+            });
+    }
+
+    function finalizarReunion() {
+        if (!confirm("¿Estás seguro de FINALIZAR la reunión?\n\n1. Se registrará la hora de término.\n2. Se generará el PDF de asistencia.\n3. Se enviará el correo a Génesis Contreras.\n\nEsta acción habilitará el botón para enviar a firma.")) {
+            return;
+        }
+
+        const btn = document.getElementById('btnFinalizar');
+        const txtOriginal = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+
+        fetch('index.php?action=api_finalizar_reunion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: idMinutaGlobal
+                })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    alert("✅ " + resp.message);
+
+                    // 1. Transformar Botón "Finalizar" a estado final
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-secondary');
+                    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Reunión Finalizada y Asistencia Enviada';
+                    // Ya está disabled por la lógica inicial, así que lo dejamos así.
+
+                    // 2. Activar Botón "Enviar a Firma"
+                    const btnFirma = document.getElementById('btnEnviarFirma');
+                    if (btnFirma) {
+                        btnFirma.disabled = false;
+                        btnFirma.classList.remove('btn-secondary');
+                        btnFirma.classList.add('btn-success', 'text-white');
+                        btnFirma.title = "Enviar solicitud de firma";
+                    }
+
+                } else if (resp.status === 'warning') {
+                    alert("⚠️ " + resp.message);
+                    // Aún si es warning (falló correo pero guardó en local), consideramos el proceso hecho
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-secondary');
+                    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Reunión Finalizada (Revise Correo)';
+
+                    const btnFirma = document.getElementById('btnEnviarFirma');
+                    if (btnFirma) {
+                        btnFirma.disabled = false;
+                        btnFirma.classList.remove('btn-secondary');
+                        btnFirma.classList.add('btn-success', 'text-white');
+                    }
+                } else {
+                    alert("❌ Error: " + resp.message);
+                    btn.disabled = false;
+                    btn.innerHTML = txtOriginal; // Revertir si falló
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error de conexión.");
+                btn.disabled = false;
+                btn.innerHTML = txtOriginal;
+            });
+    }
+
+    function enviarAFirma() {
+        // 1. CONFIRMACIÓN
+        if (!confirm("¿Desea enviar la minuta para APROBACIÓN?\n\nSe notificará a los presidentes vía correo electrónico.")) {
+            return;
+        }
+
+        // 2. DETECCIÓN INTELIGENTE DEL BOTÓN
+        // Buscamos cualquiera de los dos IDs posibles (Normal o Reenvío)
+        let btn = document.getElementById('btnEnviarFirma') || document.getElementById('btnReenviarFirma');
+
+        // Seguridad: Si por alguna razón no encuentra ninguno, intentamos con el elemento activo
+        if (!btn) btn = document.activeElement;
+
+        if (!btn) {
+            alert("Error interno: No se pudo localizar el botón de envío.");
+            return;
+        }
+
+        const txtOriginal = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-paper-plane fa-beat"></i> Enviando...';
+
+        // 3. ENVÍO AL SERVIDOR
+        fetch('index.php?action=api_enviar_aprobacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: idMinutaGlobal
+                })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    alert("✅ " + resp.message);
+
+                    // Transformar botón a estado final "Enviada"
+                    btn.classList.remove('btn-success', 'btn-warning'); // Quitamos colores previos
+                    btn.classList.add('btn-secondary');
+                    btn.innerHTML = '<i class="fas fa-check-double me-1"></i> Minuta Enviada a Presidentes';
+                    // Se mantiene disabled
+
+                } else {
+                    alert("⚠️ " + resp.message);
+                    btn.disabled = false;
+                    btn.innerHTML = txtOriginal;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error al enviar solicitud.");
+                btn.disabled = false;
+                btn.innerHTML = txtOriginal;
+            });
+    }
+
+    function iniciarReunion() {
+        if (!confirm("¿Desea HABILITAR la sala de reuniones?\n\nEsto permitirá que los Consejeros registren su asistencia y el cronómetro de 30 minutos comenzará ahora.")) {
+            return;
+        }
+
+        const btn = document.getElementById('btnIniciar');
+        const txt = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando...';
+
+        fetch('index.php?action=api_iniciar_reunion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta: idMinutaGlobal
+                })
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    alert("✅ " + resp.message);
+                    location.reload(); // Recargar para cambiar el botón a "Finalizar"
+                } else {
+                    alert("❌ Error: " + resp.message);
+                    btn.disabled = false;
+                    btn.innerHTML = txt;
+                }
+            });
+    }
+
+
+
+    function crearVotacion() {
+        const inputNombre = document.getElementById('inputNombreVotacion');
+        if (!inputNombre || inputNombre.value.trim() === '') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Falta información',
+                text: 'Escriba el tema de la votación.'
+            });
+            return;
+        }
+
+        const payload = {
+            idMinuta: idMinutaGlobal,
+            nombre: inputNombre.value.trim(),
+            idComision: idComisionGlobal ? idComisionGlobal : null
+        };
+
+        fetch('index.php?action=api_crear_votacion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(resp => {
+                if (resp.status === 'success') {
+                    // 1. Limpiar y notificar
+                    inputNombre.value = '';
+                    Swal.fire({
+                        title: '¡Votación Habilitada!',
+                        text: 'Los consejeros ya pueden votar.',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+
+                    cargarVotaciones(); // Actualizar lista de abajo
+
+                } else {
+                    Swal.fire('Error', resp.message, 'error');
+                }
+            });
+    }
+
+
+
+
+
+    // Esta función se llama desde el botón dentro del panel negro
+    function cerrarVotacionActiva() {
+        const id = document.getElementById('idVotacionEnCurso').value;
+        cerrarVotacion(id);
+    }
+
+    function cerrarVotacion(idVotacion) {
+        Swal.fire({
+            title: '¿Cerrar Votación?',
+            text: "Se dejarán de recibir votos y se calcularán los resultados finales.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Sí, cerrar votación',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                fetch('index.php?action=api_cerrar_votacion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idVotacion: idVotacion })
                     })
-                    .catch(err => Swal.fire('Error Crítico', err.message, 'error'));
+                    .then(r => r.json())
+                    .then(resp => {
+                        if (resp.status === 'success') {
+                            
+                            // --- CORRECCIÓN: SOLO ALERTAR Y RECARGAR LISTA ---
+                            Swal.fire(
+                                '¡Cerrada!',
+                                'La votación ha finalizado correctamente.',
+                                'success'
+                            );
+                            cargarVotaciones(); 
+                            // ------------------------------------------------
+                            
+                        } else {
+                            Swal.fire('Error', resp.message, 'error');
+                        }
+                    });
             }
         });
     }
 </script>
+
+<style>
+    /* Estilos personalizados para las Tabs */
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 12px 20px;
+        transition: all 0.3s ease;
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #0d6efd;
+        background-color: #f8f9fa;
+        border-color: transparent;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        background-color: #fff;
+        border-bottom: 3px solid #0d6efd;
+    }
+
+    .card-header-tabs {
+        margin-bottom: -1px;
+    }
+
+    /* Para que los textarea se vean bien */
+    .auto-expand {
+        resize: vertical;
+        min-height: 60px;
+    }
+</style>

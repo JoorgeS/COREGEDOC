@@ -2,141 +2,196 @@
 
 namespace App\Controllers;
 
-// No necesitamos el modelo todavía para el dashboard simple, 
-// pero lo dejamos listo para cuando listemos las minutas.
 use App\Models\Minuta;
 use App\Models\Comision;
 use App\Services\MailService;
+use App\Services\PdfService;
+use App\Config\Database;
 
 class MinutaController
 {
-
+    // =========================================================================
+    //  VISTAS Y NAVEGACIÓN
+    // =========================================================================
 
     public function index()
     {
-        echo "Aquí irá el listado de minutas (Próximo paso)";
+        header('Location: index.php?action=minutas_dashboard');
     }
 
     public function dashboard()
     {
-        // ... (código del dashboard que ya tienes) ...
-        // Asegúrate de copiar todo lo que tenías o dejarlo tal cual.
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        if (!isset($_SESSION['idUsuario'])) {
-            header('Location: index.php?action=login');
-            exit();
-        }
-
+        $this->verificarSesion();
         $data = [
-            'usuario' => ['nombre' => $_SESSION['pNombre'] ?? '', 'apellido' => $_SESSION['aPaterno'] ?? '', 'rol' => $_SESSION['tipoUsuario_id'] ?? 0],
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? '',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $_SESSION['tipoUsuario_id'] ?? 0
+            ],
             'pagina_actual' => 'minutas_dashboard'
         ];
         $childView = __DIR__ . '/../views/minutas/dashboard.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    // --- NUEVO MÉTODO: Listar Pendientes ---
     public function pendientes()
     {
-        $this->verificarSesion(); // Helper simple para no repetir código
+        $this->verificarSesion();
+        $rol = $_SESSION['tipoUsuario_id'] ?? 0;
+        $idUsuario = $_SESSION['idUsuario'];
 
-        $minutaModel = new Minuta();
-        // Traemos las que NO están aprobadas (Pendientes, Borradores, etc.)
-        $listaMinutas = $minutaModel->getMinutasByEstado('PENDIENTE');
+        if ($rol == 3 || $rol == 1) {
+            // ... (Lógica de presidente se mantiene igual) ...
+            $model = new Minuta();
+            $pendientes = $model->getPendientesPresidente($idUsuario);
+            $data = [
+                'usuario' => ['nombre' => $_SESSION['pNombre'] ?? '', 'apellido' => $_SESSION['aPaterno'] ?? '', 'rol' => $rol],
+                'pagina_actual' => 'minutas_pendientes',
+                'minutas' => $pendientes
+            ];
+            $childView = __DIR__ . '/../views/minutas/pendientes_presidente.php';
+        } else {
+            // --- VISTA SECRETARIO (ACTUALIZADA) ---
+            // Necesitamos las comisiones para el ComboBox
+            $comisionModel = new Comision();
+            $listaComisiones = $comisionModel->listarTodas();
 
-        $data = [
-            'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
-            'pagina_actual' => 'minutas_pendientes',
-            'minutas' => $listaMinutas
-        ];
+            $data = [
+                'usuario' => ['nombre' => $_SESSION['pNombre'] ?? '', 'apellido' => $_SESSION['aPaterno'] ?? '', 'rol' => $rol],
+                'pagina_actual' => 'minutas_pendientes',
+                'minutas' => [],
+                'comisiones' => $listaComisiones // <--- AGREGADO
+            ];
 
-        $childView = __DIR__ . '/../views/minutas/pendientes.php';
+            $childView = __DIR__ . '/../views/minutas/pendientes.php';
+        }
+
         require_once __DIR__ . '/../views/layouts/main.php';
     }
+    public function verBorrador()
+    {
+        $this->verificarSesion();
+        $idMinuta = $_GET['id'] ?? 0;
 
-    // --- NUEVO MÉTODO: Listar Aprobadas ---
+        if (!$idMinuta) {
+            die("ID Inválido");
+        }
+
+        // Ruta al archivo que contiene la función generadora
+        $rutaGenerador = __DIR__ . '/generar_pdf_borrador.php';
+
+        if (file_exists($rutaGenerador)) {
+            require_once $rutaGenerador;
+
+            // 1. Instanciamos la conexión a la BD
+            $db = new Database();
+            $pdo = $db->getConnection();
+
+            // 2. Definimos la ruta raíz del proyecto (para encontrar las imágenes)
+            $rootPath = __DIR__ . '/../../';
+
+            // 3. LLAMADA A LA FUNCIÓN que creamos en generar_pdf_borrador.php
+            generarPdfBorrador($idMinuta, $pdo, $rootPath);
+        } else {
+            echo "Error crítico: El archivo del sistema de generación de borradores no se encuentra en: $rutaGenerador";
+        }
+        exit;
+    }
+
     public function aprobadas()
     {
         $this->verificarSesion();
-
-        $minutaModel = new Minuta();
-        $listaMinutas = $minutaModel->getMinutasByEstado('APROBADA');
+        $comisionModel = new Comision();
+        $listaComisiones = $comisionModel->listarTodas();
 
         $data = [
-            'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? '',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $_SESSION['tipoUsuario_id'] ?? 0
+            ],
             'pagina_actual' => 'minutas_aprobadas',
-            'minutas' => $listaMinutas
+            'comisiones' => $listaComisiones
         ];
-
         $childView = __DIR__ . '/../views/minutas/aprobadas.php';
         require_once __DIR__ . '/../views/layouts/main.php';
-    }
-
-    // Helper privado para verificar sesión
-    private function verificarSesion()
-    {
-        if (session_status() === PHP_SESSION_NONE) session_start();
-        if (!isset($_SESSION['idUsuario'])) {
-            header('Location: index.php?action=login');
-            exit();
-        }
     }
 
     public function gestionar()
     {
         $this->verificarSesion();
-
         $idMinuta = $_GET['id'] ?? 0;
         if (!$idMinuta) {
             header('Location: index.php?action=minutas_dashboard');
             exit();
         }
 
-        $minutaModel = new Minuta();
-        $minuta = $minutaModel->getMinutaById($idMinuta);
+        $db = new Database();
+        $conn = $db->getConnection();
+
+        // Obtener datos completos de la minuta
+        $sql = "SELECT m.*, 
+                       r.nombreReunion, r.t_comision_idComision_mixta, r.t_comision_idComision_mixta2,
+                       c.nombreComision,
+                       u_sec.pNombre as secNombre, u_sec.aPaterno as secApellido,
+                       u_pres.pNombre as presNombre, u_pres.aPaterno as presApellido
+                FROM t_minuta m
+                LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                LEFT JOIN t_usuario u_sec ON m.t_usuario_idSecretario = u_sec.idUsuario
+                LEFT JOIN t_usuario u_pres ON m.t_usuario_idPresidente = u_pres.idUsuario
+                WHERE m.idMinuta = :id";
+
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([':id' => $idMinuta]);
+        $minuta = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$minuta) {
             echo "Minuta no encontrada.";
             return;
         }
 
-        // --- LÓGICA DE PERMISOS (Porteada de tu código anterior) ---
-        $idUsuarioLogueado = $_SESSION['idUsuario'];
-        $tipoUsuario = $_SESSION['tipoUsuario_id'];
-        $esSecretarioTecnico = ($tipoUsuario == 2); // O usa la constante ROL_SECRETARIO_TECNICO
-
-        $estadoFirma = $minutaModel->getEstadoFirma($idMinuta, $idUsuarioLogueado);
-
-        $esPresidenteFirmante = ($estadoFirma !== false);
-        $haFirmado = ($estadoFirma === 'FIRMADO'); // Ajusta según tus valores reales en BD
-        $haEnviadoFeedback = ($estadoFirma === 'REQUIERE_REVISION');
-
-        $estadoMinuta = $minuta['estadoMinuta'];
-
-        // Determinar si es solo lectura
-        $esSoloLectura = true;
-        if ($esSecretarioTecnico && $estadoMinuta !== 'APROBADA') {
-            $esSoloLectura = false;
-        } elseif ($esPresidenteFirmante && !$haFirmado && !$haEnviadoFeedback && $estadoMinuta !== 'APROBADA') {
-            // Si es presidente y le toca firmar, no es solo lectura (puede poner feedback)
-            // Aunque técnicamente los campos de texto sí lo son, pero el botón de acción no.
-            // Para simplificar la vista, pasaremos variables específicas.
+        // Comisiones Mixtas
+        $nombresComisiones = [$minuta['nombreComision']];
+        if (!empty($minuta['t_comision_idComision_mixta'])) {
+            $stmtC2 = $conn->prepare("SELECT nombreComision FROM t_comision WHERE idComision = ?");
+            $stmtC2->execute([$minuta['t_comision_idComision_mixta']]);
+            if ($c2 = $stmtC2->fetchColumn()) $nombresComisiones[] = $c2;
         }
+        if (!empty($minuta['t_comision_idComision_mixta2'])) {
+            $stmtC3 = $conn->prepare("SELECT nombreComision FROM t_comision WHERE idComision = ?");
+            $stmtC3->execute([$minuta['t_comision_idComision_mixta2']]);
+            if ($c3 = $stmtC3->fetchColumn()) $nombresComisiones[] = $c3;
+        }
+        $stringComisiones = implode(' + ', $nombresComisiones);
 
+        $minutaModel = new Minuta();
+        $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
+        $esSecretarioTecnico = ($tipoUsuario == 2 || $tipoUsuario == 6);
+        $estadoReunion = $minutaModel->verificarEstadoReunion($idMinuta);
 
         $data = [
-            'usuario' => ['rol' => $tipoUsuario],
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? '',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $tipoUsuario
+            ],
             'minuta' => $minuta,
+            'header_info' => [
+                'comisiones_str' => $stringComisiones,
+                'nombre_reunion' => $minuta['nombreReunion'] ?? 'Sin Reunión Asignada',
+                'secretario_completo' => ($minuta['secNombre'] ?? '') . ' ' . ($minuta['secApellido'] ?? ''),
+                'presidente_completo' => ($minuta['presNombre'] ?? '') . ' ' . ($minuta['presApellido'] ?? ''),
+                'fecha_formateada' => date('d-m-Y', strtotime($minuta['fechaMinuta'])),
+                'hora_formateada' => date('H:i', strtotime($minuta['horaMinuta'])) . ' hrs.'
+            ],
             'temas' => $minutaModel->getTemas($idMinuta),
             'asistencia' => $minutaModel->getAsistenciaData($idMinuta),
+            'adjuntos' => $minutaModel->getAdjuntosPorMinuta($idMinuta),
             'permisos' => [
-                'esSecretario' => $esSecretarioTecnico,
-                'esPresidente' => $esPresidenteFirmante,
-                'esSoloLectura' => $esSoloLectura,
-                'haFirmado' => $haFirmado,
-                'haEnviadoFeedback' => $haEnviadoFeedback,
-                'estadoFirma' => $estadoFirma
+                'esSecretario' => $esSecretarioTecnico
             ],
+            'estado_reunion' => $estadoReunion,
             'pagina_actual' => 'minuta_gestionar'
         ];
 
@@ -144,16 +199,17 @@ class MinutaController
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
+    // =========================================================================
+    //  API - ASISTENCIA
+    // =========================================================================
+
     public function apiGuardarAsistencia()
     {
         header('Content-Type: application/json');
         $this->verificarSesion();
-
-        // Leer el body JSON que envía el Javascript
         $input = json_decode(file_get_contents('php://input'), true);
-
         $idMinuta = $input['idMinuta'] ?? 0;
-        $asistencia = $input['asistencia'] ?? []; // Array de IDs
+        $asistencia = $input['asistencia'] ?? [];
 
         if (!$idMinuta) {
             echo json_encode(['status' => 'error', 'message' => 'Falta ID Minuta']);
@@ -166,15 +222,77 @@ class MinutaController
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Error en BD al guardar asistencia']);
         }
-        exit; // Importante detener aquí para no renderizar nada más
+        exit;
     }
 
-    // --- API: Guardar Borrador Completo (Temas) ---
-    public function apiGuardarBorrador()
+    public function apiGetAsistencia()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $idMinuta = $_GET['id'] ?? 0;
+
+        $model = new Minuta();
+        $data = $model->getAsistenciaDetallada($idMinuta);
+
+        echo json_encode(['status' => 'success', 'data' => $data]);
+        exit;
+    }
+
+    public function apiAlternarAsistencia()
     {
         header('Content-Type: application/json');
         $this->verificarSesion();
 
+        if (!in_array($_SESSION['tipoUsuario_id'], [2, 6])) {
+            echo json_encode(['status' => 'error', 'message' => 'No autorizado']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idMinuta = $input['idMinuta'];
+        $idUsuario = $input['idUsuario'];
+        $nuevoEstado = $input['estado'];
+
+        $model = new Minuta();
+        $res = $model->alternarAsistencia($idMinuta, $idUsuario, $nuevoEstado);
+
+        echo json_encode(['status' => $res ? 'success' : 'error']);
+        exit;
+    }
+
+    public function apiValidarAsistencia()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idMinuta = $input['idMinuta'] ?? 0;
+
+        if (!$idMinuta) {
+            echo json_encode(['status' => 'error', 'message' => 'Falta ID Minuta']);
+            exit;
+        }
+
+        try {
+            $minutaModel = new Minuta();
+            $minuta = $minutaModel->getMinutaById($idMinuta);
+
+            $minutaModel->marcarAsistenciaValidada($idMinuta);
+
+            echo json_encode(['status' => 'success', 'message' => 'Asistencia validada y enviada a Gestión.']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // =========================================================================
+    //  API - GESTIÓN MINUTA (Temas, Finalizar, Aprobar)
+    // =========================================================================
+
+    public function apiGuardarBorrador()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
         $input = json_decode(file_get_contents('php://input'), true);
         $idMinuta = $input['idMinuta'] ?? 0;
         $temas = $input['temas'] ?? [];
@@ -185,11 +303,8 @@ class MinutaController
         }
 
         $model = new Minuta();
-
-        // Guardamos temas
         $temasGuardados = $model->guardarTemas($idMinuta, $temas);
 
-        // Opcional: También podrías guardar la asistencia aquí si viene en el paquete
         if (isset($input['asistencia'])) {
             $model->guardarAsistencia($idMinuta, $input['asistencia']);
         }
@@ -202,37 +317,156 @@ class MinutaController
         exit;
     }
 
+   public function apiFinalizarReunion()
+{
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json');
+
+    $this->verificarSesion();
+    $input = json_decode(file_get_contents('php://input'), true);
+    $idMinuta = $input['idMinuta'] ?? 0;
+
+    if (!$idMinuta) {
+        echo json_encode(['status' => 'error', 'message' => 'ID no proporcionado']);
+        exit;
+    }
+
+    try {
+        $model = new Minuta();
+        
+        // 1. Cerrar Reunión en BD
+        $model->cerrarReunionDB($idMinuta);
+
+        // 2. Marcar asistencia validada
+        $model->marcarAsistenciaValidada($idMinuta);
+
+        // 3. PREPARACIÓN DE DATOS QR Y HASH (NUEVO)
+        // ---------------------------------------------------------
+        $pdfService = new PdfService();
+        
+        // Generamos un Hash único para este documento de asistencia
+        $hashAsistencia = hash('sha256', 'ASISTENCIA_MINUTA_' . $idMinuta . '_' . time());
+        
+        // URL de validación (Ajusta 'tu-dominio.com' o la ruta local)
+        // Ejemplo: http://localhost/coregedoc/validar.php?h=...
+        $baseUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
+        $urlValidacion = $baseUrl . "/public/validar.php?hash=" . $hashAsistencia;
+        
+        // Generamos la imagen QR en Base64
+        $qrBase64 = $pdfService->generarQrBase64($urlValidacion);
+        // ---------------------------------------------------------
+
+        // 4. GENERACIÓN PDF ASISTENCIA
+       $nombreArchivoDB = 'public/docs/asistencia/Asistencia_Minuta_' . $idMinuta . '.pdf'; // Nombre genérico o el mismo que usas abajo
+            
+            // ¡OJO! Asegúrate de usar la misma ruta relativa que usas para guardar el archivo físico abajo
+            // En tu código original definías:
+            $nombreArchivo = 'Asistencia_Minuta_' . $idMinuta . '_' . date('Ymd_His') . '.pdf';
+            $rutaRelativa = 'public/docs/asistencia/' . $nombreArchivo;
+            
+            // Guardamos en BD
+            $model->registrarDocumentoAsistencia($idMinuta, $rutaRelativa, $hashAsistencia);
+        $rutaFisica = __DIR__ . '/../../' . $rutaRelativa;
+
+        if (!is_dir(dirname($rutaFisica))) mkdir(dirname($rutaFisica), 0777, true);
+
+        $rutaGenerador = __DIR__ . '/generar_pdf_asistencia.php';
+
+        if (file_exists($rutaGenerador)) {
+            require_once $rutaGenerador;
+
+            // Pasamos los nuevos parámetros a la función (QR, Hash, URL)
+            $exitoPDF = generarPdfAsistencia(
+                $idMinuta,
+                $rutaFisica,
+                (new Database())->getConnection(),
+                $_SESSION['idUsuario'],
+                __DIR__ . '/../../',
+                $qrBase64,      // <--- NUEVO
+                $hashAsistencia, // <--- NUEVO
+                $urlValidacion   // <--- NUEVO
+            );
+
+            if (!$exitoPDF) throw new \Exception("La función de PDF retornó falso.");
+            
+            // Opcional: Aquí deberías guardar el $hashAsistencia en la BD 
+            // (ej: en t_adjunto o una tabla de documentos_validos) para que el validador funcione.
+            
+        } else {
+            file_put_contents($rutaFisica, "FALTA ARCHIVO GENERADOR PDF.");
+        }
+
+        // 5. Obtener datos para el correo
+        $info = $model->obtenerDatosReunion($idMinuta);
+        $info['idMinuta'] = $idMinuta;
+
+        // 6. ENVIAR CORREO
+        $mailService = new MailService();
+        $enviado = $mailService->enviarAsistencia(
+            'genesis.contreras.vargas@gmail.com',
+            $rutaFisica,
+            $info
+        );
+
+        if ($enviado) {
+            echo json_encode(['status' => 'success', 'message' => 'Reunión finalizada. PDF con QR generado y enviado.']);
+        } else {
+            echo json_encode(['status' => 'warning', 'message' => 'Reunión finalizada, PDF generado, pero falló el correo.']);
+        }
+    } catch (\Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
 
     public function apiEnviarAprobacion()
     {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $this->verificarSesion();
-
         $input = json_decode(file_get_contents('php://input'), true);
         $idMinuta = $input['idMinuta'] ?? 0;
 
-        if (!$idMinuta) {
-            echo json_encode(['status' => 'error', 'message' => 'Falta ID Minuta']);
-            exit;
-        }
-
         try {
             $model = new Minuta();
-            // Opcional: Guardar borrador una última vez antes de enviar (puedes llamar a guardarTemas aquí si quieres)
 
-            // Ejecutar envío
+            // Validar estado reunión
+            $estado = $model->verificarEstadoReunion($idMinuta);
+            if ($estado && ($estado['vigente'] == 1 || $estado['asistencia_validada'] == 0)) {
+                echo json_encode(['status' => 'error', 'message' => 'Debe finalizar la reunión y validar asistencia primero.']);
+                exit;
+            }
+
+            // --- NUEVO: MARCAR FEEDBACK COMO RESUELTO ---
+            $db = new Database();
+            $conn = $db->getConnection();
+            $conn->prepare("UPDATE t_minuta_feedback SET resuelto = 1 WHERE t_minuta_idMinuta = ?")->execute([$idMinuta]);
+            // --------------------------------------------
+
+            // 1. Cambiar estado a PENDIENTE
             $model->enviarParaFirma($idMinuta, $_SESSION['idUsuario']);
 
-            // Aquí iría la lógica de envío de CORREO (PHPMailer)
-            // Por ahora lo dejamos pendiente para no complicar este paso.
+            // 2. Notificar a los Presidentes
+            $presidentes = $model->getCorreosPresidentes($idMinuta);
+            $mailService = new MailService();
+            $correosEnviados = 0;
 
-            echo json_encode(['status' => 'success', 'message' => 'Minuta enviada a firma correctamente.']);
+            foreach ($presidentes as $presi) {
+                if (!empty($presi['correo'])) {
+                    $mailService->notificarFirma($presi['correo'], $presi['pNombre'], $idMinuta);
+                    $correosEnviados++;
+                }
+            }
+
+            echo json_encode([
+                'status' => 'success',
+                'message' => "Minuta reenviada a firma correctamente."
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
-
     public function apiFirmarMinuta()
     {
         header('Content-Type: application/json');
@@ -240,40 +474,78 @@ class MinutaController
         $input = json_decode(file_get_contents('php://input'), true);
         $idMinuta = $input['idMinuta'] ?? 0;
 
+        if (!$idMinuta) {
+            echo json_encode(['status' => 'error', 'message' => 'ID Minuta no proporcionado']);
+            exit;
+        }
+
         try {
-            $model = new Minuta();
-            $resultado = $model->firmarMinuta($idMinuta, $_SESSION['idUsuario']);
+            $minutaModel = new Minuta();
+            $resultado = $minutaModel->firmarMinuta($idMinuta, $_SESSION['idUsuario']);
+            $nuevoEstado = $resultado['estado_nuevo'];
 
-            // --- NUEVO: SI SE APROBÓ FINALMENTE, GENERAR PDF ---
-            if ($resultado['estado_nuevo'] === 'APROBADA') {
-                
-                // 1. Definir rutas
-                $nombreArchivo = 'Minuta_Final_N' . $idMinuta . '_' . date('Ymd') . '.pdf';
-                $rutaFisica = __DIR__ . '/../../public/docs/minutas_aprobadas/' . $nombreArchivo;
-                $rutaWeb = 'public/docs/minutas_aprobadas/' . $nombreArchivo;
+            if ($nuevoEstado === 'APROBADA') {
+                $db = new Database();
+                $pdo = $db->getConnection();
 
-                // 2. Cargar dependencias de PDF (puedes mover esto a un helper)
-                require_once __DIR__ . '/generar_pdf_borrador.php'; // Usamos el mismo generador por ahora
-                
-                // 3. Generar el archivo (Aquí usamos un truco: llamamos a la lógica de generación)
-                // Para hacerlo bien y rápido, te recomiendo encapsular la lógica de 'generar_pdf_borrador.php'
-                // en una función que acepte un parámetro '$guardarEnRuta'.
-                
-                // Por ahora, simplemente actualizamos la BD con la ruta futura
-                // y dejamos que el link "Ver PDF Final" apunte a un script que lo genere al vuelo si no existe,
-                // o mejor aún:
-                
-                // Lógica simplificada para este paso:
-                // Guardamos la ruta en la BD
-                $model->actualizarPathArchivo($idMinuta, $rutaWeb);
+                $sqlM = "SELECT m.*, c.nombreComision, r.nombreReunion, r.fechaInicioReunion
+                              FROM t_minuta m
+                              LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                              LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                              WHERE m.idMinuta = :id";
+                $stmt = $pdo->prepare($sqlM);
+                $stmt->execute([':id' => $idMinuta]);
+                $minutaInfo = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                $stmtT = $pdo->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :id ORDER BY idTema ASC");
+                $stmtT->execute([':id' => $idMinuta]);
+                $temas = $stmtT->fetchAll(\PDO::FETCH_ASSOC);
+
+                $sqlF = "SELECT u.pNombre, u.aPaterno, am.fechaAprobacion
+                              FROM t_aprobacion_minuta am
+                              JOIN t_usuario u ON am.t_usuario_idPresidente = u.idUsuario
+                              WHERE am.t_minuta_idMinuta = :id AND am.estado_firma = 'FIRMADO'";
+                $stmtF = $pdo->prepare($sqlF);
+                $stmtF->execute([':id' => $idMinuta]);
+                $firmas = $stmtF->fetchAll(\PDO::FETCH_ASSOC);
+
+                $hash = hash('sha256', $idMinuta . time() . 'SECRET_SALT_CORE');
+                $minutaInfo['hashValidacion'] = $hash;
+
+                $nombreArchivo = 'Minuta_Final_N' . $idMinuta . '_' . date('YmdHis') . '.pdf';
+                $rutaRelativa = 'public/docs/minutas_aprobadas/' . $nombreArchivo;
+                $rutaAbsoluta = __DIR__ . '/../../' . $rutaRelativa;
+
+                if (!is_dir(dirname($rutaAbsoluta))) {
+                    mkdir(dirname($rutaAbsoluta), 0777, true);
+                }
+
+                $datosParaPdf = [
+                    'minuta_info' => $minutaInfo,
+                    'temas' => $temas,
+                    'firmas_aprobadas' => $firmas,
+                    'comisiones_info' => [
+                        'com1' => ['nombre' => $minutaInfo['nombreComision'] ?? 'Comisión']
+                    ],
+                    'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'http://localhost/coregedoc') . "/index.php?action=validar&hash=" . $hash
+                ];
+
+                $pdfService = new PdfService();
+                $exitoPDF = $pdfService->generarPdfFinal($datosParaPdf, $rutaAbsoluta);
+
+                if ($exitoPDF) {
+                    $minutaModel->actualizarPathArchivo($idMinuta, $rutaRelativa);
+                    $minutaModel->actualizarHash($idMinuta, $hash);
+                } else {
+                    throw new \Exception("Error al generar el archivo PDF físico.");
+                }
             }
 
             echo json_encode([
-                'status' => 'success', 
-                'message' => 'Minuta firmada y finalizada.', 
-                'nuevo_estado' => $resultado['estado_nuevo']
+                'status' => 'success',
+                'message' => 'Firma registrada correctamente.',
+                'nuevo_estado' => $nuevoEstado
             ]);
-
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -303,11 +575,284 @@ class MinutaController
         exit;
     }
 
+    // =========================================================================
+    //  API - VOTACIONES
+    // =========================================================================
+
+    public function apiCrearVotacion()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (empty($input['nombre'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Nombre obligatorio']);
+            exit;
+        }
+
+        $model = new Minuta();
+        $res = $model->crearVotacion($input['idMinuta'], $input['nombre'], $input['idComision'] ?? null);
+        echo json_encode(['status' => $res ? 'success' : 'error']);
+        exit;
+    }
+
+    public function apiCerrarVotacion()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        $model = new Minuta();
+        $res = $model->cerrarVotacion($input['idVotacion']);
+        echo json_encode(['status' => $res ? 'success' : 'error']);
+        exit;
+    }
+
+    public function apiGetVotaciones()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $idMinuta = $_GET['id'] ?? 0;
+
+        $model = new Minuta();
+        $votaciones = $model->getResultadosVotacion($idMinuta);
+        echo json_encode(['status' => 'success', 'data' => $votaciones]);
+        exit;
+    }
+
+    public function apiGetDetalleVoto()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $idVotacion = $_GET['id'] ?? 0;
+
+        $model = new Minuta();
+        $detalle = $model->getDetalleVotos($idVotacion);
+        echo json_encode(['status' => 'success', 'data' => $detalle]);
+        exit;
+    }
+
+    // =========================================================================
+    //  API - LISTADOS Y FILTROS
+    // =========================================================================
+
+    public function apiFiltrarAprobadas()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $db = new Database();
+        $conn = $db->getConnection();
+
+        try {
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit = 10;
+            $offset = ($page - 1) * $limit;
+            $ordenColumna = isset($_GET['orderBy']) ? $_GET['orderBy'] : 'fechaMinuta';
+            $ordenDireccion = isset($_GET['orderDir']) && strtoupper($_GET['orderDir']) === 'ASC' ? 'ASC' : 'DESC';
+
+            $columnasPermitidas = ['idMinuta', 'fechaMinuta', 'nombreReunion', 'nombreComision'];
+            if (!in_array($ordenColumna, $columnasPermitidas)) $ordenColumna = 'fechaMinuta';
+
+            $sqlOrderBy = "ORDER BY m.{$ordenColumna} {$ordenDireccion}";
+            $params = [];
+            $whereConditions = ["m.estadoMinuta = 'APROBADA'"];
+
+            if (!empty($_GET['desde'])) {
+                $whereConditions[] = "m.fechaMinuta >= :desde";
+                $params[':desde'] = $_GET['desde'];
+            }
+            if (!empty($_GET['hasta'])) {
+                $whereConditions[] = "m.fechaMinuta <= :hasta";
+                $params[':hasta'] = $_GET['hasta'];
+            }
+            if (!empty($_GET['comision'])) {
+                $whereConditions[] = "m.t_comision_idComision = :comision";
+                $params[':comision'] = $_GET['comision'];
+            }
+            if (!empty($_GET['q'])) {
+                $term = $_GET['q'];
+                $whereConditions[] = "(r.nombreReunion LIKE :q1 OR c.nombreComision LIKE :q2 OR m.idMinuta LIKE :q_exact)";
+                $params[':q1'] = "%$term%";
+                $params[':q2'] = "%$term%";
+                $params[':q_exact'] = "$term";
+            }
+
+            $sqlWhere = "WHERE " . implode(" AND ", $whereConditions);
+
+            // Total
+            $sqlCount = "SELECT COUNT(DISTINCT m.idMinuta) FROM t_minuta m
+                         LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
+                         LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                         $sqlWhere";
+            $stmtCount = $conn->prepare($sqlCount);
+            $stmtCount->execute($params);
+            $totalRecords = $stmtCount->fetchColumn();
+            $totalPages = ceil($totalRecords / $limit);
+
+            // Data
+            $sqlData = "SELECT m.idMinuta, m.fechaMinuta AS fecha, m.pathArchivo, r.nombreReunion, c.nombreComision,
+                        (SELECT COUNT(*) FROM t_adjunto a WHERE a.t_minuta_idMinuta = m.idMinuta) AS numAdjuntos
+                        FROM t_minuta m
+                        LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
+                        LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                        $sqlWhere
+                        GROUP BY m.idMinuta
+                        {$sqlOrderBy}
+                        LIMIT $limit OFFSET $offset";
+
+            $stmt = $conn->prepare($sqlData);
+            $stmt->execute($params);
+            $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $totalRecords,
+                'page' => $page,
+                'totalPages' => $totalPages
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiFiltrarPendientes()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        $this->verificarSesion();
+        $db = new Database();
+        $conn = $db->getConnection();
+
+        try {
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit = 10;
+            $offset = ($page - 1) * $limit;
+
+            // Filtro Base
+            $whereConditions = ["UPPER(m.estadoMinuta) IN ('PENDIENTE', 'BORRADOR', 'REQUIERE_REVISION')"];
+            $params = [];
+
+            // 1. Fechas
+            if (!empty($_GET['desde'])) {
+                $whereConditions[] = "m.fechaMinuta >= :desde";
+                $params[':desde'] = $_GET['desde'];
+            }
+            if (!empty($_GET['hasta'])) {
+                $whereConditions[] = "m.fechaMinuta <= :hasta";
+                $params[':hasta'] = $_GET['hasta'];
+            }
+
+            // 2. Comisión (ComboBox)
+            if (!empty($_GET['comisionId'])) {
+                $whereConditions[] = "m.t_comision_idComision = :comisionId";
+                $params[':comisionId'] = $_GET['comisionId'];
+            }
+
+            // 3. Buscador Inteligente (Reunión, Tema u Objetivo)
+            if (!empty($_GET['q'])) {
+                $term = "%" . $_GET['q'] . "%";
+                $whereConditions[] = "(
+                    r.nombreReunion LIKE :q1 OR 
+                    m.idMinuta LIKE :q2 OR
+                    EXISTS (SELECT 1 FROM t_tema t WHERE t.t_minuta_idMinuta = m.idMinuta AND (t.nombreTema LIKE :q3 OR t.objetivo LIKE :q4))
+                )";
+                $params[':q1'] = $term;
+                $params[':q2'] = $term;
+                $params[':q3'] = $term;
+                $params[':q4'] = $term;
+            }
+
+            $sqlWhere = "WHERE " . implode(" AND ", $whereConditions);
+
+            // Contar Total
+            $sqlCount = "SELECT COUNT(DISTINCT m.idMinuta) FROM t_minuta m 
+                         LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta 
+                         $sqlWhere";
+            $stmtCount = $conn->prepare($sqlCount);
+            $stmtCount->execute($params);
+            $totalRecords = $stmtCount->fetchColumn();
+            $totalPages = ceil($totalRecords / $limit);
+
+            // Datos Finales (Columnas solicitadas)
+            $sqlData = "SELECT m.idMinuta, m.fechaMinuta AS fechaCreacion, m.estadoMinuta,
+                        COALESCE(r.nombreReunion, 'Sin Reunión') as nombreReunion, -- <--- AGREGADO
+                        COALESCE(c.nombreComision, 'Sin Comisión') as nombreComision,
+                        COALESCE(up.pNombre, '') as presidenteNombre, COALESCE(up.aPaterno, '') as presidenteApellido,
+                        (SELECT GROUP_CONCAT(nombreTema SEPARATOR ' || ') FROM t_tema WHERE t_minuta_idMinuta = m.idMinuta) AS listaTemas, -- <--- TODOS LOS TEMAS
+                        (SELECT COUNT(*) FROM t_adjunto WHERE t_minuta_idMinuta = m.idMinuta) AS numAdjuntos,
+                        (SELECT COUNT(*) FROM t_minuta_feedback WHERE t_minuta_idMinuta = m.idMinuta AND resuelto = 0) as tieneFeedback
+                        FROM t_minuta m
+                        LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                        LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                        LEFT JOIN t_usuario up ON c.t_usuario_idPresidente = up.idUsuario
+                        $sqlWhere
+                        ORDER BY m.idMinuta DESC LIMIT $limit OFFSET $offset";
+
+            $stmt = $conn->prepare($sqlData);
+            $stmt->execute($params);
+            $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            array_walk_recursive($data, function (&$item) {
+                if (is_string($item)) $item = mb_convert_encoding($item, 'UTF-8', 'UTF-8');
+            });
+
+            echo json_encode([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $totalRecords,
+                'page' => $page,
+                'totalPages' => $totalPages
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+    public function apiVerAdjuntosMinuta()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $idMinuta = $_GET['id'] ?? 0;
+        $model = new Minuta();
+        $adjuntos = $model->getAdjuntosPorMinuta($idMinuta);
+        echo json_encode(['status' => 'success', 'data' => $adjuntos]);
+        exit;
+    }
+
+
+    public function verArchivoAdjunto()
+    {
+        $this->verificarSesion();
+        $id = $_GET['id'] ?? 0;
+        if (!$id) die("ID no especificado");
+
+        $model = new Minuta();
+        $adjunto = $model->getAdjuntoPorId($id);
+        if (!$adjunto) die("Archivo no encontrado.");
+
+        $rutaFisica = __DIR__ . '/../../' . $adjunto['pathAdjunto'];
+        $rutaFisica = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rutaFisica);
+
+        if (!file_exists($rutaFisica)) {
+            $info = pathinfo($rutaFisica);
+            $rutaSinExt = $info['dirname'] . DIRECTORY_SEPARATOR . $info['filename'];
+            if (file_exists($rutaSinExt)) $rutaFisica = $rutaSinExt;
+            else die("Error 404: Archivo físico no existe.");
+        }
+
+        $mime = mime_content_type($rutaFisica) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . basename($adjunto['pathAdjunto']) . '"');
+        readfile($rutaFisica);
+        exit;
+    }
+
     public function verHistorial()
     {
         $this->verificarSesion();
         $idMinuta = $_GET['id'] ?? 0;
-
         if (!$idMinuta) {
             header('Location: index.php?action=minutas_dashboard');
             exit();
@@ -323,13 +868,16 @@ class MinutaController
         }
 
         $data = [
-            'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
-            'pagina_actual' => 'minuta_ver_historial', // Para iluminar el menú si quieres
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? '',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $_SESSION['tipoUsuario_id'] ?? 0
+            ],
+            'pagina_actual' => 'minuta_ver_historial',
             'minuta' => $minuta,
             'seguimiento' => $historial
         ];
 
-        // Cargamos la vista dentro del layout
         $childView = __DIR__ . '/../views/minutas/historial.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
@@ -337,17 +885,9 @@ class MinutaController
     public function seguimientoGeneral()
     {
         $this->verificarSesion();
-
-        // Seguridad: Solo Admin
-        if ($_SESSION['tipoUsuario_id'] != ROL_ADMINISTRADOR) {
-            header('Location: index.php?action=minutas_dashboard');
-            exit();
-        }
-
         $minutaModel = new Minuta();
         $comisionModel = new Comision();
 
-        // Capturar Filtros
         $filters = [
             'comisionId' => $_GET['comisionId'] ?? null,
             'startDate'  => $_GET['startDate'] ?? null,
@@ -357,83 +897,97 @@ class MinutaController
         ];
 
         $data = [
-            'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? '',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $_SESSION['tipoUsuario_id'] ?? 0
+            ],
             'pagina_actual' => 'seguimiento_general',
             'minutas' => $minutaModel->getSeguimientoGeneral($filters),
             'comisiones' => $comisionModel->listarTodas(),
-            'filtros_activos' => $filters // Para repoblar el formulario
+            'filtros_activos' => $filters
         ];
 
         $childView = __DIR__ . '/../views/minutas/seguimiento_general.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    public function apiValidarAsistencia() {
+    // =========================================================================
+    //  HELPERS
+    // =========================================================================
+
+    private function verificarSesion()
+    {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        if (!isset($_SESSION['idUsuario'])) {
+            if (strpos($_GET['action'] ?? '', 'api_') === 0) {
+                if (ob_get_length()) ob_clean();
+                http_response_code(401);
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 'error', 'message' => 'Sesión expirada', 'redirect' => 'login']);
+                exit;
+            }
+            header('Location: index.php?action=login');
+            exit();
+        }
+    }
+
+    // --- NUEVA FUNCIÓN: LEER FEEDBACK ---
+    public function apiVerFeedback()
+    {
         header('Content-Type: application/json');
         $this->verificarSesion();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
-        $idMinuta = $input['idMinuta'] ?? 0;
-
-        if (!$idMinuta) {
-            echo json_encode(['status'=>'error', 'message'=>'Falta ID Minuta']); 
-            exit;
-        }
+        $idMinuta = $_GET['id'] ?? 0;
 
         try {
-            $minutaModel = new Minuta();
-            $minuta = $minutaModel->getMinutaById($idMinuta); // Asumiendo que trae nombreReunion y Comision
+            $db = new Database();
+            $conn = $db->getConnection();
 
-            // 1. Generar PDF
-            $nombreArchivo = 'Asistencia_Minuta_' . $idMinuta . '.pdf';
-            $rutaFisica = __DIR__ . '/../../public/docs/minutas_finales/' . $nombreArchivo;
-            
-            // Asegurar carpeta
-            if (!is_dir(dirname($rutaFisica))) mkdir(dirname($rutaFisica), 0777, true);
+            // Traemos el último feedback pendiente
+            $sql = "SELECT f.textoFeedback, f.fechaFeedback, u.pNombre, u.aPaterno
+                    FROM t_minuta_feedback f
+                    JOIN t_usuario u ON f.t_usuario_idPresidente = u.idUsuario
+                    WHERE f.t_minuta_idMinuta = :id AND f.resuelto = 0
+                    ORDER BY f.idFeedback DESC LIMIT 1";
 
-           
-            
-            $idSecretario = $_SESSION['idUsuario'];
-            $rootPath = __DIR__ . '/../../';
-            require_once __DIR__ . '/generar_pdf_asistencia.php';
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([':id' => $idMinuta]);
+            $feedback = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-           $pdfGenerado = generarPdfAsistencia(
-                $idMinuta, 
-                $rutaFisica, 
-                (new \App\Config\Database())->getConnection(),
-                $idSecretario, // 4to argumento
-                $rootPath      // 5to argumento
-            );
-            
-            if (!$pdfGenerado) throw new \Exception("Error al generar el PDF de asistencia.");
-
-            // 2. Enviar Correo
-            $mailService = new MailService();
-            
-            // Datos extra para el cuerpo del correo (ajusta según lo que traiga tu getMinutaById)
-            $datosCorreo = [
-                'idMinuta' => $idMinuta,
-                'nombreReunion' => $minuta['nombreReunion'] ?? 'Reunión Ordinaria', // Asegúrate que tu modelo traiga esto o haz un JOIN
-                'nombreComision' => $minuta['nombreComision'] ?? 'Comisión',
-                'fecha' => date('d/m/Y')
-            ];
-
-            $enviado = $mailService->enviarAsistencia('genesis.contreras.vargas@gmail.com', $rutaFisica, $datosCorreo);
-
-            if (!$enviado) throw new \Exception("El PDF se generó, pero falló el envío del correo.");
-
-            // 3. Actualizar BD (Marcar como validada)
-            // Necesitas agregar una columna 'asistencia_validada' TINYINT en t_minuta si no existe,
-            // O usar un campo existente. Asumiremos que agregaste el campo o usas uno lógico.
-            $minutaModel->marcarAsistenciaValidada($idMinuta);
-
-            echo json_encode(['status'=>'success', 'message'=>'Asistencia validada y enviada a Gestión.']);
-
+            if ($feedback) {
+                $feedback['fechaFeedback'] = date('d/m/Y H:i', strtotime($feedback['fechaFeedback']));
+                echo json_encode(['status' => 'success', 'data' => $feedback]);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'No hay observaciones pendientes.']);
+            }
         } catch (\Exception $e) {
-            echo json_encode(['status'=>'error', 'message'=>$e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
+    public function apiIniciarReunion()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $this->verificarSesion();
 
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idMinuta = $input['idMinuta'] ?? 0;
+
+        if (!$idMinuta) {
+            echo json_encode(['status' => 'error', 'message' => 'ID inválido']);
+            exit;
+        }
+
+        try {
+            $model = new Minuta();
+            // Activamos la reunión
+            $model->iniciarReunionDB($idMinuta);
+            echo json_encode(['status' => 'success', 'message' => 'Reunión Habilitada. Los consejeros ya pueden registrar asistencia.']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
