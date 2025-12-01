@@ -1,6 +1,5 @@
 <div class="container-fluid">
 
-    <!-- MIGA DE PAN -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="index.php?action=home">Inicio</a></li>
@@ -9,19 +8,17 @@
         </ol>
     </nav>
 
-    <!-- BARRA DE FILTROS AVANZADA (AUTO-SEARCH) -->
     <div class="card shadow-sm mb-4 border-0 bg-white">
         <div class="card-body py-4">
             <div class="d-flex justify-content-between align-items-end mb-2">
                 <h6 class="text-muted text-uppercase fw-bold m-0" style="font-size: 0.8rem; letter-spacing: 1px;">
                     <i class="fas fa-filter me-1"></i> Filtros
                 </h6>
-                
+
             </div>
-            
+
             <form id="formFiltros" class="row g-3 align-items-end">
-                
-                <!-- 1. Rango de Fechas -->
+
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-secondary">Fecha de Creación</label>
                     <div class="input-group input-group-sm">
@@ -31,20 +28,18 @@
                     </div>
                 </div>
 
-                <!-- 2. Comisión (ComboBox) -->
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-secondary">Filtrar por Comisión</label>
                     <select id="filtroComision" class="form-select form-select-sm">
                         <option value="">Todas las Comisiones</option>
-                        <?php if(!empty($data['comisiones'])): ?>
-                            <?php foreach($data['comisiones'] as $c): ?>
+                        <?php if (!empty($data['comisiones'])): ?>
+                            <?php foreach ($data['comisiones'] as $c): ?>
                                 <option value="<?= $c['idComision'] ?>"><?= htmlspecialchars($c['nombreComision']) ?></option>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </select>
                 </div>
 
-                <!-- 3. Buscador Inteligente -->
                 <div class="col-md-5">
                     <label class="form-label small fw-bold text-secondary">Búsqueda Rápida</label>
                     <div class="input-group input-group-sm">
@@ -53,7 +48,6 @@
                     </div>
                 </div>
 
-                <!-- Botón Limpiar -->
                 <div class="col-md-1">
                     <button type="button" id="btnLimpiar" class="btn btn-outline-secondary btn-sm w-100" title="Limpiar filtros y recargar">
                         <i class="fas fa-eraser"></i>
@@ -63,7 +57,6 @@
         </div>
     </div>
 
-    <!-- TABLA DE RESULTADOS -->
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -71,38 +64,27 @@
                     <thead class="bg-light text-secondary">
                         <tr class="text-uppercase small fw-bold" style="font-size: 0.75rem;">
                             <th class="ps-3" width="5%">ID</th>
-                            <th width="20%">Reunión</th>
-                            <th width="20%">Comisión</th>
-                            <!-- COLUMNA ELIMINADA: Temas Tratados -->
-                            <th width="10%">Fecha</th>
-                            <th width="5%" class="text-center">Documentos Adjuntos</th>
-                            <th width="10%" class="text-center">Estado</th>
-                            <th width="10%" class="text-end">Acciones</th>
-                            <th width="5%" class="text-center border-start bg-light text-muted" title="Seguimiento">Seguimiento</th>
+                            <th width="25%">Reunión</th> <th width="25%">Comisión</th> <th width="10%">Fecha</th>
+                            <th width="10%" class="text-center">Documentos Adjuntos</th>
+                            <th width="15%" class="text-end">Acciones</th>
+                            <th width="10%" class="text-center border-start bg-light text-muted" title="Seguimiento">Seguimiento</th>
                         </tr>
                     </thead>
                     <tbody id="tbodyResultados" class="small">
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <div class="spinner-border spinner-border-sm text-primary me-2"></div> Cargando datos...
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <!-- Paginación (Contenedor) -->
             <div id="paginacionContainer" class="p-3 border-top bg-white">
-                <!-- Aquí se inyectan los botones con JS -->
-            </div>
+                </div>
         </div>
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- MODALES DEL SISTEMA -->
-<!-- ========================================== -->
-
-<!-- 1. Modal Archivos Adjuntos -->
 <div class="modal fade" id="modalAdjuntos" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -123,7 +105,6 @@
     </div>
 </div>
 
-<!-- 2. Modal Ver Feedback (Correcciones) -->
 <div class="modal fade" id="modalVerFeedback" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger shadow">
@@ -132,7 +113,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body bg-white">
-                
+
                 <div class="d-flex align-items-start mb-3 p-2 bg-light rounded border">
                     <div class="me-3 text-danger mt-1"><i class="fas fa-user-tie fa-2x"></i></div>
                     <div>
@@ -141,7 +122,7 @@
                         <small class="text-muted" id="fbFecha">-</small>
                     </div>
                 </div>
-                
+
                 <div class="p-3 border rounded bg-white">
                     <h6 class="text-uppercase text-danger small fw-bold mb-2">Detalle de la Observación:</h6>
                     <p class="card-text text-dark fst-italic" id="fbTexto">...</p>
@@ -163,22 +144,19 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- LÓGICA JAVASCRIPT -->
-<!-- ========================================== -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        
+
         // --- 1. Configuración Inicial de Fechas ---
         const hoy = new Date();
         const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
         const formatDate = d => d.toISOString().split('T')[0];
-        
+
         const inputDesde = document.getElementById('filtroDesde');
         const inputHasta = document.getElementById('filtroHasta');
         const inputComision = document.getElementById('filtroComision');
         const inputKeyword = document.getElementById('filtroKeyword');
-        
+
         if (!inputDesde.value) inputDesde.value = formatDate(primerDia);
         if (!inputHasta.value) inputHasta.value = formatDate(hoy);
 
@@ -188,10 +166,11 @@
         function cargarTabla(page = 1) {
             const tbody = document.getElementById('tbodyResultados');
             // Spinner sutil
-            if(tbody.rows.length > 1 && !tbody.innerHTML.includes('Cargando')) {
-                 tbody.style.opacity = '0.5';
+            if (tbody.rows.length > 1 && !tbody.innerHTML.includes('Cargando')) {
+                tbody.style.opacity = '0.5';
             } else {
-                 tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-primary spinner-border-sm"></div> Buscando...</td></tr>';
+                // COLSPAN AJUSTADO A 7
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5"><div class="spinner-border text-primary spinner-border-sm"></div> Buscando...</td></tr>';
             }
 
             // Recoger filtros
@@ -210,14 +189,16 @@
                     tbody.style.opacity = '1';
                     if (resp.status === 'success') {
                         renderFilas(resp.data);
-                        actualizarPaginacion(resp.total, resp.totalPages, page); 
+                        actualizarPaginacion(resp.total, resp.totalPages, page);
                     } else {
-                        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">${resp.message}</td></tr>`;
+                        // COLSPAN AJUSTADO A 7
+                        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${resp.message}</td></tr>`;
                     }
                 })
                 .catch(err => {
                     console.error(err);
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">Error de conexión.</td></tr>`;
+                    // COLSPAN AJUSTADO A 7
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Error de conexión.</td></tr>`;
                 });
         }
 
@@ -225,41 +206,36 @@
         function renderFilas(data) {
             const tbody = document.getElementById('tbodyResultados');
             let html = '';
-            
-            if(data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted fst-italic">No se encontraron resultados.</td></tr>';
+
+            if (data.length === 0) {
+                // COLSPAN AJUSTADO A 7
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted fst-italic">No se encontraron resultados.</td></tr>';
                 return;
             }
 
             data.forEach(m => {
-                // Lógica de Estados Visuales
-                let badge = '<span class="badge bg-secondary">BORRADOR</span>';
-                let btnClass = 'btn-primary'; 
+                // Lógica de Estados Visuales (Se mantiene para los botones y el color de fila, aunque no se imprima el badge)
+                let btnClass = 'btn-primary';
                 let btnText = 'Gestionar';
                 let feedbackBtn = '';
                 let rowClass = '';
 
                 if (m.estadoMinuta === 'REQUIERE_REVISION' || parseInt(m.tieneFeedback) > 0) {
-                    badge = '<span class="badge bg-danger"><i class="fas fa-exclamation-triangle me-1"></i>CORRECCIÓN</span>';
-                    btnClass = 'btn-danger'; 
+                    btnClass = 'btn-danger';
                     btnText = 'Corregir';
-                    rowClass = 'table-danger'; 
+                    rowClass = 'table-danger'; // La fila se pondrá roja si requiere corrección
                     feedbackBtn = `<button class="btn btn-sm btn-warning text-dark me-1 shadow-sm" onclick="verFeedback(${m.idMinuta})" title="Leer Observaciones"><i class="fas fa-comment-dots"></i></button>`;
-                } 
-                else if (m.estadoMinuta === 'PENDIENTE') {
-                    badge = '<span class="badge bg-warning text-dark">EN FIRMA</span>';
+                } else if (m.estadoMinuta === 'PENDIENTE') {
                     btnClass = 'btn-info text-white';
                     btnText = 'Ver Estado';
                 }
 
                 let fecha = m.fechaCreacion ? m.fechaCreacion.split('-').reverse().join('/') : '-';
                 let reunion = m.nombreReunion || '<span class="text-muted fst-italic">Sin nombre</span>';
-                
-                // Ya NO usamos 'temas' aquí, así que lo quitamos del HTML
 
-                let adjuntosHtml = parseInt(m.numAdjuntos) > 0 
-                    ? `<button class="btn btn-xs btn-outline-secondary border-0" onclick="verAdjuntos(${m.idMinuta})"><i class="fas fa-paperclip text-primary"></i> ${m.numAdjuntos}</button>` 
-                    : '<span class="text-muted small">-</span>';
+                let adjuntosHtml = parseInt(m.numAdjuntos) > 0 ?
+                    `<button class="btn btn-xs btn-outline-secondary border-0" onclick="verAdjuntos(${m.idMinuta})"><i class="fas fa-paperclip text-primary"></i> ${m.numAdjuntos}</button>` :
+                    `<span class="text-muted small">-</span>`;
 
                 html += `
                 <tr class="${rowClass}">
@@ -267,13 +243,9 @@
                     <td class="fw-bold text-primary text-truncate" style="max-width: 200px;" title="${m.nombreReunion}">${reunion}</td>
                     <td class="text-truncate" style="max-width: 200px;" title="${m.nombreComision}">${m.nombreComision}</td>
                     
-                    <!-- Columna de Temas ELIMINADA -->
-                    
                     <td><small>${fecha}</small></td>
                     
                     <td class="text-center">${adjuntosHtml}</td>
-                    
-                    <td class="text-center">${badge}</td>
                     
                     <td class="text-end">
                         <div class="btn-group btn-group-sm">
@@ -348,7 +320,7 @@
             html += `</div>`;
             container.innerHTML = html;
         }
-        
+
         // Función global para el onclick de los botones de paginación
         window.cambiarPagina = function(page) {
             if (page > 0) cargarTabla(page);
@@ -385,32 +357,65 @@
     function verAdjuntos(id) {
         const lista = document.getElementById('listaAdjuntos');
         const msg = document.getElementById('sinAdjuntosMsg');
+
         lista.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
         msg.style.display = 'none';
         new bootstrap.Modal(document.getElementById('modalAdjuntos')).show();
 
-        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`).then(r=>r.json()).then(resp=>{
-            lista.innerHTML=''; 
-            if(resp.data && resp.data.length>0){ 
-                msg.style.display='none';
-                resp.data.forEach(a=>{
-                    let url = a.tipoAdjunto==='link'?a.pathAdjunto:`index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
-                    let icon = 'fa-file text-secondary';
-                    if(a.nombreArchivo && a.nombreArchivo.includes('.pdf')) icon = 'fa-file-pdf text-danger';
-                    lista.innerHTML+=`<a href="${url}" target="_blank" class="list-group-item list-group-item-action"><i class="fas ${icon} me-2"></i> ${a.nombreArchivo||'Link'}</a>`;
-                });
-            }else{ msg.style.display='block'; }
-        });
+        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`)
+            .then(r => r.json())
+            .then(resp => {
+                lista.innerHTML = '';
+                if (resp.data && resp.data.length > 0) {
+                    msg.style.display = 'none';
+                    resp.data.forEach(a => {
+                        // MODIFICACIÓN CLAVE: Usar a.nombreArchivo o derivar de la ruta.
+                        let nombreMostrar = a.nombreArchivo || a.pathAdjunto.split('/').pop();
+
+                        let urlVisor = `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
+                        let extension = nombreMostrar.split('.').pop().toLowerCase();
+                        let icon = 'fa-file text-secondary'; // Icono default
+
+                        // Iconos según extensión
+                        if (['pdf'].includes(extension)) icon = 'fa-file-pdf text-danger';
+                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word text-primary';
+                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel text-success';
+                        else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) icon = 'fa-file-image text-info';
+
+                        // Lógica para Links Externos y Corrección de "www"
+                        if (a.tipoAdjunto === 'link' || a.pathAdjunto.startsWith('http') || a.pathAdjunto.startsWith('www')) {
+                            let urlExterna = a.pathAdjunto;
+                            if (!urlExterna.match(/^https?:\/\//)) {
+                                urlExterna = 'https://' + urlExterna;
+                            }
+                            urlVisor = urlExterna;
+                            icon = 'fa-link text-primary'; // Cambiar icono a link y color
+                        }
+
+                        lista.innerHTML += `
+                            <a href="${urlVisor}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                                <div class="me-3 fs-4"><i class="fas ${icon}"></i></div>
+                                <div class="text-truncate">
+                                    <div class="fw-bold text-dark">${nombreMostrar}</div>
+                                    <small class="text-muted">Clic para abrir</small>
+                                </div>
+                            </a>`;
+                    });
+                } else {
+                    msg.style.display = 'block';
+                }
+            })
+            .catch(e => lista.innerHTML = '<div class="text-danger p-3 text-center">Error al cargar.</div>');
     }
 
     function verFeedback(id) {
         const btn = document.getElementById('btnIrAEditar');
-        if(btn) btn.href = `index.php?action=minuta_gestionar&id=${id}`;
+        if (btn) btn.href = `index.php?action=minuta_gestionar&id=${id}`;
         const modal = new bootstrap.Modal(document.getElementById('modalVerFeedback'));
         document.getElementById('fbTexto').innerText = 'Cargando...';
         modal.show();
-        fetch(`index.php?action=api_ver_feedback&id=${id}`).then(r=>r.json()).then(resp=>{
-            if(resp.status==='success'){
+        fetch(`index.php?action=api_ver_feedback&id=${id}`).then(r => r.json()).then(resp => {
+            if (resp.status === 'success') {
                 document.getElementById('fbNombre').innerText = resp.data.pNombre;
                 document.getElementById('fbFecha').innerText = resp.data.fechaFeedback;
                 document.getElementById('fbTexto').innerText = resp.data.textoFeedback;

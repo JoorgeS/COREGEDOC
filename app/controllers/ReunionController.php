@@ -45,22 +45,89 @@ class ReunionController
     }
 
     // ------------------------------------------------------------------
-    // 3. VISTA SECUNDARIA: LISTADO TIPO TABLA (Antiguo index)
+    // 3. VISTA SECUNDARIA: LISTADO TIPO TABLA (Inicial)
     // ------------------------------------------------------------------
     public function listar()
     {
         $this->verificarPermisos();
+        
         $modelo = new Reunion();
-        $reuniones = $modelo->listar();
+        
+        // Obtenemos SOLO las comisiones para llenar el select del filtro
+        // La tabla se cargará vacía o con la primera página vía AJAX automáticamente
+        $comisiones = $modelo->getAllComisiones();
 
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
-            'pagina_actual' => 'reuniones_menu' // Mantiene activo el menú padre
+            'pagina_actual' => 'reuniones_menu',
+            'comisiones' => $comisiones,
+            // Inicializamos reuniones vacío para que el JS se encargue o para evitar errores si la vista lo espera
+            'reuniones' => [] 
         ];
+
+        // Usamos extract para que la vista tenga $comisiones disponible
+        extract($data);
 
         // Carga la vista de la tabla
         $childView = __DIR__ . '/../views/pages/reunion_listado.php';
         require_once __DIR__ . '/../views/layouts/main.php';
+    }
+
+    // ------------------------------------------------------------------
+    // API: FILTRAR REUNIONES CON PAGINACIÓN (AJAX)
+    // ------------------------------------------------------------------
+    // Esta es la función clave que llama tu JavaScript "api_filtrar_reuniones"
+    public function apiFiltrarReuniones() 
+    {
+        // Limpiar cualquier salida previa (espacios en blanco, errores, HTML del layout)
+        if (ob_get_length()) ob_clean(); 
+        
+        header('Content-Type: application/json');
+
+        try {
+            $this->verificarPermisos(); // Opcional: verificar sesión aquí también
+
+            $modelo = new Reunion();
+
+            // 1. Recibir parámetros GET
+            $desde = $_GET['desde'] ?? '';
+            $hasta = $_GET['hasta'] ?? '';
+            $comisionId = $_GET['idComision'] ?? ''; // Ojo: en JS mandas 'idComision', en PHP a veces 'comisionId'
+            $q = $_GET['q'] ?? '';
+            
+            // Paginación
+            $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+
+            if ($page < 1) $page = 1;
+            $offset = ($page - 1) * $limit;
+
+            // 2. Obtener datos filtrados y paginados
+            $data = $modelo->getReunionesFiltradas($desde, $hasta, $comisionId, $q, $limit, $offset);
+            
+            // 3. Obtener total de registros (para calcular páginas)
+            $total = $modelo->contarReunionesFiltradas($desde, $hasta, $comisionId, $q);
+
+            // 4. Calcular total de páginas
+            $totalPages = ceil($total / $limit);
+
+            // 5. Responder JSON
+            echo json_encode([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $total,
+                'totalPages' => $totalPages,
+                'currentPage' => $page
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+        
+        exit; // IMPORTANTE: Terminar script para no enviar HTML extra
     }
 
     // ------------------------------------------------------------------
@@ -119,6 +186,11 @@ class ReunionController
         $modelo = new Reunion();
         $reunion_data = $modelo->obtenerPorId($id);
 
+        if (!$reunion_data) {
+             header('Location: index.php?action=reunion_listado');
+             exit;
+        }
+
         // Bloqueo: Si ya tiene minuta, no se edita aquí
         if (!empty($reunion_data['t_minuta_idMinuta'])) {
             echo "<script>alert('La reunión ya fue iniciada y no puede editarse.'); window.history.back();</script>";
@@ -131,7 +203,8 @@ class ReunionController
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
             'pagina_actual' => 'reuniones_menu',
-            'comisiones' => $listaComisiones
+            'comisiones' => $listaComisiones,
+            'reunion_data' => $reunion_data 
         ];
 
         $childView = __DIR__ . '/../views/pages/reunion_form.php';
@@ -267,7 +340,9 @@ class ReunionController
         }
 
         $modelo = new Reunion();
-        $reuniones = $modelo->listar();
+        // Para el calendario, usamos listar() que trae todas sin paginación
+        // O podrías crear un método específico en el modelo para el calendario
+        $reuniones = $modelo->listar(); 
         $isEmbedded = isset($_GET['embedded']) && $_GET['embedded'] == 'true';
 
         $data = [

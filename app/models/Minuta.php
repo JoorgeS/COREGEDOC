@@ -1,29 +1,14 @@
 <?php
-
-
-
 namespace App\Models;
-
-
-
 use Exception;
-
 use App\Config\Database;
-
 use PDO;
-
 use PDOException;
-
-
 
 class Minuta
 
 {
-
     private $conn;
-
-
-
     public function __construct()
 
     {

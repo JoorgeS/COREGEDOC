@@ -39,12 +39,14 @@
                             <h3 id="titulo-votacion" class="fw-bold mb-5 text-dark">...</h3>
 
                             <div class="d-grid gap-3">
-                                <button class="btn btn-outline-success btn-lg py-3 fw-bold hover-fill" onclick="confirmarVoto('APRUEBO')">
-                                    <i class="fas fa-thumbs-up fa-lg me-2"></i> APRUEBO
+                                <button class="btn btn-outline-success btn-lg py-3 fw-bold hover-fill" onclick="confirmarVoto('SI')">
+                                    <i class="fas fa-check fa-lg me-2"></i> SÍ
                                 </button>
-                                <button class="btn btn-outline-danger btn-lg py-3 fw-bold hover-fill" onclick="confirmarVoto('RECHAZO')">
-                                    <i class="fas fa-thumbs-down fa-lg me-2"></i> RECHAZO
+
+                                <button class="btn btn-outline-danger btn-lg py-3 fw-bold hover-fill" onclick="confirmarVoto('NO')">
+                                    <i class="fas fa-times fa-lg me-2"></i> NO
                                 </button>
+
                                 <button class="btn btn-outline-secondary btn-lg py-3 fw-bold hover-fill" onclick="confirmarVoto('ABSTENCION')">
                                     <i class="fas fa-minus-circle fa-lg me-2"></i> ABSTENCIÓN
                                 </button>
@@ -152,13 +154,8 @@
 
     </div>
 </div>
-
 <script>
-    // --- LÓGICA DE VOTACIÓN MEJORADA ---
-
     let pollingInterval;
-    // Variable local para saber si el usuario acaba de votar en esta sesión de JS
-    // y evitar que el polling le vuelva a mostrar los botones inmediatamente
     let yaVotoLocalmente = false;
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -173,81 +170,43 @@
         if (!document.getElementById('voto').classList.contains('active')) return;
 
         fetch('index.php?action=api_voto_check')
-            .then(response => {
-                // Si la respuesta no es exitosa (ej: error 500 PHP), lanzamos error
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(text)
-                    });
-                }
-                return response.json();
-            })
+            .then(r => r.ok ? r.json() : Promise.reject(r))
             .then(resp => {
                 if (resp.status === 'active') {
                     const data = resp.data;
-
+                    
                     if (data.ya_voto === true) {
-                        let textoVisual = '';
-                        let val = data.opcion_registrada ? data.opcion_registrada.trim().toUpperCase() : '';
-
-                        if (val === 'SI') textoVisual = 'APRUEBO';
-                        else if (val === 'NO') textoVisual = 'RECHAZO';
-                        else if (val === 'ABSTENCION') textoVisual = 'ABSTENCION';
-
-                        renderizarVistaPrevia(textoVisual, data.nombreVotacion);
+                        // Si la base de datos dice que ya votó, usamos ese valor
+                        // La BD devuelve: APRUEBO, RECHAZO, ABSTENCION
+                        renderizarVistaPrevia(data.opcion_registrada, data.nombreVotacion);
                     } else {
                         mostrarVotacion(data);
                     }
                 } else if (resp.status === 'error') {
-                    // AQUÍ ESTÁ EL CAMBIO: Mostrar el error en pantalla
                     console.error("Error servidor:", resp.message);
-
-                    // Solo si eres admin/desarrollador, descomenta la siguiente linea para ver el error en un alert:
-                    // alert("Error del sistema: " + resp.message);
-
                     mostrarEspera();
                 } else {
                     mostrarEspera();
                 }
             })
-            .catch(err => {
-                console.error("Error crítico de red/sintaxis:", err);
-                // Esto mostrará qué está rompiendo el código PHP (ej: un punto y coma faltante)
-                // Una vez corregido, puedes quitar este alert o cambiarlo a console.error
-                // alert("Error Crítico (PHP/Red): " + err.message); 
-            });
+            .catch(err => console.error(err));
     }
 
     function mostrarVotacion(data) {
-        // Diagnóstico: Verificar si tenemos los elementos necesarios
         const elTitulo = document.getElementById('titulo-votacion');
         const elInput = document.getElementById('idVotacionActiva');
         const elPanel = document.getElementById('panel-votacion');
+        if (!elTitulo || !elInput || !elPanel) return;
+        
+        // Evitar parpadeo si ya se muestra la misma votación
+        if (elPanel.style.display === 'block' && elInput.value == data.idVotacion) return;
 
-        if (!elTitulo || !elInput || !elPanel) {
-            console.error("ERROR CRÍTICO: Faltan elementos HTML en sala.php.");
-            console.log("titulo-votacion:", elTitulo);
-            console.log("idVotacionActiva:", elInput);
-            console.log("panel-votacion:", elPanel);
-            return;
-        }
-
-        // Evitar parpadeos si ya estamos mostrando la misma votación
-        if (elPanel.style.display === 'block' && elInput.value == data.idVotacion) {
-            return;
-        }
-
-        yaVotoLocalmente = false; // Resetear flag local
-
-        // Asignar valores
+        yaVotoLocalmente = false;
         elInput.value = data.idVotacion;
         elTitulo.textContent = data.nombreVotacion;
-
-        // Cambiar paneles
+        
         ocultarTodosPaneles();
         elPanel.style.display = 'block';
-
-        // Vibrar celular (opcional)
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
 
@@ -265,125 +224,120 @@
         document.getElementById('panel-ya-voto').style.display = 'none';
     }
 
-    // FUNCIÓN 1: CONFIRMAR VOTO (POPUP PREGUNTA)
-    function confirmarVoto(opcion) {
+    // --- LÓGICA DE CONFIRMACIÓN ---
+    function confirmarVoto(intencion) {
+        // intencion recibe: 'SI', 'NO', 'ABSTENCION'
+        
         let colorBtn = '#6c757d';
-        let textoAccion = opcion;
+        let textoPregunta = '';
+        let valorParaBD = ''; 
 
-        if (opcion === 'APRUEBO') {
+        if (intencion === 'SI') {
             colorBtn = '#198754';
-            textoAccion = 'APROBAR';
-        }
-        if (opcion === 'RECHAZO') {
+            textoPregunta = 'SÍ'; // Con tilde solo para mostrar
+            valorParaBD = 'APRUEBO';
+        } 
+        else if (intencion === 'NO') {
             colorBtn = '#dc3545';
-            textoAccion = 'RECHAZAR';
-        }
-        if (opcion === 'ABSTENCION') {
+            textoPregunta = 'NO';
+            valorParaBD = 'RECHAZO'; 
+        } 
+        else {
             colorBtn = '#ffc107';
-            textoAccion = 'ABSTENERSE';
+            textoPregunta = 'ABSTENCIÓN';
+            valorParaBD = 'ABSTENCION'; 
         }
 
         Swal.fire({
-            title: '¿Está seguro?',
-            text: `Usted va a votar: ${opcion}`,
+            title: '¿Confirmar Voto?',
+            text: `Su voto será: ${textoPregunta}`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: colorBtn,
-            confirmButtonText: `Sí, ${textoAccion}`,
+            confirmButtonText: `VOTAR ${textoPregunta}`,
             cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed) {
-                enviarVotoAlServidor(opcion);
+                // Enviamos el valor interno (APRUEBO) pero pasamos la intención (SI) para pintar
+                enviarVotoAlServidor(valorParaBD, intencion);
             }
         });
     }
 
-    // FUNCIÓN 2: ENVIAR VOTO (FETCH)
-    function enviarVotoAlServidor(opcion) {
+    function enviarVotoAlServidor(valorBD, valorVisual) {
         const idVotacion = document.getElementById('idVotacionActiva').value;
-
-        // --- CORRECCIÓN IMPORTANTE ---
-        // 1. Capturamos el nombre AQUÍ, al inicio de la función, para que esté disponible después.
-        // Verificamos que el elemento exista para evitar errores si el DOM cambió.
-        const elementoTitulo = document.getElementById('titulo-votacion');
-        const nombreVotacionActual = elementoTitulo ? elementoTitulo.textContent : '';
-        // -----------------------------
-
-        // Bloquear botones visualmente para evitar doble clic
+        const nombreVotacion = document.getElementById('titulo-votacion').textContent;
         const botones = document.querySelectorAll('#panel-votacion button');
+        
+        // Desactivar botones para evitar doble click
         botones.forEach(b => b.disabled = true);
 
         fetch('index.php?action=api_voto_emitir', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idVotacion,
-                    opcion
-                })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                idVotacion: idVotacion, 
+                opcion: valorBD 
             })
-            .then(r => r.json())
-            .then(d => {
-                if (d.status === 'success') {
-                    yaVotoLocalmente = true;
-
-                    // Popup de éxito
-                    Swal.fire({
-                        title: '¡Voto Registrado!',
-                        text: 'Su preferencia ha sido guardada correctamente.',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-
-                    // 2. Ahora sí podemos usar la variable 'nombreVotacionActual' porque fue declarada arriba
-                    renderizarVistaPrevia(opcion, nombreVotacionActual);
-
-                } else {
-                    Swal.fire('Error', d.message, 'error');
-                    // Si falla, reactivamos botones
-                    botones.forEach(b => b.disabled = false);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                Swal.fire('Error', 'Error de conexión', 'error');
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.status === 'success') {
+                yaVotoLocalmente = true;
+                Swal.fire({
+                    title: '¡Voto Registrado!',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                renderizarVistaPrevia(valorVisual, nombreVotacion);
+            } else {
+                Swal.fire('Error', d.message, 'error');
                 botones.forEach(b => b.disabled = false);
-            });
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Error', 'Error de conexión', 'error');
+            botones.forEach(b => b.disabled = false);
+        });
     }
 
-    // FUNCIÓN 3: VISTA PREVIA (RESULTADO VISUAL)
-    function renderizarVistaPrevia(opcion, nombreVotacion) {
+    // --- LÓGICA VISUAL "BLINDADA" ---
+    function renderizarVistaPrevia(valorEntrada, nombreVotacion) {
         ocultarTodosPaneles();
-
         const panel = document.getElementById('panel-ya-voto');
         const iconoDiv = document.getElementById('icono-voto-previo');
         const textoDiv = document.getElementById('texto-voto-previo');
-        const mensajeDiv = document.getElementById('mensaje-detalle-voto'); // Nuevo elemento
+        const mensajeDiv = document.getElementById('mensaje-detalle-voto');
 
-        // Configurar estilos según la opción
-        if (opcion === 'APRUEBO') {
+        // Limpiamos y normalizamos lo que entra (quitamos espacios y pasamos a mayúsculas)
+        const op = valorEntrada ? valorEntrada.toString().toUpperCase().trim() : '';
+
+        // Listas de variantes aceptadas para evitar errores de tildes o palabras
+        const variantesSI = ['SI', 'SÍ', 'APRUEBO', 'SI ']; 
+        const variantesNO = ['NO', 'RECHAZO', 'NO '];
+
+        if (variantesSI.includes(op)) {
+            // ES UN SÍ
             iconoDiv.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
             textoDiv.className = 'fw-bold mb-3 text-success';
-        } else if (opcion === 'RECHAZO') {
+            textoDiv.textContent = 'SÍ'; // Forzamos texto bonito
+        } 
+        else if (variantesNO.includes(op)) {
+            // ES UN NO
             iconoDiv.innerHTML = '<i class="fas fa-times-circle text-danger"></i>';
             textoDiv.className = 'fw-bold mb-3 text-danger';
-        } else {
+            textoDiv.textContent = 'NO';
+        } 
+        else {
+            // CUALQUIER OTRA COSA ES ABSTENCIÓN
             iconoDiv.innerHTML = '<i class="fas fa-minus-circle text-warning"></i>';
             textoDiv.className = 'fw-bold mb-3 text-warning';
+            textoDiv.textContent = 'ABSTENCIÓN';
         }
 
-        textoDiv.textContent = opcion;
-
-        // --- AQUÍ ASIGNAMOS EL MENSAJE PERSONALIZADO ---
-        if (nombreVotacion) {
-            mensajeDiv.textContent = `para la adenda "${nombreVotacion}"`;
-        } else {
-            mensajeDiv.textContent = ''; // Limpiar si no hay nombre
-        }
-        // -----------------------------------------------
-
+        mensajeDiv.textContent = nombreVotacion ? `para "${nombreVotacion}"` : '';
         panel.style.display = 'block';
     }
 </script>

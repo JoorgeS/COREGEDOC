@@ -252,7 +252,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     <h5 class="mb-0 fw-bold c-azul">
                         <i class="fas fa-calendar-alt me-2"></i>Próximas Reuniones
                     </h5>
-                    <a href="index.php?action=calendario" class="btn btn-sm btn-outline-primary" style="border-color: #0071bc; color: #0071bc;">Ver Calendario</a>
+
                 </div>
                 <div class="card-body p-0">
                     <?php if (empty($data['proximas_reuniones'])): ?>

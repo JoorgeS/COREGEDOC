@@ -91,6 +91,11 @@ try {
             $minutaController->apiEnviarAprobacion();
             break;
 
+        case 'api_filtrar_reuniones': // <--- AGREGAR ESTE CASE
+            $controller = new App\Controllers\ReunionController();
+            $controller->apiFiltrarReuniones();
+            break;
+
         case 'api_firmar_minuta':
             $minutaController->apiFirmarMinuta();
             break;
@@ -379,6 +384,12 @@ try {
             $controller = new App\Controllers\UserController();
             $controller->logout();
             break;
+
+        case 'reunion_listado':
+            $controller = new App\Controllers\ReunionController();
+            $controller->listar();
+            break;
+
 
         default:
             // Si la acción no existe, manda al login

@@ -604,6 +604,9 @@
     // ============================================
     //  INICIALIZACIÓN
     // ============================================
+    // ============================================
+    //  INICIALIZACIÓN
+    // ============================================
     document.addEventListener('DOMContentLoaded', function() {
         // Cargar Temas
         if (temasIniciales && temasIniciales.length > 0) {
@@ -614,9 +617,17 @@
             agregarNuevoTema();
         }
 
-
-
-
+        // --- CORRECCIÓN AQUÍ: Capitalizar primera letra ---
+        // Esto debe ir aquí afuera, no dentro de la función del botón
+        const inputVotacion = document.getElementById('inputNombreVotacion');
+        if (inputVotacion) {
+            inputVotacion.addEventListener('input', function() {
+                if (this.value.length > 0) {
+                    // Capitaliza la primera letra y concatena el resto
+                    this.value = this.value.charAt(0).toUpperCase() + this.value.slice(1);
+                }
+            });
+        }
     });
 
     // ============================================
@@ -947,63 +958,6 @@
     //  FUNCIONES DE VOTACIÓN (SECRETARIO)
     // ============================================
 
-    function crearVotacion() {
-        console.log("Botón presionado: Iniciando creación...");
-
-        const inputNombre = document.getElementById('inputNombreVotacion');
-
-        // 1. Validar nombre
-        if (!inputNombre || inputNombre.value.trim() === '') {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Falta información',
-                text: 'Por favor, debe escribir el Tema o Moción para la votación.'
-            });
-            return;
-        }
-
-        // 2. Preparar datos
-        const idComisionParaEnviar = idComisionGlobal ? idComisionGlobal : null;
-
-        const payload = {
-            idMinuta: idMinutaGlobal,
-            nombre: inputNombre.value.trim(),
-            idComision: idComisionParaEnviar
-        };
-
-        // 3. Enviar al servidor
-        fetch('index.php?action=api_crear_votacion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(r => r.json())
-            .then(resp => {
-                if (resp.status === 'success') {
-
-                    // --- POPUP: VOTACIÓN HABILITADA ---
-                    Swal.fire({
-                        title: '¡Votación Habilitada!',
-                        text: 'Los consejeros ya pueden votar.',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-
-                    inputNombre.value = '';
-                    cargarVotaciones(); // Actualizar la lista visual
-
-                } else {
-                    Swal.fire('Error', resp.message, 'error');
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                Swal.fire('Error', 'Error de conexión con el servidor', 'error');
-            });
-    }
 
     function cerrarVotacion(idVotacion) {
         // --- POPUP: CONFIRMACIÓN DE CIERRE ---
@@ -1347,23 +1301,42 @@
 
 
     function crearVotacion() {
-        const inputNombre = document.getElementById('inputNombreVotacion');
-        if (!inputNombre || inputNombre.value.trim() === '') {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Falta información',
-                text: 'Escriba el tema de la votación.'
-            });
-            return;
-        }
+    const inputNombre = document.getElementById('inputNombreVotacion');
 
-        const payload = {
-            idMinuta: idMinutaGlobal,
-            nombre: inputNombre.value.trim(),
-            idComision: idComisionGlobal ? idComisionGlobal : null
-        };
+    // 1. Validar nombre
+    if (!inputNombre || inputNombre.value.trim() === '') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Falta información',
+            text: 'Por favor, debe escribir el Tema o Moción para la votación.'
+        });
+        return;
+    }
 
-        fetch('index.php?action=api_crear_votacion', {
+    // 2. PREGUNTA DE CONFIRMACIÓN (NUEVO)
+    Swal.fire({
+        title: '¿Crear Votación?',
+        text: `Se abrirá la votación para: "${inputNombre.value}"`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754', // Verde success
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, crear votación',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            
+            // Si confirma, procedemos con la lógica de envío...
+            const idComisionParaEnviar = idComisionGlobal ? idComisionGlobal : null;
+
+            const payload = {
+                idMinuta: idMinutaGlobal,
+                nombre: inputNombre.value.trim(), // Se envía lo que esté en el input (ya capitalizado)
+                idComision: idComisionParaEnviar
+            };
+
+            // 3. Enviar al servidor
+            fetch('index.php?action=api_crear_votacion', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1373,23 +1346,27 @@
             .then(r => r.json())
             .then(resp => {
                 if (resp.status === 'success') {
-                    // 1. Limpiar y notificar
-                    inputNombre.value = '';
                     Swal.fire({
                         title: '¡Votación Habilitada!',
                         text: 'Los consejeros ya pueden votar.',
                         icon: 'success',
-                        timer: 1500,
+                        timer: 2000,
                         showConfirmButton: false
                     });
 
-                    cargarVotaciones(); // Actualizar lista de abajo
-
+                    inputNombre.value = '';
+                    cargarVotaciones(); 
                 } else {
                     Swal.fire('Error', resp.message, 'error');
                 }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Error de conexión con el servidor', 'error');
             });
-    }
+        }
+    });
+}
 
 
 
@@ -1414,22 +1391,26 @@
             if (result.isConfirmed) {
                 fetch('index.php?action=api_cerrar_votacion', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ idVotacion: idVotacion })
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            idVotacion: idVotacion
+                        })
                     })
                     .then(r => r.json())
                     .then(resp => {
                         if (resp.status === 'success') {
-                            
+
                             // --- CORRECCIÓN: SOLO ALERTAR Y RECARGAR LISTA ---
                             Swal.fire(
                                 '¡Cerrada!',
                                 'La votación ha finalizado correctamente.',
                                 'success'
                             );
-                            cargarVotaciones(); 
+                            cargarVotaciones();
                             // ------------------------------------------------
-                            
+
                         } else {
                             Swal.fire('Error', resp.message, 'error');
                         }

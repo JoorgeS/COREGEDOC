@@ -335,44 +335,58 @@
     }
 
     // 3. ADJUNTOS
-    function verAdjuntos(id) {
-        const lista = document.getElementById('listaAdjuntos');
-        const msg = document.getElementById('sinAdjuntosMsg');
+    // 3. ADJUNTOS
+    function verAdjuntos(id) {
+        const lista = document.getElementById('listaAdjuntos');
+        const msg = document.getElementById('sinAdjuntosMsg');
 
-        lista.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando...</div>';
-        msg.style.display = 'none';
-        new bootstrap.Modal(document.getElementById('modalAdjuntos')).show();
+        lista.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando...</div>';
+        msg.style.display = 'none';
+        new bootstrap.Modal(document.getElementById('modalAdjuntos')).show();
 
-        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`)
-            .then(r => r.json())
-            .then(resp => {
-                lista.innerHTML = '';
-                if (resp.data && resp.data.length > 0) {
-                    msg.style.display = 'none';
-                    resp.data.forEach(a => {
-                        let icon = 'fa-file';
-                        let nombre = a.nombreArchivo || 'Enlace Web';
-                        let ext = nombre.split('.').pop().toLowerCase();
+        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`)
+            .then(r => r.json())
+            .then(resp => {
+                lista.innerHTML = '';
+                if (resp.data && resp.data.length > 0) {
+                    msg.style.display = 'none';
+                    resp.data.forEach(a => {
+                        // MODIFICACIÓN CLAVE: Usar a.nombreArchivo o derivar de la ruta.
+                        let nombreMostrar = a.nombreArchivo || a.pathAdjunto.split('/').pop();
 
-                        if (ext === 'pdf') icon = 'fa-file-pdf text-danger';
-                        else if (['doc', 'docx'].includes(ext)) icon = 'fa-file-word text-primary';
-                        else if (a.tipoAdjunto === 'link') icon = 'fa-link text-info';
+                        let urlVisor = `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
+                        let extension = nombreMostrar.split('.').pop().toLowerCase();
+                        let icon = 'fa-file text-secondary'; // Icono default
 
-                        let link = (a.tipoAdjunto === 'link') ? a.pathAdjunto : `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
+                        // Iconos según extensión
+                        if (['pdf'].includes(extension)) icon = 'fa-file-pdf text-danger';
+                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word text-primary';
+                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel text-success';
+                        else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) icon = 'fa-file-image text-info';
 
-                        lista.innerHTML += `
-                            <a href="${link}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
-                                <i class="fas ${icon} fs-4 me-3"></i>
-                                <div class="text-truncate">
-                                    <div class="fw-bold text-dark">${nombre}</div>
-                                    <small class="text-muted">Clic para abrir</small>
-                                </div>
-                            </a>`;
-                    });
-                } else {
-                    msg.style.display = 'block';
-                }
-            })
-            .catch(e => lista.innerHTML = '<div class="text-danger p-3 text-center">Error al cargar.</div>');
-    }
+                        // Lógica para Links Externos y Corrección de "www"
+                        if (a.tipoAdjunto === 'link' || a.pathAdjunto.startsWith('http') || a.pathAdjunto.startsWith('www')) {
+                            let urlExterna = a.pathAdjunto;
+                            if (!urlExterna.match(/^https?:\/\//)) {
+                                urlExterna = 'https://' + urlExterna;
+                            }
+                            urlVisor = urlExterna;
+                            icon = 'fa-link text-primary'; // Cambiar icono a link y color
+                        }
+
+                        lista.innerHTML += `
+                            <a href="${urlVisor}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                                <div class="me-3 fs-4"><i class="fas ${icon}"></i></div>
+                                <div class="text-truncate">
+                                    <div class="fw-bold text-dark">${nombreMostrar}</div>
+                                    <small class="text-muted">Clic para abrir</small>
+                                </div>
+                            </a>`;
+                    });
+                } else {
+                    msg.style.display = 'block';
+                }
+            })
+            .catch(e => lista.innerHTML = '<div class="text-danger p-3 text-center">Error al cargar.</div>');
+    }
 </script>
