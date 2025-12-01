@@ -164,37 +164,68 @@ class MailService
 
     // ... dentro de MailService ...
 
+    /**
+     * Correo 3: Recuperación de Contraseña (Estandarizado)
+     */
     public function enviarInstruccionesRecuperacion($email, $token)
     {
         try {
             $mail = $this->getConfiguredMailer();
             $mail->addAddress($email);
+            
             $mail->Subject = 'Recuperación de Contraseña - COREGEDOC';
+
+            // 1. IMPORTANTE: Generamos la firma igual que en los otros métodos
+            $firmaTag = $this->obtenerTagFirma($mail);
+
             $mail->isHTML(true);
 
             // Construir enlace MVC
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-            // Apuntamos al router principal
+            
+            // Asegúrate que la ruta '/coregedoc/' sea correcta para tu servidor
             $link = "{$protocol}://{$host}/coregedoc/index.php?action=restablecer_password&token={$token}";
 
+            // 2. CUERPO DEL CORREO CON ESTILO ESTANDARIZADO
             $mail->Body = "
             <html>
-            <body style='font-family: Arial, sans-serif; color: #333;'>
-                <h3>Solicitud de Restablecimiento</h3>
-                <p>Hemos recibido una solicitud para restablecer tu contraseña en <strong>COREGEDOC</strong>.</p>
-                <p>Haz clic en el siguiente enlace para crear una nueva clave (vence en 1 hora):</p>
-                <p style='margin: 20px 0;'>
-                    <a href='{$link}' style='background-color: #000; color: #fff; padding: 10px 15px; text-decoration: none; border-radius: 4px; font-weight: bold;'>RESTABLECER CONTRASEÑA</a>
-                </p>
-                <p><small>Si no fuiste tú, ignora este mensaje.</small></p>
+            <body style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
+                
+                <h3 style='color: #0056b3;'>Solicitud de Restablecimiento de Clave</h3>
+                
+                <p>Estimado(a) Usuario,</p>
+                
+                <p>Hemos recibido una solicitud para restablecer su contraseña en la plataforma <strong>COREGEDOC</strong>.</p>
+                
+                <div style='background-color: #f8f9fa; padding: 15px; border-left: 4px solid #0056b3; margin: 20px 0;'>
+                    <strong>Instrucciones:</strong><br>
+                    1. Haga clic en el botón de abajo para acceder al formulario de cambio de clave.<br>
+                    2. Ingrese su nueva contraseña.<br>
+                    <br>
+                    <div style='text-align: center; margin: 10px 0;'>
+                        <a href='{$link}' style='background-color: #212529; color: #fff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;'>RESTABLECER CONTRASEÑA</a>
+                    </div>
+                    <br>
+                    <small>Nota: Este enlace vencerá en 1 hora por seguridad.</small>
+                </div>
+
+                <p>Si usted no ha solicitado este cambio, por favor ignore este correo electrónico; su contraseña permanecerá segura.</p>
+                
+                <br>
+                <p>Atentamente,<br><strong>Sistema COREGEDOC</strong></p>
+                
+                {$firmaTag}
             </body>
             </html>";
 
             $mail->send();
             return true;
+            
         } catch (Exception $e) {
             error_log("Error Mail Recuperación: " . $mail->ErrorInfo);
+            // Opcional: Log local
+            $this->logLocal($email, "Error enviando recuperación: " . $e->getMessage());
             return false;
         }
     }

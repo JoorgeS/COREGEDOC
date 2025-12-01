@@ -174,7 +174,7 @@
             .then(resp => {
                 if (resp.status === 'active') {
                     const data = resp.data;
-                    
+
                     if (data.ya_voto === true) {
                         // Si la base de datos dice que ya votó, usamos ese valor
                         // La BD devuelve: APRUEBO, RECHAZO, ABSTENCION
@@ -196,26 +196,52 @@
         const elTitulo = document.getElementById('titulo-votacion');
         const elInput = document.getElementById('idVotacionActiva');
         const elPanel = document.getElementById('panel-votacion');
+
         if (!elTitulo || !elInput || !elPanel) return;
-        
+
         // Evitar parpadeo si ya se muestra la misma votación
         if (elPanel.style.display === 'block' && elInput.value == data.idVotacion) return;
 
         yaVotoLocalmente = false;
         elInput.value = data.idVotacion;
         elTitulo.textContent = data.nombreVotacion;
-        
+
+        // --- CORRECCIÓN: RE-HABILITAR BOTONES ---
+        // Nos aseguramos de que los botones estén clickeables
+        const botones = elPanel.querySelectorAll('button');
+        botones.forEach(btn => {
+            btn.disabled = false;
+        });
+        // ----------------------------------------
+
         ocultarTodosPaneles();
         elPanel.style.display = 'block';
+
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
 
     function mostrarEspera() {
-        if (document.getElementById('panel-votacion').style.display === 'none' &&
-            document.getElementById('panel-ya-voto').style.display === 'none') {
-            ocultarTodosPaneles();
-            document.getElementById('panel-espera').style.display = 'block';
-        }
+        // Si ya estamos viendo el panel de espera, no hacemos nada (evita parpadeo)
+        if (document.getElementById('panel-espera').style.display === 'block') return;
+
+        // Forzamos el reseteo de la interfaz
+        ocultarTodosPaneles();
+        document.getElementById('panel-espera').style.display = 'block';
+
+        // Limpiamos el ID guardado para que la próxima votación se detecte como nueva
+        const elInput = document.getElementById('idVotacionActiva');
+        if (elInput) elInput.value = '';
+
+        // Reactivamos botones por si acaso
+        const botones = document.querySelectorAll('#panel-votacion button');
+        botones.forEach(b => b.disabled = false);
+    }
+
+    function ocultarTodosPaneles() {
+        // Ocultamos todo sin preguntar
+        document.getElementById('panel-espera').style.display = 'none';
+        document.getElementById('panel-votacion').style.display = 'none';
+        document.getElementById('panel-ya-voto').style.display = 'none';
     }
 
     function ocultarTodosPaneles() {
@@ -227,25 +253,23 @@
     // --- LÓGICA DE CONFIRMACIÓN ---
     function confirmarVoto(intencion) {
         // intencion recibe: 'SI', 'NO', 'ABSTENCION'
-        
+
         let colorBtn = '#6c757d';
         let textoPregunta = '';
-        let valorParaBD = ''; 
+        let valorParaBD = '';
 
         if (intencion === 'SI') {
             colorBtn = '#198754';
             textoPregunta = 'SÍ'; // Con tilde solo para mostrar
             valorParaBD = 'APRUEBO';
-        } 
-        else if (intencion === 'NO') {
+        } else if (intencion === 'NO') {
             colorBtn = '#dc3545';
             textoPregunta = 'NO';
-            valorParaBD = 'RECHAZO'; 
-        } 
-        else {
+            valorParaBD = 'RECHAZO';
+        } else {
             colorBtn = '#ffc107';
             textoPregunta = 'ABSTENCIÓN';
-            valorParaBD = 'ABSTENCION'; 
+            valorParaBD = 'ABSTENCION';
         }
 
         Swal.fire({
@@ -268,39 +292,41 @@
         const idVotacion = document.getElementById('idVotacionActiva').value;
         const nombreVotacion = document.getElementById('titulo-votacion').textContent;
         const botones = document.querySelectorAll('#panel-votacion button');
-        
+
         // Desactivar botones para evitar doble click
         botones.forEach(b => b.disabled = true);
 
         fetch('index.php?action=api_voto_emitir', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                idVotacion: idVotacion, 
-                opcion: valorBD 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idVotacion: idVotacion,
+                    opcion: valorBD
+                })
             })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if (d.status === 'success') {
-                yaVotoLocalmente = true;
-                Swal.fire({
-                    title: '¡Voto Registrado!',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-                renderizarVistaPrevia(valorVisual, nombreVotacion);
-            } else {
-                Swal.fire('Error', d.message, 'error');
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    yaVotoLocalmente = true;
+                    Swal.fire({
+                        title: '¡Voto Registrado!',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    renderizarVistaPrevia(valorVisual, nombreVotacion);
+                } else {
+                    Swal.fire('Error', d.message, 'error');
+                    botones.forEach(b => b.disabled = false);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Error de conexión', 'error');
                 botones.forEach(b => b.disabled = false);
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            Swal.fire('Error', 'Error de conexión', 'error');
-            botones.forEach(b => b.disabled = false);
-        });
+            });
     }
 
     // --- LÓGICA VISUAL "BLINDADA" ---
@@ -315,7 +341,7 @@
         const op = valorEntrada ? valorEntrada.toString().toUpperCase().trim() : '';
 
         // Listas de variantes aceptadas para evitar errores de tildes o palabras
-        const variantesSI = ['SI', 'SÍ', 'APRUEBO', 'SI ']; 
+        const variantesSI = ['SI', 'SÍ', 'APRUEBO', 'SI '];
         const variantesNO = ['NO', 'RECHAZO', 'NO '];
 
         if (variantesSI.includes(op)) {
@@ -323,14 +349,12 @@
             iconoDiv.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
             textoDiv.className = 'fw-bold mb-3 text-success';
             textoDiv.textContent = 'SÍ'; // Forzamos texto bonito
-        } 
-        else if (variantesNO.includes(op)) {
+        } else if (variantesNO.includes(op)) {
             // ES UN NO
             iconoDiv.innerHTML = '<i class="fas fa-times-circle text-danger"></i>';
             textoDiv.className = 'fw-bold mb-3 text-danger';
             textoDiv.textContent = 'NO';
-        } 
-        else {
+        } else {
             // CUALQUIER OTRA COSA ES ABSTENCIÓN
             iconoDiv.innerHTML = '<i class="fas fa-minus-circle text-warning"></i>';
             textoDiv.className = 'fw-bold mb-3 text-warning';

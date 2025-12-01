@@ -7,6 +7,7 @@ use App\Models\Comision;
 use App\Services\MailService;
 use App\Services\PdfService;
 use App\Config\Database;
+use PDO;
 
 class MinutaController
 {
@@ -68,36 +69,217 @@ class MinutaController
 
         require_once __DIR__ . '/../views/layouts/main.php';
     }
+
     public function verBorrador()
     {
-        $this->verificarSesion();
-        $idMinuta = $_GET['id'] ?? 0;
+        $idMinuta = $_GET['id'] ?? null;
+        if (!$idMinuta) die("ID requerido");
 
-        if (!$idMinuta) {
-            die("ID Inválido");
-        }
+        $datosCompletos = $this->obtenerDatosParaPdf($idMinuta);
 
-        // Ruta al archivo que contiene la función generadora
-        $rutaGenerador = __DIR__ . '/generar_pdf_borrador.php';
+        if (!$datosCompletos) die("Minuta no encontrada");
 
-        if (file_exists($rutaGenerador)) {
-            require_once $rutaGenerador;
+        $pdfService = new PdfService();
+        $nombreArchivo = "Borrador_Minuta_{$idMinuta}.pdf";
+        $rutaTemporal = sys_get_temp_dir() . '/' . $nombreArchivo;
 
-            // 1. Instanciamos la conexión a la BD
-            $db = new Database();
-            $pdo = $db->getConnection();
-
-            // 2. Definimos la ruta raíz del proyecto (para encontrar las imágenes)
-            $rootPath = __DIR__ . '/../../';
-
-            // 3. LLAMADA A LA FUNCIÓN que creamos en generar_pdf_borrador.php
-            generarPdfBorrador($idMinuta, $pdo, $rootPath);
+        if ($pdfService->generarPdfBorrador($datosCompletos, $rutaTemporal)) {
+            header("Content-type: application/pdf");
+            header("Content-Disposition: inline; filename={$nombreArchivo}");
+            readfile($rutaTemporal);
+            unlink($rutaTemporal);
+            exit;
         } else {
-            echo "Error crítico: El archivo del sistema de generación de borradores no se encuentra en: $rutaGenerador";
+            echo "Error al generar el PDF.";
         }
-        exit;
     }
+    private function obtenerDatosParaPdf($idMinuta)
+    {
+        $db = (new \App\Config\Database())->getConnection();
 
+        // 1. MINUTA Y REUNIÓN
+        $sql = "SELECT m.*, 
+                       r.idReunion, 
+                       r.nombreReunion, 
+                       r.fechaInicioReunion,
+                       r.fechaTerminoReunion,
+                       u1.pNombre as pNomPres, u1.aPaterno as aPatPres,
+                       u2.pNombre as pNomSec, u2.aPaterno as aPatSec
+                FROM t_minuta m
+                LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                LEFT JOIN t_usuario u1 ON m.t_usuario_idPresidente = u1.idUsuario
+                LEFT JOIN t_usuario u2 ON m.t_usuario_idSecretario = u2.idUsuario
+                WHERE m.idMinuta = :id";
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute([':id' => $idMinuta]);
+        $minutaInfo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$minutaInfo) return null;
+
+        // PROCESAMIENTO DE HORAS
+        if (!empty($minutaInfo['fechaInicioReunion'])) {
+            $minutaInfo['horaInicioReal'] = date('H:i', strtotime($minutaInfo['fechaInicioReunion']));
+        } else {
+            $minutaInfo['horaInicioReal'] = isset($minutaInfo['horaMinuta']) ? date('H:i', strtotime($minutaInfo['horaMinuta'])) : '--:--';
+        }
+
+        if (!empty($minutaInfo['fechaTerminoReunion'])) {
+            $minutaInfo['horaTerminoReal'] = date('H:i', strtotime($minutaInfo['fechaTerminoReunion']));
+        } else {
+            $minutaInfo['horaTerminoReal'] = 'En curso';
+        }
+
+        // 2. COMISIONES
+        $comisionesInfo = [];
+        if (!empty($minutaInfo['t_comision_idComision'])) {
+            $stmtC = $db->prepare("SELECT nombreComision as nombre FROM t_comision WHERE idComision = :id");
+            $stmtC->execute([':id' => $minutaInfo['t_comision_idComision']]);
+            $com = $stmtC->fetch(PDO::FETCH_ASSOC);
+            if ($com) $comisionesInfo[] = $com;
+        }
+
+        // 3. TEMAS
+        $stmtT = $db->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :id ORDER BY idTema ASC");
+        $stmtT->execute([':id' => $idMinuta]);
+        $temas = $stmtT->fetchAll(PDO::FETCH_ASSOC);
+
+        // 4. ASISTENCIA
+        $stmtA = $db->prepare("SELECT u.pNombre, u.aPaterno, a.estadoAsistencia
+                                   FROM t_asistencia a
+                                   JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                                   WHERE a.t_minuta_idMinuta = :id
+                                   ORDER BY u.aPaterno ASC");
+        $stmtA->execute([':id' => $idMinuta]);
+        $asistenciaRaw = $stmtA->fetchAll(PDO::FETCH_ASSOC);
+        $asistencia = [];
+        foreach ($asistenciaRaw as $row) {
+            $row['estaPresente'] = ($row['estadoAsistencia'] === 'PRESENTE' || $row['estadoAsistencia'] === 'ATRASADO') ? 1 : 0;
+            $asistencia[] = $row;
+        }
+
+        // B. VOTACIONES (Con la corrección de columnas aplicada)
+        $idReunion = $minutaInfo['idReunion'] ?? null;
+        $sqlV = "SELECT * FROM t_votacion 
+                     WHERE t_minuta_idMinuta = :idMin 
+                     OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
+
+        $stmtV = $db->prepare($sqlV);
+        $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
+        $votacionesRaw = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+
+        $votaciones = [];
+        foreach ($votacionesRaw as $v) {
+            // CORRECCIÓN CRÍTICA: Usamos t_votacion_idVotacion y t_usuario_idUsuario
+            $stmtD = $db->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
+                                       FROM t_voto vo
+                                       JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
+                                       WHERE vo.t_votacion_idVotacion = :idVot");
+            $stmtD->execute([':idVot' => $v['idVotacion']]);
+            $detalles = $stmtD->fetchAll(PDO::FETCH_ASSOC);
+
+            // Recalcular contadores para asegurar consistencia
+            $si = 0;
+            $no = 0;
+            $abs = 0;
+            $detalleAsistentes = [];
+
+            foreach ($detalles as $d) {
+                $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
+                $opcion = $d['opcionVoto'];
+                $detalleAsistentes[] = ['nombre' => $nombre, 'voto' => $opcion];
+
+                if ($opcion === 'SI' || $opcion === 'APRUEBO') $si++;
+                elseif ($opcion === 'NO' || $opcion === 'RECHAZO') $no++;
+                elseif ($opcion === 'ABSTENCION') $abs++;
+            }
+
+            // Determinar resultado texto
+            $resultadoTexto = "SIN RESULTADO";
+            if ($si > $no) $resultadoTexto = "APROBADO";
+            elseif ($no > $si) $resultadoTexto = "RECHAZADO";
+            elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
+
+            $votaciones[] = [
+                'nombreVotacion' => $v['nombreVotacion'],
+                'resultado' => $resultadoTexto,
+                'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
+                'detalle_asistentes' => $detalleAsistentes
+            ];
+        }
+
+        // 5. VOTACIONES Y DETALLES (CORREGIDO)
+        $idReunion = $minutaInfo['idReunion'] ?? null;
+
+        // Búsqueda ampliada: Por ID Minuta O Por ID Reunión
+        $sqlV = "SELECT * FROM t_votacion 
+                 WHERE t_minuta_idMinuta = :idMin 
+                 OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
+
+        $stmtV = $db->prepare($sqlV);
+        $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
+        $votacionesRaw = $stmtV->fetchAll(PDO::FETCH_ASSOC);
+
+        $votaciones = [];
+        foreach ($votacionesRaw as $v) {
+            // Detalle de votos usando ids correctos
+            $stmtD = $db->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
+                                   FROM t_voto vo
+                                   JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
+                                   WHERE vo.t_votacion_idVotacion = :idVot");
+
+            $stmtD->execute([':idVot' => $v['idVotacion']]);
+            $detalles = $stmtD->fetchAll(PDO::FETCH_ASSOC);
+
+            $si = 0;
+            $no = 0;
+            $abs = 0;
+            $detalleAsistentes = [];
+
+            foreach ($detalles as $d) {
+                $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
+                $opcion = $d['opcionVoto'];
+
+                $detalleAsistentes[] = ['nombre' => $nombre, 'voto' => $opcion];
+
+                if ($opcion === 'SI') $si++;
+                elseif ($opcion === 'NO') $no++;
+                elseif ($opcion === 'ABSTENCION') $abs++;
+            }
+
+            $resultadoTexto = "SIN RESULTADO";
+            if ($si > $no) $resultadoTexto = "APROBADO";
+            elseif ($no > $si) $resultadoTexto = "RECHAZADO";
+            elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
+
+            $votaciones[] = [
+                'nombreVotacion' => $v['nombreVotacion'],
+                'resultado' => $resultadoTexto,
+                'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
+                'detalle_asistentes' => $detalleAsistentes
+            ];
+        }
+
+        // 6. FIRMAS
+        $firmas = [];
+        if (!empty($minutaInfo['pNomPres'])) {
+            $firmas[] = [
+                'pNombre' => $minutaInfo['pNomPres'],
+                'aPaterno' => $minutaInfo['aPatPres'],
+                'fechaAprobacion' => $minutaInfo['fechaMinuta']
+            ];
+        }
+
+        return [
+            'urlValidacion' => 'https://coregedoc.cl/validar?h=' . ($minutaInfo['hashValidacion'] ?? ''),
+            'minuta_info' => $minutaInfo,
+            'comisiones_info' => $comisionesInfo,
+            'temas' => $temas,
+            'asistencia' => $asistencia,
+            'votaciones' => $votaciones,
+            'firmas_aprobadas' => $firmas
+        ];
+    }
     public function aprobadas()
     {
         $this->verificarSesion();
@@ -317,107 +499,109 @@ class MinutaController
         exit;
     }
 
-   public function apiFinalizarReunion()
-{
-    if (ob_get_length()) ob_clean();
-    header('Content-Type: application/json');
+    public function apiFinalizarReunion()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
 
-    $this->verificarSesion();
-    $input = json_decode(file_get_contents('php://input'), true);
-    $idMinuta = $input['idMinuta'] ?? 0;
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idMinuta = $input['idMinuta'] ?? 0;
 
-    if (!$idMinuta) {
-        echo json_encode(['status' => 'error', 'message' => 'ID no proporcionado']);
-        exit;
-    }
+        if (!$idMinuta) {
+            echo json_encode(['status' => 'error', 'message' => 'ID no proporcionado']);
+            exit;
+        }
 
-    try {
-        $model = new Minuta();
-        
-        // 1. Cerrar Reunión en BD
-        $model->cerrarReunionDB($idMinuta);
+        try {
+            $model = new Minuta();
 
-        // 2. Marcar asistencia validada
-        $model->marcarAsistenciaValidada($idMinuta);
+            // 1. Cerrar Reunión en BD
+            $model->cerrarReunionDB($idMinuta);
 
-        // 3. PREPARACIÓN DE DATOS QR Y HASH (NUEVO)
-        // ---------------------------------------------------------
-        $pdfService = new PdfService();
-        
-        // Generamos un Hash único para este documento de asistencia
-        $hashAsistencia = hash('sha256', 'ASISTENCIA_MINUTA_' . $idMinuta . '_' . time());
-        
-        // URL de validación (Ajusta 'tu-dominio.com' o la ruta local)
-        // Ejemplo: http://localhost/coregedoc/validar.php?h=...
-        $baseUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
-        $urlValidacion = $baseUrl . "/public/validar.php?hash=" . $hashAsistencia;
-        
-        // Generamos la imagen QR en Base64
-        $qrBase64 = $pdfService->generarQrBase64($urlValidacion);
-        // ---------------------------------------------------------
+            // 2. Marcar asistencia validada
+            $model->marcarAsistenciaValidada($idMinuta);
 
-        // 4. GENERACIÓN PDF ASISTENCIA
-       $nombreArchivoDB = 'public/docs/asistencia/Asistencia_Minuta_' . $idMinuta . '.pdf'; // Nombre genérico o el mismo que usas abajo
-            
+            // 3. PREPARACIÓN DE DATOS QR Y HASH (NUEVO)
+            // ---------------------------------------------------------
+            $pdfService = new PdfService();
+
+            // Generamos un Hash único para este documento de asistencia
+            $hashAsistencia = hash('sha256', 'ASISTENCIA_MINUTA_' . $idMinuta . '_' . time());
+
+            // URL de validación (Ajusta 'tu-dominio.com' o la ruta local)
+            // Ejemplo: http://localhost/coregedoc/validar.php?h=...
+            $baseUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
+            $urlValidacion = $baseUrl . "/public/validar.php?hash=" . $hashAsistencia;
+
+            // Generamos la imagen QR en Base64
+            $qrBase64 = $pdfService->generarQrBase64($urlValidacion);
+            // ---------------------------------------------------------
+
+            // 4. GENERACIÓN PDF ASISTENCIA
+            $nombreArchivoDB = 'public/docs/asistencia/Asistencia_Minuta_' . $idMinuta . '.pdf'; // Nombre genérico o el mismo que usas abajo
+
             // ¡OJO! Asegúrate de usar la misma ruta relativa que usas para guardar el archivo físico abajo
             // En tu código original definías:
             $nombreArchivo = 'Asistencia_Minuta_' . $idMinuta . '_' . date('Ymd_His') . '.pdf';
             $rutaRelativa = 'public/docs/asistencia/' . $nombreArchivo;
-            
+
             // Guardamos en BD
             $model->registrarDocumentoAsistencia($idMinuta, $rutaRelativa, $hashAsistencia);
-        $rutaFisica = __DIR__ . '/../../' . $rutaRelativa;
+            $rutaFisica = __DIR__ . '/../../' . $rutaRelativa;
 
-        if (!is_dir(dirname($rutaFisica))) mkdir(dirname($rutaFisica), 0777, true);
+            if (!is_dir(dirname($rutaFisica))) mkdir(dirname($rutaFisica), 0777, true);
 
-        $rutaGenerador = __DIR__ . '/generar_pdf_asistencia.php';
+            $rutaGenerador = __DIR__ . '/generar_pdf_asistencia.php';
 
-        if (file_exists($rutaGenerador)) {
-            require_once $rutaGenerador;
+            if (file_exists($rutaGenerador)) {
+                require_once $rutaGenerador;
 
-            // Pasamos los nuevos parámetros a la función (QR, Hash, URL)
-            $exitoPDF = generarPdfAsistencia(
-                $idMinuta,
+                // Pasamos los nuevos parámetros a la función (QR, Hash, URL)
+                $exitoPDF = generarPdfAsistencia(
+                    $idMinuta,
+                    $rutaFisica,
+                    (new Database())->getConnection(),
+                    $_SESSION['idUsuario'],
+                    __DIR__ . '/../../',
+                    $qrBase64,      // <--- NUEVO
+                    $hashAsistencia, // <--- NUEVO
+                    $urlValidacion   // <--- NUEVO
+                );
+
+                if (!$exitoPDF) throw new \Exception("La función de PDF retornó falso.");
+
+                // Opcional: Aquí deberías guardar el $hashAsistencia en la BD 
+                // (ej: en t_adjunto o una tabla de documentos_validos) para que el validador funcione.
+
+            } else {
+                file_put_contents($rutaFisica, "FALTA ARCHIVO GENERADOR PDF.");
+            }
+
+            // 5. Obtener datos para el correo
+            $info = $model->obtenerDatosReunion($idMinuta);
+            $info['idMinuta'] = $idMinuta;
+
+            // 6. ENVIAR CORREO
+            $mailService = new MailService();
+            $enviado = $mailService->enviarAsistencia(
+                'genesis.contreras.vargas@gmail.com',
                 $rutaFisica,
-                (new Database())->getConnection(),
-                $_SESSION['idUsuario'],
-                __DIR__ . '/../../',
-                $qrBase64,      // <--- NUEVO
-                $hashAsistencia, // <--- NUEVO
-                $urlValidacion   // <--- NUEVO
+                $info
             );
 
-            if (!$exitoPDF) throw new \Exception("La función de PDF retornó falso.");
-            
-            // Opcional: Aquí deberías guardar el $hashAsistencia en la BD 
-            // (ej: en t_adjunto o una tabla de documentos_validos) para que el validador funcione.
-            
-        } else {
-            file_put_contents($rutaFisica, "FALTA ARCHIVO GENERADOR PDF.");
+            if ($enviado) {
+                echo json_encode(['status' => 'success', 'message' => 'Reunión finalizada. PDF con QR generado y enviado.']);
+            } else {
+                echo json_encode(['status' => 'warning', 'message' => 'Reunión finalizada, PDF generado, pero falló el correo.']);
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
         }
-
-        // 5. Obtener datos para el correo
-        $info = $model->obtenerDatosReunion($idMinuta);
-        $info['idMinuta'] = $idMinuta;
-
-        // 6. ENVIAR CORREO
-        $mailService = new MailService();
-        $enviado = $mailService->enviarAsistencia(
-            'genesis.contreras.vargas@gmail.com',
-            $rutaFisica,
-            $info
-        );
-
-        if ($enviado) {
-            echo json_encode(['status' => 'success', 'message' => 'Reunión finalizada. PDF con QR generado y enviado.']);
-        } else {
-            echo json_encode(['status' => 'warning', 'message' => 'Reunión finalizada, PDF generado, pero falló el correo.']);
-        }
-    } catch (\Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+        exit;
     }
-    exit;
-}
+
+
 
     public function apiEnviarAprobacion()
     {
@@ -483,32 +667,107 @@ class MinutaController
             $minutaModel = new Minuta();
             $resultado = $minutaModel->firmarMinuta($idMinuta, $_SESSION['idUsuario']);
             $nuevoEstado = $resultado['estado_nuevo'];
-
             if ($nuevoEstado === 'APROBADA') {
+                // 1. CONEXIÓN A BASE DE DATOS (Primero que todo)
                 $db = new Database();
                 $pdo = $db->getConnection();
 
-                $sqlM = "SELECT m.*, c.nombreComision, r.nombreReunion, r.fechaInicioReunion
-                              FROM t_minuta m
-                              LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
-                              LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
-                              WHERE m.idMinuta = :id";
+                // 2. OBTENER DATOS GENERALES MINUTA
+                // Importante: Agregamos r.idReunion para poder buscar las votaciones
+                $sqlM = "SELECT m.*, c.nombreComision, r.nombreReunion, r.fechaInicioReunion, r.idReunion
+                         FROM t_minuta m
+                         LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                         LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                         WHERE m.idMinuta = :id";
                 $stmt = $pdo->prepare($sqlM);
                 $stmt->execute([':id' => $idMinuta]);
                 $minutaInfo = $stmt->fetch(\PDO::FETCH_ASSOC);
 
+                // 3. OBTENER TEMAS
                 $stmtT = $pdo->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :id ORDER BY idTema ASC");
                 $stmtT->execute([':id' => $idMinuta]);
                 $temas = $stmtT->fetchAll(\PDO::FETCH_ASSOC);
 
+                // 4. OBTENER FIRMAS
                 $sqlF = "SELECT u.pNombre, u.aPaterno, am.fechaAprobacion
-                              FROM t_aprobacion_minuta am
-                              JOIN t_usuario u ON am.t_usuario_idPresidente = u.idUsuario
-                              WHERE am.t_minuta_idMinuta = :id AND am.estado_firma = 'FIRMADO'";
+                         FROM t_aprobacion_minuta am
+                         JOIN t_usuario u ON am.t_usuario_idPresidente = u.idUsuario
+                         WHERE am.t_minuta_idMinuta = :id AND am.estado_firma = 'FIRMADO'";
                 $stmtF = $pdo->prepare($sqlF);
                 $stmtF->execute([':id' => $idMinuta]);
                 $firmas = $stmtF->fetchAll(\PDO::FETCH_ASSOC);
 
+                // ---------------------------------------------------------
+                // 5. NUEVO BLOQUE: OBTENER ASISTENCIA Y VOTACIONES
+                // ---------------------------------------------------------
+
+                // A. ASISTENCIA
+                $stmtA = $pdo->prepare("SELECT u.pNombre, u.aPaterno, a.estadoAsistencia
+                                       FROM t_asistencia a
+                                       JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                                       WHERE a.t_minuta_idMinuta = :id
+                                       ORDER BY u.aPaterno ASC");
+                $stmtA->execute([':id' => $idMinuta]);
+                $asistenciaRaw = $stmtA->fetchAll(\PDO::FETCH_ASSOC);
+                $asistencia = [];
+                foreach ($asistenciaRaw as $row) {
+                    // Marcamos como presente si dice PRESENTE o ATRASADO
+                    $row['estaPresente'] = ($row['estadoAsistencia'] === 'PRESENTE' || $row['estadoAsistencia'] === 'ATRASADO') ? 1 : 0;
+                    $asistencia[] = $row;
+                }
+
+                // B. VOTACIONES (Con corrección de nombres de columnas)
+                $idReunion = $minutaInfo['idReunion'] ?? null;
+                $sqlV = "SELECT * FROM t_votacion 
+                         WHERE t_minuta_idMinuta = :idMin 
+                         OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
+
+                $stmtV = $pdo->prepare($sqlV);
+                $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
+                $votacionesRaw = $stmtV->fetchAll(\PDO::FETCH_ASSOC);
+
+                $votaciones = [];
+                foreach ($votacionesRaw as $v) {
+                    // Consultamos el detalle usando las columnas correctas: t_votacion_idVotacion y t_usuario_idUsuario
+                    $stmtD = $pdo->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
+                                           FROM t_voto vo
+                                           JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
+                                           WHERE vo.t_votacion_idVotacion = :idVot");
+                    $stmtD->execute([':idVot' => $v['idVotacion']]);
+                    $detalles = $stmtD->fetchAll(\PDO::FETCH_ASSOC);
+
+                    // Recalcular contadores manualmente para asegurar datos en el PDF
+                    $si = 0;
+                    $no = 0;
+                    $abs = 0;
+                    $detalleAsistentes = [];
+
+                    foreach ($detalles as $d) {
+                        $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
+                        $opcion = $d['opcionVoto'];
+                        $detalleAsistentes[] = ['nombre' => $nombre, 'voto' => $opcion];
+
+                        if ($opcion === 'SI' || $opcion === 'APRUEBO') $si++;
+                        elseif ($opcion === 'NO' || $opcion === 'RECHAZO') $no++;
+                        elseif ($opcion === 'ABSTENCION' || $opcion === 'ABS') $abs++;
+                    }
+
+                    // Determinar resultado texto
+                    $resultadoTexto = "SIN RESULTADO";
+                    if ($si > $no) $resultadoTexto = "APROBADO";
+                    elseif ($no > $si) $resultadoTexto = "RECHAZADO";
+                    elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
+
+                    $votaciones[] = [
+                        'nombreVotacion' => $v['nombreVotacion'],
+                        'resultado' => $resultadoTexto,
+                        'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
+                        'detalle_asistentes' => $detalleAsistentes
+                    ];
+                }
+                // ---------------------------------------------------------
+
+                // 6. GENERAR PDF
                 $hash = hash('sha256', $idMinuta . time() . 'SECRET_SALT_CORE');
                 $minutaInfo['hashValidacion'] = $hash;
 
@@ -520,10 +779,13 @@ class MinutaController
                     mkdir(dirname($rutaAbsoluta), 0777, true);
                 }
 
+                // Aquí las variables $asistencia y $votaciones YA EXISTEN porque las creamos en el paso 5
                 $datosParaPdf = [
                     'minuta_info' => $minutaInfo,
                     'temas' => $temas,
                     'firmas_aprobadas' => $firmas,
+                    'asistencia' => $asistencia,
+                    'votaciones' => $votaciones,
                     'comisiones_info' => [
                         'com1' => ['nombre' => $minutaInfo['nombreComision'] ?? 'Comisión']
                     ],
@@ -540,7 +802,6 @@ class MinutaController
                     throw new \Exception("Error al generar el archivo PDF físico.");
                 }
             }
-
             echo json_encode([
                 'status' => 'success',
                 'message' => 'Firma registrada correctamente.',

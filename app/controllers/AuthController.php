@@ -33,7 +33,7 @@ class AuthController
                 $userModel = new User();
                 $user = $userModel->findByEmail($usuario);
 
-                // VALIDACIÓN DE SEGURIDAD: Aseguramos que $user sea un array y tenga contraseña
+                // VALIDACIÓN DE SEGURIDAD
                 if ($user && is_array($user) && isset($user['contrasena'])) {
                     
                     if (password_verify($clave, $user['contrasena'])) {
@@ -43,19 +43,15 @@ class AuthController
                         $_SESSION['aPaterno'] = $user['aPaterno'];
                         $_SESSION['tipoUsuario_id'] = $user['tipoUsuario_id'];
                         
-                        // SOLUCIÓN A ALERTAS NAVBAR Y PERFIL:
-                        $_SESSION['email'] = $user['correo']; // Guardamos el correo
+                        $_SESSION['email'] = $user['correo'];
                         $_SESSION['rutaImagenPerfil'] = $user['foto_perfil'];
                         
-                        // (RUT excluido por regla de negocio)
-
                         header('Location: index.php?action=home');
                         exit();
                     } else {
                         $error_message = 'La contraseña es incorrecta.';
                     }
                 } else {
-                    // Si $user no es array o no se encontró
                     $error_message = 'Usuario no encontrado o error en base de datos.';
                 }
             }
@@ -70,7 +66,7 @@ class AuthController
             session_start();
         }
         session_destroy();
-        header('Location: index.php'); // Redirige al index general
+        header('Location: index.php');
         exit();
     }
 
@@ -113,6 +109,7 @@ class AuthController
         require_once __DIR__ . '/../views/auth/recuperar.php';
     }
 
+    // --- AQUÍ ESTÁ LA CORRECCIÓN ---
     public function restablecerPassword()
     {
         $token = $_GET['token'] ?? '';
@@ -135,10 +132,19 @@ class AuthController
                 $message_type = 'danger';
             } else {
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
-                // Se usa idUsuario porque el modelo devuelve un array
+                
                 if ($userModel->actualizarPassword($usuario['idUsuario'], $hash)) {
-                    echo "<script>alert('Contraseña actualizada. Inicie sesión.'); window.location.href='index.php?action=login';</script>";
-                    exit;
+                    
+                    // --- CORRECCIÓN: ---
+                    // Eliminamos el 'echo script alert' y el 'exit'.
+                    // Pasamos el mensaje de éxito para que la VISTA muestre el SweetAlert.
+                    
+                    $message = 'Su contraseña ha sido actualizada correctamente.';
+                    $message_type = 'success'; 
+                    
+                    // NO hacemos redirección aquí. Dejamos que el código continúe
+                    // y cargue la vista de abajo.
+                    
                 } else {
                     $message = 'Error al actualizar en base de datos.';
                     $message_type = 'danger';
@@ -146,6 +152,8 @@ class AuthController
             }
         }
 
+        // Importante: Asegúrate de que este nombre de archivo coincida con el de tu vista
+        // (A veces lo llamaste restablecer.php y otras restablecer_password.php)
         require_once __DIR__ . '/../views/auth/restablecer.php';
     }
 }

@@ -119,7 +119,8 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                         
                         <div>
                             <h2 class="fw-bold text-dark mb-1">
-                                <?php echo $data['saludo'] . ' ' . $nombreUser . ' ' . $apellidoUser; ?>
+                                <!-- CORRECCIÓN AQUÍ: Usamos solo la variable saludo del controlador -->
+                                <?php echo $data['saludo']; ?>
                             </h2>
                             <span class="badge bg-light c-azul border border-primary rounded-pill px-3 py-2">
                                 <i class="fas fa-user-tie me-1"></i> <?php echo $nombreRol; ?>
@@ -263,13 +264,20 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     <?php else: ?>
                         <ul class="list-group list-group-flush">
                             <?php foreach ($data['proximas_reuniones'] as $reunion): 
+                                // Mantenemos $fecha solo para la hora, pero el mes/día viene del controlador
                                 $fecha = new DateTime($reunion['fechaInicioReunion']);
                             ?>
                                 <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                                     <div class="d-flex align-items-center">
                                         <div class="text-center bg-light rounded p-2 me-3 border border-verde" style="min-width: 60px;">
-                                            <div class="small text-uppercase fw-bold c-verde"><?php echo $fecha->format('M'); ?></div>
-                                            <div class="h4 mb-0 fw-bold text-dark"><?php echo $fecha->format('d'); ?></div>
+                                            <!-- CORRECCIÓN AQUÍ: Usamos 'mes_esp' del controlador -->
+                                            <div class="small text-uppercase fw-bold c-verde">
+                                                <?php echo $reunion['mes_esp'] ?? $fecha->format('M'); ?>
+                                            </div>
+                                            <!-- CORRECCIÓN AQUÍ: Usamos 'dia_fmt' del controlador -->
+                                            <div class="h4 mb-0 fw-bold text-dark">
+                                                <?php echo $reunion['dia_fmt'] ?? $fecha->format('d'); ?>
+                                            </div>
                                         </div>
                                         <div>
                                             <h6 class="mb-1 fw-bold text-dark"><?php echo htmlspecialchars($reunion['nombreReunion']); ?></h6>

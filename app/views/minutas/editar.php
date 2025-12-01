@@ -1144,36 +1144,68 @@
     }
 
     function finalizarReunion() {
-        if (!confirm("¿Estás seguro de FINALIZAR la reunión?\n\n1. Se registrará la hora de término.\n2. Se generará el PDF de asistencia.\n3. Se enviará el correo a Génesis Contreras.\n\nEsta acción habilitará el botón para enviar a firma.")) {
-            return;
-        }
+        Swal.fire({
+            title: '¿Finalizar la Reunión?',
+            html: `
+            <div class="text-start small">
+                <p>Se realizarán las siguientes acciones:</p>
+                <ol>
+                    <li>Se registrará la hora de término.</li>
+                    <li>Se generará el PDF de asistencia.</li>
+                    <li>Se enviará el correo de respaldo.</li>
+                </ol>
+                <p class="text-danger fw-bold mb-0">Esta acción habilitará el botón para enviar a firma.</p>
+            </div>
+        `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545', // Rojo para indicar acción importante
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, Finalizar',
+            cancelButtonText: 'Cancelar',
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                // Retornamos la promesa del fetch para que Swal maneje el loading
+                return fetch('index.php?action=api_finalizar_reunion', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            idMinuta: idMinutaGlobal
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error(response.statusText);
+                        return response.json();
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(`Error de conexión: ${error}`);
+                    });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const resp = result.value;
+                const btn = document.getElementById('btnFinalizar');
 
-        const btn = document.getElementById('btnFinalizar');
-        const txtOriginal = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-
-        fetch('index.php?action=api_finalizar_reunion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinutaGlobal
-                })
-            })
-            .then(r => r.json())
-            .then(resp => {
                 if (resp.status === 'success') {
-                    alert("✅ " + resp.message);
+                    // ÉXITO
+                    Swal.fire({
+                        title: '¡Reunión Finalizada!',
+                        text: resp.message,
+                        icon: 'success',
+                        confirmButtonText: 'Excelente'
+                    });
 
-                    // 1. Transformar Botón "Finalizar" a estado final
-                    btn.classList.remove('btn-danger');
-                    btn.classList.add('btn-secondary');
-                    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Reunión Finalizada y Asistencia Enviada';
-                    // Ya está disabled por la lógica inicial, así que lo dejamos así.
+                    // Actualizar UI del botón Finalizar
+                    if (btn) {
+                        btn.classList.remove('btn-danger');
+                        btn.classList.add('btn-secondary');
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Reunión Finalizada y Asistencia Enviada';
+                    }
 
-                    // 2. Activar Botón "Enviar a Firma"
+                    // Activar Botón "Enviar a Firma"
                     const btnFirma = document.getElementById('btnEnviarFirma');
                     if (btnFirma) {
                         btnFirma.disabled = false;
@@ -1183,87 +1215,114 @@
                     }
 
                 } else if (resp.status === 'warning') {
-                    alert("⚠️ " + resp.message);
-                    // Aún si es warning (falló correo pero guardó en local), consideramos el proceso hecho
-                    btn.classList.remove('btn-danger');
-                    btn.classList.add('btn-secondary');
-                    btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Reunión Finalizada (Revise Correo)';
+                    // ADVERTENCIA (Ej: Guardó pero falló correo)
+                    Swal.fire({
+                        title: 'Finalizada con Advertencia',
+                        text: resp.message,
+                        icon: 'warning',
+                        confirmButtonText: 'Entendido'
+                    });
 
+                    if (btn) {
+                        btn.classList.remove('btn-danger');
+                        btn.classList.add('btn-secondary');
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Finalizada (Revise Correo)';
+                    }
+                    // Aún así activamos el flujo de firma
                     const btnFirma = document.getElementById('btnEnviarFirma');
                     if (btnFirma) {
                         btnFirma.disabled = false;
                         btnFirma.classList.remove('btn-secondary');
                         btnFirma.classList.add('btn-success', 'text-white');
                     }
+
                 } else {
-                    alert("❌ Error: " + resp.message);
-                    btn.disabled = false;
-                    btn.innerHTML = txtOriginal; // Revertir si falló
+                    // ERROR
+                    Swal.fire('Error', resp.message || 'Ocurrió un error inesperado', 'error');
                 }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error de conexión.");
-                btn.disabled = false;
-                btn.innerHTML = txtOriginal;
-            });
+            }
+        });
     }
 
     function enviarAFirma() {
-        // 1. CONFIRMACIÓN
-        if (!confirm("¿Desea enviar la minuta para APROBACIÓN?\n\nSe notificará a los presidentes vía correo electrónico.")) {
-            return;
-        }
-
-        // 2. DETECCIÓN INTELIGENTE DEL BOTÓN
-        // Buscamos cualquiera de los dos IDs posibles (Normal o Reenvío)
+        // 1. Detección del botón y contexto (Envío normal vs Reenvío)
         let btn = document.getElementById('btnEnviarFirma') || document.getElementById('btnReenviarFirma');
 
-        // Seguridad: Si por alguna razón no encuentra ninguno, intentamos con el elemento activo
+        // Seguridad por si no encuentra el ID exacto
         if (!btn) btn = document.activeElement;
 
         if (!btn) {
-            alert("Error interno: No se pudo localizar el botón de envío.");
+            Swal.fire('Error', 'No se pudo localizar el botón de acción.', 'error');
             return;
         }
 
-        const txtOriginal = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-paper-plane fa-beat"></i> Enviando...';
+        // Determinar textos según si es reenvío o no
+        const esReenvio = btn.innerText.toLowerCase().includes('reenviar') || btn.innerText.toLowerCase().includes('correc');
 
-        // 3. ENVÍO AL SERVIDOR
-        fetch('index.php?action=api_enviar_aprobacion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    idMinuta: idMinutaGlobal
-                })
-            })
-            .then(r => r.json())
-            .then(resp => {
+        const tituloSwal = esReenvio ? '¿Reenviar Minuta Corregida?' : '¿Enviar a Firma?';
+        const textoSwal = esReenvio ?
+            'Se notificará nuevamente a los presidentes indicando que se han aplicado las correcciones.' :
+            'Se enviará la minuta para su APROBACIÓN y firma electrónica.';
+        const colorBtn = esReenvio ? '#ffc107' : '#198754'; // Amarillo para reenvío, Verde para normal
+        const txtBtn = esReenvio ? 'Sí, Reenviar' : 'Sí, Enviar';
+
+        // 2. Disparar SweetAlert
+        Swal.fire({
+            title: tituloSwal,
+            text: textoSwal,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: colorBtn,
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: txtBtn,
+            cancelButtonText: 'Cancelar',
+            showLoaderOnConfirm: true, // Spinner automático en el botón de confirmación del Swal
+            preConfirm: () => {
+                return fetch('index.php?action=api_enviar_aprobacion', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            idMinuta: idMinutaGlobal
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error(response.statusText);
+                        return response.json();
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(`Error de conexión: ${error}`);
+                    });
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const resp = result.value;
+
                 if (resp.status === 'success') {
-                    alert("✅ " + resp.message);
+                    Swal.fire({
+                        title: '¡Enviado!',
+                        text: resp.message,
+                        icon: 'success',
+                        timer: 2500,
+                        showConfirmButton: false
+                    });
 
-                    // Transformar botón a estado final "Enviada"
-                    btn.classList.remove('btn-success', 'btn-warning'); // Quitamos colores previos
+                    // Actualizar UI del botón
+                    btn.disabled = true;
+                    btn.classList.remove('btn-success', 'btn-warning', 'fa-beat-fade');
                     btn.classList.add('btn-secondary');
-                    btn.innerHTML = '<i class="fas fa-check-double me-1"></i> Minuta Enviada a Presidentes';
-                    // Se mantiene disabled
+
+                    // Cambiar texto e ícono
+                    const nuevoTexto = esReenvio ? 'Minuta Reenviada' : 'Minuta Enviada a Presidentes';
+                    btn.innerHTML = `<i class="fas fa-check-double me-1"></i> ${nuevoTexto}`;
 
                 } else {
-                    alert("⚠️ " + resp.message);
-                    btn.disabled = false;
-                    btn.innerHTML = txtOriginal;
+                    Swal.fire('Error', resp.message || 'No se pudo enviar la solicitud.', 'error');
                 }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error al enviar solicitud.");
-                btn.disabled = false;
-                btn.innerHTML = txtOriginal;
-            });
+            }
+        });
     }
 
     function iniciarReunion() {
@@ -1301,72 +1360,72 @@
 
 
     function crearVotacion() {
-    const inputNombre = document.getElementById('inputNombreVotacion');
+        const inputNombre = document.getElementById('inputNombreVotacion');
 
-    // 1. Validar nombre
-    if (!inputNombre || inputNombre.value.trim() === '') {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Falta información',
-            text: 'Por favor, debe escribir el Tema o Moción para la votación.'
-        });
-        return;
-    }
-
-    // 2. PREGUNTA DE CONFIRMACIÓN (NUEVO)
-    Swal.fire({
-        title: '¿Crear Votación?',
-        text: `Se abrirá la votación para: "${inputNombre.value}"`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#198754', // Verde success
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sí, crear votación',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            
-            // Si confirma, procedemos con la lógica de envío...
-            const idComisionParaEnviar = idComisionGlobal ? idComisionGlobal : null;
-
-            const payload = {
-                idMinuta: idMinutaGlobal,
-                nombre: inputNombre.value.trim(), // Se envía lo que esté en el input (ya capitalizado)
-                idComision: idComisionParaEnviar
-            };
-
-            // 3. Enviar al servidor
-            fetch('index.php?action=api_crear_votacion', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            })
-            .then(r => r.json())
-            .then(resp => {
-                if (resp.status === 'success') {
-                    Swal.fire({
-                        title: '¡Votación Habilitada!',
-                        text: 'Los consejeros ya pueden votar.',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-
-                    inputNombre.value = '';
-                    cargarVotaciones(); 
-                } else {
-                    Swal.fire('Error', resp.message, 'error');
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                Swal.fire('Error', 'Error de conexión con el servidor', 'error');
+        // 1. Validar nombre
+        if (!inputNombre || inputNombre.value.trim() === '') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Falta información',
+                text: 'Por favor, debe escribir el Tema o Moción para la votación.'
             });
+            return;
         }
-    });
-}
+
+        // 2. PREGUNTA DE CONFIRMACIÓN (NUEVO)
+        Swal.fire({
+            title: '¿Crear Votación?',
+            text: `Se abrirá la votación para: "${inputNombre.value}"`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#198754', // Verde success
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, crear votación',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+
+                // Si confirma, procedemos con la lógica de envío...
+                const idComisionParaEnviar = idComisionGlobal ? idComisionGlobal : null;
+
+                const payload = {
+                    idMinuta: idMinutaGlobal,
+                    nombre: inputNombre.value.trim(), // Se envía lo que esté en el input (ya capitalizado)
+                    idComision: idComisionParaEnviar
+                };
+
+                // 3. Enviar al servidor
+                fetch('index.php?action=api_crear_votacion', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(r => r.json())
+                    .then(resp => {
+                        if (resp.status === 'success') {
+                            Swal.fire({
+                                title: '¡Votación Habilitada!',
+                                text: 'Los consejeros ya pueden votar.',
+                                icon: 'success',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+
+                            inputNombre.value = '';
+                            cargarVotaciones();
+                        } else {
+                            Swal.fire('Error', resp.message, 'error');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        Swal.fire('Error', 'Error de conexión con el servidor', 'error');
+                    });
+            }
+        });
+    }
 
 
 

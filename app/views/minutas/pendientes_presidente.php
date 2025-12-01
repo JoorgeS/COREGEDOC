@@ -277,7 +277,7 @@
                         // CASO 2: FIRMA PARCIAL (Mixta)
                         Swal.fire({
                             title: 'Firma Registrada',
-                            text: 'Su firma se guardó correctamente. La minuta permanecerá pendiente hasta que los demás presidentes firmen.',
+                            text: 'Su firma se guardó correctamente.',
                             icon: 'success',
                             confirmButtonText: 'Entendido'
                         }).then(() => {

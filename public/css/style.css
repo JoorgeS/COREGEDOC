@@ -385,3 +385,31 @@
             color: #E1306C !important;
             /* Rosa/Púrpura Instagram */
         }
+
+        /* Colores de redes sociales al pasar el mouse */
+        .fa-facebook:hover {
+            color: #1877F2 !important;
+        }
+
+        .fa-twitter:hover,
+        .fa-x-twitter:hover {
+            color: #000000 !important;
+        }
+
+        /* X es negro */
+        .fa-instagram:hover {
+            color: #E4405F !important;
+        }
+
+        .fa-youtube:hover {
+            color: #FF0000 !important;
+        }
+
+        .fa-linkedin:hover {
+            color: #0077B5 !important;
+        }
+
+        /* Opcional: transición suave */
+        .fab {
+            transition: color 0.3s ease;
+        }

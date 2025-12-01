@@ -53,8 +53,6 @@ class HomeController
         */
         
         // 2. Preparar variables de usuario
-        // NOTA: Si la sesión expiró arriba, estas líneas darían error si no hay redirección,
-        // pero el exit() de arriba lo previene.
         $idUsuarioLogueado = $_SESSION['idUsuario'] ?? null; 
         $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? null;
 
@@ -77,16 +75,29 @@ class HomeController
 
         // --- INICIO: LÓGICA DE VISTA REFACTORIZADA (MOVIDA DESDE home.php) ---
 
-        // A. Definir un saludo según la hora (Lógica movida)
+        // A. Definir un saludo según la hora + Nombre Usuario (SIN ROL)
         $hora = date('G');
         if ($hora >= 5 && $hora < 12) {
-            $saludo = "Buenos días";
-        } elseif ($hora >= 12 && $hora < 19) {
-            $saludo = "Buenas tardes";
+            $saludoBase = "Buenos días";
+        } elseif ($hora >= 12 && $hora < 20) {
+            $saludoBase = "Buenas tardes";
         } else {
-            $saludo = "Buenas noches";
+            $saludoBase = "Buenas noches";
         }
-        $data['saludo'] = $saludo;
+
+        // Obtenemos nombre y apellido de la sesión
+        $pNombre = $_SESSION['pNombre'] ?? '';
+        $aPaterno = $_SESSION['aPaterno'] ?? '';
+        
+        // Concatenamos SOLO nombre y apellido, sin el rol.
+        $nombreCompleto = trim("$pNombre $aPaterno");
+        
+        if (!empty($nombreCompleto)) {
+            $data['saludo'] = "$saludoBase, $nombreCompleto";
+        } else {
+            $data['saludo'] = $saludoBase;
+        }
+
 
         $imagenesZonas = [
             // 1. FIRMA DIGITAL
@@ -250,13 +261,31 @@ class HomeController
                 $data['actividad_reciente'] = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
             }
 
-            // E. Próximas Reuniones
+            // E. Próximas Reuniones (Con formato de fecha corregido)
             $sql = "SELECT r.idReunion, r.nombreReunion, r.fechaInicioReunion, c.nombreComision
                     FROM t_reunion r
                     LEFT JOIN t_comision c ON r.t_comision_idComision = c.idComision
                     WHERE r.fechaInicioReunion >= NOW()
                     ORDER BY r.fechaInicioReunion ASC LIMIT 3";
-            $data['proximas_reuniones'] = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+            
+            $reuniones = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+            // LOGICA: Traducir meses a español manualmente para el Dashboard
+            $mesesEsp = [
+                1 => 'ENE', 2 => 'FEB', 3 => 'MAR', 4 => 'ABR', 5 => 'MAY', 6 => 'JUN',
+                7 => 'JUL', 8 => 'AGO', 9 => 'SEP', 10 => 'OCT', 11 => 'NOV', 12 => 'DIC'
+            ];
+
+            foreach ($reuniones as &$r) {
+                $timestamp = strtotime($r['fechaInicioReunion']);
+                // Agregamos dos campos nuevos para usar en la vista home.php
+                $r['dia_fmt'] = date('d', $timestamp); // Ej: 15
+                $r['mes_esp'] = $mesesEsp[(int)date('n', $timestamp)]; // Ej: DIC (en vez de DEC)
+            }
+            unset($r); // Romper referencia
+
+            $data['proximas_reuniones'] = $reuniones;
+
         } catch (\Exception $e) {
             // error_log($e->getMessage());
         }
