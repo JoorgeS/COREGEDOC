@@ -114,14 +114,46 @@
                                         </div>
 
                                         <div class="col-md-6">
-                                            <label class="small text-muted text-uppercase fw-bold mb-1" style="font-size:0.7rem">Progreso Aprobación</label>
-                                            <div class="d-flex align-items-center">
-                                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                                                    <div class="progress-bar bg-success" role="progressbar" style="width: <?= $porcentaje ?>%"></div>
+                                            <label class="small text-muted text-uppercase fw-bold mb-1" style="font-size:0.7rem">Estado Firmas</label>
+
+                                            <?php
+                                            // Calculamos pendientes (las otras variables ya vienen definidas al inicio del foreach)
+                                            $pendientes = $firmasTotal - $firmasActuales;
+                                            ?>
+
+                                            <div class="d-flex flex-column">
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span class="badge bg-light text-dark border">
+                                                        <i class="fas fa-file-signature text-primary"></i>
+                                                        <?= $firmasActuales ?> de <?= $firmasTotal ?>
+                                                    </span>
+
+                                                    <?php if ($m['mi_estado_firma'] === 'FIRMADO'): ?>
+                                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                                            <i class="fas fa-check me-1"></i> Firmado
+                                                        </span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-warning bg-opacity-10 text-dark border border-warning">
+                                                            <i class="fas fa-clock me-1"></i> Falta su firma
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </div>
-                                                <small class="text-muted fw-bold" style="font-size: 0.8rem;">
-                                                    <?= $firmasActuales ?> de <?= $firmasTotal ?> firmas
-                                                </small>
+
+                                                <?php if ($m['mi_estado_firma'] === 'FIRMADO'): ?>
+                                                    <?php if ($pendientes > 0): ?>
+                                                        <small class="text-muted fst-italic" style="font-size: 0.8rem;">
+                                                            <i class="fas fa-spinner fa-spin me-1"></i> Esperando a <?= $pendientes ?> presidente(s) más...
+                                                        </small>
+                                                    <?php else: ?>
+                                                        <small class="text-success fw-bold" style="font-size: 0.8rem;">
+                                                            ¡Proceso Completado!
+                                                        </small>
+                                                    <?php endif; ?>
+                                                <?php else: ?>
+                                                    <div class="progress" style="height: 6px;">
+                                                        <div class="progress-bar bg-success" role="progressbar" style="width: <?= $porcentaje ?>%"></div>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </div>
@@ -236,26 +268,30 @@
             allowOutsideClick: () => !Swal.isLoading(),
             preConfirm: () => {
                 return fetch('index.php?action=api_firmar_minuta', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idMinuta: id })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(response.statusText)
-                    }
-                    return response.json()
-                })
-                .catch(error => {
-                    Swal.showValidationMessage(`Error de conexión: ${error}`)
-                })
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            idMinuta: id
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(response.statusText)
+                        }
+                        return response.json()
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(`Error de conexión: ${error}`)
+                    })
             }
         }).then((result) => {
             if (result.isConfirmed) {
                 const resp = result.value;
 
                 if (resp.status && resp.status.includes('success')) {
-                    
+
                     // LOGICA DE RESPUESTA SEGÚN ESTADO FINAL
                     if (resp.estado_nuevo === 'APROBADA') {
                         // CASO 1: MINUTA TOTALMENTE APROBADA
@@ -267,7 +303,7 @@
                         }).then(() => {
                             // 1. Abrir PDF
                             window.open(`index.php?action=ver_minuta_oficial&id=${id}`, '_blank');
-                            
+
                             // 2. Recargar con pequeño retraso para que no cancele la apertura del PDF
                             setTimeout(() => {
                                 location.reload();
@@ -284,7 +320,7 @@
                             location.reload();
                         });
                     }
-                    
+
                 } else {
                     Swal.fire('Error', resp.message || 'Error desconocido', 'error');
                 }
@@ -312,12 +348,16 @@
             title: 'Enviando solicitud...',
             text: 'Por favor espere',
             allowOutsideClick: false,
-            didOpen: () => { Swal.showLoading() }
+            didOpen: () => {
+                Swal.showLoading()
+            }
         });
 
         fetch('index.php?action=api_enviar_feedback', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({
                     idMinuta: id,
                     feedback: txt
@@ -336,45 +376,45 @@
 
     // 3. ADJUNTOS
     // 3. ADJUNTOS
-    function verAdjuntos(id) {
-        const lista = document.getElementById('listaAdjuntos');
-        const msg = document.getElementById('sinAdjuntosMsg');
+    function verAdjuntos(id) {
+        const lista = document.getElementById('listaAdjuntos');
+        const msg = document.getElementById('sinAdjuntosMsg');
 
-        lista.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando...</div>';
-        msg.style.display = 'none';
-        new bootstrap.Modal(document.getElementById('modalAdjuntos')).show();
+        lista.innerHTML = '<div class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando...</div>';
+        msg.style.display = 'none';
+        new bootstrap.Modal(document.getElementById('modalAdjuntos')).show();
 
-        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`)
-            .then(r => r.json())
-            .then(resp => {
-                lista.innerHTML = '';
-                if (resp.data && resp.data.length > 0) {
-                    msg.style.display = 'none';
-                    resp.data.forEach(a => {
-                        // MODIFICACIÓN CLAVE: Usar a.nombreArchivo o derivar de la ruta.
-                        let nombreMostrar = a.nombreArchivo || a.pathAdjunto.split('/').pop();
+        fetch(`index.php?action=api_ver_adjuntos_minuta&id=${id}`)
+            .then(r => r.json())
+            .then(resp => {
+                lista.innerHTML = '';
+                if (resp.data && resp.data.length > 0) {
+                    msg.style.display = 'none';
+                    resp.data.forEach(a => {
+                        // MODIFICACIÓN CLAVE: Usar a.nombreArchivo o derivar de la ruta.
+                        let nombreMostrar = a.nombreArchivo || a.pathAdjunto.split('/').pop();
 
-                        let urlVisor = `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
-                        let extension = nombreMostrar.split('.').pop().toLowerCase();
-                        let icon = 'fa-file text-secondary'; // Icono default
+                        let urlVisor = `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
+                        let extension = nombreMostrar.split('.').pop().toLowerCase();
+                        let icon = 'fa-file text-secondary'; // Icono default
 
-                        // Iconos según extensión
-                        if (['pdf'].includes(extension)) icon = 'fa-file-pdf text-danger';
-                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word text-primary';
-                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel text-success';
-                        else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) icon = 'fa-file-image text-info';
+                        // Iconos según extensión
+                        if (['pdf'].includes(extension)) icon = 'fa-file-pdf text-danger';
+                        else if (['doc', 'docx'].includes(extension)) icon = 'fa-file-word text-primary';
+                        else if (['xls', 'xlsx'].includes(extension)) icon = 'fa-file-excel text-success';
+                        else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) icon = 'fa-file-image text-info';
 
-                        // Lógica para Links Externos y Corrección de "www"
-                        if (a.tipoAdjunto === 'link' || a.pathAdjunto.startsWith('http') || a.pathAdjunto.startsWith('www')) {
-                            let urlExterna = a.pathAdjunto;
-                            if (!urlExterna.match(/^https?:\/\//)) {
-                                urlExterna = 'https://' + urlExterna;
-                            }
-                            urlVisor = urlExterna;
-                            icon = 'fa-link text-primary'; // Cambiar icono a link y color
-                        }
+                        // Lógica para Links Externos y Corrección de "www"
+                        if (a.tipoAdjunto === 'link' || a.pathAdjunto.startsWith('http') || a.pathAdjunto.startsWith('www')) {
+                            let urlExterna = a.pathAdjunto;
+                            if (!urlExterna.match(/^https?:\/\//)) {
+                                urlExterna = 'https://' + urlExterna;
+                            }
+                            urlVisor = urlExterna;
+                            icon = 'fa-link text-primary'; // Cambiar icono a link y color
+                        }
 
-                        lista.innerHTML += `
+                        lista.innerHTML += `
                             <a href="${urlVisor}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
                                 <div class="me-3 fs-4"><i class="fas ${icon}"></i></div>
                                 <div class="text-truncate">
@@ -382,11 +422,11 @@
                                     <small class="text-muted">Clic para abrir</small>
                                 </div>
                             </a>`;
-                    });
-                } else {
-                    msg.style.display = 'block';
-                }
-            })
-            .catch(e => lista.innerHTML = '<div class="text-danger p-3 text-center">Error al cargar.</div>');
-    }
+                    });
+                } else {
+                    msg.style.display = 'block';
+                }
+            })
+            .catch(e => lista.innerHTML = '<div class="text-danger p-3 text-center">Error al cargar.</div>');
+    }
 </script>

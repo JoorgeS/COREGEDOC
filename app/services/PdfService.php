@@ -62,11 +62,11 @@ class PdfService
     private function renderizarPdf($data, $rutaGuardado, $esBorrador)
     {
         // 1. Imágenes
-        $baseImg = $_SERVER['DOCUMENT_ROOT'] . '/coregedoc/public/img/';
+        // Ajustamos para usar __DIR__ y evitar problemas con DOCUMENT_ROOT en algunos servidores
+        $baseImg = __DIR__ . '/../../public/img/';
 
         $logoGore = $this->imageToDataUrl($baseImg . 'logo2.png');
         $logoCore = $this->imageToDataUrl($baseImg . 'logoCore1.png');
-        // Usamos la imagen del sello/firma digital como marca de agua en la firma
         $firmaImg = $this->imageToDataUrl($baseImg . 'firmadigital.png');
 
         // 2. QR
@@ -124,11 +124,20 @@ class PdfService
             @page { margin: 40px 50px; }
             body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
             
-            /* Marca de Agua (Fondo página Borrador) */
+            /* Marca de Agua */
             .watermark {
-                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 80pt; font-weight: bold; color: rgba(200, 200, 200, 0.15);
-                z-index: -1000; text-transform: uppercase; text-align: center; width: 100%;
+                position: fixed; 
+                top: 50%; 
+                left: 50%; 
+                transform: translate(-50%, -50%) rotate(-45deg);
+                font-size: 80pt; 
+                font-weight: bold; 
+                color: rgba(95, 93, 93, 0.08); 
+                z-index: 9999; 
+                text-transform: uppercase; 
+                text-align: center; 
+                width: 100%;
+                pointer-events: none;
             }
 
             /* Encabezado */
@@ -163,12 +172,15 @@ class PdfService
             .tema-lbl { font-weight: bold; font-size: 9pt; color: #555; display: block; margin-bottom: 2px; }
             .tema-val { display: block; text-align: justify; font-size: 9.5pt; }
             
-            /* --- VOTACIONES (Diseño Mejorado) --- */
+            /* --- VOTACIONES --- */
             .votacion-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; page-break-inside: avoid; background-color: #fff; }
-            .vot-title { font-weight: bold; font-size: 10pt; margin-bottom: 5px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+            .vot-title { font-weight: bold; font-size: 10pt; margin-bottom: 2px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+            .vot-comision { font-size: 8pt; color: #0071bc; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; }
+            
             .vot-res { font-weight: bold; float: right; text-transform: uppercase; }
             .res-aprobado { color: green; }
             .res-rechazado { color: red; }
+            
             .vot-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 10px; border: 1px solid #eee; }
             .vot-table th { background-color: #f9f9f9; text-align: left; padding: 5px; border-bottom: 1px solid #ddd; color: #555; }
             .vot-table td { padding: 5px; border-bottom: 1px solid #eee; }
@@ -176,56 +188,53 @@ class PdfService
             .voto-no { color: red; font-weight: bold; }
             .voto-abs { color: orange; font-weight: bold; }
             
-            /* --- FIRMAS (Diseño Punteado con Sello) --- */
+            /* --- FIRMAS --- */
             .signature-wrapper { margin-top: 50px; margin-bottom: 30px; text-align: center; }
-            
             .signature-box {
                 display: inline-block;
                 width: 280px;
-                /* BORDE PUNTEADO */
                 border: 1px dashed #999; 
                 padding: 20px 10px;
                 margin: 0 20px;
-                position: relative; /* Contexto para el sello */
-                background-color: transparent; /* Transparente para que se vean las capas */
+                position: relative; 
+                background-color: transparent; 
                 vertical-align: middle;
                 text-align: center;
             }
-            
-            /* Sello de fondo */
             .sig-seal {
                 position: absolute;
-                /* CÁLCULO MANUAL PARA CENTRAR: 
-                   (Ancho Caja 280px - Ancho Imagen 100px) / 2 = 90px de izquierda 
-                */
                 left: 90px; 
-                top: 15px; /* Ajuste vertical fijo */
+                top: 15px; 
                 width: 100px; 
-                opacity: 0.15; /* Marca de agua suave */
-                z-index: -1; /* Enviar al fondo */
+                opacity: 0.15; 
+                z-index: -1; 
             }
-            
-            /* Contenido de la firma (por encima del sello) */
-            .sig-content {
-                position: relative;
-                z-index: 2; /* Texto encima de la imagen */
-            }
-            
-            /* Contenido de la firma (por encima del sello) */
-            .sig-content {
-                position: relative;
-                z-index: 1; 
-            }
-            
+            .sig-content { position: relative; z-index: 1; }
             .sig-name { font-weight: bold; font-size: 11pt; color: #000; margin-bottom: 4px; }
             .sig-role { font-size: 10pt; color: #555; margin-bottom: 4px; }
             .sig-meta { font-size: 8pt; color: #888; line-height: 1.2; }
             
             /* Footer */
             .footer-sep { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
-            .footer-table { width: 100%; }
-            .qr-col { width: 90px; vertical-align: top; }
-            .info-col { vertical-align: top; font-size: 8pt; color: #555; line-height: 1.3; }
+            .footer-table { width: 100%; border-top: 1px solid #ccc; padding-top: 10px; margin-top: 20px; }
+            .qr-col { width: 80px; vertical-align: top; padding-right: 15px; }
+            .info-col { 
+                vertical-align: top; 
+                font-size: 8pt; 
+                color: #555; 
+                line-height: 1.3; 
+                text-align: justify;
+            }
+            .link-validacion {
+                color: #0071bc;
+                text-decoration: none;
+                font-family: monospace; 
+                font-size: 7pt; 
+                word-break: break-all;
+                overflow-wrap: break-word;
+                display: block; 
+                margin-top: 3px;
+            }
             .hash-tag { font-family: monospace; background: #eee; padding: 2px; }
             .footer-borrador { text-align: center; color: #999; font-size: 8pt; margin-top: 30px; border-top: 1px dashed #ccc; padding-top: 10px; }
         ";
@@ -248,7 +257,6 @@ class PdfService
                 <div class="watermark">BORRADOR</div>
             <?php endif; ?>
 
-            <!-- ENCABEZADO -->
             <table class="header-table">
                 <tr>
                     <td width="100" align="left" style="vertical-align: middle;">
@@ -266,10 +274,8 @@ class PdfService
             </table>
             <hr class="header-sep">
 
-            <!-- TÍTULO -->
             <div class="doc-title"><?= $tituloDocumento ?></div>
 
-            <!-- DATOS GENERALES -->
             <table class="info-table">
                 <tr>
                     <td class="lbl">COMISIÓN:</td>
@@ -287,13 +293,9 @@ class PdfService
                     <td class="lbl">HORA TÉRMINO:</td>
                     <td class="val"><?= isset($m['horaTerminoReal']) ? date('H:i', strtotime($m['horaTerminoReal'])) : 'En curso' ?> hrs.</td>
                 </tr>
-                <tr>
-                    <td class="lbl">ESTADO:</td>
-                    <td class="val"><?= $estado ?></td>
-                </tr>
+
             </table>
 
-            <!-- 1. ASISTENCIA -->
             <h3 class="sec-title">1. Asistencia de Consejeros</h3>
             <?php
             $presentes = array_filter($asistencia, function ($a) {
@@ -331,7 +333,6 @@ class PdfService
             <?php endif; ?>
 
 
-            <!-- 2. DESARROLLO DE TEMAS -->
             <h3 class="sec-title">2. Desarrollo de la Reunión</h3>
             <?php if (!empty($temas)): ?>
                 <?php foreach ($temas as $index => $t): ?>
@@ -363,26 +364,20 @@ class PdfService
             <?php endif; ?>
 
 
-            <!-- 3. VOTACIONES -->
             <h3 class="sec-title">3. Registro de Votaciones</h3>
             <?php if (!empty($votaciones)): ?>
                 <?php foreach ($votaciones as $v):
-                    // 1. PREPARACIÓN DE DATOS (Cálculo automático para evitar ceros)
                     $si = 0;
                     $no = 0;
                     $abs = 0;
                     $listaVotosProcesados = [];
 
-                    // Obtenemos el array de detalles, intentando varios nombres posibles
                     $detalles = $v['detalle_asistentes'] ?? $v['detalles'] ?? [];
 
-                    // Recorremos los votos para contar y formatear
                     foreach ($detalles as $dv) {
-                        // Detectar la opción de voto (BD: opcionVoto)
                         $opcionRaw = $dv['opcionVoto'] ?? $dv['voto'] ?? 'PENDIENTE';
                         $opcion = strtoupper($opcionRaw);
 
-                        // Contamos manualmente para arreglar el resumen en 0
                         if ($opcion == 'SI' || $opcion == 'APRUEBO') {
                             $si++;
                             $claseCss = 'voto-si';
@@ -393,10 +388,9 @@ class PdfService
                             $abs++;
                             $claseCss = 'voto-abs';
                         } else {
-                            $claseCss = ''; // Pendiente o Ausente
+                            $claseCss = '';
                         }
 
-                        // Construir nombre (BD: pNombre, aPaterno)
                         $nombreConsejero = 'Consejero';
                         if (!empty($dv['nombre'])) {
                             $nombreConsejero = $dv['nombre'];
@@ -404,7 +398,6 @@ class PdfService
                             $nombreConsejero = $dv['pNombre'] . ' ' . ($dv['aPaterno'] ?? '');
                         }
 
-                        // Solo agregamos a la lista si ya votó (ignoramos pendientes en el PDF final si se desea)
                         if ($opcion != 'PENDIENTE') {
                             $listaVotosProcesados[] = [
                                 'nombre' => $nombreConsejero,
@@ -414,11 +407,9 @@ class PdfService
                         }
                     }
 
-                    // Determinar resultado basado en el conteo real
                     $txtResultado = ($si > $no) ? 'APROBADO' : 'RECHAZADO';
                     if ($si == 0 && $no == 0 && $abs == 0) $txtResultado = 'SIN VOTOS';
 
-                    // Si la BD trae un resultado explícito, lo usamos, si no, usamos el calculado
                     $resultadoFinal = strtoupper($v['resultado'] ?? $txtResultado);
                     $colorRes = ($resultadoFinal == 'APROBADO' || $resultadoFinal == 'SI') ? 'res-aprobado' : 'res-rechazado';
                 ?>
@@ -426,6 +417,10 @@ class PdfService
                         <div class="vot-title">
                             Moción: <?= htmlspecialchars($v['nombreVotacion']) ?>
                             <span class="vot-res <?= $colorRes ?>"><?= $resultadoFinal ?></span>
+                        </div>
+
+                        <div class="vot-comision">
+                            COMISIÓN: <?= htmlspecialchars($v['nombreComision'] ?? 'GENERAL') ?>
                         </div>
 
                         <div style="font-size: 9pt; margin-bottom: 8px; background-color: #f9f9f9; padding: 5px; border-radius: 3px;">
@@ -464,21 +459,22 @@ class PdfService
             <?php endif; ?>
 
 
-            <!-- FIRMAS (Estilo punteado con sello de fondo) -->
-            <!-- La firma se muestra SI NO ES BORRADOR -->
-
             <?php if (!$esBorrador): ?>
                 <div class="signature-wrapper">
                     <?php if (!empty($firmas)): ?>
                         <?php foreach ($firmas as $f): ?>
                             <div class="signature-box">
                                 <img src="<?= $firmaImg ?>" class="sig-seal">
-
                                 <div class="sig-content">
                                     <div class="sig-name">
-                                        <?= htmlspecialchars($f['pNombre'] . ' ' . $f['aPaterno']) ?>
+                                        <!-- CORRECCIÓN: Usamos pNombre y aPaterno que vienen del Controller -->
+                                        <?= htmlspecialchars(($f['pNombre'] ?? '') . ' ' . ($f['aPaterno'] ?? '')) ?> 
                                     </div>
-                                    <div class="sig-role">Presidente Comisión</div>
+                                    <div class="sig-role" style="font-size: 9pt; font-weight: bold; margin-bottom: 2px;">
+                                        <!-- CORRECCIÓN: Fallback al nombre de comisión del documento si no hay específica -->
+                                        <?= htmlspecialchars($f['nombreComision'] ?? $nombreComision) ?>
+                                    </div>
+                                    <div class="sig-role">Presidente</div>
                                     <div class="sig-meta">
                                         Firmado digitalmente<br>
                                         <?= date('d/m/Y H:i', strtotime($f['fechaAprobacion'])) ?>
@@ -492,7 +488,6 @@ class PdfService
                 </div>
             <?php endif; ?>
 
-            <!-- PIE DE PÁGINA -->
             <div style="page-break-inside: avoid;">
                 <?php if ($esBorrador): ?>
                     <div class="footer-borrador">
@@ -507,7 +502,7 @@ class PdfService
                                 <strong>VALIDACIÓN DE AUTENTICIDAD</strong><br>
                                 Este documento es una copia fiel del original firmado electrónicamente en el Sistema COREGEDOC.<br>
                                 Valide su originalidad escaneando el código QR o ingresando a:<br>
-                                <span style="color: #0071bc;"><?= $data['urlValidacion'] ?></span>
+                                <span class="link-validacion"><?= $data['urlValidacion'] ?></span>
                                 <br><br>
                                 Hash Seguridad: <span class="hash-tag"><?= $hash ?></span>
                             </td>

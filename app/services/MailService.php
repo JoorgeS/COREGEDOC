@@ -229,4 +229,106 @@ class MailService
             return false;
         }
     }
+
+    public function notificarFeedback($datos, $autorAccion, $mensajeFeedback)
+    {
+        $asunto = "⚠️ Corrección Solicitada - Minuta N° " . $datos['minuta']['id'];
+        
+        $cuerpo = "<h3>Solicitud de Corrección</h3>";
+        $cuerpo .= "<p>El Presidente <b>$autorAccion</b> ha solicitado correcciones en la minuta de la comisión <b>{$datos['minuta']['comision']}</b>.</p>";
+        $cuerpo .= "<p><strong>Observación:</strong> <br><i>\"$mensajeFeedback\"</i></p>";
+        $cuerpo .= "<p>El estado de las firmas se ha reiniciado. Por favor, ingrese al sistema para editar y reenviar.</p>";
+        
+        $this->enviarA_Todos($datos, $asunto, $cuerpo);
+    }
+
+    /**
+     * Notifica que un presidente firmó (pero faltan otros)
+     */
+    public function notificarFirmaParcial($datos, $autorAccion)
+    {
+        $asunto = "✍️ Firma Recibida - Minuta N° " . $datos['minuta']['id'];
+        
+        $cuerpo = "<h3>Firma Registrada</h3>";
+        $cuerpo .= "<p>El Presidente <b>$autorAccion</b> ha firmado y aprobado la minuta de la comisión <b>{$datos['minuta']['comision']}</b>.</p>";
+        $cuerpo .= "<p>El documento queda a la espera de las firmas restantes para su aprobación final.</p>";
+        
+        $this->enviarA_Todos($datos, $asunto, $cuerpo);
+    }
+
+    /**
+     * Notifica que la minuta fue APROBADA (Todos firmaron)
+     */
+    public function notificarAprobacionFinal($datos)
+    {
+        $asunto = "✅ Minuta Aprobada Oficialmente - N° " . $datos['minuta']['id'];
+        
+        $cuerpo = "<h3>Proceso Finalizado</h3>";
+        $cuerpo .= "<p>La minuta de la comisión <b>{$datos['minuta']['comision']}</b> ha completado el ciclo de firmas.</p>";
+        $cuerpo .= "<p>El documento oficial ya se encuentra disponible en el sistema.</p>";
+        
+        $this->enviarA_Todos($datos, $asunto, $cuerpo);
+    }
+
+    /**
+     * Notifica a los presidentes que el ST envió/reenvió la minuta para firma
+     */
+    public function notificarSolicitudFirma($datos, $esReenvio)
+    {
+        $tipo = $esReenvio ? "Corrección Aplicada" : "Solicitud de Firma";
+        $asunto = "📄 $tipo - Minuta N° " . $datos['minuta']['id'];
+        
+        $cuerpo = "<h3>Documento Disponible para Firma</h3>";
+        $cuerpo .= "<p>El Secretario Técnico ha " . ($esReenvio ? "aplicado las correcciones" : "generado el borrador") . " de la minuta <b>{$datos['minuta']['comision']}</b>.</p>";
+        $cuerpo .= "<p>Por favor, ingrese al sistema para revisar y firmar.</p>";
+        
+        // En este caso particular, quizás solo quieras notificar a los presidentes, 
+        // pero según tu requerimiento de "mantener a todos informados", enviamos a todos.
+        $this->enviarA_Todos($datos, $asunto, $cuerpo);
+    }
+
+    // --- Helper Privado para iterar destinatarios ---
+    private function enviarA_Todos($datos, $asunto, $cuerpo)
+    {
+        // 1. Enviar al Secretario Técnico
+        if (!empty($datos['st']['email'])) {
+            $this->sendEmail($datos['st']['email'], $datos['st']['nombre'], $asunto, $cuerpo);
+        }
+
+        // 2. Enviar a TODOS los Presidentes
+        foreach ($datos['presidentes'] as $presi) {
+            if (!empty($presi['correo'])) {
+                $this->sendEmail($presi['correo'], $presi['nombre'], $asunto, $cuerpo);
+            }
+        }
+    }
+    
+    // Función mockup por si no tienes la tuya definida
+    private function sendEmail($to, $name, $subject, $body) {
+    try {
+        $mail = $this->getConfiguredMailer();
+        $mail->addAddress($to, $name);
+        $mail->Subject = $subject;
+        
+        // Agregar la firma institucional al cuerpo
+        $firmaTag = $this->obtenerTagFirma($mail);
+        
+        $mail->isHTML(true);
+        $mail->Body = "
+            <html>
+            <body style='font-family: Arial, sans-serif; color: #333;'>
+                $body
+                <br>
+                <p>Atentamente,<br><strong>Sistema COREGEDOC</strong></p>
+                $firmaTag
+            </body>
+            </html>";
+            
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        error_log("Error genérico MailService: " . $mail->ErrorInfo);
+        return false;
+    }
+}
 }

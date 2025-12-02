@@ -211,10 +211,12 @@ class MinutaController
         // 5. VOTACIONES Y DETALLES (CORREGIDO)
         $idReunion = $minutaInfo['idReunion'] ?? null;
 
-        // Búsqueda ampliada: Por ID Minuta O Por ID Reunión
-        $sqlV = "SELECT * FROM t_votacion 
-                 WHERE t_minuta_idMinuta = :idMin 
-                 OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
+        // Agregamos LEFT JOIN t_comision para traer el nombre de la comisión asignada a la votación
+        $sqlV = "SELECT v.*, c.nombreComision as nombreComisionVoto
+             FROM t_votacion v
+             LEFT JOIN t_comision c ON v.idComision = c.idComision
+             WHERE v.t_minuta_idMinuta = :idMin 
+             OR (v.t_reunion_idReunion IS NOT NULL AND v.t_reunion_idReunion = :idReu)";
 
         $stmtV = $db->prepare($sqlV);
         $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
@@ -252,8 +254,11 @@ class MinutaController
             elseif ($no > $si) $resultadoTexto = "RECHAZADO";
             elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
 
+            $nombreComisionVoto = $v['nombreComisionVoto'] ?? $minutaInfo['nombreComision'] ?? 'General';
+
             $votaciones[] = [
                 'nombreVotacion' => $v['nombreVotacion'],
+                'nombreComision' => $nombreComisionVoto, // <--- NUEVO DATO PARA EL PDF
                 'resultado' => $resultadoTexto,
                 'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
                 'detalle_asistentes' => $detalleAsistentes
@@ -311,17 +316,13 @@ class MinutaController
         $db = new Database();
         $conn = $db->getConnection();
 
-        // Obtener datos completos de la minuta
+        // Obtener datos base de la minuta y usuarios relacionados
         $sql = "SELECT m.*, 
                        r.nombreReunion, r.t_comision_idComision_mixta, r.t_comision_idComision_mixta2,
-                       c.nombreComision,
-                       u_sec.pNombre as secNombre, u_sec.aPaterno as secApellido,
-                       u_pres.pNombre as presNombre, u_pres.aPaterno as presApellido
+                       u_sec.pNombre as secNombre, u_sec.aPaterno as secApellido
                 FROM t_minuta m
                 LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
-                LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
                 LEFT JOIN t_usuario u_sec ON m.t_usuario_idSecretario = u_sec.idUsuario
-                LEFT JOIN t_usuario u_pres ON m.t_usuario_idPresidente = u_pres.idUsuario
                 WHERE m.idMinuta = :id";
 
         $stmt = $conn->prepare($sql);
@@ -333,19 +334,48 @@ class MinutaController
             return;
         }
 
-        // Comisiones Mixtas
-        $nombresComisiones = [$minuta['nombreComision']];
-        if (!empty($minuta['t_comision_idComision_mixta'])) {
-            $stmtC2 = $conn->prepare("SELECT nombreComision FROM t_comision WHERE idComision = ?");
-            $stmtC2->execute([$minuta['t_comision_idComision_mixta']]);
-            if ($c2 = $stmtC2->fetchColumn()) $nombresComisiones[] = $c2;
+        // --- LÓGICA COMISIONES MIXTAS ---
+        $idsComisiones = [];
+        if (!empty($minuta['t_comision_idComision'])) $idsComisiones[] = $minuta['t_comision_idComision'];
+        if (!empty($minuta['t_comision_idComision_mixta'])) $idsComisiones[] = $minuta['t_comision_idComision_mixta'];
+        if (!empty($minuta['t_comision_idComision_mixta2'])) $idsComisiones[] = $minuta['t_comision_idComision_mixta2'];
+
+        $listaComisionesDetalle = [];
+        $nombresComisionesStr = [];
+        $nombresPresidentesStr = [];
+
+        if (!empty($idsComisiones)) {
+            $inQuery = implode(',', array_fill(0, count($idsComisiones), '?'));
+
+            // Traemos nombre comisión y nombre presidente
+            $sqlC = "SELECT c.idComision, c.nombreComision, 
+                            u.pNombre, u.aPaterno 
+                     FROM t_comision c
+                     LEFT JOIN t_usuario u ON c.t_usuario_idPresidente = u.idUsuario
+                     WHERE c.idComision IN ($inQuery)";
+
+            $stmtC = $conn->prepare($sqlC);
+            $stmtC->execute($idsComisiones);
+            $resultados = $stmtC->fetchAll(\PDO::FETCH_ASSOC);
+
+            foreach ($resultados as $res) {
+                // Para el Select del Modal
+                $listaComisionesDetalle[] = [
+                    'id' => $res['idComision'],
+                    'nombre' => $res['nombreComision']
+                ];
+
+                // Para el Header
+                $nombresComisionesStr[] = $res['nombreComision'];
+                if (!empty($res['pNombre'])) {
+                    $nombresPresidentesStr[] = $res['pNombre'] . ' ' . $res['aPaterno'];
+                }
+            }
         }
-        if (!empty($minuta['t_comision_idComision_mixta2'])) {
-            $stmtC3 = $conn->prepare("SELECT nombreComision FROM t_comision WHERE idComision = ?");
-            $stmtC3->execute([$minuta['t_comision_idComision_mixta2']]);
-            if ($c3 = $stmtC3->fetchColumn()) $nombresComisiones[] = $c3;
-        }
-        $stringComisiones = implode(' + ', $nombresComisiones);
+
+        $stringComisiones = implode(' + ', $nombresComisionesStr);
+        $stringPresidentes = implode(' + ', array_unique($nombresPresidentesStr));
+        // --------------------------------
 
         $minutaModel = new Minuta();
         $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
@@ -363,10 +393,12 @@ class MinutaController
                 'comisiones_str' => $stringComisiones,
                 'nombre_reunion' => $minuta['nombreReunion'] ?? 'Sin Reunión Asignada',
                 'secretario_completo' => ($minuta['secNombre'] ?? '') . ' ' . ($minuta['secApellido'] ?? ''),
-                'presidente_completo' => ($minuta['presNombre'] ?? '') . ' ' . ($minuta['presApellido'] ?? ''),
+                'presidente_completo' => $stringPresidentes, // Muestra todos los presidentes
                 'fecha_formateada' => date('d-m-Y', strtotime($minuta['fechaMinuta'])),
                 'hora_formateada' => date('H:i', strtotime($minuta['horaMinuta'])) . ' hrs.'
             ],
+            // Enviamos la lista detallada a la vista
+            'lista_comisiones_select' => $listaComisionesDetalle,
             'temas' => $minutaModel->getTemas($idMinuta),
             'asistencia' => $minutaModel->getAsistenciaData($idMinuta),
             'adjuntos' => $minutaModel->getAdjuntosPorMinuta($idMinuta),
@@ -479,13 +511,18 @@ class MinutaController
         $idMinuta = $input['idMinuta'] ?? 0;
         $temas = $input['temas'] ?? [];
 
+        // Obtenemos ID de usuario para el LOG
+        $idUsuarioEditor = $_SESSION['idUsuario'];
+
         if (!$idMinuta) {
             echo json_encode(['status' => 'error', 'message' => 'Falta ID Minuta']);
             exit;
         }
 
         $model = new Minuta();
-        $temasGuardados = $model->guardarTemas($idMinuta, $temas);
+
+        // PASAMOS $idUsuarioEditor COMO 3er PARAMETRO PARA ACTIVAR LOGS DE CORRECCIÓN
+        $temasGuardados = $model->guardarTemas($idMinuta, $temas, $idUsuarioEditor);
 
         if (isset($input['asistencia'])) {
             $model->guardarAsistencia($idMinuta, $input['asistencia']);
@@ -602,7 +639,6 @@ class MinutaController
     }
 
 
-
     public function apiEnviarAprobacion()
     {
         if (ob_get_length()) ob_clean();
@@ -614,43 +650,68 @@ class MinutaController
         try {
             $model = new Minuta();
 
-            // Validar estado reunión
+            // 1. Validar estado reunión (Se mantiene igual)
             $estado = $model->verificarEstadoReunion($idMinuta);
             if ($estado && ($estado['vigente'] == 1 || $estado['asistencia_validada'] == 0)) {
                 echo json_encode(['status' => 'error', 'message' => 'Debe finalizar la reunión y validar asistencia primero.']);
                 exit;
             }
 
-            // --- NUEVO: MARCAR FEEDBACK COMO RESUELTO ---
+            // 2. Marcar Feedback como Resuelto y DETECTAR si fue corrección
             $db = new Database();
             $conn = $db->getConnection();
-            $conn->prepare("UPDATE t_minuta_feedback SET resuelto = 1 WHERE t_minuta_idMinuta = ?")->execute([$idMinuta]);
-            // --------------------------------------------
+            $stmt = $conn->prepare("UPDATE t_minuta_feedback SET resuelto = 1 WHERE t_minuta_idMinuta = ?");
+            $stmt->execute([$idMinuta]);
 
-            // 1. Cambiar estado a PENDIENTE
+            // Si rowCount > 0, significa que había observaciones pendientes -> Es un REENVÍO
+            $esReenvio = ($stmt->rowCount() > 0);
+
+            // 3. Cambiar estado a PENDIENTE (Lógica de DB se mantiene)
             $model->enviarParaFirma($idMinuta, $_SESSION['idUsuario']);
 
-            // 2. Notificar a los Presidentes
-            $presidentes = $model->getCorreosPresidentes($idMinuta);
-            $mailService = new MailService();
-            $correosEnviados = 0;
+            // 4. NOTIFICACIONES (NUEVO BLOQUE INTEGRADO)
+            // -----------------------------------------------------
+            // Obtenemos los correos de la tabla t_aprobacion_minuta, 
+            // que ya contiene a todos los presidentes asignados (Principal y Mixtos)
+            $sqlCorreos = "SELECT u.correo, u.pNombre, u.aPaterno 
+                           FROM t_aprobacion_minuta ap
+                           JOIN t_usuario u ON ap.t_usuario_idPresidente = u.idUsuario
+                           WHERE ap.t_minuta_idMinuta = :id";
 
-            foreach ($presidentes as $presi) {
-                if (!empty($presi['correo'])) {
-                    $mailService->notificarFirma($presi['correo'], $presi['pNombre'], $idMinuta);
-                    $correosEnviados++;
+            $stmtC = $conn->prepare($sqlCorreos);
+            $stmtC->execute([':id' => $idMinuta]);
+            $destinatarios = $stmtC->fetchAll(\PDO::FETCH_ASSOC);
+
+            $mailService = new MailService();
+
+            // Enviar correo a cada presidente
+            foreach ($destinatarios as $dest) {
+                if (!empty($dest['correo'])) {
+                    // Asumimos que tienes un método enviarAvisoFirma en MailService
+                    // Si es reenvío, podrías cambiar el asunto internamente en el MailService o pasar un flag
+                    // Aquí usamos tu función 'notificarSolicitudFirma' si ya la tienes, o 'enviarAvisoFirma'
+                    // Ajusta el nombre de la función según tu MailService real.
+
+                    // Opción A: Si usas notificarSolicitudFirma (que vi en tu código pegado)
+                    // $mailService->notificarSolicitudFirma($dest, $esReenvio); 
+
+                    // Opción B: Si usas enviarAvisoFirma (estándar)
+                    // Opción B: Usamos el método existente 'notificarFirma'
+                    $mailService->notificarFirma($dest['correo'], $dest['pNombre'], $idMinuta);
                 }
             }
+            // -----------------------------------------------------
 
             echo json_encode([
                 'status' => 'success',
-                'message' => "Minuta reenviada a firma correctamente."
+                'message' => "Minuta enviada a firma y notificaciones despachadas."
             ]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
+
     public function apiFirmarMinuta()
     {
         header('Content-Type: application/json');
@@ -667,21 +728,45 @@ class MinutaController
             $minutaModel = new Minuta();
             $resultado = $minutaModel->firmarMinuta($idMinuta, $_SESSION['idUsuario']);
             $nuevoEstado = $resultado['estado_nuevo'];
+
+            // =========================================================
+            // 1. PREPARACIÓN PARA NOTIFICACIONES (NUEVO BLOQUE)
+            // =========================================================
+            $mailService = new MailService();
+            // Obtenemos correos del ST y todos los presidentes involucrados
+            $datosNotif = $minutaModel->getDatosNotificacion($idMinuta);
+            $nombreAutor = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
+            // =========================================================
+
             if ($nuevoEstado === 'APROBADA') {
-                // 1. CONEXIÓN A BASE DE DATOS (Primero que todo)
+                // 1. CONEXIÓN A BASE DE DATOS
                 $db = new Database();
                 $pdo = $db->getConnection();
 
                 // 2. OBTENER DATOS GENERALES MINUTA
-                // Importante: Agregamos r.idReunion para poder buscar las votaciones
-                $sqlM = "SELECT m.*, c.nombreComision, r.nombreReunion, r.fechaInicioReunion, r.idReunion
+                $sqlM = "SELECT m.*, c.nombreComision, 
+                                r.nombreReunion, r.fechaInicioReunion, r.fechaTerminoReunion, r.idReunion
                          FROM t_minuta m
                          LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
                          LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
                          WHERE m.idMinuta = :id";
+
                 $stmt = $pdo->prepare($sqlM);
                 $stmt->execute([':id' => $idMinuta]);
                 $minutaInfo = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                // PROCESAMIENTO DE HORAS
+                if (!empty($minutaInfo['fechaInicioReunion'])) {
+                    $minutaInfo['horaInicioReal'] = date('H:i', strtotime($minutaInfo['fechaInicioReunion']));
+                } else {
+                    $minutaInfo['horaInicioReal'] = isset($minutaInfo['horaMinuta']) ? date('H:i', strtotime($minutaInfo['horaMinuta'])) : '--:--';
+                }
+
+                if (!empty($minutaInfo['fechaTerminoReunion'])) {
+                    $minutaInfo['horaTerminoReal'] = date('H:i', strtotime($minutaInfo['fechaTerminoReunion']));
+                } else {
+                    $minutaInfo['horaTerminoReal'] = date('H:i');
+                }
 
                 // 3. OBTENER TEMAS
                 $stmtT = $pdo->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :id ORDER BY idTema ASC");
@@ -697,30 +782,28 @@ class MinutaController
                 $stmtF->execute([':id' => $idMinuta]);
                 $firmas = $stmtF->fetchAll(\PDO::FETCH_ASSOC);
 
-                // ---------------------------------------------------------
-                // 5. NUEVO BLOQUE: OBTENER ASISTENCIA Y VOTACIONES
-                // ---------------------------------------------------------
-
-                // A. ASISTENCIA
+                // 5. ASISTENCIA
                 $stmtA = $pdo->prepare("SELECT u.pNombre, u.aPaterno, a.estadoAsistencia
-                                       FROM t_asistencia a
-                                       JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                                       WHERE a.t_minuta_idMinuta = :id
-                                       ORDER BY u.aPaterno ASC");
+                                        FROM t_asistencia a
+                                        JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                                        WHERE a.t_minuta_idMinuta = :id
+                                        ORDER BY u.aPaterno ASC");
                 $stmtA->execute([':id' => $idMinuta]);
                 $asistenciaRaw = $stmtA->fetchAll(\PDO::FETCH_ASSOC);
                 $asistencia = [];
                 foreach ($asistenciaRaw as $row) {
-                    // Marcamos como presente si dice PRESENTE o ATRASADO
                     $row['estaPresente'] = ($row['estadoAsistencia'] === 'PRESENTE' || $row['estadoAsistencia'] === 'ATRASADO') ? 1 : 0;
                     $asistencia[] = $row;
                 }
 
-                // B. VOTACIONES (Con corrección de nombres de columnas)
+                // 6. VOTACIONES
                 $idReunion = $minutaInfo['idReunion'] ?? null;
-                $sqlV = "SELECT * FROM t_votacion 
-                         WHERE t_minuta_idMinuta = :idMin 
-                         OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
+
+                $sqlV = "SELECT v.*, c.nombreComision as nombreComisionVoto
+                         FROM t_votacion v
+                         LEFT JOIN t_comision c ON v.idComision = c.idComision
+                         WHERE v.t_minuta_idMinuta = :idMin 
+                         OR (v.t_reunion_idReunion IS NOT NULL AND v.t_reunion_idReunion = :idReu)";
 
                 $stmtV = $pdo->prepare($sqlV);
                 $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
@@ -728,15 +811,13 @@ class MinutaController
 
                 $votaciones = [];
                 foreach ($votacionesRaw as $v) {
-                    // Consultamos el detalle usando las columnas correctas: t_votacion_idVotacion y t_usuario_idUsuario
                     $stmtD = $pdo->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
-                                           FROM t_voto vo
-                                           JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
-                                           WHERE vo.t_votacion_idVotacion = :idVot");
+                                            FROM t_voto vo
+                                            JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
+                                            WHERE vo.t_votacion_idVotacion = :idVot");
                     $stmtD->execute([':idVot' => $v['idVotacion']]);
                     $detalles = $stmtD->fetchAll(\PDO::FETCH_ASSOC);
 
-                    // Recalcular contadores manualmente para asegurar datos en el PDF
                     $si = 0;
                     $no = 0;
                     $abs = 0;
@@ -752,22 +833,23 @@ class MinutaController
                         elseif ($opcion === 'ABSTENCION' || $opcion === 'ABS') $abs++;
                     }
 
-                    // Determinar resultado texto
                     $resultadoTexto = "SIN RESULTADO";
                     if ($si > $no) $resultadoTexto = "APROBADO";
                     elseif ($no > $si) $resultadoTexto = "RECHAZADO";
                     elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
 
+                    $nombreComisionVoto = $v['nombreComisionVoto'] ?? $minutaInfo['nombreComision'] ?? 'General';
+
                     $votaciones[] = [
                         'nombreVotacion' => $v['nombreVotacion'],
+                        'nombreComision' => $nombreComisionVoto,
                         'resultado' => $resultadoTexto,
                         'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
                         'detalle_asistentes' => $detalleAsistentes
                     ];
                 }
-                // ---------------------------------------------------------
 
-                // 6. GENERAR PDF
+                // 7. GENERAR PDF
                 $hash = hash('sha256', $idMinuta . time() . 'SECRET_SALT_CORE');
                 $minutaInfo['hashValidacion'] = $hash;
 
@@ -779,7 +861,6 @@ class MinutaController
                     mkdir(dirname($rutaAbsoluta), 0777, true);
                 }
 
-                // Aquí las variables $asistencia y $votaciones YA EXISTEN porque las creamos en el paso 5
                 $datosParaPdf = [
                     'minuta_info' => $minutaInfo,
                     'temas' => $temas,
@@ -798,10 +879,21 @@ class MinutaController
                 if ($exitoPDF) {
                     $minutaModel->actualizarPathArchivo($idMinuta, $rutaRelativa);
                     $minutaModel->actualizarHash($idMinuta, $hash);
+
+                    // =====================================================
+                    // 2. NOTIFICAR APROBACIÓN FINAL (Si el PDF fue un éxito)
+                    // =====================================================
+                    $mailService->notificarAprobacionFinal($datosNotif);
                 } else {
                     throw new \Exception("Error al generar el archivo PDF físico.");
                 }
+            } else {
+                // =========================================================
+                // 3. NOTIFICAR FIRMA PARCIAL (Si no está aprobada aún)
+                // =========================================================
+                $mailService->notificarFirmaParcial($datosNotif, $nombreAutor);
             }
+
             echo json_encode([
                 'status' => 'success',
                 'message' => 'Firma registrada correctamente.',
@@ -812,6 +904,8 @@ class MinutaController
         }
         exit;
     }
+
+
 
     public function apiEnviarFeedback()
     {
@@ -828,8 +922,19 @@ class MinutaController
 
         try {
             $model = new Minuta();
+            // Guardamos el feedback (esto ya resetea las firmas en BD)
             $model->guardarFeedback($idMinuta, $_SESSION['idUsuario'], $texto);
-            echo json_encode(['status' => 'success', 'message' => 'Observaciones enviadas al Secretario Técnico.']);
+
+            // --- NOTIFICACIÓN CORREO ---
+            $mailService = new MailService();
+            $datosNotif = $model->getDatosNotificacion($idMinuta);
+            $nombreAutor = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
+
+            // Enviamos alerta a ST y demás Presidentes
+            $mailService->notificarFeedback($datosNotif, $nombreAutor, $texto);
+            // ---------------------------
+
+            echo json_encode(['status' => 'success', 'message' => 'Observaciones enviadas y notificadas.']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -852,8 +957,13 @@ class MinutaController
         }
 
         $model = new Minuta();
-        $res = $model->crearVotacion($input['idMinuta'], $input['nombre'], $input['idComision'] ?? null);
-        echo json_encode(['status' => $res ? 'success' : 'error']);
+        try {
+            // Aseguramos que pase el idComision
+            $res = $model->crearVotacion($input['idMinuta'], $input['nombre'], $input['idComision'] ?? null);
+            echo json_encode(['status' => $res ? 'success' : 'error']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         exit;
     }
 
@@ -1248,6 +1358,258 @@ class MinutaController
             echo json_encode(['status' => 'success', 'message' => 'Reunión Habilitada. Los consejeros ya pueden registrar asistencia.']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+    // =========================================================================
+    //  API - ADJUNTOS (Faltaban estas funciones)
+    // =========================================================================
+
+    public function apiSubirAdjunto()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+
+        $idMinuta = $_POST['idMinuta'] ?? 0;
+
+        if (!$idMinuta || empty($_FILES['archivos'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Faltan datos o archivos.']);
+            exit;
+        }
+
+        $db = new Database();
+        $conn = $db->getConnection();
+        $errores = [];
+
+        // Directorio de destino (Ajusta según tu estructura de carpetas)
+        $uploadDir = __DIR__ . '/../../public/docs/adjuntos/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+        // Procesar múltiples archivos
+        $archivos = $_FILES['archivos'];
+        // Reorganizar el array de $_FILES si vienen múltiples
+        $fileCount = count($archivos['name']);
+
+        for ($i = 0; $i < $fileCount; $i++) {
+            $fileName = $archivos['name'][$i];
+            $fileTmp  = $archivos['tmp_name'][$i];
+            $fileError = $archivos['error'][$i];
+
+            if ($fileError === UPLOAD_ERR_OK) {
+                // Generar nombre único para evitar sobrescribir
+                $nuevoNombre = 'Adjunto_M' . $idMinuta . '_' . time() . '_' . basename($fileName);
+                $destino = $uploadDir . $nuevoNombre;
+
+                // Ruta relativa para guardar en BD
+                $pathRelativo = 'public/docs/adjuntos/' . $nuevoNombre;
+
+                if (move_uploaded_file($fileTmp, $destino)) {
+                    // Guardar en Base de Datos
+                    try {
+                        $sql = "INSERT INTO t_adjunto (t_minuta_idMinuta, nombreArchivo, pathAdjunto, tipoAdjunto, fechaSubida) 
+                                VALUES (:idMin, :nom, :path, 'archivo', NOW())";
+                        $stmt = $conn->prepare($sql);
+                        $stmt->execute([
+                            ':idMin' => $idMinuta,
+                            ':nom' => $fileName, // Nombre original para mostrar
+                            ':path' => $pathRelativo
+                        ]);
+                    } catch (\Exception $e) {
+                        $errores[] = "Error BD al guardar $fileName";
+                    }
+                } else {
+                    $errores[] = "Error al mover el archivo $fileName";
+                }
+            } else {
+                $errores[] = "Error de subida en archivo $fileName";
+            }
+        }
+
+        if (empty($errores)) {
+            echo json_encode(['status' => 'success', 'message' => 'Archivos subidos correctamente']);
+        } else {
+            echo json_encode(['status' => 'warning', 'message' => implode(', ', $errores)]);
+        }
+        exit;
+    }
+
+    public function apiGuardarLink()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        $idMinuta = $input['idMinuta'] ?? 0;
+        $nombre = $input['nombre'] ?? '';
+        $url = $input['url'] ?? '';
+
+        if (!$idMinuta || !$nombre || !$url) {
+            echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
+            exit;
+        }
+
+        try {
+            $db = new Database();
+            $conn = $db->getConnection();
+
+            // Tipo 'link' para diferenciar de archivos físicos
+            $sql = "INSERT INTO t_adjunto (t_minuta_idMinuta, nombreArchivo, pathAdjunto, tipoAdjunto, fechaSubida) 
+                    VALUES (:idMin, :nom, :url, 'link', NOW())";
+
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([
+                ':idMin' => $idMinuta,
+                ':nom' => $nombre,
+                ':url' => $url
+            ]);
+
+            echo json_encode(['status' => 'success', 'message' => 'Enlace guardado']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiEliminarAdjunto()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idAdjunto = $input['idAdjunto'] ?? 0;
+
+        if (!$idAdjunto) {
+            echo json_encode(['status' => 'error', 'message' => 'ID Adjunto requerido']);
+            exit;
+        }
+
+        try {
+            $db = new Database();
+            $conn = $db->getConnection();
+
+            // 1. Obtener info para borrar archivo físico si corresponde
+            $stmt = $conn->prepare("SELECT pathAdjunto, tipoAdjunto FROM t_adjunto WHERE idAdjunto = :id");
+            $stmt->execute([':id' => $idAdjunto]);
+            $adjunto = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if ($adjunto && $adjunto['tipoAdjunto'] !== 'link') {
+                $rutaFisica = __DIR__ . '/../../' . $adjunto['pathAdjunto'];
+                if (file_exists($rutaFisica)) {
+                    unlink($rutaFisica);
+                }
+            }
+
+            // 2. Borrar de BD
+            $stmtDel = $conn->prepare("DELETE FROM t_adjunto WHERE idAdjunto = :id");
+            $stmtDel->execute([':id' => $idAdjunto]);
+
+            echo json_encode(['status' => 'success', 'message' => 'Adjunto eliminado']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // =========================================================================
+    //  API - SALA DE VOTACIÓN (Para los Consejeros)
+    // =========================================================================
+
+    public function apiVotoCheck()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        
+        $idUsuario = $_SESSION['idUsuario'];
+        $model = new Minuta(); // O VotacionModel si lo tienes separado
+
+        try {
+            // 1. Buscar si hay alguna votación ABIERTA (habilitada = 1)
+            // Esta lógica asume que solo puede haber 1 abierta a la vez.
+            $db = (new Database())->getConnection();
+            $sql = "SELECT idVotacion, nombreVotacion, habilitada 
+                    FROM t_votacion 
+                    WHERE habilitada = 1 
+                    LIMIT 1";
+            $stmt = $db->prepare($sql);
+            $stmt->execute();
+            $votacionActiva = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$votacionActiva) {
+                echo json_encode(['status' => 'waiting', 'message' => 'No hay votación activa']);
+                exit;
+            }
+
+            // 2. Verificar si este usuario YA votó en esa votación
+            $sqlVoto = "SELECT opcionVoto FROM t_voto 
+                        WHERE t_votacion_idVotacion = :idVot AND t_usuario_idUsuario = :idUser";
+            $stmtV = $db->prepare($sqlVoto);
+            $stmtV->execute([
+                ':idVot' => $votacionActiva['idVotacion'],
+                ':idUser' => $idUsuario
+            ]);
+            $miVoto = $stmtV->fetch(\PDO::FETCH_ASSOC);
+
+            $dataResponse = [
+                'idVotacion' => $votacionActiva['idVotacion'],
+                'nombreVotacion' => $votacionActiva['nombreVotacion'],
+                'ya_voto' => $miVoto ? true : false,
+                'opcion_registrada' => $miVoto ? $miVoto['opcionVoto'] : null
+            ];
+
+            echo json_encode(['status' => 'active', 'data' => $dataResponse]);
+
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function apiVotoEmitir()
+    {
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+        
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idVotacion = $input['idVotacion'] ?? 0;
+        $opcion = $input['opcion'] ?? ''; // Aquí llegará 'APRUEBO', 'RECHAZO' o 'ABSTENCION'
+        $idUsuario = $_SESSION['idUsuario'];
+
+        if (!$idVotacion || empty($opcion)) {
+            echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+
+            // 1. Verificar que la votación sigue abierta (seguridad)
+            $stmtCheck = $db->prepare("SELECT habilitada FROM t_votacion WHERE idVotacion = ?");
+            $stmtCheck->execute([$idVotacion]);
+            $estado = $stmtCheck->fetchColumn();
+
+            if ($estado != 1) {
+                echo json_encode(['status' => 'error', 'message' => 'La votación ya se cerró.']);
+                exit;
+            }
+
+            // 2. Verificar si ya votó (evitar duplicados)
+            $stmtExist = $db->prepare("SELECT idVoto FROM t_voto WHERE t_votacion_idVotacion = ? AND t_usuario_idUsuario = ?");
+            $stmtExist->execute([$idVotacion, $idUsuario]);
+            if ($stmtExist->rowCount() > 0) {
+                // Si ya votó, actualizamos su voto (opcional, o lanzamos error)
+                $sqlUpd = "UPDATE t_voto SET opcionVoto = ?, fechaVoto = NOW() WHERE t_votacion_idVotacion = ? AND t_usuario_idUsuario = ?";
+                $stmtUpd = $db->prepare($sqlUpd);
+                $stmtUpd->execute([$opcion, $idVotacion, $idUsuario]);
+            } else {
+                // Insertar voto nuevo
+                $sqlIns = "INSERT INTO t_voto (t_votacion_idVotacion, t_usuario_idUsuario, opcionVoto, fechaVoto) VALUES (?, ?, ?, NOW())";
+                $stmtIns = $db->prepare($sqlIns);
+                $stmtIns->execute([$idVotacion, $idUsuario, $opcion]);
+            }
+
+            echo json_encode(['status' => 'success', 'message' => 'Voto registrado']);
+
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Error al guardar voto: ' . $e->getMessage()]);
         }
         exit;
     }

@@ -390,6 +390,26 @@ try {
             $controller->listar();
             break;
 
+        // Rutas de Adjuntos (Estas deben coincidir con lo que pide el JS)
+        case 'api_adjunto_subir':
+            $controller->apiSubirAdjunto();
+            break;
+        case 'api_adjunto_link':
+            $controller->apiGuardarLink();
+            break;
+        case 'api_adjunto_eliminar':
+            $controller->apiEliminarAdjunto();
+            break;
+        case 'api_adjunto_listar':
+            // Nota: En tu código ya tenías apiVerAdjuntosMinuta, reutilízala aquí
+            $controller->apiVerAdjuntosMinuta();
+            break;
+
+            if ($action == 'api_adjunto_link') {
+                $controller = new MinutaController();
+                $controller->apiGuardarLink(); // <--- Debe coincidir con el nombre en el Controller
+            }
+
 
         default:
             // Si la acción no existe, manda al login
