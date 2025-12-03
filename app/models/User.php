@@ -48,6 +48,65 @@ class User
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // --- NUEVO: Filtrar Usuarios con Paginación ---
+    // --- NUEVA FUNCIÓN PARA FILTROS Y PAGINACIÓN ---
+    public function filtrarUsuarios($limit, $offset, $filters = [])
+    {
+        $sqlBase = " FROM t_usuario u
+                     LEFT JOIN t_tipousuario t ON u.tipoUsuario_id = t.idTipoUsuario
+                     LEFT JOIN t_partido p ON u.partido_id = p.idPartido ";
+
+        $whereClauses = ["u.estado = 1"]; // Solo usuarios activos
+        $params = [];
+
+        // 1. Filtro por Palabra Clave (CORREGIDO HY093)
+        if (!empty($filters['keyword'])) {
+            // Usamos marcadores distintos para cada campo
+            $whereClauses[] = "(u.pNombre LIKE :kw1 OR u.aPaterno LIKE :kw2 OR u.correo LIKE :kw3)";
+            $term = "%" . $filters['keyword'] . "%";
+            $params[':kw1'] = $term;
+            $params[':kw2'] = $term;
+            $params[':kw3'] = $term;
+        }
+
+        // 2. Filtro por Rol
+        if (!empty($filters['rol'])) {
+            $whereClauses[] = "u.tipoUsuario_id = :rol";
+            $params[':rol'] = $filters['rol'];
+        }
+
+        // 3. Filtro por Partido
+        if (!empty($filters['partido'])) {
+            $whereClauses[] = "u.partido_id = :partido";
+            $params[':partido'] = $filters['partido'];
+        }
+
+        $sqlWhere = " WHERE " . implode(" AND ", $whereClauses);
+
+        // --- Query 1: Contar Total ---
+        $sqlCount = "SELECT COUNT(*) " . $sqlBase . $sqlWhere;
+        $stmtCount = $this->conn->prepare($sqlCount);
+        $stmtCount->execute($params);
+        $total = $stmtCount->fetchColumn();
+
+        // --- Query 2: Obtener Datos ---
+        $sqlData = "SELECT u.*, t.descTipoUsuario, p.nombrePartido " . $sqlBase . $sqlWhere . " 
+                    ORDER BY u.idUsuario DESC 
+                    LIMIT $limit OFFSET $offset";
+        
+        $stmt = $this->conn->prepare($sqlData);
+        
+        // Vinculamos los parámetros manualmente para asegurar el tipo correcto
+        foreach ($params as $key => $val) {
+            // bindValue es más seguro aquí
+            $stmt->bindValue($key, $val);
+        }
+        
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return ['data' => $data, 'total' => $total];
+    }
     // Obtener uno por ID
     public function getById($id)
     {
@@ -58,12 +117,12 @@ class User
     }
 
     // Alias para getById (usado en el perfil)
-   // En app/models/User.php
+    // En app/models/User.php
 
-public function getUserById($id)
-{
-    // Hacemos LEFT JOIN para traer los nombres en lugar de solo los IDs
-    $sql = "SELECT u.*, 
+    public function getUserById($id)
+    {
+        // Hacemos LEFT JOIN para traer los nombres en lugar de solo los IDs
+        $sql = "SELECT u.*, 
                    p.nombrePartido, 
                    prov.nombreProvincia,
                    t.descTipoUsuario
@@ -73,10 +132,10 @@ public function getUserById($id)
             LEFT JOIN t_tipousuario t ON u.tipoUsuario_id = t.idTipoUsuario
             WHERE u.idUsuario = :id LIMIT 1";
 
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([':id' => $id]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
     // Crear Usuario
     public function create($data)
@@ -162,7 +221,7 @@ public function getUserById($id)
     {
         return $this->conn->query("SELECT * FROM t_provincia ORDER BY nombreProvincia")->fetchAll(PDO::FETCH_ASSOC);
     }
-    
+
     // ============================================================
     // 🔄 RECUPERACIÓN DE CONTRASEÑA (Token)
     // ============================================================
@@ -171,15 +230,15 @@ public function getUserById($id)
     {
         $stmt = $this->conn->prepare("SELECT idUsuario FROM t_usuario WHERE correo = :email AND estado = 1");
         $stmt->execute([':email' => $email]);
-        if (!$stmt->fetch()) return false; 
+        if (!$stmt->fetch()) return false;
 
         $expira = date("Y-m-d H:i:s", time() + 3600);
         $sql = "UPDATE t_usuario SET reset_token = :token, reset_expira = :expira WHERE correo = :email";
-        
+
         $stmtUpd = $this->conn->prepare($sql);
         return $stmtUpd->execute([
-            ':token' => $token, 
-            ':expira' => $expira, 
+            ':token' => $token,
+            ':expira' => $expira,
             ':email' => $email
         ]);
     }
@@ -203,18 +262,18 @@ public function getUserById($id)
     // 👤 PERFIL Y CONFIGURACIÓN (Corregidos)
     // ============================================================
 
-// app/models/User.php
+    // app/models/User.php
 
-public function updateProfilePhoto($id, $path)
-{
-    // Usamos 'foto_perfil' que es como se llama en tu base de datos
-    $query = "UPDATE " . $this->table . " SET foto_perfil = :path WHERE idUsuario = :id";
-    
-    $stmt = $this->conn->prepare($query);
-    $stmt->bindParam(':path', $path);
-    $stmt->bindParam(':id', $id);
-    return $stmt->execute();
-}
+    public function updateProfilePhoto($id, $path)
+    {
+        // Usamos 'foto_perfil' que es como se llama en tu base de datos
+        $query = "UPDATE " . $this->table . " SET foto_perfil = :path WHERE idUsuario = :id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':path', $path);
+        $stmt->bindParam(':id', $id);
+        return $stmt->execute();
+    }
 
     // Método para cambiar la contraseña (Desde Configuración)
     public function updatePassword($id, $newHash)
@@ -236,9 +295,9 @@ public function updateProfilePhoto($id, $path)
         $stmt->bindParam(':id', $id);
         $stmt->execute();
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         // CORREGIDO: verifica contra $row['contrasena']
-        if($row && password_verify($password, $row['contrasena'])) {
+        if ($row && password_verify($password, $row['contrasena'])) {
             return true;
         }
         return false;

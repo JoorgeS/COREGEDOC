@@ -129,8 +129,8 @@
                                                     </span>
 
                                                     <?php if ($m['mi_estado_firma'] === 'FIRMADO'): ?>
-                                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                                            <i class="fas fa-check me-1"></i> Firmado
+                                                        <span class="badge bg-success text-white">
+                                                            <i class="fas fa-check me-1 text-white"></i> Firmado
                                                         </span>
                                                     <?php else: ?>
                                                         <span class="badge bg-warning bg-opacity-10 text-dark border border-warning">

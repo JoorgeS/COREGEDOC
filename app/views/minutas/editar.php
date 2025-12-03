@@ -30,7 +30,7 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                 $st = $data['estado_reunion'];
                 // 1. EN CURSO (Vigente=1)
                 if ($st['vigente'] == 1): ?>
-                    <span class="badge bg-success ms-2 shadow-sm"><i class="fas fa-circle fa-beat-fade me-1" style="--fa-animation-duration: 2s;"></i> EN CURSO</span>
+                    <span id="badgeEstadoSesion" class="badge bg-success ms-2 shadow-sm"><i class="fas fa-circle fa-beat-fade me-1" style="--fa-animation-duration: 2s;"></i> EN CURSO</span>
 
                 <?php // 2. FINALIZADA (Validada=1) 
                 elseif ($st['asistencia_validada'] == 1): ?>
@@ -353,6 +353,37 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                     </div>
                 </div>
             </div>
+
+            <div class="modal fade" id="modalNuevoLink" tabindex="-1" aria-labelledby="modalNuevoLinkLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title fs-6 fw-bold" id="modalNuevoLinkLabel">
+                                <i class="fas fa-link me-2"></i>Agregar Enlace Web
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="linkNombre" class="form-label text-muted small fw-bold">NOMBRE PARA MOSTRAR</label>
+                                <input type="text" class="form-control" id="linkNombre" placeholder="Ej: Noticia en prensa local">
+                            </div>
+                            <div class="mb-3">
+                                <label for="linkUrl" class="form-label text-muted small fw-bold">DIRECCIÓN WEB (URL)</label>
+                                <input type="url" class="form-control" id="linkUrl" placeholder="https://www.ejemplo.com">
+                                <div class="form-text text-muted small">Asegúrese de incluir http:// o https://</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="guardarLink()">
+                                <i class="fas fa-save me-1"></i> Guardar Enlace
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <script>
                 // ============================================
                 //  LÓGICA PESTAÑA: ADJUNTOS
@@ -474,14 +505,28 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                 }
 
                 // 3. Subir Archivo (Físico)
+            // 3. Subir Archivo (Físico)
                 function subirArchivos(files) {
                     if (files.length === 0) return;
 
                     const formData = new FormData();
                     formData.append('idMinuta', idMinutaGlobal);
+                    
+                    // Límite 25 MB
+                    const maxBytes = 25 * 1024 * 1024; 
 
                     // Soporte para múltiples archivos a la vez
                     for (let i = 0; i < files.length; i++) {
+                        
+                        // --- VALIDACIÓN JS (PRE-ENVÍO) ---
+                        if (files[i].size > maxBytes) {
+                            alert(`El archivo "${files[i].name}" supera el máximo de 25 MB.`);
+                            // Limpiamos el input para que pueda seleccionar otro
+                            document.getElementById('inputArchivoOculto').value = '';
+                            return; 
+                        }
+                        // ---------------------------------
+
                         formData.append('archivos[]', files[i]);
                     }
 
@@ -496,87 +541,101 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                         .then(r => r.json())
                         .then(resp => {
                             if (resp.status === 'success') {
-                                cargarAdjuntos(); // Recargar lista
-                            } else {
-                                alert('Error al subir: ' + resp.message);
+                                cargarAdjuntos(); 
+                            } else if (resp.status === 'warning') {
+                                alert(resp.message); // Mostrar error específico (ej: "Pesa más de 25MB")
                                 cargarAdjuntos();
+                            } else {
+                                alert('Error: ' + resp.message);
+                                cargarAdjuntos();
+                            }
+                            document.getElementById('inputArchivoOculto').value = '';
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            alert('Ocurrió un error en la conexión.');
+                            cargarAdjuntos();
+                            document.getElementById('inputArchivoOculto').value = '';
+                        });
+                }
+
+                // 4. Guardar Link (Enlace) - VERSIÓN DEFINITIVA (SIN ERRORES BOOTSTRAP)
+                function guardarLink() {
+                    const nombre = document.getElementById('linkNombre').value;
+                    const url = document.getElementById('linkUrl').value;
+
+                    if (!nombre || !url) {
+                        Swal.fire('Atención', 'Debe completar nombre y URL', 'warning');
+                        return;
+                    }
+
+                    const payload = {
+                        idMinuta: idMinutaGlobal,
+                        nombre: nombre,
+                        url: url
+                    };
+
+                    // NOTA: Asegúrate que en tu index.php 'api_adjunto_link' dirija a 'apiGuardarLink'
+                    fetch('index.php?action=api_adjunto_link', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        })
+                        .then(r => r.json())
+                        .then(resp => {
+                            if (resp.status === 'success') {
+
+                                // --- CIERRE MANUAL DEL MODAL (EVITA ERROR DE BOOTSTRAP) ---
+                                const modalEl = document.getElementById('modalNuevoLink');
+                                if (modalEl) {
+                                    // 1. Quitar clases visuales
+                                    modalEl.classList.remove('show');
+                                    modalEl.style.display = 'none';
+                                    modalEl.setAttribute('aria-hidden', 'true');
+                                    modalEl.removeAttribute('aria-modal');
+                                    modalEl.removeAttribute('role');
+
+                                    // 2. Limpiar el 'body' para reactivar el scroll
+                                    document.body.classList.remove('modal-open');
+                                    document.body.style.overflow = '';
+                                    document.body.style.paddingRight = '';
+
+                                    // 3. Eliminar el fondo gris oscuro (Backdrop)
+                                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                                    backdrops.forEach(backdrop => backdrop.remove());
+                                }
+                                // ----------------------------------------------------------
+
+                                // Limpiar campos
+                                document.getElementById('linkNombre').value = '';
+                                document.getElementById('linkUrl').value = '';
+
+                                // Recargar la lista
+                                cargarAdjuntos();
+
+                                // Mensaje de éxito discreto
+                                const Toast = Swal.mixin({
+                                    toast: true,
+                                    position: 'top-end',
+                                    showConfirmButton: false,
+                                    timer: 3000
+                                });
+                                Toast.fire({
+                                    icon: 'success',
+                                    title: 'Enlace guardado'
+                                });
+
+                            } else {
+                                Swal.fire('Error', resp.message || 'No se pudo guardar', 'error');
                             }
                         })
                         .catch(err => {
                             console.error(err);
-                            alert('Error de conexión al subir archivo.');
+                            Swal.fire('Error', 'Error de conexión', 'error');
                         });
                 }
-
-              // 4. Guardar Link (Enlace) - VERSIÓN DEFINITIVA (SIN ERRORES BOOTSTRAP)
-function guardarLink() {
-    const nombre = document.getElementById('linkNombre').value;
-    const url = document.getElementById('linkUrl').value;
-
-    if (!nombre || !url) {
-        Swal.fire('Atención', 'Debe completar nombre y URL', 'warning');
-        return;
-    }
-
-    const payload = {
-        idMinuta: idMinutaGlobal,
-        nombre: nombre,
-        url: url
-    };
-
-    // NOTA: Asegúrate que en tu index.php 'api_adjunto_link' dirija a 'apiGuardarLink'
-    fetch('index.php?action=api_adjunto_link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(resp => {
-        if (resp.status === 'success') {
-            
-            // --- CIERRE MANUAL DEL MODAL (EVITA ERROR DE BOOTSTRAP) ---
-            const modalEl = document.getElementById('modalNuevoLink');
-            if (modalEl) {
-                // 1. Quitar clases visuales
-                modalEl.classList.remove('show');
-                modalEl.style.display = 'none';
-                modalEl.setAttribute('aria-hidden', 'true');
-                modalEl.removeAttribute('aria-modal');
-                modalEl.removeAttribute('role');
-
-                // 2. Limpiar el 'body' para reactivar el scroll
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
-
-                // 3. Eliminar el fondo gris oscuro (Backdrop)
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(backdrop => backdrop.remove());
-            }
-            // ----------------------------------------------------------
-
-            // Limpiar campos
-            document.getElementById('linkNombre').value = '';
-            document.getElementById('linkUrl').value = '';
-
-            // Recargar la lista
-            cargarAdjuntos();
-            
-            // Mensaje de éxito discreto
-            const Toast = Swal.mixin({
-                toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
-            });
-            Toast.fire({ icon: 'success', title: 'Enlace guardado' });
-
-        } else {
-            Swal.fire('Error', resp.message || 'No se pudo guardar', 'error');
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        Swal.fire('Error', 'Error de conexión', 'error');
-    });
-}
                 // 5. Eliminar Adjunto
                 function eliminarAdjunto(idAdjunto) {
                     if (!confirm('¿Estás seguro de eliminar este adjunto?')) return;

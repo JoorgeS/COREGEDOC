@@ -132,9 +132,7 @@ try {
         case 'api_adjunto_listar':
             $adjuntoController->apiListar();
             break;
-        case 'api_adjunto_subir':
-            $adjuntoController->apiSubir();
-            break;
+
         case 'api_adjunto_link':
             $adjuntoController->apiAgregarLink();
             break;
@@ -213,9 +211,7 @@ try {
         case 'comision_guardar':
             $comisionController->store();
             break;
-        case 'comision_eliminar':
-            $comisionController->delete();
-            break;
+
 
         case 'seguimiento_general':
             $minutaController->seguimientoGeneral();
@@ -392,13 +388,18 @@ try {
 
         // Rutas de Adjuntos (Estas deben coincidir con lo que pide el JS)
         case 'api_adjunto_subir':
-            $controller->apiSubirAdjunto();
+            $minutaController->apiSubirAdjunto();
             break;
         case 'api_adjunto_link':
             $controller->apiGuardarLink();
             break;
         case 'api_adjunto_eliminar':
             $controller->apiEliminarAdjunto();
+            break;
+
+        case 'api_filtrar_seguimiento': // <--- NUEVO CASE
+            $controller = new App\Controllers\MinutaController();
+            $controller->apiFiltrarSeguimiento();
             break;
         case 'api_adjunto_listar':
             // Nota: En tu código ya tenías apiVerAdjuntosMinuta, reutilízala aquí
@@ -409,6 +410,26 @@ try {
                 $controller = new MinutaController();
                 $controller->apiGuardarLink(); // <--- Debe coincidir con el nombre en el Controller
             }
+
+        case 'api_filtrar_comisiones':
+            $controller = new App\Controllers\ComisionController();
+            $controller->apiFiltrarComisiones();
+            break;
+
+        case 'api_filtrar_comisiones':
+            $controller = new App\Controllers\ComisionController();
+            $controller->apiFiltrarComisiones();
+            break;
+
+        case 'api_comision_estado': // <--- NUEVA RUTA
+            $controller = new App\Controllers\ComisionController();
+            $controller->apiCambiarEstado();
+            break;
+
+        case 'api_filtrar_usuarios':
+            $controller = new App\Controllers\UserController();
+            $controller->apiFiltrarUsuarios();
+            break;
 
 
         default:

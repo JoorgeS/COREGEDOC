@@ -3,8 +3,6 @@ namespace App\Models;
 
 use App\Config\Database;
 use PDO;
-use Exception;    
-use PDOException;
 
 class Comision
 {
@@ -17,23 +15,22 @@ class Comision
         $this->conn = $database->getConnection();
     }
 
-    // --- Listar todas (con nombres de autoridades) ---
+    // --- Listar todas (Usado por el Controller antiguo, opcional si usas solo API) ---
     public function getAll()
     {
+        // Modificado para traer TAMBIÉN las inactivas, así puedes reactivarlas
         $sql = "SELECT c.*, 
                        CONCAT(up.pNombre, ' ', up.aPaterno) as nombrePresidente,
                        CONCAT(uv.pNombre, ' ', uv.aPaterno) as nombreVicepresidente
                 FROM t_comision c
                 LEFT JOIN t_usuario up ON c.t_usuario_idPresidente = up.idUsuario
                 LEFT JOIN t_usuario uv ON c.t_usuario_idVicepresidente = uv.idUsuario
-                WHERE c.vigencia = 1
-                ORDER BY c.nombreComision ASC";
+                ORDER BY c.nombreComision ASC"; // Quitamos el WHERE vigencia=1 para ver todo
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // --- Obtener una por ID ---
     public function getById($id)
     {
         $sql = "SELECT * FROM " . $this->table . " WHERE idComision = :id";
@@ -42,7 +39,6 @@ class Comision
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // --- Crear ---
     public function create($data)
     {
         $sql = "INSERT INTO " . $this->table . " (nombreComision, t_usuario_idPresidente, t_usuario_idVicepresidente, vigencia) 
@@ -56,7 +52,6 @@ class Comision
         ]);
     }
 
-    // --- Actualizar ---
     public function update($id, $data)
     {
         $sql = "UPDATE " . $this->table . " SET 
@@ -74,18 +69,18 @@ class Comision
         ]);
     }
 
-    // --- Eliminar (Lógico) ---
-    public function delete($id)
+    // --- NUEVO: Alternar Estado (Habilitar/Deshabilitar) ---
+    public function toggleVigencia($id, $estadoActual)
     {
-        $sql = "UPDATE " . $this->table . " SET vigencia = 0 WHERE idComision = :id";
+        // Si viene 1 lo pasamos a 0, si viene 0 lo pasamos a 1
+        $nuevoEstado = ($estadoActual == 1) ? 0 : 1;
+        $sql = "UPDATE " . $this->table . " SET vigencia = :nuevo WHERE idComision = :id";
         $stmt = $this->conn->prepare($sql);
-        return $stmt->execute([':id' => $id]);
+        return $stmt->execute([':nuevo' => $nuevoEstado, ':id' => $id]);
     }
 
-    // --- Helper: Obtener candidatos (Consejeros) ---
     public function getPosiblesAutoridades()
     {
-        // Traemos usuarios que sean Consejeros (1), Presidentes (3) o Vicepresidentes (7)
         $sql = "SELECT idUsuario, CONCAT(pNombre, ' ', aPaterno) as nombreCompleto 
                 FROM t_usuario 
                 WHERE tipoUsuario_id IN (1, 3, 7) AND estado = 1 
@@ -94,6 +89,5 @@ class Comision
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    // Método antiguo (para compatibilidad si lo usaste en otro lado)
-    public function listarTodas($soloVigentes = true) { return $this->getAll(); }
+    public function listarTodas() { return $this->getAll(); }
 }

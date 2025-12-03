@@ -1,10 +1,12 @@
 <?php
+
 namespace App\Controllers;
 
 use App\Models\User;
 use App\Config\Database;
 
-class UserController {
+class UserController
+{
 
     private $db;
     private $userModel;
@@ -27,7 +29,7 @@ class UserController {
 
         // Pasar datos a la vista
         $data = ['usuario' => $datosUsuario, 'pagina_actual' => 'perfil'];
-        
+
         // Cargar vista
         $childView = __DIR__ . '/../views/usuarios/perfil.php';
         require_once __DIR__ . '/../views/layouts/main.php';
@@ -37,11 +39,11 @@ class UserController {
     public function update_perfil()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        
+
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['fotoPerfil'])) {
             $idUsuario = $_SESSION['idUsuario'];
             $file = $_FILES['fotoPerfil'];
-            
+
             // Validaciones básicas
             $allowed = ['jpg', 'jpeg', 'png', 'gif'];
             $filename = $file['name'];
@@ -52,17 +54,17 @@ class UserController {
                 // Crear nombre único y ruta
                 $new_name = 'user_' . $idUsuario . '_' . time() . '.' . $ext;
                 $upload_dir = 'public/img/perfiles/';
-                
+
                 if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
                 if (move_uploaded_file($filetmp, $upload_dir . $new_name)) {
                     // Guardar ruta en BD
                     $rutaDB = $upload_dir . $new_name;
                     $this->userModel->updateProfilePhoto($idUsuario, $rutaDB);
-                    
+
                     // Actualizar sesión para reflejar cambio inmediato
                     $_SESSION['rutaImagenPerfil'] = $rutaDB;
-                    
+
                     header('Location: index.php?action=perfil&msg=foto_ok');
                 } else {
                     header('Location: index.php?action=perfil&msg=error_upload');
@@ -85,7 +87,7 @@ class UserController {
     public function update_password()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        
+
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $current = $_POST['current_password'];
             $new = $_POST['new_password'];
@@ -119,9 +121,10 @@ class UserController {
         header('Location: index.php?action=login');
         exit();
     }
-    
+
     // Seguridad: Solo permite acceso si es Admin
-    private function verificarAdmin() {
+    private function verificarAdmin()
+    {
         if (session_status() === PHP_SESSION_NONE) session_start();
         // ROL_ADMINISTRADOR debe ser 6 según tu BD
         if (!isset($_SESSION['idUsuario']) || $_SESSION['tipoUsuario_id'] != ROL_ADMINISTRADOR) {
@@ -130,39 +133,63 @@ class UserController {
         }
     }
 
-    public function index() {
+ 
+
+    public function index()
+    {
         $this->verificarAdmin();
         $model = new User();
-        
+
+        // Obtenemos los datos necesarios para los filtros de la vista
+        $roles = $model->getRoles();
+        $partidos = $model->getPartidos();
+
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
             'pagina_actual' => 'usuarios_dashboard',
-            'usuarios' => $model->getAll()
+
+            // 1. Inicializamos 'usuarios' como vacío, ya que se carga por AJAX.
+            'usuarios' => [],
+
+            // 2. CORRECCIÓN: Pasamos las listas de filtros a la vista.
+            'roles' => $roles,
+            'partidos' => $partidos
         ];
 
         $childView = __DIR__ . '/../views/usuarios/listado.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
+    // En App/Controllers/UserController.php
 
-    public function form() {
+    public function form()
+    {
         $this->verificarAdmin();
         $model = new User();
         $id = $_GET['id'] ?? null;
+
+        // --- CORRECCIÓN CLAVE AQUÍ ---
+        $roles = $model->getRoles();
+        $partidos = $model->getPartidos();
+        $provincias = $model->getProvincias();
+        // ----------------------------
 
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
             'pagina_actual' => 'usuarios_dashboard',
             'edit_user' => $id ? $model->getById($id) : null,
-            'roles' => $model->getRoles(),
-            'partidos' => $model->getPartidos(),
-            'provincias' => $model->getProvincias()
+
+            // Asignamos las listas a $data
+            'roles' => $roles,       // <-- Datos de roles para el SELECT
+            'partidos' => $partidos, // <-- Datos de partidos para el SELECT
+            'provincias' => $provincias // <-- Datos de provincias
         ];
 
         $childView = __DIR__ . '/../views/usuarios/form.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    public function store() {
+    public function store()
+    {
         $this->verificarAdmin();
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $model = new User();
@@ -182,7 +209,8 @@ class UserController {
         }
     }
 
-    public function delete() {
+    public function delete()
+    {
         $this->verificarAdmin();
         $id = $_GET['id'] ?? 0;
         if ($id) {
@@ -190,6 +218,41 @@ class UserController {
             $model->delete($id);
         }
         header('Location: index.php?action=usuarios_dashboard');
+        exit;
+    }
+
+    public function apiFiltrarUsuarios()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $this->verificarAdmin();
+
+        try {
+            $page     = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit    = 10;
+            $offset   = ($page - 1) * $limit;
+
+            $filters = [
+                'keyword' => $_GET['keyword'] ?? null,
+                'rol'     => $_GET['rol'] ?? null,
+                'partido' => $_GET['partido'] ?? null
+            ];
+
+            $model = new User();
+            $result = $model->filtrarUsuarios($limit, $offset, $filters);
+
+            $totalPages = ($result['total'] > 0) ? ceil($result['total'] / $limit) : 1;
+
+            echo json_encode([
+                'status' => 'success',
+                'data' => $result['data'],
+                'total' => $result['total'],
+                'page' => $page,
+                'totalPages' => $totalPages
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         exit;
     }
 }

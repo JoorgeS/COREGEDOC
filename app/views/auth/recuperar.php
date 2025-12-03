@@ -1,49 +1,53 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Recuperar Contraseña | COREGEDOC</title>
     <link href="public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-    <!-- IMPORTANTE: Vinculamos tu CSS de Login -->
     <link rel="stylesheet" href="public/css/login_style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        /* Estilos específicos para centrar y superponer */
-        body { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
             margin: 0;
-            overflow: hidden; 
+            overflow: hidden;
         }
-        .card-auth { 
-            width: 100%; 
-            max-width: 400px; 
-            border: none; 
+
+        .card-auth {
+            width: 100%;
+            max-width: 400px;
+            border: none;
             border-radius: 10px;
-            /* Sombra suave */
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-            /* Aseguramos que quede SOBRE el fondo */
-            position: relative; 
-            z-index: 2; 
-            /* Fondo blanco sólido o con ligera transparencia si prefieres */
-            background: #fff; 
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 2;
+            background: #fff;
         }
-        .captcha-box { 
-            font-family: monospace; 
-            letter-spacing: 3px; 
-            background: #eee; 
-            padding: 8px; 
-            text-align: center; 
-            font-weight: bold; 
-            font-size: 1.2em; 
+
+        .captcha-box {
+            font-family: monospace;
+            letter-spacing: 3px;
+            background: #eee;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2em;
             border-radius: 4px;
+        }
+
+        /* Asegura que el Swal esté por encima */
+        .swal2-container {
+            z-index: 9999 !important;
         }
     </style>
 </head>
+
 <body>
 
-    <!-- CAPA DE FONDO (La misma del Login) -->
     <div class="background-overlay"></div>
 
     <div class="card card-auth p-4">
@@ -56,7 +60,7 @@
             <div class="alert alert-<?= $message_type ?>"><?= htmlspecialchars($message) ?></div>
         <?php endif; ?>
 
-        <form method="POST">
+        <form method="POST" id="formRecuperar">
             <div class="mb-3">
                 <label class="form-label fw-bold">Correo Electrónico</label>
                 <input type="email" name="correo" class="form-control" required placeholder="nombre@ejemplo.cl">
@@ -76,5 +80,29 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.getElementById('formRecuperar').addEventListener('submit', function(e) {
+
+            let btn = this.querySelector('button[type="submit"]');
+
+            Swal.fire({
+                title: 'Enviando correo...',
+                text: 'Por favor espere un momento mientras procesamos su solicitud.',
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                backdrop: false, // <--- ESTO QUITA EL FONDO OSCURO
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        });
+    </script>
 </body>
+
+</html>
+</body>
+
 </html>

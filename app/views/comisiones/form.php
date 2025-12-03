@@ -17,8 +17,13 @@ $titulo = $isEdit ? "Editar Comisión" : "Crear Nueva Comisión";
 
                 <div class="mb-4">
                     <label class="form-label fw-bold">Nombre de la Comisión *</label>
-                    <input type="text" name="nombreComision" class="form-control form-control-lg" required 
-                           value="<?php echo $c['nombreComision'] ?? ''; ?>" placeholder="Ej: Comisión de Salud">
+                    <input type="text" 
+                           id="inputNombreComision"
+                           name="nombreComision" 
+                           class="form-control form-control-lg" 
+                           required 
+                           value="<?php echo $c['nombreComision'] ?? ''; ?>" 
+                           placeholder="Ej: Comisión de Salud">
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -59,3 +64,19 @@ $titulo = $isEdit ? "Editar Comisión" : "Crear Nueva Comisión";
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputNombre = document.getElementById('inputNombreComision');
+
+    if(inputNombre) {
+        inputNombre.addEventListener('input', function() {
+            // Si hay texto, tomamos el primer caracter, lo hacemos mayúscula
+            // y le concatenamos el resto del texto tal cual viene.
+            if (this.value.length > 0) {
+                this.value = this.value.charAt(0).toUpperCase() + this.value.slice(1);
+            }
+        });
+    }
+});
+</script>

@@ -277,10 +277,12 @@
 
     // --- FUNCIÓN MODAL ADJUNTOS (CORREGIDA) ---
     // --- FUNCIÓN MODAL ADJUNTOS (CORREGIDA) ---
+    // --- FUNCIÓN MODAL ADJUNTOS (FILTRADA) ---
     function verAdjuntos(idMinuta) {
         const lista = document.getElementById('listaAdjuntos');
         const msg = document.getElementById('sinAdjuntosMsg');
 
+        // Spinner de carga
         lista.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary spinner-border-sm"></div></div>';
 
         const myModal = new bootstrap.Modal(document.getElementById('modalAdjuntos'));
@@ -291,56 +293,75 @@
             .then(resp => {
                 lista.innerHTML = '';
 
-                if (resp.data && resp.data.length > 0) {
+                // 1. FILTRADO: Excluimos la asistencia antes de contar o mostrar
+                const dataRaw = resp.data || [];
+                
+                const adjuntosValidos = dataRaw.filter(a => {
+                    // Normalizamos a minúsculas para comparar
+                    const nombre = (a.nombreArchivo || '').toLowerCase();
+                    const path = (a.pathAdjunto || '').toLowerCase();
+                    const tipo = (a.tipoAdjunto || '').toLowerCase(); // Si tu backend envía el tipo
+
+                    // Si el nombre, ruta o tipo contienen "asistencia", lo descartamos (return false)
+                    if (nombre.includes('asistencia')) return false;
+                    if (path.includes('asistencia')) return false;
+                    if (tipo === 'asistencia') return false;
+
+                    return true; // Es un adjunto válido
+                });
+
+                // 2. LOGICA VISUAL: Usamos el array filtrado 'adjuntosValidos'
+                if (adjuntosValidos.length > 0) {
                     msg.style.display = 'none';
 
-                    resp.data.forEach(a => {
-                        // MODIFICACIÓN CLAVE: Priorizar a.nombreArchivo o derivar de la ruta.
+                    adjuntosValidos.forEach(a => {
+                        // Priorizar a.nombreArchivo o derivar de la ruta.
                         let nombreMostrar = a.nombreArchivo || a.pathAdjunto.split('/').pop();
 
-                        // 1. Configuración de URL e ícono por defecto
+                        // Configuración de URL e ícono por defecto
                         let urlVisor = `index.php?action=ver_archivo_adjunto&id=${a.idAdjunto}`;
                         let extension = nombreMostrar.split('.').pop().toLowerCase();
-                        let icon = '<i class="fas fa-file text-secondary"></i>'; // Icono default
+                        let icon = '<i class="fas fa-file text-secondary"></i>'; 
 
-                        // 2. Iconos según extensión
+                        // Iconos según extensión
                         if (['pdf'].includes(extension)) icon = '<i class="fas fa-file-pdf text-danger"></i>';
                         else if (['doc', 'docx'].includes(extension)) icon = '<i class="fas fa-file-word text-primary"></i>';
                         else if (['xls', 'xlsx'].includes(extension)) icon = '<i class="fas fa-file-excel text-success"></i>';
                         else if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) icon = '<i class="fas fa-file-image text-info"></i>';
 
-                        // 3. Lógica para Links Externos y Corrección de "www"
+                        // Lógica para Links Externos
                         if (a.tipoAdjunto === 'link' || a.pathAdjunto.startsWith('http') || a.pathAdjunto.startsWith('www')) {
-
                             let urlExterna = a.pathAdjunto;
-
-                            // Si NO empieza con http:// ni https://, se lo agregamos
                             if (!urlExterna.match(/^https?:\/\//)) {
                                 urlExterna = 'https://' + urlExterna;
                             }
-
                             urlVisor = urlExterna;
                             icon = '<i class="fas fa-link text-primary"></i>';
                         }
 
                         // Generar el HTML
                         const item = `
-                        <a href="${urlVisor}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
-                            <div class="me-3 fs-4">${icon}</div>
-                            <div class="text-truncate w-100">
-                                <div class="fw-bold text-dark" title="${nombreMostrar}">${nombreMostrar}</div>
-                                <small class="text-muted d-block">
-                                    <i class="fas fa-eye me-1"></i> Vista Previa
-                                </small>
-                            </div>
-                        </a>
-                    `;
+                        <a href="${urlVisor}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                            <div class="me-3 fs-4">${icon}</div>
+                            <div class="text-truncate w-100">
+                                <div class="fw-bold text-dark" title="${nombreMostrar}">${nombreMostrar}</div>
+                                <small class="text-muted d-block">
+                                    <i class="fas fa-eye me-1"></i> Vista Previa
+                                </small>
+                            </div>
+                        </a>
+                    `;
                         lista.innerHTML += item;
                     });
                 } else {
+                    // Si después de filtrar no queda nada (o solo había asistencia)
                     msg.style.display = 'block';
+                    msg.innerHTML = 'No se encontraron archivos adjuntos (Asistencia oculta).';
                 }
             })
-            .catch(e => console.error(e)); // Dejé el console.error para debug si falla
+            .catch(e => {
+                console.error(e);
+                lista.innerHTML = '<div class="text-danger text-center p-3">Error al cargar archivos.</div>';
+            }); 
     }
 </script>

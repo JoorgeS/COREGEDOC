@@ -1,0 +1,1 @@
+12:04:54 - To: genesis.contreras.vargas@gmail.com - Msg: Error enviando recuperación: SMTP Error: Could not connect to SMTP host.

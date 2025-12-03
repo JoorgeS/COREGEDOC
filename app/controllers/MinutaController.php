@@ -101,8 +101,10 @@ class MinutaController
         $sql = "SELECT m.*, 
                        r.idReunion, 
                        r.nombreReunion, 
-                       r.fechaInicioReunion,
+                       r.fechaInicioReunion, 
                        r.fechaTerminoReunion,
+                       r.t_comision_idComision_mixta,
+                       r.t_comision_idComision_mixta2,
                        u1.pNombre as pNomPres, u1.aPaterno as aPatPres,
                        u2.pNombre as pNomSec, u2.aPaterno as aPatSec
                 FROM t_minuta m
@@ -118,26 +120,47 @@ class MinutaController
         if (!$minutaInfo) return null;
 
         // PROCESAMIENTO DE HORAS
-        if (!empty($minutaInfo['fechaInicioReunion'])) {
-            $minutaInfo['horaInicioReal'] = date('H:i', strtotime($minutaInfo['fechaInicioReunion']));
-        } else {
-            $minutaInfo['horaInicioReal'] = isset($minutaInfo['horaMinuta']) ? date('H:i', strtotime($minutaInfo['horaMinuta'])) : '--:--';
-        }
+        $minutaInfo['horaInicioReal'] = !empty($minutaInfo['fechaInicioReunion']) ? date('H:i', strtotime($minutaInfo['fechaInicioReunion'])) : (isset($minutaInfo['horaMinuta']) ? date('H:i', strtotime($minutaInfo['horaMinuta'])) : '--:--');
+        $minutaInfo['horaTerminoReal'] = !empty($minutaInfo['fechaTerminoReunion']) ? date('H:i', strtotime($minutaInfo['fechaTerminoReunion'])) : 'En curso';
 
-        if (!empty($minutaInfo['fechaTerminoReunion'])) {
-            $minutaInfo['horaTerminoReal'] = date('H:i', strtotime($minutaInfo['fechaTerminoReunion']));
-        } else {
-            $minutaInfo['horaTerminoReal'] = 'En curso';
-        }
+        // 2. COMISIONES Y PRESIDENTES
+        $idsComisiones = [];
+        if (!empty($minutaInfo['t_comision_idComision'])) $idsComisiones[] = $minutaInfo['t_comision_idComision'];
+        if (!empty($minutaInfo['t_comision_idComision_mixta'])) $idsComisiones[] = $minutaInfo['t_comision_idComision_mixta'];
+        if (!empty($minutaInfo['t_comision_idComision_mixta2'])) $idsComisiones[] = $minutaInfo['t_comision_idComision_mixta2'];
 
-        // 2. COMISIONES
         $comisionesInfo = [];
-        if (!empty($minutaInfo['t_comision_idComision'])) {
-            $stmtC = $db->prepare("SELECT nombreComision as nombre FROM t_comision WHERE idComision = :id");
-            $stmtC->execute([':id' => $minutaInfo['t_comision_idComision']]);
-            $com = $stmtC->fetch(PDO::FETCH_ASSOC);
-            if ($com) $comisionesInfo[] = $com;
+        $firmasPresidentes = []; 
+        $nombresTexto = []; // Para el encabezado
+
+        if (!empty($idsComisiones)) {
+            $inQuery = implode(',', array_fill(0, count($idsComisiones), '?'));
+            $sqlC = "SELECT c.nombreComision, u.pNombre, u.aPaterno 
+                     FROM t_comision c
+                     LEFT JOIN t_usuario u ON c.t_usuario_idPresidente = u.idUsuario
+                     WHERE c.idComision IN ($inQuery)";
+            $stmtC = $db->prepare($sqlC);
+            $stmtC->execute($idsComisiones);
+            $resComs = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($resComs as $c) {
+                $comisionesInfo[] = ['nombre' => $c['nombreComision']];
+                if (!empty($c['pNombre'])) {
+                    $nombreComp = $c['pNombre'] . ' ' . $c['aPaterno'];
+                    $nombresTexto[] = $nombreComp;
+                    
+                    $firmasPresidentes[] = [
+                        'pNombre' => $c['pNombre'],
+                        'aPaterno' => $c['aPaterno'],
+                        'nombreComision' => $c['nombreComision'],
+                        'fechaAprobacion' => $minutaInfo['fechaAprobacion'] ?? $minutaInfo['fechaMinuta']
+                    ];
+                }
+            }
         }
+        
+        // Cadena para el encabezado PDF (ej: "Juan Pérez / María López")
+        $presidentesStr = implode(' / ', array_unique($nombresTexto));
 
         // 3. TEMAS
         $stmtT = $db->prepare("SELECT * FROM t_tema WHERE t_minuta_idMinuta = :id ORDER BY idTema ASC");
@@ -146,10 +169,10 @@ class MinutaController
 
         // 4. ASISTENCIA
         $stmtA = $db->prepare("SELECT u.pNombre, u.aPaterno, a.estadoAsistencia
-                                   FROM t_asistencia a
-                                   JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
-                                   WHERE a.t_minuta_idMinuta = :id
-                                   ORDER BY u.aPaterno ASC");
+                               FROM t_asistencia a
+                               JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                               WHERE a.t_minuta_idMinuta = :id
+                               ORDER BY u.aPaterno ASC");
         $stmtA->execute([':id' => $idMinuta]);
         $asistenciaRaw = $stmtA->fetchAll(PDO::FETCH_ASSOC);
         $asistencia = [];
@@ -158,60 +181,8 @@ class MinutaController
             $asistencia[] = $row;
         }
 
-        // B. VOTACIONES (Con la corrección de columnas aplicada)
+        // 5. VOTACIONES
         $idReunion = $minutaInfo['idReunion'] ?? null;
-        $sqlV = "SELECT * FROM t_votacion 
-                     WHERE t_minuta_idMinuta = :idMin 
-                     OR (t_reunion_idReunion IS NOT NULL AND t_reunion_idReunion = :idReu)";
-
-        $stmtV = $db->prepare($sqlV);
-        $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
-        $votacionesRaw = $stmtV->fetchAll(PDO::FETCH_ASSOC);
-
-        $votaciones = [];
-        foreach ($votacionesRaw as $v) {
-            // CORRECCIÓN CRÍTICA: Usamos t_votacion_idVotacion y t_usuario_idUsuario
-            $stmtD = $db->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
-                                       FROM t_voto vo
-                                       JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
-                                       WHERE vo.t_votacion_idVotacion = :idVot");
-            $stmtD->execute([':idVot' => $v['idVotacion']]);
-            $detalles = $stmtD->fetchAll(PDO::FETCH_ASSOC);
-
-            // Recalcular contadores para asegurar consistencia
-            $si = 0;
-            $no = 0;
-            $abs = 0;
-            $detalleAsistentes = [];
-
-            foreach ($detalles as $d) {
-                $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
-                $opcion = $d['opcionVoto'];
-                $detalleAsistentes[] = ['nombre' => $nombre, 'voto' => $opcion];
-
-                if ($opcion === 'SI' || $opcion === 'APRUEBO') $si++;
-                elseif ($opcion === 'NO' || $opcion === 'RECHAZO') $no++;
-                elseif ($opcion === 'ABSTENCION') $abs++;
-            }
-
-            // Determinar resultado texto
-            $resultadoTexto = "SIN RESULTADO";
-            if ($si > $no) $resultadoTexto = "APROBADO";
-            elseif ($no > $si) $resultadoTexto = "RECHAZADO";
-            elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
-
-            $votaciones[] = [
-                'nombreVotacion' => $v['nombreVotacion'],
-                'resultado' => $resultadoTexto,
-                'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
-                'detalle_asistentes' => $detalleAsistentes
-            ];
-        }
-
-        // 5. VOTACIONES Y DETALLES (CORREGIDO)
-        $idReunion = $minutaInfo['idReunion'] ?? null;
-
-        // Agregamos LEFT JOIN t_comision para traer el nombre de la comisión asignada a la votación
         $sqlV = "SELECT v.*, c.nombreComision as nombreComisionVoto
              FROM t_votacion v
              LEFT JOIN t_comision c ON v.idComision = c.idComision
@@ -221,68 +192,50 @@ class MinutaController
         $stmtV = $db->prepare($sqlV);
         $stmtV->execute([':idMin' => $idMinuta, ':idReu' => $idReunion]);
         $votacionesRaw = $stmtV->fetchAll(PDO::FETCH_ASSOC);
-
         $votaciones = [];
+
         foreach ($votacionesRaw as $v) {
-            // Detalle de votos usando ids correctos
             $stmtD = $db->prepare("SELECT u.pNombre, u.aPaterno, vo.opcionVoto 
                                    FROM t_voto vo
                                    JOIN t_usuario u ON vo.t_usuario_idUsuario = u.idUsuario
                                    WHERE vo.t_votacion_idVotacion = :idVot");
-
             $stmtD->execute([':idVot' => $v['idVotacion']]);
             $detalles = $stmtD->fetchAll(PDO::FETCH_ASSOC);
 
-            $si = 0;
-            $no = 0;
-            $abs = 0;
+            $si = 0; $no = 0; $abs = 0;
             $detalleAsistentes = [];
-
             foreach ($detalles as $d) {
                 $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
                 $opcion = $d['opcionVoto'];
-
                 $detalleAsistentes[] = ['nombre' => $nombre, 'voto' => $opcion];
-
-                if ($opcion === 'SI') $si++;
-                elseif ($opcion === 'NO') $no++;
+                if ($opcion === 'SI' || $opcion === 'APRUEBO') $si++;
+                elseif ($opcion === 'NO' || $opcion === 'RECHAZO') $no++;
                 elseif ($opcion === 'ABSTENCION') $abs++;
             }
-
+            
             $resultadoTexto = "SIN RESULTADO";
             if ($si > $no) $resultadoTexto = "APROBADO";
             elseif ($no > $si) $resultadoTexto = "RECHAZADO";
             elseif ($si > 0 && $si == $no) $resultadoTexto = "EMPATE";
 
-            $nombreComisionVoto = $v['nombreComisionVoto'] ?? $minutaInfo['nombreComision'] ?? 'General';
-
             $votaciones[] = [
                 'nombreVotacion' => $v['nombreVotacion'],
-                'nombreComision' => $nombreComisionVoto, // <--- NUEVO DATO PARA EL PDF
+                'nombreComision' => $v['nombreComisionVoto'] ?? 'General',
                 'resultado' => $resultadoTexto,
                 'contadores' => ['SI' => $si, 'NO' => $no, 'ABS' => $abs],
                 'detalle_asistentes' => $detalleAsistentes
             ];
         }
 
-        // 6. FIRMAS
-        $firmas = [];
-        if (!empty($minutaInfo['pNomPres'])) {
-            $firmas[] = [
-                'pNombre' => $minutaInfo['pNomPres'],
-                'aPaterno' => $minutaInfo['aPatPres'],
-                'fechaAprobacion' => $minutaInfo['fechaMinuta']
-            ];
-        }
-
         return [
-            'urlValidacion' => 'https://coregedoc.cl/validar?h=' . ($minutaInfo['hashValidacion'] ?? ''),
+            'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'https://coregedoc.cl') . '/validar?h=' . ($minutaInfo['hashValidacion'] ?? ''),
             'minuta_info' => $minutaInfo,
             'comisiones_info' => $comisionesInfo,
+            'presidentes_str' => $presidentesStr, // <--- DATO CLAVE PARA PDF
             'temas' => $temas,
             'asistencia' => $asistencia,
             'votaciones' => $votaciones,
-            'firmas_aprobadas' => $firmas
+            'firmas_aprobadas' => $firmasPresidentes
         ];
     }
     public function aprobadas()
@@ -381,6 +334,18 @@ class MinutaController
         $tipoUsuario = $_SESSION['tipoUsuario_id'] ?? 0;
         $esSecretarioTecnico = ($tipoUsuario == 2 || $tipoUsuario == 6);
         $estadoReunion = $minutaModel->verificarEstadoReunion($idMinuta);
+
+        $adjuntosRaw = $minutaModel->getAdjuntosPorMinuta($idMinuta);
+        $adjuntosProcesados = [];
+        foreach ($adjuntosRaw as $adj) {
+            if ($adj['tipoAdjunto'] === 'link' && strpos($adj['pathAdjunto'], '|||') !== false) {
+                // Separamos "Nombre Visual|||https://url..."
+                list($nombreLink, $urlLink) = explode('|||', $adj['pathAdjunto'], 2);
+                $adj['nombreArchivo'] = $nombreLink; // Sobreescribimos para la vista
+                $adj['pathAdjunto'] = $urlLink;      // URL limpia
+            }
+            $adjuntosProcesados[] = $adj;
+        }
 
         $data = [
             'usuario' => [
@@ -1181,13 +1146,124 @@ class MinutaController
         }
         exit;
     }
+
+    public function apiFiltrarSeguimiento()
+    {
+        // 1. Headers y Sesión
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+
+        $db = new Database();
+        $conn = $db->getConnection();
+
+        try {
+            // 2. Recibir Parámetros
+            $page     = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+            $limit    = 10; // <--- PAGINACIÓN DE 10
+            $offset   = ($page - 1) * $limit;
+
+            $desde    = $_GET['desde'] ?? date('Y-m-01');
+            $hasta    = $_GET['hasta'] ?? date('Y-m-d');
+            $comision = !empty($_GET['comision']) ? $_GET['comision'] : null;
+            $keyword  = !empty($_GET['keyword'])  ? trim($_GET['keyword']) : null;
+            $orderBy  = $_GET['orderBy'] ?? 'idMinuta';
+            $orderDir = $_GET['orderDir'] ?? 'DESC';
+
+            // Validar ordenamiento
+            $allowedCols = ['idMinuta', 'fechaMinuta', 'estadoMinuta'];
+            if (!in_array($orderBy, $allowedCols)) $orderBy = 'idMinuta';
+            $orderDir = (strtoupper($orderDir) === 'ASC') ? 'ASC' : 'DESC';
+
+            // 3. Construcción Dinámica del WHERE y Params
+            // Definimos la base del FROM para reutilizarla en el COUNT y en el SELECT
+            $sqlFrom = " FROM t_minuta m
+                         LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                         LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta ";
+
+            $whereClauses = ["m.fechaMinuta BETWEEN :desde AND :hasta"];
+            $params = [
+                ':desde' => $desde, 
+                ':hasta' => $hasta . ' 23:59:59'
+            ];
+
+            if ($comision) {
+                $whereClauses[] = "m.t_comision_idComision = :comision";
+                $params[':comision'] = $comision;
+            }
+
+            if ($keyword) {
+                $whereClauses[] = "(r.nombreReunion LIKE :kw1 OR m.idMinuta LIKE :kw2)";
+                $params[':kw1'] = "%$keyword%";
+                $params[':kw2'] = "%$keyword%";
+            }
+
+            // Unimos los WHERE
+            $sqlWhere = " WHERE " . implode(" AND ", $whereClauses);
+
+            // 4. CONSULTA 1: Contar Total de Registros (Para la paginación)
+            $sqlCount = "SELECT COUNT(*) as total " . $sqlFrom . $sqlWhere;
+            $stmtCount = $conn->prepare($sqlCount);
+            $stmtCount->execute($params);
+            $totalRecords = $stmtCount->fetchColumn();
+            $totalPages = ceil($totalRecords / $limit);
+
+            // 5. CONSULTA 2: Obtener Datos Paginados
+            $sqlData = "SELECT 
+                            m.idMinuta,
+                            c.nombreComision,
+                            m.estadoMinuta,
+                            m.fechaMinuta as ultima_fecha,
+                            r.nombreReunion,
+                            -- Campos simulados para historial
+                            'Actualización de estado' as ultimo_detalle,
+                            'Sistema' as ultimo_usuario
+                        " . $sqlFrom . $sqlWhere . " 
+                        ORDER BY m.$orderBy $orderDir 
+                        LIMIT $limit OFFSET $offset"; // <--- AQUI APLICAMOS LIMIT
+
+            $stmt = $conn->prepare($sqlData);
+            $stmt->execute($params);
+            $resultados = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 6. Retornar JSON con metadata de paginación
+            echo json_encode([
+                'status'     => 'success',
+                'data'       => $resultados,
+                'total'      => $totalRecords,
+                'page'       => $page,
+                'totalPages' => $totalPages
+            ]);
+
+        } catch (\Exception $e) {
+            echo json_encode([
+                'status'  => 'error',
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+        exit;
+    }
+
     public function apiVerAdjuntosMinuta()
     {
         header('Content-Type: application/json');
         $this->verificarSesion();
         $idMinuta = $_GET['id'] ?? 0;
+
         $model = new Minuta();
-        $adjuntos = $model->getAdjuntosPorMinuta($idMinuta);
+        $adjuntosRaw = $model->getAdjuntosPorMinuta($idMinuta);
+
+        // Procesamos para separar nombre de URL
+        $adjuntos = [];
+        foreach ($adjuntosRaw as $adj) {
+            if ($adj['tipoAdjunto'] === 'link' && strpos($adj['pathAdjunto'], '|||') !== false) {
+                list($nombre, $url) = explode('|||', $adj['pathAdjunto'], 2);
+                $adj['nombreArchivo'] = $nombre;
+                $adj['pathAdjunto'] = $url; // Para que el href funcione
+            }
+            $adjuntos[] = $adj;
+        }
+
         echo json_encode(['status' => 'success', 'data' => $adjuntos]);
         exit;
     }
@@ -1443,7 +1519,7 @@ class MinutaController
         $nombre = $input['nombre'] ?? '';
         $url = $input['url'] ?? '';
 
-        if (!$idMinuta || !$nombre || !$url) {
+        if (!$idMinuta || !$url) {
             echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
             exit;
         }
@@ -1452,18 +1528,20 @@ class MinutaController
             $db = new Database();
             $conn = $db->getConnection();
 
-            // Tipo 'link' para diferenciar de archivos físicos
-            $sql = "INSERT INTO t_adjunto (t_minuta_idMinuta, nombreArchivo, pathAdjunto, tipoAdjunto, fechaSubida) 
-                    VALUES (:idMin, :nom, :url, 'link', NOW())";
+            // TRUCO: Como la tabla no tiene campo 'nombreArchivo', guardamos "NOMBRE|||URL" en pathAdjunto.
+            // La función 'gestionar' y 'apiVerAdjuntosMinuta' sabrán separarlo.
+            $valorGuardar = (!empty($nombre)) ? $nombre . '|||' . $url : $url;
+
+            $sql = "INSERT INTO t_adjunto (t_minuta_idMinuta, pathAdjunto, tipoAdjunto, hash_validacion) 
+                    VALUES (:idMin, :path, 'link', NULL)";
 
             $stmt = $conn->prepare($sql);
             $stmt->execute([
                 ':idMin' => $idMinuta,
-                ':nom' => $nombre,
-                ':url' => $url
+                ':path' => $valorGuardar // Guardamos "Nombre|||URL"
             ]);
 
-            echo json_encode(['status' => 'success', 'message' => 'Enlace guardado']);
+            echo json_encode(['status' => 'success', 'message' => 'Enlace guardado correctamente']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -1517,7 +1595,7 @@ class MinutaController
     {
         header('Content-Type: application/json');
         $this->verificarSesion();
-        
+
         $idUsuario = $_SESSION['idUsuario'];
         $model = new Minuta(); // O VotacionModel si lo tienes separado
 
@@ -1556,7 +1634,6 @@ class MinutaController
             ];
 
             echo json_encode(['status' => 'active', 'data' => $dataResponse]);
-
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -1567,7 +1644,7 @@ class MinutaController
     {
         header('Content-Type: application/json');
         $this->verificarSesion();
-        
+
         $input = json_decode(file_get_contents('php://input'), true);
         $idVotacion = $input['idVotacion'] ?? 0;
         $opcion = $input['opcion'] ?? ''; // Aquí llegará 'APRUEBO', 'RECHAZO' o 'ABSTENCION'
@@ -1607,10 +1684,11 @@ class MinutaController
             }
 
             echo json_encode(['status' => 'success', 'message' => 'Voto registrado']);
-
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => 'Error al guardar voto: ' . $e->getMessage()]);
         }
         exit;
     }
+
+    
 }
