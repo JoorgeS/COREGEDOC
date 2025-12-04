@@ -42,7 +42,7 @@
                     <a href="https://www.youtube.com/@gorevalparaiso_" class="text-secondary text-decoration-none fs-5 link-hover-primary"><i class="fab fa-youtube"></i></a>
                 </div>
                 <div class="mt-3">
-                    <a href="https://www.gobiernovalparaiso.cl/" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                    <a href="http://www.corevalparaiso.cl//" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
                         Ir al Sitio Web Oficial <i class="fas fa-external-link-alt ms-1"></i>
                     </a>
                 </div>
@@ -54,12 +54,6 @@
         <div class="container-fluid px-4 d-flex flex-column flex-md-row justify-content-between align-items-center small text-muted">
             <div class="mb-2 mb-md-0">
                 &copy; <?php echo date('Y'); ?> <strong>Consejo Regional de Valparaíso</strong>. Todos los derechos reservados.
-            </div>
-            <div>
-                <span class="me-3">Versión 2.5</span>
-                <a href="#" class="text-muted text-decoration-none me-2">Privacidad</a>
-                <span class="text-muted">|</span>
-                <a href="#" class="text-muted text-decoration-none ms-2">Soporte</a>
             </div>
         </div>
     </div>

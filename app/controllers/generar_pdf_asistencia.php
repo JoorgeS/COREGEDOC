@@ -9,7 +9,7 @@ if (file_exists($autoloadPath) && !class_exists('Dompdf\Dompdf')) {
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
-// Función segura para convertir imágenes a base64 (para que se vean en el PDF)
+// Función segura para convertir imágenes a base64
 function ImageToDataUrl(String $filename): String
 {
     if (!file_exists($filename)) return '';
@@ -26,9 +26,12 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // 1. OBTENER DATOS DE LA BASE DE DATOS
         // ==========================================
         
-        // Datos de la Minuta y Reunión
+        // Datos de la Minuta y Reunión (Agregué fechaTerminoReunion)
         $stmt = $pdo->prepare("
-            SELECT m.idMinuta, r.fechaInicioReunion, c.nombreComision,
+            SELECT m.idMinuta, 
+                   r.fechaInicioReunion, 
+                   r.fechaTerminoReunion,
+                   c.nombreComision,
                    CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario
             FROM t_minuta m
             LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
@@ -41,7 +44,7 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
 
         if (!$minuta) return false;
 
-        // Lista de Asistentes (Presentes y Ausentes)
+        // Lista de Asistentes
         $sqlAsis = "
             SELECT 
                 CONCAT(u.pNombre, ' ', u.aPaterno, ' ', u.aMaterno) as nombreCompleto,
@@ -61,81 +64,112 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // ==========================================
         // 2. PREPARAR VARIABLES Y RUTAS
         // ==========================================
-        $fechaReunion = $minuta['fechaInicioReunion'] ? date('d-m-Y', strtotime($minuta['fechaInicioReunion'])) : date('d-m-Y');
-        $horaReunion = $minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--';
-        $fechaValidacion = date('d-m-Y H:i:s');
+        $fechaRaw = strtotime($minuta['fechaInicioReunion']);
+        $meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        $fechaTexto = date('d', $fechaRaw) . ' de ' . $meses[date('n', $fechaRaw) - 1] . ' de ' . date('Y', $fechaRaw);
+
+        $horaInicio = $minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--';
+        $horaTermino = $minuta['fechaTerminoReunion'] ? date('H:i', strtotime($minuta['fechaTerminoReunion'])) : 'En curso';
         
-        // Helper function for images
-        $getImgBase64 = function($path) {
-            if(file_exists($path)) {
-                $data = file_get_contents($path);
-                return 'data:image/png;base64,' . base64_encode($data);
-            }
-            return '';
-        };
+        // Preparar nombre de comisión en mayúsculas
+        $nombreComision = mb_strtoupper($minuta['nombreComision'] ?? 'SIN COMISIÓN', 'UTF-8');
 
         // Rutas absolutas para imágenes
-        $logoGore = $getImgBase64($rootPath . '/public/img/logo2.png');
-        $logoCore = $getImgBase64($rootPath . '/public/img/logoCore1.png');
-        $selloImg = $getImgBase64($rootPath . '/public/img/aprobacion.png');
+        $logoGore = ImageToDataUrl($rootPath . '/public/img/logo2.png');
+        $logoCore = ImageToDataUrl($rootPath . '/public/img/logoCore1.png');
+        // $selloImg = ImageToDataUrl($rootPath . '/public/img/aprobacion.png'); // Opcional si quieres usar el sello antiguo
 
         // ==========================================
-        // 3. CONSTRUIR EL HTML DEL REPORTE
+        // 3. CONSTRUIR EL HTML (ESTILO MINUTA)
         // ==========================================
+        
+        $css = "
+            @page { margin: 160px 50px 50px 50px; }
+            body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
+            
+            /* HEADER FIJO */
+            header { position: fixed; top: -140px; left: 0px; right: 0px; height: 130px; text-align: center; }
+            .header-table { width: 100%; border-collapse: collapse; }
+            .header-center { text-align: center; color: #000; vertical-align: top; padding-top: 5px; }
+            .h-line-1 { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin: 0; }
+            .h-line-2 { font-size: 10pt; font-weight: bold; text-transform: uppercase; margin: 2px 0 10px 0; }
+            .h-line-dynamic { font-size: 9pt; color: #000; margin-bottom: 4px; line-height: 1.2; text-transform: uppercase; }
+            hr.header-sep { border: 0; border-top: 2px solid #0071bc; margin: 5px 0 0 0; }
+
+            .doc-title { text-align: center; font-size: 14pt; font-weight: bold; color: #000; text-transform: uppercase; margin-bottom: 15px; background-color: #f0f0f0; padding: 5px; border: 1px solid #ccc; margin-top: 10px; }
+
+            /* INFO TABLE */
+            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9pt; table-layout: fixed; }
+            .info-table td { padding: 4px; border-bottom: 1px solid #eee; vertical-align: top; }
+            .lbl { font-weight: bold; color: #000; width: 130px; }
+            .val { color: #333; word-wrap: break-word; }
+
+            /* ASISTENCIA TABLE */
+            .tabla-asistencia { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5pt; }
+            .tabla-asistencia th { background-color: #f9f9f9; padding: 8px; border: 1px solid #ddd; text-align: left; color: #555; }
+            .tabla-asistencia td { padding: 6px; border: 1px solid #eee; vertical-align: middle; }
+            
+            /* COLORES SOLICITADOS */
+            .presente { color: #00a650; font-weight: bold; text-transform: uppercase; }
+            .ausente { color: #999; font-weight: bold; text-transform: uppercase; }
+            .manual { color: #666; font-size: 7pt; font-style: italic; display:block; }
+
+            /* FOOTER: CUADRO GRIS DE VALIDACIÓN (Idéntico a Minuta) */
+            .footer-container { margin-top: 30px; page-break-inside: avoid; width: 100%; text-align: center; }
+            .footer-validation-box { background-color: #f4f4f4; border: 1px solid #dcdcdc; border-radius: 6px; padding: 10px; width: 100%; box-sizing: border-box; }
+            .footer-content-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            .qr-cell { width: 90px; vertical-align: middle; text-align: center; padding-right: 15px; border-right: 1px solid #ccc; }
+            .info-cell { padding-left: 15px; text-align: left; vertical-align: middle; font-size: 8pt; color: #555; line-height: 1.3; word-wrap: break-word; }
+            .link-validacion { color: #0071bc; text-decoration: none; font-family: monospace; font-size: 7pt; display: block; width: 100%; margin-top: 3px; word-break: break-all; overflow-wrap: break-word; }
+            .hash-tag { font-family: monospace; background: #eee; padding: 2px; font-size: 7pt; word-break: break-all; }
+            
+            /* Footer de página pequeño */
+            .page-footer-text { position: fixed; bottom: -30px; left: 0; right: 0; text-align: center; font-size: 8pt; color: #aaa; }
+        ";
+
         $html = '
         <html>
         <head>
             <meta charset="UTF-8">
-            <style>
-                body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #333; }
-                .header-table { width: 100%; border-bottom: 2px solid #ccc; margin-bottom: 20px; padding-bottom: 10px; }
-                .titulo { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; margin: 15px 0; color: #000; }
-                .info-box { width: 100%; margin-bottom: 20px; border-collapse: collapse; }
-                .info-box td { border: 1px solid #999; padding: 6px; }
-                .label { background-color: #f0f0f0; font-weight: bold; width: 25%; }
-                
-                .tabla-asistencia { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                .tabla-asistencia th { background-color: #e9ecef; padding: 8px; border: 1px solid #999; text-align: left; }
-                .tabla-asistencia td { padding: 6px; border: 1px solid #ccc; vertical-align: middle; }
-                
-                .presente { color: green; font-weight: bold; }
-                .ausente { color: red; font-weight: bold; }
-                .manual { color: #0056b3; font-size: 8pt; font-style: italic; display:block; }
-                
-                .sello-container { text-align: center; margin-top: 50px; margin-bottom: 10px; }
-                .footer { position: fixed; bottom: 20px; left: 0; right: 0; text-align: center; font-size: 8pt; color: #888; border-top: 1px solid #eee; padding-top: 5px; }
-
-                /* New styles for QR Footer */
-                .footer-sep { border: 0; border-top: 1px solid #eee; margin: 30px 0 10px 0; }
-                .footer-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                .qr-col { width: 100px; vertical-align: top; padding-right: 15px; }
-                .info-col { vertical-align: top; font-size: 9pt; color: #555; line-height: 1.4; }
-                .link-blue { color: #0066cc; text-decoration: none; word-break: break-all; font-size: 8pt; }
-                .hash-tag { background-color: #eee; padding: 2px 6px; font-family: monospace; font-size: 8pt; color: #666; display: block; margin-top: 5px; word-break: break-all; }
-            </style>
+            <style>' . $css . '</style>
         </head>
         <body>
-            <table class="header-table">
-                <tr>
-                    <td width="15%"><img src="' . $logoGore . '" style="width: 70px;"></td>
-                    <td width="70%" align="center">
-                        <strong>GOBIERNO REGIONAL DE VALPARAÍSO</strong><br>
-                        CONSEJO REGIONAL
-                    </td>
-                    <td width="15%" align="right"><img src="' . $logoCore . '" style="width: 70px;"></td>
-                </tr>
-            </table>
+            <header>
+                <table class="header-table">
+                    <tr>
+                        <td width="100" align="left"><img src="' . $logoGore . '" width="70" style="display:block;"></td>
+                        <td class="header-center">
+                            <div class="h-line-1">GOBIERNO REGIONAL - REGIÓN DE VALPARAÍSO</div>
+                            <div class="h-line-2">CONSEJO REGIONAL</div>
+                            
+                            <div class="h-line-dynamic">COMISIÓN ' . $nombreComision . '</div>
+                        </td>
+                        <td width="130" align="right"><img src="' . $logoCore . '" width="120" style="display:block;"></td>
+                    </tr>
+                </table>
+                <hr class="header-sep">
+            </header>
 
-            <div class="titulo">Certificado de Asistencia Validada</div>
+            <div class="page-footer-text">Sistema de Gestión COREGEDOC - Generado el ' . date('d/m/Y H:i') . '</div>
 
-            <table class="info-box">
+            <div class="doc-title">CERTIFICADO DE ASISTENCIA</div>
+
+            <table class="info-table">
                 <tr>
-                    <td class="label">N° Minuta:</td><td>' . $idMinuta . '</td>
-                    <td class="label">Fecha Reunión:</td><td>' . $fechaReunion . '</td>
+                    <td class="lbl">FECHA:</td>
+                    <td class="val">' . $fechaTexto . '</td>
                 </tr>
                 <tr>
-                    <td class="label">Comisión:</td><td>' . htmlspecialchars($minuta['nombreComision'] ?? 'Sin Comisión') . '</td>
-                    <td class="label">Hora Inicio:</td><td>' . $horaReunion . '</td>
+                    <td class="lbl">HORA INICIO:</td>
+                    <td class="val">' . $horaInicio . ' hrs.</td>
+                </tr>
+                <tr>
+                    <td class="lbl">HORA TÉRMINO:</td>
+                    <td class="val">' . $horaTermino . ' hrs.</td>
+                </tr>
+                <tr>
+                    <td class="lbl">LUGAR:</td>
+                    <td class="val">Sala de plenos</td>
                 </tr>
             </table>
 
@@ -144,8 +178,8 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 <thead>
                     <tr>
                         <th>Consejero Regional</th>
-                        <th width="150" style="text-align:center;">Estado</th>
-                        <th width="120" style="text-align:center;">Hora Registro</th>
+                        <th width="120" style="text-align:center;">Estado</th>
+                        <th width="100" style="text-align:center;">Hora Registro</th>
                     </tr>
                 </thead>
                 <tbody>';
@@ -159,7 +193,7 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 $totalPresentes++;
                 $estado = '<span class="presente">PRESENTE</span>';
                 if($p['origenAsistencia'] === 'SECRETARIO') {
-                    $estado .= '<span class="manual">(Validación Manual ST)</span>';
+                    $estado .= '<span class="manual">(Manual)</span>';
                 }
                 
                 if (!empty($p['fechaRegistroAsistencia'])) {
@@ -175,53 +209,42 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         }
 
         $html .= '</tbody></table>
-            <p style="text-align:right; margin-top:10px;"><strong>Total Asistentes: ' . $totalPresentes . '</strong></p>
+            <div style="text-align:right; margin-top:10px; font-size:9pt; color:#555;">Total Asistentes: <strong>' . $totalPresentes . '</strong></div>
 
-            <div class="sello-container">
-                <img src="' . $selloImg . '" style="width: 100px; opacity: 0.8;"><br>
-                <p><strong>VALIDADO DIGITALMENTE</strong><br>
-                Por: ' . htmlspecialchars($minuta['nombreSecretario'] ?? 'Secretaría Técnica') . '<br>
-                Fecha de Cierre: ' . $fechaValidacion . '</p>
-            </div>
-
-            <div style="page-break-inside: avoid;">
-                <hr class="footer-sep">
-                <table class="footer-table">
-                    <tr>
-                        <td class="qr-col">';
-        
+            <div class="footer-container">
+                <div class="footer-validation-box">
+                    <table class="footer-content-table">
+                        <tr>
+                            <td class="qr-cell">';
+                            
         if ($qrBase64) {
-            $html .= '<img src="' . $qrBase64 . '" style="width: 90px; height: 90px;">';
+            $html .= '<img src="' . $qrBase64 . '" width="80">';
         }
 
-        $html .= '      </td>
-                        <td class="info-col">
-                            <strong>Verificación de Autenticidad</strong><br>
-                            Este documento certifica la asistencia oficial a la sesión indicada.<br>
-                            Puede validar su originalidad escaneando el código QR o visitando:<br>
-                            <a href="' . $urlValidacion . '" class="link-blue">' . $urlValidacion . '</a>
-                            <br>
-                            <span class="hash-tag">HASH: ' . $hash . '</span>
-                        </td>
-                    </tr>
-                </table>
+        $html .= '          </td>
+                            <td class="info-cell">
+                                <strong>VALIDACIÓN DE AUTENTICIDAD</strong><br>
+                                Este documento certifica la asistencia oficial.<br>
+                                Valide en: <span class="link-validacion">' . ($urlValidacion ?? '#') . '</span>
+
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </div>
 
-            <div class="footer">
-                Documento oficial generado por Sistema COREGEDOC el ' . date('d/m/Y H:i:s') . '
-            </div>
         </body>
         </html>';
 
         // ==========================================
-        // 4. GENERAR ARCHIVO (Con Fallback de Seguridad)
+        // 4. GENERAR ARCHIVO
         // ==========================================
         
-        // Opción A: Si Dompdf está instalado, generamos PDF real
         if (class_exists('Dompdf\Dompdf')) {
             $options = new Options();
             $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true); // Permitir imágenes
+            $options->set('isRemoteEnabled', true);
+            $options->set('defaultFont', 'Helvetica');
             
             $dompdf = new Dompdf($options);
             $dompdf->loadHtml($html);
@@ -230,20 +253,15 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             $output = $dompdf->output();
             
             file_put_contents($rutaGuardado, $output);
-        } 
-        // Opción B: Si falla o no está instalado, guardamos el HTML
-        // Esto permite que el archivo "exista" físicamente y el correo se pueda enviar.
-        else {
-            $aviso = "";
-            file_put_contents($rutaGuardado, $aviso . $html);
+        } else {
+            // Fallback si no hay Dompdf (guarda HTML)
+            file_put_contents($rutaGuardado, $html);
         }
 
-        return true; // Retornamos éxito siempre para no detener el flujo del controlador
+        return true;
 
     } catch (Exception $e) {
-        // En caso de error catastrófico, guardamos un archivo de error
-        // para que al menos exista algo que adjuntar y no falle el mail.
-        file_put_contents($rutaGuardado, "Error generando reporte: " . $e->getMessage());
+        file_put_contents($rutaGuardado, "Error: " . $e->getMessage());
         return true; 
     }
 }

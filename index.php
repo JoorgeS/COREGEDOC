@@ -388,7 +388,14 @@ try {
 
         // Rutas de Adjuntos (Estas deben coincidir con lo que pide el JS)
         case 'api_adjunto_subir':
-            $minutaController->apiSubirAdjunto();
+            // 1. Cargamos el controlador correcto (donde pegaste el código nuevo)
+            require_once 'app/controllers/AdjuntoController.php';
+
+            // 2. Instanciamos el AdjuntoController
+            $adjuntoController = new AdjuntoController();
+
+            // 3. Llamamos a la función que arreglamos (apiSubir)
+            $adjuntoController->apiSubir();
             break;
         case 'api_adjunto_link':
             $controller->apiGuardarLink();
