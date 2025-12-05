@@ -21,33 +21,54 @@ function ImageToDataUrl(String $filename): String
 
 function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $rootPath, $qrBase64 = null, $hash = null, $urlValidacion = null)
 {
+    // Aumentar límite de memoria y tiempo de ejecución para evitar cortes abruptos
+    ini_set('memory_limit', '512M');
+    set_time_limit(120);
+
     try {
         // ==========================================
         // 1. OBTENER DATOS DE LA BASE DE DATOS
         // ==========================================
         
-        // Datos de la Minuta, Reunión, Comisión, Presidente y Secretario
+        // CORRECCIÓN: Se eliminaron r.horaInicioReal y r.horaTerminoReal que no existen.
+        // Se agregaron JOINs para obtener nombreComision y nombrePresidentes dinámicamente.
         $stmt = $pdo->prepare("
             SELECT m.idMinuta, 
                    m.fechaMinuta,
                    m.fechaAprobacion, 
                    r.fechaInicioReunion, 
-                   r.horaInicioReal,
                    r.fechaTerminoReunion,
-                   r.horaTerminoReal,
                    r.nombreReunion,
-                   m.nombreComision,
-                   m.nombrePresidentes,
+                   -- Construir string de comisiones (Principal + Mixtas)
+                   CONCAT_WS(' / ', c1.nombreComision, c2.nombreComision, c3.nombreComision) as nombreComision,
+                   -- Construir string de presidentes
+                   CONCAT_WS(' / ', 
+                        TRIM(CONCAT(p1.pNombre, ' ', p1.aPaterno, ' ', p1.aMaterno)),
+                        TRIM(CONCAT(p2.pNombre, ' ', p2.aPaterno, ' ', p2.aMaterno)),
+                        TRIM(CONCAT(p3.pNombre, ' ', p3.aPaterno, ' ', p3.aMaterno))
+                   ) as nombrePresidentes,
                    CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario
             FROM t_minuta m
             LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+            -- Joins para Comisiones (Principal y Mixtas)
+            LEFT JOIN t_comision c1 ON r.t_comision_idComision = c1.idComision
+            LEFT JOIN t_comision c2 ON r.t_comision_idComision_mixta = c2.idComision
+            LEFT JOIN t_comision c3 ON r.t_comision_idComision_mixta2 = c3.idComision
+            -- Joins para Presidentes de esas Comisiones
+            LEFT JOIN t_usuario p1 ON c1.t_usuario_idPresidente = p1.idUsuario
+            LEFT JOIN t_usuario p2 ON c2.t_usuario_idPresidente = p2.idUsuario
+            LEFT JOIN t_usuario p3 ON c3.t_usuario_idPresidente = p3.idUsuario
+            -- Join Secretario
             LEFT JOIN t_usuario s ON s.idUsuario = :idSecretario
             WHERE m.idMinuta = :idMinuta
         ");
         $stmt->execute([':idMinuta' => $idMinuta, ':idSecretario' => $idSecretario]);
         $minuta = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$minuta) return false;
+        if (!$minuta) {
+            error_log("PDF Error: No se encontró la minuta ID: " . $idMinuta);
+            return false;
+        }
 
         // Lista de Asistentes
         $sqlAsis = "
@@ -71,13 +92,13 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // ==========================================
         
         // --- LÓGICA DE FECHAS Y HORAS ---
-        $fechaRaw = strtotime($minuta['fechaMinuta']); // Usamos fechaMinuta para consistencia
+        $fechaRaw = strtotime($minuta['fechaMinuta']); 
         $meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         $fechaTexto = date('d', $fechaRaw) . ' de ' . $meses[date('n', $fechaRaw) - 1] . ' de ' . date('Y', $fechaRaw);
 
-        // Horas reales (o planificadas si fallan)
-        $horaInicio = $minuta['horaInicioReal'] ? date('H:i', strtotime($minuta['horaInicioReal'])) : ($minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--');
-        $horaTermino = $minuta['horaTerminoReal'] ? date('H:i', strtotime($minuta['horaTerminoReal'])) : 'En curso';
+        // CORRECCIÓN: Extraer hora directamente de los campos datetime
+        $horaInicio = ($minuta['fechaInicioReunion']) ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--';
+        $horaTermino = ($minuta['fechaTerminoReunion']) ? date('H:i', strtotime($minuta['fechaTerminoReunion'])) : 'En curso';
 
         // --- LÓGICA DE ENCABEZADO (FORMATO LISTA) ---
         $formatear = function ($cadena) {
@@ -85,8 +106,11 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             // Asumimos que pueden venir separados por '/' o ser un solo string
             $list = explode('/', $cadena); 
             $list = array_map(function ($n) { return mb_strtoupper(trim($n), 'UTF-8'); }, $list);
+            // Filtramos vacíos por si acaso
+            $list = array_filter($list, function($v) { return !empty($v); });
             $list = array_values(array_unique($list)); // Eliminar duplicados y reindexar
             
+            if (empty($list)) return '---';
             if (count($list) === 1) return $list[0];
             $ultimo = array_pop($list);
             return implode(', ', $list) . ' Y ' . $ultimo;
@@ -336,7 +360,6 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         $y = $h - 40; // Altura del footer
 
         // Texto centrado: "Documento generado por COREGEDOC"
-        // Le agregamos la fecha actual para referencia si quieres, si no, solo el texto
         $textoCentro = "Documento generado por COREGEDOC"; 
         
         $anchoTexto = $fontMetrics->getTextWidth($textoCentro, $font, $size);
@@ -348,14 +371,26 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         $xPagina = $w - 80; // A la derecha
         $canvas->page_text($xPagina, $y, $textPagina, $font, $size, $color);
 
-        // --- GUARDADO ---
+        // --- GUARDADO CON VERIFICACIÓN ---
         $output = $dompdf->output();
-        $guardado = file_put_contents($rutaGuardado, $output);
+        
+        // Verificamos si podemos escribir en la ruta antes de intentarlo
+        if (!is_writable(dirname($rutaGuardado))) {
+             error_log("PDF Error: No hay permisos de escritura en la carpeta: " . dirname($rutaGuardado));
+        }
 
-        return ($guardado !== false);
+        $guardado = @file_put_contents($rutaGuardado, $output);
+
+        if ($guardado === false) {
+             error_log("PDF Error: Falló file_put_contents en: " . $rutaGuardado);
+             return false;
+        }
+
+        return true;
 
     } catch (Exception $e) {
-        file_put_contents($rutaGuardado, "Error: " . $e->getMessage());
+        // En lugar de escribir en el archivo (lo cual corrompe el PDF), escribimos en el log del servidor
+        error_log("PDF CRITICAL EXCEPTION: " . $e->getMessage() . " en línea " . $e->getLine());
         return false; 
     }
 }

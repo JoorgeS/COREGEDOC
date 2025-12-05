@@ -91,8 +91,8 @@ $dNoneClass = $esEditable ? '' : 'd-none';
 
                     <div class="row mb-2 align-items-center">
                         <div class="col-4 fw-bold text-end text-secondary">Reunión:</div>
-               
-                        <?= $data['header_info']['nombre_reunion'] ?>
+                        <div class="col-8 text-dark">
+                            <?= $data['header_info']['nombre_reunion'] ?>
                         </div>
                     </div>
 
@@ -129,7 +129,7 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                     </div>
 
                     <div class="row mb-2 align-items-center">
-                        <div class="col-4 fw-bold text-end text-secondary">Secretario Técnico:</div>
+                        <div class="col-4 fw-bold text-end text-secondary">Secretario Téc.:</div>
                         <div class="col-8 text-dark">
                             <?= $data['header_info']['secretario_completo'] ?>
                         </div>
