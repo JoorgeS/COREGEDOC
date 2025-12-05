@@ -201,7 +201,7 @@
                 // Se eliminó la línea <td class="small">${temasHtml}</td> del template
                 const tr = `
             <tr>
-                <td class="fw-bold text-muted">#${m.idMinuta}</td>
+                <td class="fw-bold text-muted">${m.idMinuta}</td>
                 <td class="fw-bold text-dark">${m.nombreReunion || 'Sin nombre'}</td>
                 <td class="small text-secondary">${m.nombreComision || 'General'}</td>
                 <td>${m.fecha ? m.fecha.substring(0,10) : 'Sin fecha'}</td>

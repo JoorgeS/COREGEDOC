@@ -122,9 +122,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                                 <!-- CORRECCIÓN AQUÍ: Usamos solo la variable saludo del controlador -->
                                 <?php echo $data['saludo']; ?>
                             </h2>
-                            <span class="badge bg-light c-azul border border-primary rounded-pill px-3 py-2">
-                                <i class="fas fa-user-tie me-1"></i> <?php echo $nombreRol; ?>
-                            </span>
+
                             <p class="c-gris mt-3 mb-0 small">
                                 <i class="far fa-clock me-1"></i> Último acceso: <?php echo date('d/m/Y H:i'); ?>
                             </p>
@@ -303,7 +301,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
 </div>
 
 <script>
-    // Usamos window.onload para asegurar que todos los elementos HTML se hayan cargado.
+
     window.onload = function() {
         const carouselElement = document.getElementById('carouselZonas');
         

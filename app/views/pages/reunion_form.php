@@ -1,28 +1,21 @@
 <?php
-
-
 // Variables predefinidas para facilitar la lectura en el HTML
 $isEdit = isset($reunion_data) && !empty($reunion_data);
 $titulo = $isEdit ? 'Editar Reunión #' . $reunion_data['idReunion'] : 'Nueva Reunión';
 $action = $isEdit ? 'update_reunion' : 'store_reunion';
 
-// Valores por defecto (vacíos si es nuevo, datos si es edit)
+// Valores por defecto
 $nombre = $isEdit ? $reunion_data['nombreReunion'] : '';
 $idCom1 = $isEdit ? $reunion_data['t_comision_idComision'] : '';
 $idCom2 = $isEdit ? $reunion_data['t_comision_idComision_mixta'] : '';
 $idCom3 = $isEdit ? $reunion_data['t_comision_idComision_mixta2'] : '';
 
-// --- Lógica de Fechas ajustada con Zona Horaria ---
-// Obtenemos la fecha/hora actual de Chile
+// Fechas
 $now = date('Y-m-d\TH:i');
-
-// Si es edición, usa la fecha de la base de datos. 
-// Si es nueva, usa $now (hora actual Chile) para Inicio
-// Para término, sumamos 1 hora por defecto para comodidad
 $ini = $isEdit ? date('Y-m-d\TH:i', strtotime($reunion_data['fechaInicioReunion'])) : $now;
 $fin = $isEdit ? date('Y-m-d\TH:i', strtotime($reunion_data['fechaTerminoReunion'])) : date('Y-m-d\TH:i', strtotime('+1 hour'));
 
-$comisiones = $data['comisiones']; // Viene del controlador
+$comisiones = $data['comisiones']; 
 ?>
 
 <div class="container mt-4" style="max-width: 800px;">
@@ -47,7 +40,7 @@ $comisiones = $data['comisiones']; // Viene del controlador
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Comisión Principal *</label>
-                        <select name="t_comision_idComision" id="selectCom1" class="form-select" required onchange="verificarMixta()">
+                        <select name="t_comision_idComision" id="selectCom1" class="form-select select-comision" required onchange="verificarMixta(); actualizarExclusiones();">
                             <option value="">-- Seleccione --</option>
                             <?php foreach ($comisiones as $c): ?>
                                 <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom1 == $c['idComision']) ? 'selected' : ''; ?>>
@@ -58,14 +51,15 @@ $comisiones = $data['comisiones']; // Viene del controlador
                     </div>
 
                     <div class="form-check mb-3" id="divCheckMixta" style="<?php echo $idCom1 ? '' : 'display:none;'; ?>">
-                        <input class="form-check-input" type="checkbox" id="checkMixta" onchange="toggleMixta()" <?php echo $idCom2 ? 'checked' : ''; ?>>
+                        <input class="form-check-input" type="checkbox" id="checkMixta" onchange="toggleMixta(); actualizarExclusiones();" <?php echo $idCom2 ? 'checked' : ''; ?>>
                         <label class="form-check-label" for="checkMixta">Es una reunión de Comisión Mixta</label>
                     </div>
 
                     <div id="bloqueMixta" style="<?php echo $idCom2 ? '' : 'display:none;'; ?>">
+                        
                         <div class="mb-3">
                             <label class="form-label">Segunda Comisión</label>
-                            <select name="t_comision_idComision_mixta" id="selectCom2" class="form-select">
+                            <select name="t_comision_idComision_mixta" id="selectCom2" class="form-select select-comision" onchange="actualizarExclusiones()">
                                 <option value="">-- Seleccione --</option>
                                 <?php foreach ($comisiones as $c): ?>
                                     <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom2 == $c['idComision']) ? 'selected' : ''; ?>>
@@ -77,7 +71,7 @@ $comisiones = $data['comisiones']; // Viene del controlador
 
                         <div class="mb-3">
                             <label class="form-label">Tercera Comisión (Opcional)</label>
-                            <select name="t_comision_idComision_mixta2" id="selectCom3" class="form-select">
+                            <select name="t_comision_idComision_mixta2" id="selectCom3" class="form-select select-comision" onchange="actualizarExclusiones()">
                                 <option value="">-- Seleccione --</option>
                                 <?php foreach ($comisiones as $c): ?>
                                     <option value="<?php echo $c['idComision']; ?>" <?php echo ($idCom3 == $c['idComision']) ? 'selected' : ''; ?>>
@@ -97,7 +91,7 @@ $comisiones = $data['comisiones']; // Viene del controlador
                         required
                         value="<?php echo $nombre; ?>"
                         placeholder="Ej: Reunión Ordinaria N° 15"
-                        onblur="capitalizarInput(this)">
+                        oninput="capitalizarInput(this)">
                 </div>
 
                 <div class="row g-3 mb-4">
@@ -122,15 +116,54 @@ $comisiones = $data['comisiones']; // Viene del controlador
 </div>
 
 <script>
-    // Función para Mayúscula en la primera letra
+    // 1. Lógica para Mayúscula inmediata
     function capitalizarInput(input) {
         let valor = input.value;
         if (valor.length > 0) {
+            // Toma la primera letra, la hace mayúscula y le concatena el resto
             input.value = valor.charAt(0).toUpperCase() + valor.slice(1);
         }
     }
 
-    // Lógica para mostrar/ocultar campos de mixta
+    // 2. Lógica para filtrar Comisiones (Evitar duplicados)
+    function actualizarExclusiones() {
+        // Obtenemos los 3 selectores
+        const s1 = document.getElementById('selectCom1');
+        const s2 = document.getElementById('selectCom2');
+        const s3 = document.getElementById('selectCom3');
+
+        // Valores actuales
+        const v1 = s1.value;
+        const v2 = s2.value;
+        const v3 = s3.value;
+
+        // Función auxiliar para deshabilitar opciones en un select específico
+        const deshabilitarEnSelect = (selectTarget, valoresExcluidos) => {
+            const opciones = selectTarget.options;
+            for (let i = 0; i < opciones.length; i++) {
+                // Primero reseteamos (habilitamos todo)
+                opciones[i].disabled = false;
+                
+                // Si el valor de la opción coincide con uno excluido (y no es el valor vacío ""), se deshabilita
+                if (opciones[i].value !== "" && valoresExcluidos.includes(opciones[i].value)) {
+                    opciones[i].disabled = true;
+                }
+            }
+        };
+
+        // Aplicamos la lógica cruzada
+        // En el Select 2, no pueden estar lo que se eligió en el 1 ni en el 3
+        deshabilitarEnSelect(s2, [v1, v3]);
+        
+        // En el Select 3, no pueden estar lo que se eligió en el 1 ni en el 2
+        deshabilitarEnSelect(s3, [v1, v2]);
+
+        // (Opcional) En el Select 1, no pueden estar lo que se eligió en el 2 ni en el 3
+        deshabilitarEnSelect(s1, [v2, v3]);
+    }
+
+
+    // --- Lógica original de visibilidad ---
     function verificarMixta() {
         const com1 = document.getElementById('selectCom1').value;
         const divCheck = document.getElementById('divCheckMixta');
@@ -157,6 +190,15 @@ $comisiones = $data['comisiones']; // Viene del controlador
             sel2.required = false;
             sel2.value = '';
             document.getElementById('selectCom3').value = '';
+            // Importante: al ocultar y limpiar, debemos liberar las opciones bloqueadas
+            actualizarExclusiones(); 
         }
     }
+
+    // Ejecutar al cargar la página por si es modo Editar
+    document.addEventListener('DOMContentLoaded', function() {
+        verificarMixta();
+        toggleMixta(); // Asegura el estado inicial
+        actualizarExclusiones(); // Aplica filtros si vienen datos cargados
+    });
 </script>

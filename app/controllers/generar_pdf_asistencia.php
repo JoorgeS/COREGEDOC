@@ -26,17 +26,21 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // 1. OBTENER DATOS DE LA BASE DE DATOS
         // ==========================================
         
-        // Datos de la Minuta y Reunión (Agregué fechaTerminoReunion)
+        // Datos de la Minuta, Reunión, Comisión y Presidente
+        // JOIN adicional hacia t_usuario (alias p) para obtener nombre del presidente
         $stmt = $pdo->prepare("
             SELECT m.idMinuta, 
+                   m.fechaAprobacion, 
                    r.fechaInicioReunion, 
                    r.fechaTerminoReunion,
                    c.nombreComision,
-                   CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario
+                   CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario,
+                   CONCAT(p.pNombre, ' ', p.aPaterno, ' ', p.aMaterno) as nombrePresidente
             FROM t_minuta m
             LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
             LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
             LEFT JOIN t_usuario s ON s.idUsuario = :idSecretario
+            LEFT JOIN t_usuario p ON c.t_usuario_idPresidente = p.idUsuario
             WHERE m.idMinuta = :idMinuta
         ");
         $stmt->execute([':idMinuta' => $idMinuta, ':idSecretario' => $idSecretario]);
@@ -71,16 +75,23 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         $horaInicio = $minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--';
         $horaTermino = $minuta['fechaTerminoReunion'] ? date('H:i', strtotime($minuta['fechaTerminoReunion'])) : 'En curso';
         
-        // Preparar nombre de comisión en mayúsculas
+        // Preparar nombres en mayúsculas
         $nombreComision = mb_strtoupper($minuta['nombreComision'] ?? 'SIN COMISIÓN', 'UTF-8');
+        $nombrePresidente = mb_strtoupper($minuta['nombrePresidente'] ?? 'SIN PRESIDENTE ASIGNADO', 'UTF-8');
+
+        // Lógica para fecha del footer: Usar fechaAprobacion de la BD
+        if (!empty($minuta['fechaAprobacion'])) {
+            $fechaGeneracionDoc = date('d/m/Y H:i', strtotime($minuta['fechaAprobacion']));
+        } else {
+            $fechaGeneracionDoc = "Pendiente de firma"; // O date('d/m/Y H:i') si prefieres la actual
+        }
 
         // Rutas absolutas para imágenes
         $logoGore = ImageToDataUrl($rootPath . '/public/img/logo2.png');
         $logoCore = ImageToDataUrl($rootPath . '/public/img/logoCore1.png');
-        // $selloImg = ImageToDataUrl($rootPath . '/public/img/aprobacion.png'); // Opcional si quieres usar el sello antiguo
 
         // ==========================================
-        // 3. CONSTRUIR EL HTML (ESTILO MINUTA)
+        // 3. CONSTRUIR EL HTML
         // ==========================================
         
         $css = "
@@ -109,21 +120,32 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             .tabla-asistencia th { background-color: #f9f9f9; padding: 8px; border: 1px solid #ddd; text-align: left; color: #555; }
             .tabla-asistencia td { padding: 6px; border: 1px solid #eee; vertical-align: middle; }
             
-            /* COLORES SOLICITADOS */
+            /* COLORES */
             .presente { color: #00a650; font-weight: bold; text-transform: uppercase; }
             .ausente { color: #999; font-weight: bold; text-transform: uppercase; }
             .manual { color: #666; font-size: 7pt; font-style: italic; display:block; }
 
-            /* FOOTER: CUADRO GRIS DE VALIDACIÓN (Idéntico a Minuta) */
+            /* FOOTER */
             .footer-container { margin-top: 30px; page-break-inside: avoid; width: 100%; text-align: center; }
             .footer-validation-box { background-color: #f4f4f4; border: 1px solid #dcdcdc; border-radius: 6px; padding: 10px; width: 100%; box-sizing: border-box; }
             .footer-content-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .qr-cell { width: 90px; vertical-align: middle; text-align: center; padding-right: 15px; border-right: 1px solid #ccc; }
-            .info-cell { padding-left: 15px; text-align: left; vertical-align: middle; font-size: 8pt; color: #555; line-height: 1.3; word-wrap: break-word; }
-            .link-validacion { color: #0071bc; text-decoration: none; font-family: monospace; font-size: 7pt; display: block; width: 100%; margin-top: 3px; word-break: break-all; overflow-wrap: break-word; }
+            .info-cell { padding-left: 15px; text-align: left; vertical-align: middle; font-size: 8pt; color: #555; line-height: 1.3; }
+            
+            /* LINK COMO ANCLA CLICKABLE */
+            .link-validacion { 
+                color: #0071bc; 
+                text-decoration: none; 
+                font-family: monospace; 
+                font-size: 7pt; 
+                display: block; 
+                width: 100%; 
+                margin-top: 3px; 
+                word-break: break-all; 
+                overflow-wrap: break-word; 
+            }
             .hash-tag { font-family: monospace; background: #eee; padding: 2px; font-size: 7pt; word-break: break-all; }
             
-            /* Footer de página pequeño */
             .page-footer-text { position: fixed; bottom: -30px; left: 0; right: 0; text-align: center; font-size: 8pt; color: #aaa; }
         ";
 
@@ -141,8 +163,8 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                         <td class="header-center">
                             <div class="h-line-1">GOBIERNO REGIONAL - REGIÓN DE VALPARAÍSO</div>
                             <div class="h-line-2">CONSEJO REGIONAL</div>
-                            
-                            <div class="h-line-dynamic">COMISIÓN ' . $nombreComision . '</div>
+                            <div class="h-line-dynamic"><?= $labelComision ?> <?= htmlspecialchars($comisionesStr) ?></div>
+                            <div class="h-line-dynamic"><?= $labelPresidente ?> <?= htmlspecialchars($presidentesStr) ?></div>
                         </td>
                         <td width="130" align="right"><img src="' . $logoCore . '" width="120" style="display:block;"></td>
                     </tr>
@@ -150,11 +172,18 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 <hr class="header-sep">
             </header>
 
-            <div class="page-footer-text">Sistema de Gestión COREGEDOC - Generado el ' . date('d/m/Y H:i') . '</div>
+            <div class="page-footer-text">Sistema de Gestión COREGEDOC - Documento generado el ' . $fechaGeneracionDoc . '</div>
 
             <div class="doc-title">CERTIFICADO DE ASISTENCIA</div>
 
             <table class="info-table">
+
+                <tr>
+                    <td class="lbl">NOMBRE REUNIÓN:</td>
+                    <td class="val"><strong><?= htmlspecialchars($nombreReunion) ?></strong></td>
+                </tr>
+
+
                 <tr>
                     <td class="lbl">FECHA:</td>
                     <td class="val">' . $fechaTexto . '</td>
@@ -166,6 +195,10 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 <tr>
                     <td class="lbl">HORA TÉRMINO:</td>
                     <td class="val">' . $horaTermino . ' hrs.</td>
+                </tr>
+                <tr>
+                    <td class="lbl"><?= $labelPresidente ?></td>
+                    <td class="val"><?= htmlspecialchars($presidentesStr) ?></td>
                 </tr>
                 <tr>
                     <td class="lbl">LUGAR:</td>
@@ -221,12 +254,15 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             $html .= '<img src="' . $qrBase64 . '" width="80">';
         }
 
+        $url = $urlValidacion ?? '#';
+        $hashShow = $hash ?? '---';
+
         $html .= '          </td>
                             <td class="info-cell">
                                 <strong>VALIDACIÓN DE AUTENTICIDAD</strong><br>
                                 Este documento certifica la asistencia oficial.<br>
-                                Valide en: <span class="link-validacion">' . ($urlValidacion ?? '#') . '</span>
-
+                                Valide en: 
+                                <a href="' . $url . '" class="link-validacion" target="_blank">' . $url . '</a>
                             </td>
                         </tr>
                     </table>
@@ -254,7 +290,6 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             
             file_put_contents($rutaGuardado, $output);
         } else {
-            // Fallback si no hay Dompdf (guarda HTML)
             file_put_contents($rutaGuardado, $html);
         }
 

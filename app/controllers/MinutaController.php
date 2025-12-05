@@ -130,7 +130,8 @@ class MinutaController
         if (!empty($minutaInfo['t_comision_idComision_mixta2'])) $idsComisiones[] = $minutaInfo['t_comision_idComision_mixta2'];
 
         $comisionesInfo = [];
-        $firmasPresidentes = []; 
+        $presidentesInfo = [];
+        $firmasPresidentes = [];
         $nombresTexto = []; // Para el encabezado
 
         if (!empty($idsComisiones)) {
@@ -148,7 +149,7 @@ class MinutaController
                 if (!empty($c['pNombre'])) {
                     $nombreComp = $c['pNombre'] . ' ' . $c['aPaterno'];
                     $nombresTexto[] = $nombreComp;
-                    
+                    $presidentesInfo[] = ['nombre' => $nombreComp];
                     $firmasPresidentes[] = [
                         'pNombre' => $c['pNombre'],
                         'aPaterno' => $c['aPaterno'],
@@ -158,7 +159,7 @@ class MinutaController
                 }
             }
         }
-        
+
         // Cadena para el encabezado PDF (ej: "Juan Pérez / María López")
         $presidentesStr = implode(' / ', array_unique($nombresTexto));
 
@@ -202,7 +203,9 @@ class MinutaController
             $stmtD->execute([':idVot' => $v['idVotacion']]);
             $detalles = $stmtD->fetchAll(PDO::FETCH_ASSOC);
 
-            $si = 0; $no = 0; $abs = 0;
+            $si = 0;
+            $no = 0;
+            $abs = 0;
             $detalleAsistentes = [];
             foreach ($detalles as $d) {
                 $nombre = $d['pNombre'] . ' ' . $d['aPaterno'];
@@ -212,7 +215,7 @@ class MinutaController
                 elseif ($opcion === 'NO' || $opcion === 'RECHAZO') $no++;
                 elseif ($opcion === 'ABSTENCION') $abs++;
             }
-            
+
             $resultadoTexto = "SIN RESULTADO";
             if ($si > $no) $resultadoTexto = "APROBADO";
             elseif ($no > $si) $resultadoTexto = "RECHAZADO";
@@ -231,6 +234,7 @@ class MinutaController
             'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'https://coregedoc.cl') . '/validar?h=' . ($minutaInfo['hashValidacion'] ?? ''),
             'minuta_info' => $minutaInfo,
             'comisiones_info' => $comisionesInfo,
+            'presidentes_info' => $presidentesInfo,
             'presidentes_str' => $presidentesStr, // <--- DATO CLAVE PARA PDF
             'temas' => $temas,
             'asistencia' => $asistencia,
@@ -695,10 +699,9 @@ class MinutaController
             $nuevoEstado = $resultado['estado_nuevo'];
 
             // =========================================================
-            // 1. PREPARACIÓN PARA NOTIFICACIONES (NUEVO BLOQUE)
+            // 1. PREPARACIÓN PARA NOTIFICACIONES
             // =========================================================
             $mailService = new MailService();
-            // Obtenemos correos del ST y todos los presidentes involucrados
             $datosNotif = $minutaModel->getDatosNotificacion($idMinuta);
             $nombreAutor = $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'];
             // =========================================================
@@ -710,8 +713,9 @@ class MinutaController
 
                 // 2. OBTENER DATOS GENERALES MINUTA
                 $sqlM = "SELECT m.*, c.nombreComision, 
-                                r.nombreReunion, r.fechaInicioReunion, r.fechaTerminoReunion, r.idReunion
-                         FROM t_minuta m
+                        r.nombreReunion, r.fechaInicioReunion, r.fechaTerminoReunion, r.idReunion,
+                        r.t_comision_idComision_mixta, r.t_comision_idComision_mixta2  -- <--- AGREGADO
+                        FROM t_minuta m
                          LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
                          LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
                          WHERE m.idMinuta = :id";
@@ -747,6 +751,19 @@ class MinutaController
                 $stmtF->execute([':id' => $idMinuta]);
                 $firmas = $stmtF->fetchAll(\PDO::FETCH_ASSOC);
 
+                // --- [NUEVO] PROCESAR NOMBRES DE PRESIDENTES PARA EL PDF ---
+                // Convertimos la lista de firmas en el formato [['nombre'=>'Juan Perez'], ...]
+                $presidentesInfo = [];
+                if (!empty($firmas)) {
+                    foreach ($firmas as $f) {
+                        $nombreCompleto = $f['pNombre'] . ' ' . $f['aPaterno'];
+                        $presidentesInfo[] = ['nombre' => $nombreCompleto];
+                    }
+                    // Eliminar duplicados si una persona firmó dos veces (por tener doble rol)
+                    $presidentesInfo = array_map("unserialize", array_unique(array_map("serialize", $presidentesInfo)));
+                }
+                // -----------------------------------------------------------
+
                 // 5. ASISTENCIA
                 $stmtA = $pdo->prepare("SELECT u.pNombre, u.aPaterno, a.estadoAsistencia
                                         FROM t_asistencia a
@@ -763,7 +780,6 @@ class MinutaController
 
                 // 6. VOTACIONES
                 $idReunion = $minutaInfo['idReunion'] ?? null;
-
                 $sqlV = "SELECT v.*, c.nombreComision as nombreComisionVoto
                          FROM t_votacion v
                          LEFT JOIN t_comision c ON v.idComision = c.idComision
@@ -826,15 +842,54 @@ class MinutaController
                     mkdir(dirname($rutaAbsoluta), 0777, true);
                 }
 
+                $idsComisiones = [];
+                // 1. Comisión Principal
+                if (!empty($minutaInfo['t_comision_idComision'])) $idsComisiones[] = $minutaInfo['t_comision_idComision'];
+                // 2. Comisiones Mixtas (Ya las agregaste al SELECT, así que aquí existen)
+                if (!empty($minutaInfo['t_comision_idComision_mixta'])) $idsComisiones[] = $minutaInfo['t_comision_idComision_mixta'];
+                if (!empty($minutaInfo['t_comision_idComision_mixta2'])) $idsComisiones[] = $minutaInfo['t_comision_idComision_mixta2'];
+
+                $comisionesInfo = [];
+                if (!empty($idsComisiones)) {
+                    // Consultamos los nombres
+                    $inQuery = implode(',', array_fill(0, count($idsComisiones), '?'));
+                    $stmtCms = $pdo->prepare("SELECT nombreComision FROM t_comision WHERE idComision IN ($inQuery)");
+                    $stmtCms->execute($idsComisiones);
+                    $resCms = $stmtCms->fetchAll(\PDO::FETCH_ASSOC);
+
+                    foreach ($resCms as $c) {
+                        $comisionesInfo[] = ['nombre' => $c['nombreComision']];
+                    }
+                } else {
+                    // Respaldo
+                    $comisionesInfo[] = ['nombre' => $minutaInfo['nombreComision'] ?? 'Comisión'];
+                }
+                // -----------------------------------------------------------
+
                 $datosParaPdf = [
                     'minuta_info' => $minutaInfo,
                     'temas' => $temas,
                     'firmas_aprobadas' => $firmas,
                     'asistencia' => $asistencia,
                     'votaciones' => $votaciones,
-                    'comisiones_info' => [
-                        'com1' => ['nombre' => $minutaInfo['nombreComision'] ?? 'Comisión']
-                    ],
+
+                    // --- [CAMBIO AQUÍ] Reemplaza el array fijo por la variable procesada ---
+                    'comisiones_info' => $comisionesInfo,
+                    // -----------------------------------------------------------------------
+
+                    'presidentes_info' => $presidentesInfo, // Esto ya lo tenías bien
+                    'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'http://localhost/coregedoc') . "/index.php?action=validar&hash=" . $hash
+                ];
+
+                $datosParaPdf = [
+                    'minuta_info' => $minutaInfo,
+                    'temas' => $temas,
+                    'firmas_aprobadas' => $firmas,
+                    'asistencia' => $asistencia,
+                    'votaciones' => $votaciones,
+                    'comisiones_info' => $comisionesInfo,
+                    'presidentes_info' => $presidentesInfo,
+                    // -----------------------------------------------------------
                     'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'http://localhost/coregedoc') . "/index.php?action=validar&hash=" . $hash
                 ];
 
@@ -846,7 +901,7 @@ class MinutaController
                     $minutaModel->actualizarHash($idMinuta, $hash);
 
                     // =====================================================
-                    // 2. NOTIFICAR APROBACIÓN FINAL (Si el PDF fue un éxito)
+                    // 2. NOTIFICAR APROBACIÓN FINAL
                     // =====================================================
                     $mailService->notificarAprobacionFinal($datosNotif);
                 } else {
@@ -854,7 +909,7 @@ class MinutaController
                 }
             } else {
                 // =========================================================
-                // 3. NOTIFICAR FIRMA PARCIAL (Si no está aprobada aún)
+                // 3. NOTIFICAR FIRMA PARCIAL
                 // =========================================================
                 $mailService->notificarFirmaParcial($datosNotif, $nombreAutor);
             }
@@ -1025,9 +1080,9 @@ class MinutaController
             $totalRecords = $stmtCount->fetchColumn();
             $totalPages = ceil($totalRecords / $limit);
 
-            // Data
+            // Data - CORREGIDO CONTEO DE ADJUNTOS
             $sqlData = "SELECT m.idMinuta, m.fechaMinuta AS fecha, m.pathArchivo, r.nombreReunion, c.nombreComision,
-                        (SELECT COUNT(*) FROM t_adjunto a WHERE a.t_minuta_idMinuta = m.idMinuta) AS numAdjuntos
+                        (SELECT COUNT(*) FROM t_adjunto a WHERE a.t_minuta_idMinuta = m.idMinuta AND a.tipoAdjunto != 'asistencia') AS numAdjuntos
                         FROM t_minuta m
                         LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
                         LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
@@ -1111,13 +1166,13 @@ class MinutaController
             $totalRecords = $stmtCount->fetchColumn();
             $totalPages = ceil($totalRecords / $limit);
 
-            // Datos Finales (Columnas solicitadas)
+            // Datos Finales (Columnas solicitadas) - CORREGIDO CONTEO DE ADJUNTOS
             $sqlData = "SELECT m.idMinuta, m.fechaMinuta AS fechaCreacion, m.estadoMinuta,
                         COALESCE(r.nombreReunion, 'Sin Reunión') as nombreReunion, -- <--- AGREGADO
                         COALESCE(c.nombreComision, 'Sin Comisión') as nombreComision,
                         COALESCE(up.pNombre, '') as presidenteNombre, COALESCE(up.aPaterno, '') as presidenteApellido,
                         (SELECT GROUP_CONCAT(nombreTema SEPARATOR ' || ') FROM t_tema WHERE t_minuta_idMinuta = m.idMinuta) AS listaTemas, -- <--- TODOS LOS TEMAS
-                        (SELECT COUNT(*) FROM t_adjunto WHERE t_minuta_idMinuta = m.idMinuta) AS numAdjuntos,
+                        (SELECT COUNT(*) FROM t_adjunto WHERE t_minuta_idMinuta = m.idMinuta AND tipoAdjunto != 'asistencia') AS numAdjuntos,
                         (SELECT COUNT(*) FROM t_minuta_feedback WHERE t_minuta_idMinuta = m.idMinuta AND resuelto = 0) as tieneFeedback
                         FROM t_minuta m
                         LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
@@ -1183,7 +1238,7 @@ class MinutaController
 
             $whereClauses = ["m.fechaMinuta BETWEEN :desde AND :hasta"];
             $params = [
-                ':desde' => $desde, 
+                ':desde' => $desde,
                 ':hasta' => $hasta . ' 23:59:59'
             ];
 
@@ -1228,13 +1283,12 @@ class MinutaController
 
             // 6. Retornar JSON con metadata de paginación
             echo json_encode([
-                'status'     => 'success',
-                'data'       => $resultados,
-                'total'      => $totalRecords,
-                'page'       => $page,
+                'status'      => 'success',
+                'data'        => $resultados,
+                'total'       => $totalRecords,
+                'page'        => $page,
                 'totalPages' => $totalPages
             ]);
-
         } catch (\Exception $e) {
             echo json_encode([
                 'status'  => 'error',
@@ -1689,6 +1743,4 @@ class MinutaController
         }
         exit;
     }
-
-    
 }

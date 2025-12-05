@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Exception;
@@ -26,7 +27,6 @@ class Minuta
             $this->conn->beginTransaction();
 
             // 1. IDENTIFICAR TODOS LOS PRESIDENTES (Principal + Mixtas)
-            // Buscamos la comisión principal en la Minuta y las mixtas en la Reunión asociada
             $sqlComisiones = "SELECT 
                                 m.t_comision_idComision as c1, 
                                 r.t_comision_idComision_mixta as c2, 
@@ -34,7 +34,7 @@ class Minuta
                               FROM t_minuta m
                               LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
                               WHERE m.idMinuta = :idMinuta";
-            
+
             $stmtC = $this->conn->prepare($sqlComisiones);
             $stmtC->execute([':idMinuta' => $idMinuta]);
             $res = $stmtC->fetch(PDO::FETCH_ASSOC);
@@ -53,16 +53,15 @@ class Minuta
             }
 
             // 2. OBTENER LOS PRESIDENTES DE ESAS COMISIONES
-            // Usamos implosión para crear los placeholders (?,?,?) dinámicos
             $inQuery = implode(',', array_fill(0, count($idsComisiones), '?'));
-            
+
             $sqlPresis = "SELECT DISTINCT t_usuario_idPresidente 
                           FROM t_comision 
                           WHERE idComision IN ($inQuery) 
                           AND t_usuario_idPresidente IS NOT NULL";
-            
+
             $stmtP = $this->conn->prepare($sqlPresis);
-            $stmtP->execute($idsComisiones); // Pasamos el array limpio de IDs
+            $stmtP->execute($idsComisiones); 
             $presidentes = $stmtP->fetchAll(PDO::FETCH_COLUMN);
 
             if (empty($presidentes)) {
@@ -70,22 +69,19 @@ class Minuta
             }
 
             // 3. LIMPIAR SOLICITUDES ANTERIORES
-            // Borramos para evitar duplicados si es un reenvío por corrección
             $sqlDel = "DELETE FROM t_aprobacion_minuta WHERE t_minuta_idMinuta = :idMinuta";
             $stmtD = $this->conn->prepare($sqlDel);
             $stmtD->execute([':idMinuta' => $idMinuta]);
 
             // 4. INSERTAR SOLICITUD PARA CADA PRESIDENTE
-            // CORRECCIÓN SQLSTATE 1048: Eliminamos 'fechaAprobacion' del insert o pasamos NULL explícito
-            // Nota: Asegúrate de haber ejecutado el ALTER TABLE para permitir NULL.
             $sqlIns = "INSERT INTO t_aprobacion_minuta (t_minuta_idMinuta, t_usuario_idPresidente, estado_firma, fechaAprobacion)
-                       VALUES (:idMinuta, :idPresidente, 'EN_ESPERA', NULL)"; 
-            
+                       VALUES (:idMinuta, :idPresidente, 'EN_ESPERA', NULL)";
+
             $stmtI = $this->conn->prepare($sqlIns);
 
             foreach ($presidentes as $idPresidente) {
                 $stmtI->execute([
-                    ':idMinuta' => $idMinuta, 
+                    ':idMinuta' => $idMinuta,
                     ':idPresidente' => $idPresidente
                 ]);
             }
@@ -95,11 +91,11 @@ class Minuta
                           SET estadoMinuta = 'PENDIENTE', 
                               presidentesRequeridos = :total 
                           WHERE idMinuta = :idMinuta";
-            
+
             $stmtU = $this->conn->prepare($sqlUpdate);
             $stmtU->execute([
                 ':idMinuta' => $idMinuta,
-                ':total' => count($presidentes) // Guardamos cuántos deben firmar
+                ':total' => count($presidentes)
             ]);
 
             // 6. LOG DE AUDITORÍA
@@ -108,10 +104,8 @@ class Minuta
 
             $this->conn->commit();
             return true;
-
         } catch (Exception $e) {
             $this->conn->rollBack();
-            // Agregamos contexto al error para depuración
             throw new Exception("Error al enviar a firma: " . $e->getMessage());
         }
     }
@@ -121,22 +115,19 @@ class Minuta
         try {
             $this->conn->beginTransaction();
 
-            // 1. Firmar el registro individual
             $sqlFirma = "UPDATE t_aprobacion_minuta SET estado_firma = 'FIRMADO', fechaAprobacion = NOW()
                          WHERE t_minuta_idMinuta = :idMinuta AND t_usuario_idPresidente = :idUsuario";
             $stmt = $this->conn->prepare($sqlFirma);
             $stmt->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
 
-            // 2. Verificar si quedan otros presidentes por firmar
             $sqlPendientes = "SELECT COUNT(*) FROM t_aprobacion_minuta
                               WHERE t_minuta_idMinuta = :idMinuta AND estado_firma != 'FIRMADO'";
             $stmtP = $this->conn->prepare($sqlPendientes);
             $stmtP->execute([':idMinuta' => $idMinuta]);
             $pendientes = $stmtP->fetchColumn();
 
-            // 3. Si pendientes es 0, todos firmaron -> APROBADA
             $nuevoEstado = ($pendientes == 0) ? 'APROBADA' : 'PARCIAL';
-            
+
             $sqlUpdate = "UPDATE t_minuta SET estadoMinuta = :estado WHERE idMinuta = :idMinuta";
             $stmtU = $this->conn->prepare($sqlUpdate);
             $stmtU->execute([':estado' => $nuevoEstado, ':idMinuta' => $idMinuta]);
@@ -153,7 +144,6 @@ class Minuta
 
     public function getCorreosPresidentes($idMinuta)
     {
-        // ACTUALIZADO: Obtiene correos de TODOS los presidentes en la tabla de aprobación
         $sql = "SELECT u.pNombre, u.aPaterno, u.correo
                 FROM t_aprobacion_minuta ap
                 JOIN t_usuario u ON ap.t_usuario_idPresidente = u.idUsuario
@@ -165,14 +155,13 @@ class Minuta
     }
 
     // =========================================================================
-    //  NUEVA GESTIÓN DE VOTACIONES (REEMPLAZA CÓDIGO ANTERIOR)
+    //  NUEVA GESTIÓN DE VOTACIONES
     // =========================================================================
 
     public function crearVotacion($idMinuta, $nombre, $idComision)
     {
-        // Validar que si llega 0 o vacío, se guarde como NULL
         if (empty($idComision)) {
-             $idComision = null; 
+            $idComision = null;
         }
 
         $sql = "INSERT INTO t_votacion (nombreVotacion, t_minuta_idMinuta, idComision, fechaCreacion, habilitada)
@@ -192,7 +181,7 @@ class Minuta
     }
 
     // =========================================================================
-    //  NUEVA GESTIÓN DE TEMAS CON AUDITORÍA (REEMPLAZA CÓDIGO ANTERIOR)
+    //  NUEVA GESTIÓN DE TEMAS CON AUDITORÍA
     // =========================================================================
 
     public function guardarTemas($idMinuta, $temas, $idUsuarioEditor = null)
@@ -200,13 +189,10 @@ class Minuta
         try {
             $this->conn->beginTransaction();
 
-            // --- AUDITORÍA DE CAMBIOS ---
             if ($idUsuarioEditor) {
                 $this->auditarCambiosTemas($idMinuta, $temas, $idUsuarioEditor);
             }
-            // ---------------------------
 
-            // Borrado e Inserción
             $sqlDelete = "DELETE FROM t_tema WHERE t_minuta_idMinuta = :idMinuta";
             $stmtDelete = $this->conn->prepare($sqlDelete);
             $stmtDelete->execute([':idMinuta' => $idMinuta]);
@@ -234,39 +220,30 @@ class Minuta
         }
     }
 
-    // --- NUEVAS FUNCIONES AUXILIARES PARA AUDITORÍA ---
-
     private function auditarCambiosTemas($idMinuta, $nuevosTemas, $idUsuario)
     {
-        // 1. Obtenemos estado actual para saber si vale la pena auditar
         $minuta = $this->getMinutaById($idMinuta);
         if ($minuta['estadoMinuta'] !== 'REQUIERE_REVISION') {
-            return; // Solo auditamos cambios post-envío
+            return;
         }
 
-        // 2. Obtenemos los temas "viejos" antes de borrarlos
         $oldTemas = $this->getTemas($idMinuta);
-
         $maxCount = max(count($oldTemas), count($nuevosTemas));
 
         for ($i = 0; $i < $maxCount; $i++) {
             $old = $oldTemas[$i] ?? [];
             $new = $nuevosTemas[$i] ?? [];
 
-            // Caso: Tema Nuevo
             if (empty($old) && !empty($new)) {
                 $this->logSeguimiento($idMinuta, $idUsuario, 'EDICION', "Se agregó un nuevo tema: " . substr($new['nombreTema'], 0, 30) . "...");
                 continue;
             }
-            // Caso: Tema Borrado
             if (!empty($old) && empty($new)) {
                 $this->logSeguimiento($idMinuta, $idUsuario, 'EDICION', "Se eliminó el tema: " . substr($old['nombreTema'], 0, 30) . "...");
                 continue;
             }
 
-            // Caso: Comparación de campos
-            $nombreTema = $old['nombreTema'] ?? 'Tema ' . ($i+1);
-            
+            $nombreTema = $old['nombreTema'] ?? 'Tema ' . ($i + 1);
             $this->checkDiff($idMinuta, $idUsuario, "Tema '$nombreTema' (Objetivo)", $old['objetivo'] ?? '', $new['objetivo'] ?? '');
             $this->checkDiff($idMinuta, $idUsuario, "Tema '$nombreTema' (Acuerdos)", $old['acuerdos'] ?? '', $new['acuerdos'] ?? '');
             $this->checkDiff($idMinuta, $idUsuario, "Tema '$nombreTema' (Compromiso)", $old['compromiso'] ?? '', $new['compromiso'] ?? '');
@@ -274,14 +251,15 @@ class Minuta
         }
     }
 
-    private function checkDiff($idMinuta, $idUsuario, $campo, $valOld, $valNew) {
+    private function checkDiff($idMinuta, $idUsuario, $campo, $valOld, $valNew)
+    {
         if (trim($valOld) !== trim($valNew)) {
             $this->logSeguimiento($idMinuta, $idUsuario, 'CORRECCION', "Editado $campo.");
         }
     }
 
     // =========================================================================
-    //  FUNCIONES EXISTENTES (MANTENIDAS)
+    //  FUNCIONES EXISTENTES - CON FILTRO DE CONTEO ROBUSTO (ACTUALIZADO)
     // =========================================================================
 
     public function getMinutasByEstado($estado, $startDate = null, $endDate = null)
@@ -298,6 +276,19 @@ class Minuta
                 m.pathArchivo,
                 r.nombreReunion,
                 m.fechaMinuta,
+                
+                /* --- CORRECCIÓN DEFINITIVA: Lógica 'NOT OR' idéntica al JS --- */
+                (SELECT COUNT(*) 
+                 FROM t_adjunto a 
+                 WHERE a.t_minuta_idMinuta = m.idMinuta 
+                 AND NOT (
+                    LOWER(COALESCE(a.tipoAdjunto, '')) = 'asistencia' OR
+                    LOWER(COALESCE(a.pathAdjunto, '')) LIKE '%asistencia%' OR
+                    LOWER(COALESCE(a.nombreArchivo, '')) LIKE '%asistencia%'
+                 )
+                ) as numAdjuntos,
+                /* ------------------------------------------------------------- */
+                
                 IFNULL(GROUP_CONCAT(DISTINCT t.nombreTema ORDER BY t.idTema SEPARATOR '<br>'), 'N/A') AS nombreTemas
             FROM t_minuta m
             LEFT JOIN t_tema    t   ON t.t_minuta_idMinuta   = m.idMinuta
@@ -365,12 +356,11 @@ class Minuta
 
     public function getAsistenciaData($idMinuta)
     {
-        // CORRECCIÓN: Agregamos "AND estado = 1" para filtrar inactivos
         $sqlMiembros = "SELECT idUsuario, pNombre, sNombre, aPaterno, aMaterno,
                         TRIM(CONCAT(pNombre, ' ', COALESCE(sNombre, ''), ' ', aPaterno, ' ', aMaterno)) AS nombreCompleto
                         FROM t_usuario 
                         WHERE tipoUsuario_id IN (1, 3) 
-                        AND estado = 1  -- <--- FILTRO DE USUARIOS ACTIVOS
+                        AND estado = 1 
                         ORDER BY aPaterno";
 
         $stmt = $this->conn->prepare($sqlMiembros);
@@ -422,31 +412,22 @@ class Minuta
     {
         try {
             $this->conn->beginTransaction();
-
-            // 1. Guardar el comentario de feedback
             $sql = "INSERT INTO t_minuta_feedback (t_minuta_idMinuta, t_usuario_idPresidente, textoFeedback, fechaFeedback, resuelto)
                     VALUES (:idMinuta, :idUsuario, :texto, NOW(), 0)";
             $stmt = $this->conn->prepare($sql);
             $stmt->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario, ':texto' => $textoFeedback]);
 
-            // 2. LÓGICA DE RESET: INVALIDAR TODAS LAS FIRMAS
-            // Si el Presidente B corrige, la firma del Presidente A ya no vale (el documento cambió).
-            // Ponemos a TODOS los aprobadores de esta minuta en estado 'REQUIERE_REVISION'.
-            
             $sqlReset = "UPDATE t_aprobacion_minuta 
                          SET estado_firma = 'REQUIERE_REVISION', 
                              fechaAprobacion = NULL 
                          WHERE t_minuta_idMinuta = :idMinuta";
-            
             $stmtReset = $this->conn->prepare($sqlReset);
             $stmtReset->execute([':idMinuta' => $idMinuta]);
 
-            // 3. Cambiar estado general de la minuta
             $sqlMin = "UPDATE t_minuta SET estadoMinuta = 'REQUIERE_REVISION' WHERE idMinuta = :idMinuta";
             $stmtMin = $this->conn->prepare($sqlMin);
             $stmtMin->execute([':idMinuta' => $idMinuta]);
 
-            // 4. Log de auditoría
             $this->logSeguimiento($idMinuta, $idUsuario, 'FEEDBACK_ENVIADO', 'Correcciones solicitadas. Se han reiniciado las firmas.');
 
             $this->conn->commit();
@@ -492,7 +473,6 @@ class Minuta
     public function registrarAutoAsistencia($idMinuta, $idUsuario, $idReunion)
     {
         try {
-            // 1. Verificar si ya existe registro (Creado por iniciarMinuta)
             $sqlCheck = "SELECT idAsistencia FROM t_asistencia
                          WHERE t_minuta_idMinuta = :idMinuta
                          AND t_usuario_idUsuario = :idUsuario";
@@ -501,27 +481,22 @@ class Minuta
             $idExistente = $stmtCheck->fetchColumn();
 
             if ($idExistente) {
-                // UPDATE
                 $sqlUpdate = "UPDATE t_asistencia
                               SET fechaRegistroAsistencia = NOW(),
                                   fechaMarca = NOW(),
                                   origenAsistencia = 'AUTOREGISTRO',
                                   estadoAsistencia = 'PRESENTE'
                               WHERE idAsistencia = :idAsistencia";
-
                 $stmtUp = $this->conn->prepare($sqlUpdate);
                 return $stmtUp->execute([':idAsistencia' => $idExistente]);
             } else {
-                // INSERT
                 $sql = "INSERT INTO t_asistencia
                         (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia, fechaMarca, origenAsistencia, estadoAsistencia)
                         VALUES (:idMinuta, :idUsuario, 1, NOW(), NOW(), 'AUTOREGISTRO', 'PRESENTE')";
-
                 $stmt = $this->conn->prepare($sql);
                 return $stmt->execute([':idMinuta' => $idMinuta, ':idUsuario' => $idUsuario]);
             }
         } catch (Exception $e) {
-            error_log("Error autoasistencia: " . $e->getMessage());
             return false;
         }
     }
@@ -591,17 +566,14 @@ class Minuta
         $stmt->execute([':id' => $id]);
     }
 
-   public function getFirmasAprobadas($idMinuta)
+    public function getFirmasAprobadas($idMinuta)
     {
-        // Esta consulta busca la comisión que preside el usuario firmante
         $sql = "SELECT ap.fechaAprobacion, 
                        CONCAT(u.pNombre, ' ', u.aPaterno) as nombrePresidente,
                        c.nombreComision
                 FROM t_aprobacion_minuta ap
                 JOIN t_usuario u ON ap.t_usuario_idPresidente = u.idUsuario
-                /* Unimos con t_comision para obtener el nombre donde este usuario es presidente */
                 JOIN t_comision c ON c.t_usuario_idPresidente = u.idUsuario
-                /* Filtro extra opcional: Asegurarnos que esa comisión está relacionada con la minuta (si es estricto) */
                 WHERE ap.t_minuta_idMinuta = :id 
                 AND ap.estado_firma = 'FIRMADO' 
                 ORDER BY ap.fechaAprobacion ASC";
@@ -648,22 +620,55 @@ class Minuta
         return $stmt->execute([':hash' => $hash, ':id' => $idMinuta]);
     }
 
+    // =========================================================================
+    //  AQUÍ ESTÁ LA OTRA CORRECCIÓN CLAVE: getMinutasAprobadasFiltradas
+    // =========================================================================
+
     public function getMinutasAprobadasFiltradas($filtros, $limit = 10, $offset = 0)
     {
         $condiciones = ["m.estadoMinuta = 'APROBADA'"];
         $params = [];
 
+        if (!empty($filtros['q'])) {
+            $condiciones[] = "(r.nombreReunion LIKE :q OR c.nombreComision LIKE :q)";
+            $params[':q'] = '%' . $filtros['q'] . '%';
+        }
+        if (!empty($filtros['comision'])) {
+            $condiciones[] = "m.t_comision_idComision = :com";
+            $params[':com'] = $filtros['comision'];
+        }
+        if (!empty($filtros['desde'])) {
+            $condiciones[] = "m.fechaMinuta >= :desde";
+            $params[':desde'] = $filtros['desde'];
+        }
+        if (!empty($filtros['hasta'])) {
+            $condiciones[] = "m.fechaMinuta <= :hasta";
+            $params[':hasta'] = $filtros['hasta'] . ' 23:59:59';
+        }
+
         $sqlWhere = " WHERE " . implode(" AND ", $condiciones);
 
         $sqlData = "SELECT m.idMinuta, m.fechaMinuta, m.pathArchivo, r.nombreReunion, c.nombreComision,
-                    (SELECT COUNT(*) FROM t_adjunto a WHERE a.t_minuta_idMinuta = m.idMinuta AND a.tipoAdjunto != 'asistencia') as numAdjuntos
+                    
+                    /* --- CORRECCIÓN DEFINITIVA: Lógica 'NOT OR' idéntica al JS --- */
+                    (SELECT COUNT(*)
+                     FROM t_adjunto a
+                     WHERE a.t_minuta_idMinuta = m.idMinuta
+                     AND NOT (
+                        LOWER(COALESCE(a.tipoAdjunto, '')) = 'asistencia' OR
+                        LOWER(COALESCE(a.pathAdjunto, '')) LIKE '%asistencia%' OR
+                        LOWER(COALESCE(a.nombreArchivo, '')) LIKE '%asistencia%'
+                     )
+                    ) as numAdjuntos
+                    /* ------------------------------------------------------------- */
+                    
                     FROM t_minuta m
                     LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
                     LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
                     $sqlWhere
                     ORDER BY m.idMinuta DESC LIMIT :limit OFFSET :offset";
 
-        $sqlCount = "SELECT COUNT(DISTINCT m.idMinuta) FROM t_minuta m $sqlWhere";
+        $sqlCount = "SELECT COUNT(DISTINCT m.idMinuta) FROM t_minuta m LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision $sqlWhere";
 
         try {
             $stmtCount = $this->conn->prepare($sqlCount);
@@ -680,7 +685,7 @@ class Minuta
 
             return ['data' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'total' => $totalRegistros];
         } catch (PDOException $e) {
-            return ['error' => true];
+            return ['error' => true, 'message' => $e->getMessage()];
         }
     }
 
@@ -701,7 +706,6 @@ class Minuta
 
     public function getAsistenciaDetallada($idMinuta)
     {
-        // 1. Obtenemos datos de la reunión solo para saber hora inicio (visual)
         $sqlReunion = "SELECT fechaInicioReunion FROM t_reunion WHERE t_minuta_idMinuta = :id";
         $stmtR = $this->conn->prepare($sqlReunion);
         $stmtR->execute([':id' => $idMinuta]);
@@ -710,7 +714,7 @@ class Minuta
         $inicioReunion = $datosReunion['fechaInicioReunion'] ?? null;
 
         $condicionAsistencia = "a.t_minuta_idMinuta = :idMinuta";
-        
+
         $sql = "SELECT 
                     u.idUsuario, 
                     u.pNombre, u.aPaterno, 
@@ -725,7 +729,7 @@ class Minuta
                 ORDER BY u.pNombre ASC, u.aPaterno ASC";
 
         $stmt = $this->conn->prepare($sql);
- 
+
         $stmt->execute([':idMinuta' => $idMinuta]);
         $listado = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -733,13 +737,13 @@ class Minuta
             $consejero['estado_visual'] = 'ausente';
 
             if ($consejero['estaPresente']) {
-                
+
                 if ($consejero['origenAsistencia'] === 'SECRETARIO') {
                     $consejero['estado_visual'] = 'manual';
                 } elseif ($inicioReunion) {
                     $horaInicio = strtotime($inicioReunion);
                     $horaLlegada = strtotime($consejero['fechaRegistroAsistencia']);
-                    
+
                     if ($horaLlegada) {
                         $diferenciaMinutos = ($horaLlegada - $horaInicio) / 60;
                         if ($diferenciaMinutos <= 30) {
@@ -773,7 +777,6 @@ class Minuta
     public function alternarAsistencia($idMinuta, $idUsuario, $estado)
     {
         try {
-            // 1. Verificar si existe el registro
             $sqlCheck = "SELECT idAsistencia FROM t_asistencia 
                          WHERE t_minuta_idMinuta = :idMinuta 
                          AND t_usuario_idUsuario = :idUsuario";
@@ -784,27 +787,25 @@ class Minuta
             $textoEstado = $estado ? 'PRESENTE' : 'AUSENTE';
 
             if ($idExistente) {
-                // UPDATE
                 $sql = "UPDATE t_asistencia 
                         SET fechaRegistroAsistencia = NOW(), 
                             origenAsistencia = 'SECRETARIO', 
                             estadoAsistencia = :nuevoEstado 
                         WHERE idAsistencia = :idAsistencia";
-                
+
                 $stmt = $this->conn->prepare($sql);
                 return $stmt->execute([
-                    ':nuevoEstado' => $textoEstado, 
+                    ':nuevoEstado' => $textoEstado,
                     ':idAsistencia' => $idExistente
                 ]);
             } else {
-                // INSERT
                 $sql = "INSERT INTO t_asistencia (t_minuta_idMinuta, t_usuario_idUsuario, t_tipoReunion_idTipoReunion, fechaRegistroAsistencia, origenAsistencia, estadoAsistencia) 
                         VALUES (:idMinuta, :idUsuario, 1, NOW(), 'SECRETARIO', :nuevoEstado)";
-                
+
                 $stmt = $this->conn->prepare($sql);
                 return $stmt->execute([
-                    ':idMinuta' => $idMinuta, 
-                    ':idUsuario' => $idUsuario, 
+                    ':idMinuta' => $idMinuta,
+                    ':idUsuario' => $idUsuario,
                     ':nuevoEstado' => $textoEstado
                 ]);
             }
@@ -822,7 +823,6 @@ class Minuta
 
     public function getResultadosVotacion($idMinuta)
     {
-        // 1. Obtener lista de asistentes (Consejeros)
         $sqlAsistentes = "SELECT u.idUsuario, u.pNombre, u.aPaterno
                           FROM t_asistencia a
                           JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
@@ -835,7 +835,6 @@ class Minuta
         $stmtA->execute([':id' => $idMinuta]);
         $asistentes = $stmtA->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 2. Obtener las votaciones de esta minuta
         $sqlV = "SELECT v.idVotacion, v.nombreVotacion, v.habilitada, v.fechaCreacion, c.nombreComision
                  FROM t_votacion v
                  LEFT JOIN t_comision c ON v.idComision = c.idComision
@@ -845,7 +844,6 @@ class Minuta
         $stmtV->execute([':id' => $idMinuta]);
         $votaciones = $stmtV->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 3. Procesar cada votación
         foreach ($votaciones as &$v) {
             $sqlVotos = "SELECT t_usuario_idUsuario, opcionVoto 
                          FROM t_voto 
@@ -983,7 +981,7 @@ class Minuta
                 )";
 
         $stmt = $this->conn->prepare($sql);
-        
+
         $stmt->execute([
             ':idMinuta' => $idMinuta,
             ':idMinutaCheck' => $idMinuta
@@ -996,9 +994,9 @@ class Minuta
                 (pathAdjunto, t_minuta_idMinuta, tipoAdjunto, hash_validacion) 
                 VALUES 
                 (:path, :idMinuta, 'asistencia', :hash)";
-        
+
         $stmt = $this->conn->prepare($sql);
-        
+
         try {
             return $stmt->execute([
                 ':path' => $path,
@@ -1068,13 +1066,13 @@ class Minuta
     {
         // 1. Obtener datos del Secretario Técnico (ST) y la Minuta
         $sqlST = "SELECT m.idMinuta, m.fechaMinuta, 
-                         u.correo as correo_st, CONCAT(u.pNombre, ' ', u.aPaterno) as nombre_st,
-                         c.nombreComision as nombre_comision_principal
+                          u.correo as correo_st, CONCAT(u.pNombre, ' ', u.aPaterno) as nombre_st,
+                          c.nombreComision as nombre_comision_principal
                   FROM t_minuta m
                   LEFT JOIN t_usuario u ON m.t_usuario_idSecretario = u.idUsuario
                   LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
                   WHERE m.idMinuta = :id";
-        
+
         $stmt = $this->conn->prepare($sqlST);
         $stmt->execute([':id' => $idMinuta]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1087,7 +1085,7 @@ class Minuta
                       FROM t_aprobacion_minuta ap
                       JOIN t_usuario u ON ap.t_usuario_idPresidente = u.idUsuario
                       WHERE ap.t_minuta_idMinuta = :id";
-        
+
         $stmtP = $this->conn->prepare($sqlPresis);
         $stmtP->execute([':id' => $idMinuta]);
         $presidentes = $stmtP->fetchAll(PDO::FETCH_ASSOC);
@@ -1105,5 +1103,4 @@ class Minuta
             ]
         ];
     }
-
 }

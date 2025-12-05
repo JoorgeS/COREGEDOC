@@ -390,14 +390,39 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                 // ============================================
 
                 // 1. Inicializar al cargar la página
+                // 1. Inicializar al cargar la página
                 document.addEventListener('DOMContentLoaded', function() {
                     configurarDragDrop();
+
                     // Cargar lista inicial si estamos en la tab (o esperar al click)
                     const tabAdjuntos = document.getElementById('adjuntos-tab');
                     if (tabAdjuntos) {
                         tabAdjuntos.addEventListener('shown.bs.tab', cargarAdjuntos);
                     }
+
+                    // --- FUNCIÓN PARA AUTO-CAPITALIZAR ---
+                    // Esta función se aplica a cualquier input que le pases por ID
+                    function activarCapitalizacion(idInput) {
+                        const input = document.getElementById(idInput);
+                        if (input) {
+                            input.addEventListener('input', function() {
+                                if (this.value.length > 0) {
+                                    const start = this.selectionStart;
+                                    const end = this.selectionEnd;
+                                    // Poner primera letra mayúscula y mantener el resto igual
+                                    this.value = this.value.charAt(0).toUpperCase() + this.value.slice(1);
+                                    // Restaurar posición del cursor (para que no salte al final si editas al medio)
+                                    this.setSelectionRange(start, end);
+                                }
+                            });
+                        }
+                    }
+
+                    // APLICAR A LOS CAMPOS QUE NECESITAS:
+                    activarCapitalizacion('inputNombreVotacion'); // Para crear votación
+                    activarCapitalizacion('linkNombre'); // Para nombre del link
                 });
+
 
                 // 2. Cargar Lista desde el Servidor
                 function cargarAdjuntos() {
@@ -505,25 +530,25 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                 }
 
                 // 3. Subir Archivo (Físico)
-            // 3. Subir Archivo (Físico)
+                // 3. Subir Archivo (Físico)
                 function subirArchivos(files) {
                     if (files.length === 0) return;
 
                     const formData = new FormData();
                     formData.append('idMinuta', idMinutaGlobal);
-                    
+
                     // Límite 25 MB
-                    const maxBytes = 25 * 1024 * 1024; 
+                    const maxBytes = 25 * 1024 * 1024;
 
                     // Soporte para múltiples archivos a la vez
                     for (let i = 0; i < files.length; i++) {
-                        
+
                         // --- VALIDACIÓN JS (PRE-ENVÍO) ---
                         if (files[i].size > maxBytes) {
                             alert(`El archivo "${files[i].name}" supera el máximo de 25 MB.`);
                             // Limpiamos el input para que pueda seleccionar otro
                             document.getElementById('inputArchivoOculto').value = '';
-                            return; 
+                            return;
                         }
                         // ---------------------------------
 
@@ -541,7 +566,7 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                         .then(r => r.json())
                         .then(resp => {
                             if (resp.status === 'success') {
-                                cargarAdjuntos(); 
+                                cargarAdjuntos();
                             } else if (resp.status === 'warning') {
                                 alert(resp.message); // Mostrar error específico (ej: "Pesa más de 25MB")
                                 cargarAdjuntos();
@@ -722,12 +747,23 @@ $dNoneClass = $esEditable ? '' : 'd-none';
 
                     // --- CORRECCIÓN AQUÍ: Capitalizar primera letra ---
                     // Esto debe ir aquí afuera, no dentro de la función del botón
+                    // ---------------------------------------------------------
+                    // LÓGICA: Capitalizar primera letra del nombre de votación
+                    // ---------------------------------------------------------
                     const inputVotacion = document.getElementById('inputNombreVotacion');
+
                     if (inputVotacion) {
                         inputVotacion.addEventListener('input', function() {
                             if (this.value.length > 0) {
-                                // Capitaliza la primera letra y concatena el resto
+                                // 1. Guardamos la posición del cursor (para que no salte al final si editas en medio)
+                                const start = this.selectionStart;
+                                const end = this.selectionEnd;
+
+                                // 2. Aplicamos la mayúscula a la primera letra y concatenamos el resto
                                 this.value = this.value.charAt(0).toUpperCase() + this.value.slice(1);
+
+                                // 3. Restauramos la posición del cursor
+                                this.setSelectionRange(start, end);
                             }
                         });
                     }

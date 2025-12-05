@@ -409,7 +409,7 @@ try {
             $controller->apiFiltrarSeguimiento();
             break;
         case 'api_adjunto_listar':
-            // Nota: En tu código ya tenías apiVerAdjuntosMinuta, reutilízala aquí
+
             $controller->apiVerAdjuntosMinuta();
             break;
 
