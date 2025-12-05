@@ -14,64 +14,51 @@ $dNoneClass = $esEditable ? '' : 'd-none';
 <div class="container-fluid py-4">
 
     <div class="card shadow-sm mb-4 border-0">
+
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
-            <h6 class="mb-0 fw-bold text-uppercase"><i class="fas fa-file-alt me-2"></i>Gestión de la Minuta</h6>
+            <h6 class="mb-0 fw-bold"><i class="fas fa-file-alt me-2"></i>Encabezado Minuta</h6>
             <span class="badge bg-light text-primary fw-bold px-3 border border-white">
                 ESTADO: <?= strtoupper($data['minuta']['estadoMinuta']) ?>
             </span>
-
         </div>
-        <!-- BARRA DE ACCIONES SUPERIOR -->
+
         <div class="bg-light p-3 border-bottom d-flex justify-content-between align-items-center">
             <div>
                 <span class="text-muted small text-uppercase fw-bold">Estado de Sesión:</span>
-
                 <?php
                 $st = $data['estado_reunion'];
-                // 1. EN CURSO (Vigente=1)
                 if ($st['vigente'] == 1): ?>
                     <span id="badgeEstadoSesion" class="badge bg-success ms-2 shadow-sm"><i class="fas fa-circle fa-beat-fade me-1" style="--fa-animation-duration: 2s;"></i> EN CURSO</span>
-
-                <?php // 2. FINALIZADA (Validada=1) 
-                elseif ($st['asistencia_validada'] == 1): ?>
+                <?php elseif ($st['asistencia_validada'] == 1): ?>
                     <span id="badgeEstadoSesion" class="badge bg-info text-dark ms-2 border border-info">
                         <i class="fas fa-clock me-1"></i> REUNIÓN FINALIZADA (ESPERA APROBACIÓN)
                     </span>
-
-                <?php // 3. ESPERA (Ni vigente ni validada)
-                else: ?>
+                <?php else: ?>
                     <span class="badge bg-warning text-dark ms-2 border border-warning">ESPERANDO INICIO</span>
                 <?php endif; ?>
             </div>
 
             <div class="d-flex gap-2">
                 <?php if ($data['permisos']['esSecretario']): ?>
-
-                    <!-- BOTÓN DE CONTROL DE SESIÓN (Dinámico) -->
                     <?php
                     if ($st['vigente'] == 1) {
-                        // ESTADO: EN CURSO -> Mostrar FINALIZAR
                         echo '<button id="btnFinalizar" class="btn btn-danger btn-sm text-white shadow-sm" onclick="finalizarReunion()">
                             <i class="fas fa-stop-circle me-1"></i> Finalizar Reunión y Enviar Asistencia
                           </button>';
                     } elseif ($st['asistencia_validada'] == 1) {
-                        // ESTADO: FINALIZADA -> Mostrar BLOQUEADO
                         echo '<button class="btn btn-secondary btn-sm text-white" disabled>
                             <i class="fas fa-check-circle me-1"></i> Reunión Cerrada
                           </button>';
                     } else {
-                        // ESTADO: ESPERA -> Mostrar INICIAR
                         echo '<button id="btnIniciar" class="btn btn-primary btn-sm text-white shadow-sm" onclick="iniciarReunion()">
                             <i class="fas fa-play me-1"></i> Habilitar / Iniciar Reunión
                           </button>';
                     }
                     ?>
-
-                    <!-- BOTÓN ENVIAR A FIRMA (Lógica existente) -->
                     <?php
                     $estadoMin = $data['minuta']['estadoMinuta'];
                     $puedeEnviar = ($estadoMin === 'BORRADOR' || $estadoMin === 'REQUIERE_REVISION');
-                    $listoParaEnviar = ($st['vigente'] == 0 && $st['asistencia_validada'] == 1); // Solo si terminó
+                    $listoParaEnviar = ($st['vigente'] == 0 && $st['asistencia_validada'] == 1);
 
                     if (!$puedeEnviar) {
                         echo '<button class="btn btn-secondary btn-sm" disabled><i class="fas fa-check-double me-1"></i> En Proceso de Firma</button>';
@@ -86,46 +73,68 @@ $dNoneClass = $esEditable ? '' : 'd-none';
                           </button>';
                     }
                     ?>
-
                 <?php endif; ?>
             </div>
         </div>
+
         <div class="card-body bg-white">
             <div class="row g-3">
+
                 <div class="col-md-6 border-end">
-                    <div class="row mb-1">
-                        <div class="col-4 fw-bold text-end text-secondary">N° Minuta:</div>
-                        <div class="col-8 text-dark fw-bold fs-5"><?= $data['minuta']['idMinuta'] ?></div>
-                    </div>
-                    <div class="row mb-1">
-                        <div class="col-4 fw-bold text-end text-secondary">Reunión:</div>
-                        <div class="col-8 text-primary fw-bold text-uppercase" style="font-size: 0.9rem;">
-                            <?= $data['header_info']['nombre_reunion'] ?>
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">N° Sesión:</div>
+                        <div class="col-8 text-dark fw-bold fs-5">
+                            <?= $data['minuta']['idMinuta'] ?>
                         </div>
                     </div>
-                    <div class="row mb-1">
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">Reunión:</div>
+               
+                        <?= $data['header_info']['nombre_reunion'] ?>
+                        </div>
+                    </div>
+
+                    <div class="row mb-2 align-items-center">
                         <div class="col-4 fw-bold text-end text-secondary">Fecha:</div>
-                        <div class="col-8"><?= $data['header_info']['fecha_formateada'] ?></div>
+                        <div class="col-8">
+                            <?= $data['header_info']['fecha_formateada'] ?>
+                        </div>
                     </div>
-                    <div class="row mb-1">
-                        <div class="col-4 fw-bold text-end text-secondary">Hora:</div>
-                        <div class="col-8"><?= $data['header_info']['hora_formateada'] ?></div>
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">Hora Inicio:</div>
+                        <div class="col-8">
+                            <?= $data['header_info']['hora_formateada'] ?>
+                        </div>
                     </div>
+
                 </div>
 
                 <div class="col-md-6">
-                    <div class="row mb-1">
-                        <div class="col-3 fw-bold text-end text-secondary">Comisión:</div>
-                        <div class="col-9 fw-bold text-dark"><?= $data['header_info']['comisiones_str'] ?></div>
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">Comisión:</div>
+                        <div class="col-8 fw-bold text-uppercase text-primary">
+                            <?= $data['header_info']['comisiones_str'] ?>
+                        </div>
                     </div>
-                    <div class="row mb-1">
-                        <div class="col-3 fw-bold text-end text-secondary">Presidente:</div>
-                        <div class="col-9 text-dark"><?= $data['header_info']['presidente_completo'] ?></div>
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">Presidente:</div>
+                        <div class="col-8 text-dark">
+                            <?= $data['header_info']['presidente_completo'] ?>
+                        </div>
                     </div>
-                    <div class="row">
-                        <div class="col-3 fw-bold text-end text-secondary">Secretario:</div>
-                        <div class="col-9 text-secondary"><?= $data['header_info']['secretario_completo'] ?></div>
+
+                    <div class="row mb-2 align-items-center">
+                        <div class="col-4 fw-bold text-end text-secondary">Secretario Técnico:</div>
+                        <div class="col-8 text-dark">
+                            <?= $data['header_info']['secretario_completo'] ?>
+                        </div>
                     </div>
+
                 </div>
             </div>
         </div>

@@ -206,7 +206,7 @@ class PdfService
 
         // Texto centrado (Fecha y Hora actual para el control de versión impresa)
 
-        $textoCentro = "Documento preliminar generado el " . date('d/m/Y H:i');
+        $textoCentro = "Documento generado por COREGEDOC el " . date('d/m/Y H:i');
 
 
 

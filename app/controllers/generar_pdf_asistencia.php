@@ -26,21 +26,22 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // 1. OBTENER DATOS DE LA BASE DE DATOS
         // ==========================================
         
-        // Datos de la Minuta, Reunión, Comisión y Presidente
-        // JOIN adicional hacia t_usuario (alias p) para obtener nombre del presidente
+        // Datos de la Minuta, Reunión, Comisión, Presidente y Secretario
         $stmt = $pdo->prepare("
             SELECT m.idMinuta, 
+                   m.fechaMinuta,
                    m.fechaAprobacion, 
                    r.fechaInicioReunion, 
+                   r.horaInicioReal,
                    r.fechaTerminoReunion,
-                   c.nombreComision,
-                   CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario,
-                   CONCAT(p.pNombre, ' ', p.aPaterno, ' ', p.aMaterno) as nombrePresidente
+                   r.horaTerminoReal,
+                   r.nombreReunion,
+                   m.nombreComision,
+                   m.nombrePresidentes,
+                   CONCAT(s.pNombre, ' ', s.aPaterno, ' ', s.aMaterno) as nombreSecretario
             FROM t_minuta m
             LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
-            LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
             LEFT JOIN t_usuario s ON s.idUsuario = :idSecretario
-            LEFT JOIN t_usuario p ON c.t_usuario_idPresidente = p.idUsuario
             WHERE m.idMinuta = :idMinuta
         ");
         $stmt->execute([':idMinuta' => $idMinuta, ':idSecretario' => $idSecretario]);
@@ -68,27 +69,50 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         // ==========================================
         // 2. PREPARAR VARIABLES Y RUTAS
         // ==========================================
-        $fechaRaw = strtotime($minuta['fechaInicioReunion']);
+        
+        // --- LÓGICA DE FECHAS Y HORAS ---
+        $fechaRaw = strtotime($minuta['fechaMinuta']); // Usamos fechaMinuta para consistencia
         $meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         $fechaTexto = date('d', $fechaRaw) . ' de ' . $meses[date('n', $fechaRaw) - 1] . ' de ' . date('Y', $fechaRaw);
 
-        $horaInicio = $minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--';
-        $horaTermino = $minuta['fechaTerminoReunion'] ? date('H:i', strtotime($minuta['fechaTerminoReunion'])) : 'En curso';
-        
-        // Preparar nombres en mayúsculas
-        $nombreComision = mb_strtoupper($minuta['nombreComision'] ?? 'SIN COMISIÓN', 'UTF-8');
-        $nombrePresidente = mb_strtoupper($minuta['nombrePresidente'] ?? 'SIN PRESIDENTE ASIGNADO', 'UTF-8');
+        // Horas reales (o planificadas si fallan)
+        $horaInicio = $minuta['horaInicioReal'] ? date('H:i', strtotime($minuta['horaInicioReal'])) : ($minuta['fechaInicioReunion'] ? date('H:i', strtotime($minuta['fechaInicioReunion'])) : '--:--');
+        $horaTermino = $minuta['horaTerminoReal'] ? date('H:i', strtotime($minuta['horaTerminoReal'])) : 'En curso';
 
-        // Lógica para fecha del footer: Usar fechaAprobacion de la BD
-        if (!empty($minuta['fechaAprobacion'])) {
-            $fechaGeneracionDoc = date('d/m/Y H:i', strtotime($minuta['fechaAprobacion']));
-        } else {
-            $fechaGeneracionDoc = "Pendiente de firma"; // O date('d/m/Y H:i') si prefieres la actual
-        }
+        // --- LÓGICA DE ENCABEZADO (FORMATO LISTA) ---
+        $formatear = function ($cadena) {
+            if (empty($cadena)) return '---';
+            // Asumimos que pueden venir separados por '/' o ser un solo string
+            $list = explode('/', $cadena); 
+            $list = array_map(function ($n) { return mb_strtoupper(trim($n), 'UTF-8'); }, $list);
+            $list = array_values(array_unique($list)); // Eliminar duplicados y reindexar
+            
+            if (count($list) === 1) return $list[0];
+            $ultimo = array_pop($list);
+            return implode(', ', $list) . ' Y ' . $ultimo;
+        };
+
+        $comisionesStr = $formatear($minuta['nombreComision'] ?? '');
+        $presidentesStr = $formatear($minuta['nombrePresidentes'] ?? '');
+        
+        // Labels plural/singular
+        $labelComision = (strpos($comisionesStr, ' Y ') !== false) ? "COMISIONES: " : "COMISIÓN: ";
+        $labelPresidente = (strpos($presidentesStr, ' Y ') !== false) ? "PRESIDENTES:" : "PRESIDENTE:";
+
+        // Nombre Reunión
+        $nombreReunion = mb_strtoupper($minuta['nombreReunion'] ?? '---', 'UTF-8');
+        
+        // Título del Documento con ID
+        $tituloDocumento = "CERTIFICADO DE ASISTENCIA PARA MINUTA N°" . ($minuta['idMinuta'] ?? '---');
+        
+        // Datos para validación digital
+        $nombreSecretario = mb_strtoupper($minuta['nombreSecretario'] ?? 'SECRETARIO TÉCNICO', 'UTF-8');
+        $fechaValidacion = date('d/m/Y H:i'); // Fecha de emisión del certificado
 
         // Rutas absolutas para imágenes
         $logoGore = ImageToDataUrl($rootPath . '/public/img/logo2.png');
         $logoCore = ImageToDataUrl($rootPath . '/public/img/logoCore1.png');
+        $aprobacionImg = ImageToDataUrl($rootPath . '/public/img/aprobacion.png'); // Imagen para el sello verde
 
         // ==========================================
         // 3. CONSTRUIR EL HTML
@@ -125,14 +149,29 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
             .ausente { color: #999; font-weight: bold; text-transform: uppercase; }
             .manual { color: #666; font-size: 7pt; font-style: italic; display:block; }
 
-            /* FOOTER */
+            /* VALIDACION DIGITAL BOX (VERDE) */
+            .validation-wrapper { text-align: center; margin-top: 40px; margin-bottom: 20px; page-break-inside: avoid; }
+            .validation-box { 
+                display: inline-block; 
+                width: 350px; 
+                border: 2px solid #28a745; /* Borde Verde */
+                background-color: transparent; 
+                padding: 15px; 
+                text-align: center; 
+                border-radius: 8px;
+            }
+            .val-title { color: #28a745; font-weight: bold; font-size: 11pt; margin-bottom: 5px; text-transform: uppercase; }
+            .val-img { width: 60px; margin-bottom: 10px; }
+            .val-text { font-size: 10pt; color: #333; margin-bottom: 4px; }
+            .val-date { font-size: 9pt; color: #666; font-style: italic; }
+
+            /* FOOTER QR */
             .footer-container { margin-top: 30px; page-break-inside: avoid; width: 100%; text-align: center; }
             .footer-validation-box { background-color: #f4f4f4; border: 1px solid #dcdcdc; border-radius: 6px; padding: 10px; width: 100%; box-sizing: border-box; }
             .footer-content-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
             .qr-cell { width: 90px; vertical-align: middle; text-align: center; padding-right: 15px; border-right: 1px solid #ccc; }
             .info-cell { padding-left: 15px; text-align: left; vertical-align: middle; font-size: 8pt; color: #555; line-height: 1.3; }
             
-            /* LINK COMO ANCLA CLICKABLE */
             .link-validacion { 
                 color: #0071bc; 
                 text-decoration: none; 
@@ -144,9 +183,6 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 word-break: break-all; 
                 overflow-wrap: break-word; 
             }
-            .hash-tag { font-family: monospace; background: #eee; padding: 2px; font-size: 7pt; word-break: break-all; }
-            
-            .page-footer-text { position: fixed; bottom: -30px; left: 0; right: 0; text-align: center; font-size: 8pt; color: #aaa; }
         ";
 
         $html = '
@@ -163,8 +199,8 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                         <td class="header-center">
                             <div class="h-line-1">GOBIERNO REGIONAL - REGIÓN DE VALPARAÍSO</div>
                             <div class="h-line-2">CONSEJO REGIONAL</div>
-                            <div class="h-line-dynamic"><?= $labelComision ?> <?= htmlspecialchars($comisionesStr) ?></div>
-                            <div class="h-line-dynamic"><?= $labelPresidente ?> <?= htmlspecialchars($presidentesStr) ?></div>
+                            <div class="h-line-dynamic">' . $labelComision . ' ' . htmlspecialchars($comisionesStr) . '</div>
+                            <div class="h-line-dynamic">' . $labelPresidente . ' ' . htmlspecialchars($presidentesStr) . '</div>
                         </td>
                         <td width="130" align="right"><img src="' . $logoCore . '" width="120" style="display:block;"></td>
                     </tr>
@@ -172,18 +208,13 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 <hr class="header-sep">
             </header>
 
-            <div class="page-footer-text">Sistema de Gestión COREGEDOC - Documento generado el ' . $fechaGeneracionDoc . '</div>
-
-            <div class="doc-title">CERTIFICADO DE ASISTENCIA</div>
+            <div class="doc-title">' . $tituloDocumento . '</div>
 
             <table class="info-table">
-
                 <tr>
                     <td class="lbl">NOMBRE REUNIÓN:</td>
-                    <td class="val"><strong><?= htmlspecialchars($nombreReunion) ?></strong></td>
+                    <td class="val"><strong>' . htmlspecialchars($nombreReunion) . '</strong></td>
                 </tr>
-
-
                 <tr>
                     <td class="lbl">FECHA:</td>
                     <td class="val">' . $fechaTexto . '</td>
@@ -195,10 +226,6 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
                 <tr>
                     <td class="lbl">HORA TÉRMINO:</td>
                     <td class="val">' . $horaTermino . ' hrs.</td>
-                </tr>
-                <tr>
-                    <td class="lbl"><?= $labelPresidente ?></td>
-                    <td class="val"><?= htmlspecialchars($presidentesStr) ?></td>
                 </tr>
                 <tr>
                     <td class="lbl">LUGAR:</td>
@@ -244,6 +271,17 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         $html .= '</tbody></table>
             <div style="text-align:right; margin-top:10px; font-size:9pt; color:#555;">Total Asistentes: <strong>' . $totalPresentes . '</strong></div>
 
+            <!-- VALIDACIÓN DIGITAL CON SECRETARIO -->
+            <div class="validation-wrapper">
+                <div class="validation-box">
+                    <img src="' . $aprobacionImg . '" class="val-img">
+                    <div class="val-title">VALIDADO DIGITALMENTE</div>
+                    <div class="val-text"><strong>' . htmlspecialchars($nombreSecretario) . '</strong></div>
+                    <div class="val-date">Certificado emitido el: ' . $fechaValidacion . '</div>
+                </div>
+            </div>
+
+            <!-- FOOTER CON QR -->
             <div class="footer-container">
                 <div class="footer-validation-box">
                     <table class="footer-content-table">
@@ -255,7 +293,6 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         }
 
         $url = $urlValidacion ?? '#';
-        $hashShow = $hash ?? '---';
 
         $html .= '          </td>
                             <td class="info-cell">
@@ -273,30 +310,53 @@ function generarPdfAsistencia($idMinuta, $rutaGuardado, $pdo, $idSecretario, $ro
         </html>';
 
         // ==========================================
-        // 4. GENERAR ARCHIVO
+        // 4. GENERAR ARCHIVO Y CANVAS (Paginación)
         // ==========================================
         
-        if (class_exists('Dompdf\Dompdf')) {
-            $options = new Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $options->set('defaultFont', 'Helvetica');
-            
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('letter', 'portrait');
-            $dompdf->render();
-            $output = $dompdf->output();
-            
-            file_put_contents($rutaGuardado, $output);
-        } else {
-            file_put_contents($rutaGuardado, $html);
-        }
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'Helvetica');
+        
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('letter', 'portrait');
+        $dompdf->render();
 
-        return true;
+        // --- INYECCIÓN DE PIE DE PÁGINA (Paginación y Texto Fijo) ---
+        $canvas = $dompdf->getCanvas();
+        $w = $canvas->get_width();
+        $h = $canvas->get_height();
+
+        $fontMetrics = $dompdf->getFontMetrics();
+        $font = $fontMetrics->getFont("Helvetica", "normal");
+        $size = 8;
+        $color = array(0.33, 0.33, 0.33);
+
+        $y = $h - 40; // Altura del footer
+
+        // Texto centrado: "Documento generado por COREGEDOC"
+        // Le agregamos la fecha actual para referencia si quieres, si no, solo el texto
+        $textoCentro = "Documento generado por COREGEDOC"; 
+        
+        $anchoTexto = $fontMetrics->getTextWidth($textoCentro, $font, $size);
+        $xCentro = ($w - $anchoTexto) / 2;
+        $canvas->page_text($xCentro, $y, $textoCentro, $font, $size, $color);
+
+        // Numeración: "Página X / Y"
+        $textPagina = "Página {PAGE_NUM} / {PAGE_COUNT}";
+        $xPagina = $w - 80; // A la derecha
+        $canvas->page_text($xPagina, $y, $textPagina, $font, $size, $color);
+
+        // --- GUARDADO ---
+        $output = $dompdf->output();
+        $guardado = file_put_contents($rutaGuardado, $output);
+
+        return ($guardado !== false);
 
     } catch (Exception $e) {
         file_put_contents($rutaGuardado, "Error: " . $e->getMessage());
-        return true; 
+        return false; 
     }
 }
+?>
