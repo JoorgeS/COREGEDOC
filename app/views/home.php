@@ -313,7 +313,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                 interval: 5000, // Ajusta el intervalo automático
                 ride: false // Desactiva la auto-reproducción si el usuario interactúa
             });
-            console.log("Carrusel inicializado por script, listo para interacción manual.");
+            
         }
     };
 </script>

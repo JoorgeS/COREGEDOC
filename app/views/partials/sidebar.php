@@ -13,7 +13,15 @@
                 </a>
             </li>
 
-            <?php if (in_array($tipoUsuario, [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO])): ?>
+            <?php 
+            // Definimos quiénes ven el bloque de GESTIÓN (Admin, Secretario y ahora Presidente)
+            $rolesGestion = [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO, ROL_PRESIDENTE_COMISION];
+            
+            // Definimos quiénes ven las opciones AVANZADAS (Admin y Presidente)
+            $rolesAvanzados = [ROL_ADMINISTRADOR, ROL_PRESIDENTE_COMISION];
+            ?>
+
+            <?php if (in_array($tipoUsuario, $rolesGestion)): ?>
 
                 <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Gestión</li>
 
@@ -30,28 +38,41 @@
                     </a>
                 </li>
 
-                <?php if ($tipoUsuario == ROL_ADMINISTRADOR): ?>
+                <?php 
+                // Bloque exclusivo para Administrador y Presidente de Comisión
+                if (in_array($tipoUsuario, $rolesAvanzados)): 
+                ?>
 
-    
                     <li class="nav-item mt-2">
                         <a href="index.php?action=usuarios_dashboard" class="nav-link <?php echo ($paginaActual == 'usuarios_dashboard') ? 'active' : ''; ?>">
                             <i class="fas fa-users-cog fa-fw me-2"></i> Usuarios
                         </a>
                     </li>
+                    
                     <li class="nav-item">
                         <a href="index.php?action=comisiones_dashboard" class="nav-link <?php echo ($paginaActual == 'comisiones_dashboard') ? 'active' : ''; ?>">
                             <i class="fas fa-sitemap fa-fw me-2"></i> Comisiones
                         </a>
                     </li>
+
+                    <li class="nav-item">
+                        <a href="index.php?action=monitor_gestion" class="nav-link <?php echo ($paginaActual == 'monitor_gestion') ? 'active' : ''; ?>">
+                            <i class="fas fa-chart-line fa-fw me-2"></i> Monitor de Gestión
+                        </a>
+                    </li>
+
                 <?php endif; ?>
 
             <?php endif; ?>
 
-            <?php if ($tipoUsuario == ROL_PRESIDENTE_COMISION): ?>
+            <?php 
+            // Mantenemos el bloque de firma específico si el Presidente necesita firmar aparte de gestionar
+            if ($tipoUsuario == ROL_PRESIDENTE_COMISION): 
+            ?>
                 <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Firma</li>
                 <li class="nav-item">
                     <a href="index.php?action=minutas_dashboard" class="nav-link <?php echo esActivo('minutas', $paginaActual) ? 'active' : ''; ?>">
-                        <i class="fas fa-file-signature fa-fw me-2"></i> Firmar Minutas
+                        <i class="fas fa-file-signature fa-fw me-2"></i> Minutas (Firma)
                     </a>
                 </li>
             <?php endif; ?>
