@@ -155,40 +155,55 @@ class VotacionController
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    public function apiHistorialVotos()
+
+    public function apiHistorialGlobal()
     {
+        // Limpieza de buffer por si hay espacios en blanco previos
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
+        // 1. Verificación de Sesión
         if (session_status() === PHP_SESSION_NONE) session_start();
         if (!isset($_SESSION['idUsuario'])) {
             echo json_encode(['status' => 'error', 'message' => 'Sesión no iniciada']);
             exit;
         }
 
-        $idUsuario = $_SESSION['idUsuario'];
-        $modelo = new Votacion();
-
-        $filtros = [
-            'desde' => $_GET['desde'] ?? null,
-            'hasta' => $_GET['hasta'] ?? null,
-            'comision' => $_GET['comision'] ?? null,
-            'q' => $_GET['q'] ?? null
-        ];
-
-        $page = (int)($_GET['page'] ?? 1);
-        $limit = (int)($_GET['limit'] ?? 10);
+        // 2. Captura de Parámetros (Filtros y Paginación)
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
 
+        $filtros = [
+            'desde'    => $_GET['desde'] ?? '',
+            'hasta'    => $_GET['hasta'] ?? '',
+            'comision' => $_GET['comision'] ?? '',
+            'q'        => $_GET['q'] ?? ''
+        ];
+
         try {
-            $resultado = $modelo->getHistorialVotosPersonalFiltrado($idUsuario, $filtros, $limit, $offset);
-            echo json_encode($resultado);
+            $model = new Votacion();
+            
+            // Llamamos al método optimizado del Modelo
+            $resultado = $model->getHistorialGlobalFiltrado($filtros, $limit, $offset);
+
+            echo json_encode([
+                'status'     => 'success',
+                'data'       => $resultado['data'],
+                'total'      => $resultado['total'],
+                'totalPages' => $resultado['totalPages'],
+                'page'       => $page
+            ]);
+
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
+ // Fin de la clase VotacionController
+
+    
 
     public function apiCheckActive()
     {
