@@ -21,6 +21,7 @@ use App\Controllers\ComisionController;
 use App\Controllers\PublicController;
 
 
+
 session_start();
 
 $action = $_GET['action'] ?? $_POST['action'] ?? 'login';
@@ -34,6 +35,7 @@ $asistenciaController = new AsistenciaController();
 $reunionController = new ReunionController();
 $userController = new UserController();
 $comisionController = new ComisionController();
+
 
 try {
     switch ($action) {
@@ -49,6 +51,14 @@ try {
 
         case 'minutas_dashboard':
             $minutaController->dashboard();
+            break;
+
+        case 'reportes_index':
+            $reporteController->index();
+            break;
+
+        case 'reporte_generar':
+            $reporteController->generarPdf();
             break;
 
         case 'minutas_pendientes':
@@ -81,10 +91,6 @@ try {
 
         case 'api_guardar_asistencia':
             $minutaController->apiGuardarAsistencia();
-            break;
-
-        case 'api_guardar_borrador':
-            $minutaController->apiGuardarBorrador();
             break;
 
         case 'api_enviar_aprobacion':
@@ -149,9 +155,6 @@ try {
             $asistenciaController->apiMarcar();
             break;
 
-        case 'reuniones_dashboard':
-            $reunionController->index();
-            break;
 
 
 
@@ -213,6 +216,10 @@ try {
             break;
 
 
+
+
+
+
         case 'seguimiento_general':
             $minutaController->seguimientoGeneral();
             break;
@@ -229,16 +236,6 @@ try {
         case 'ver_archivo_adjunto': // <--- NUEVA RUTA
             $controller = new App\Controllers\MinutaController();
             $controller->verArchivoAdjunto();
-            break;
-
-        // ---------------------------------------------------------
-        // RUTAS API - GESTIÓN DE MINUTA (Desarrollo, Asistencia, Votos)
-        // ---------------------------------------------------------
-
-        // 1. DESARROLLO (Auto-Save de Temas)
-        case 'api_guardar_borrador':
-            $controller = new App\Controllers\MinutaController();
-            $controller->apiGuardarBorrador();
             break;
 
         // 2. ASISTENCIA (Tiempo Real)
@@ -302,10 +299,7 @@ try {
             $controller = new ReunionController();
             $controller->delete();
             break;
-        case 'reuniones_dashboard':
-            $controller = new ReunionController();
-            $controller->index();
-            break;
+
 
         case 'reunion_calendario':
             $controller = new ReunionController();
@@ -340,17 +334,14 @@ try {
             $minutaController->apiIniciarReunion();
             break;
 
-        // --- AQUI ARREGLAMOS EL ERROR ---
 
-        // El dashboard (Menu de tarjetas)
         case 'reuniones_dashboard':
-            // Nota: Si ya tienes este case definido más arriba, bórralo de aquí. 
-            // Si no, déjalo. Lo importante es no tener duplicados.
+
             $controller = new ReunionController();
             $controller->index();
             break;
 
-        // ESTE ES EL QUE FALTABA EN EL SWITCH PRINCIPAL
+
         case 'reunion_listado':
             $controller = new ReunionController();
             $controller->listar();
@@ -408,20 +399,12 @@ try {
             $controller = new App\Controllers\MinutaController();
             $controller->apiFiltrarSeguimiento();
             break;
+
         case 'api_adjunto_listar':
 
             $controller->apiVerAdjuntosMinuta();
             break;
 
-            if ($action == 'api_adjunto_link') {
-                $controller = new MinutaController();
-                $controller->apiGuardarLink(); // <--- Debe coincidir con el nombre en el Controller
-            }
-
-        case 'api_filtrar_comisiones':
-            $controller = new App\Controllers\ComisionController();
-            $controller->apiFiltrarComisiones();
-            break;
 
         case 'api_filtrar_comisiones':
             $controller = new App\Controllers\ComisionController();
@@ -432,9 +415,6 @@ try {
             $controller = new App\Controllers\ComisionController();
             $controller->apiCambiarEstado();
             break;
-
-
-
 
         case 'api_filtrar_usuarios':
             $controller = new App\Controllers\UserController();
@@ -449,9 +429,6 @@ try {
         case 'api_historial_global':
             $votacionController->apiHistorialGlobal();
             break;
-
-
-
 
         default:
             // Si la acción no existe, manda al login

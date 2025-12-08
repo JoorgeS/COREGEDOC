@@ -10,12 +10,10 @@ class AuthController
 
     public function login()
     {
-        // Iniciamos sesión si no está iniciada
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        // Si ya está logueado, redirigir al home
         if (isset($_SESSION['idUsuario'])) {
             header('Location: index.php?action=home');
             exit();
@@ -24,7 +22,8 @@ class AuthController
         $error_message = '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $usuario = isset($_POST['correo']) ? trim($_POST['correo']) : '';
+            // ✅ MEJORA: Saneamiento básico de email
+            $usuario = isset($_POST['correo']) ? filter_var(trim($_POST['correo']), FILTER_SANITIZE_EMAIL) : '';
             $clave = isset($_POST['contrasena']) ? $_POST['contrasena'] : '';
 
             if (empty($usuario) || empty($clave)) {
@@ -33,25 +32,24 @@ class AuthController
                 $userModel = new User();
                 $user = $userModel->findByEmail($usuario);
 
-                // VALIDACIÓN DE SEGURIDAD
                 if ($user && is_array($user) && isset($user['contrasena'])) {
-                    
+
                     if (password_verify($clave, $user['contrasena'])) {
                         // --- INICIO SESIÓN EXITOSO ---
+
+                        // ✅ SEGURIDAD CRÍTICA: Prevenir Session Fixation
+                        session_regenerate_id(true);
+
                         $_SESSION['idUsuario'] = $user['idUsuario'];
                         $_SESSION['pNombre'] = $user['pNombre'];
                         $_SESSION['aPaterno'] = $user['aPaterno'];
                         $_SESSION['tipoUsuario_id'] = $user['tipoUsuario_id'];
-                        
                         $_SESSION['email'] = $user['correo'];
                         $_SESSION['rutaImagenPerfil'] = $user['foto_perfil'];
 
-                        // ======================================================
-                        // [NUEVO] REGISTRAR LOG DE INGRESO (LOGIN)
-                        // ======================================================
+                        // LOG DE INGRESO
                         $userModel->registrarLogAcceso($user['idUsuario'], 'LOGIN');
-                        // ======================================================
-                        
+
                         header('Location: index.php?action=home');
                         exit();
                     } else {
@@ -62,40 +60,50 @@ class AuthController
                 }
             }
         }
-        
+
         require_once __DIR__ . '/../views/login.php';
     }
-
     public function logout()
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        // ======================================================
-        // [NUEVO] REGISTRAR LOG DE SALIDA (LOGOUT) ANTES DE DESTRUIR
-        // ======================================================
+        // LOG DE SALIDA (Correcto: hacerlo antes de destruir la sesión)
         if (isset($_SESSION['idUsuario'])) {
             $userModel = new User();
             $userModel->registrarLogAcceso($_SESSION['idUsuario'], 'LOGOUT');
         }
-        // ======================================================
+
+        // ✅ MEJORA: Limpiar el array de sesión antes de destruir
+        $_SESSION = array();
+
+        // ✅ MEJORA: Borrar la cookie de sesión si existe
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params["path"],
+                $params["domain"],
+                $params["secure"],
+                $params["httponly"]
+            );
+        }
 
         session_destroy();
         header('Location: index.php');
         exit();
     }
-
-    // ... (El resto de funciones recuperarPassword y restablecerPassword siguen igual) ...
-    
     public function recuperarPassword()
     {
         // ... (código existente) ...
         if (session_status() === PHP_SESSION_NONE) session_start();
-        
+
         $message = '';
         $message_type = '';
-        
+
         if (!isset($_SESSION['captcha_code'])) {
             $_SESSION['captcha_code'] = substr(md5(microtime()), rand(0, 26), 5);
         }
@@ -111,7 +119,7 @@ class AuthController
             } else {
                 $token = bin2hex(random_bytes(32));
                 $userModel = new User();
-                
+
                 if ($userModel->guardarTokenRecuperacion($email, $token)) {
                     $mailService = new MailService();
                     $mailService->enviarInstruccionesRecuperacion($email, $token);
@@ -132,7 +140,7 @@ class AuthController
         $token = $_GET['token'] ?? '';
         $userModel = new User();
         $usuario = $userModel->verificarToken($token);
-        
+
         $message = '';
         $message_type = '';
         $tokenValido = ($usuario !== false);
@@ -149,10 +157,10 @@ class AuthController
                 $message_type = 'danger';
             } else {
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
-                
+
                 if ($userModel->actualizarPassword($usuario['idUsuario'], $hash)) {
                     $message = 'Su contraseña ha sido actualizada correctamente.';
-                    $message_type = 'success'; 
+                    $message_type = 'success';
                 } else {
                     $message = 'Error al actualizar en base de datos.';
                     $message_type = 'danger';

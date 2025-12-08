@@ -13,10 +13,10 @@
                 </a>
             </li>
 
-            <?php 
-            
+            <?php
+
             $rolesGestion = [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO, ROL_PRESIDENTE_COMISION];
-            
+
 
             $rolesAvanzados = [ROL_ADMINISTRADOR];
             ?>
@@ -38,9 +38,9 @@
                     </a>
                 </li>
 
-                <?php 
-      
-                if (in_array($tipoUsuario, $rolesAvanzados)): 
+                <?php
+
+                if (in_array($tipoUsuario, $rolesAvanzados)):
                 ?>
                     <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Administración</li>
 
@@ -49,10 +49,17 @@
                             <i class="fas fa-users-cog fa-fw me-2"></i> Usuarios
                         </a>
                     </li>
-                    
+
                     <li class="nav-item">
                         <a href="index.php?action=comisiones_dashboard" class="nav-link <?php echo ($paginaActual == 'comisiones_dashboard') ? 'active' : ''; ?>">
                             <i class="fas fa-sitemap fa-fw me-2"></i> Comisiones
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link collapsed" href="index.php?controller=reporte&action=index">
+                            <i class="bi bi-file-earmark-bar-graph"></i>
+                            <span>Reportes Asistencia</span>
                         </a>
                     </li>
 
@@ -63,9 +70,9 @@
 
 
 
-            <?php 
-   
-            if (in_array($tipoUsuario, [1, 3, 7])): 
+            <?php
+
+            if (in_array($tipoUsuario, [1, 3, 7])):
             ?>
                 <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Sala Virtual</li>
 
@@ -81,6 +88,8 @@
                     </a>
                 </li>
             <?php endif; ?>
+
+
 
             <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Enlaces Externos</li>
 

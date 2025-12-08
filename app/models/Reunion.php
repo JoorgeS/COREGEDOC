@@ -193,4 +193,41 @@ class Reunion
         $stmt->execute([':id' => $id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+    // ============================================================
+    // 📊 NUEVO: REPORTE DE ASISTENCIA MENSUAL
+    // ============================================================
+    public function obtenerAsistenciaPorFiltro($mes, $anio, $idComision)
+    {
+        // NOTA: Ajusté los nombres de las columnas para coincidir con tu estructura:
+        // - t_reunion_idReunion (FK en t_asistencia)
+        // - t_usuario_idUsuario (FK en t_asistencia)
+        // - t_tipoAsistencia_idTipoAsistencia (FK en t_asistencia)
+        
+        $sql = "SELECT 
+                    u.nombres, 
+                    u.apellidos, 
+                    u.rut,
+                    r.fechaInicioReunion as fecha, 
+                    r.nombreReunion,
+                    ta.nombreTipoAsistencia as estado_asistencia, -- Asegúrate que esta columna se llame así en t_tipoasistencia
+                    c.nombreComision as nombre_comision
+                FROM t_asistencia a
+                INNER JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                INNER JOIN t_reunion r ON a.t_reunion_idReunion = r.idReunion
+                INNER JOIN t_tipoasistencia ta ON a.t_tipoAsistencia_idTipoAsistencia = ta.idTipoAsistencia
+                INNER JOIN t_comision c ON r.t_comision_idComision = c.idComision
+                WHERE MONTH(r.fechaInicioReunion) = :mes 
+                  AND YEAR(r.fechaInicioReunion) = :anio 
+                  AND r.t_comision_idComision = :idComision
+                  AND r.vigente = 1
+                ORDER BY u.apellidos ASC, r.fechaInicioReunion ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':mes', $mes, PDO::PARAM_INT);
+        $stmt->bindParam(':anio', $anio, PDO::PARAM_INT);
+        $stmt->bindParam(':idComision', $idComision, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
