@@ -46,7 +46,7 @@ class Votacion
         $check = "SELECT idVoto FROM t_voto 
                   WHERE (idVotacion = :idVotacion OR t_votacion_idVotacion = :idVotacion) 
                   AND (idUsuario = :idUsuario OR t_usuario_idUsuario = :idUsuario)";
-        
+
         $stmtCheck = $this->conn->prepare($check);
         $stmtCheck->execute([':idVotacion' => $idVotacion, ':idUsuario' => $idUsuario]);
 
@@ -87,7 +87,7 @@ class Votacion
                          FROM t_voto 
                          WHERE (idVotacion = :id OR t_votacion_idVotacion = :id) 
                          GROUP BY opcionVoto";
-            
+
             $stmt = $this->conn->prepare($sqlVotos);
             $stmt->execute([':id' => $v['idVotacion']]);
             $conteo = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -98,7 +98,7 @@ class Votacion
                            JOIN t_usuario u ON (t.idUsuario = u.idUsuario OR t.t_usuario_idUsuario = u.idUsuario)
                            WHERE (t.idVotacion = :id OR t.t_votacion_idVotacion = :id)
                            AND u.idUsuario > 0";
-            
+
             $stmtDet = $this->conn->prepare($sqlDetalle);
             $stmtDet->execute([':id' => $v['idVotacion']]);
             $detalle = $stmtDet->fetchAll(PDO::FETCH_ASSOC);
@@ -149,13 +149,13 @@ class Votacion
                 FROM t_votacion v
                 WHERE v.habilitada = 0 
                 ORDER BY v.fechaCreacion DESC LIMIT 10";
-        
+
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-// --- FILTRAR HISTORIAL DE VOTOS PERSONAL (Con Resultado Calculado) ---
+    // --- FILTRAR HISTORIAL DE VOTOS PERSONAL (Con Resultado Calculado) ---
     public function getHistorialVotosPersonalFiltrado($idUsuario, $filtros, $limit, $offset)
     {
         $sqlWhere = " WHERE vo.t_usuario_idUsuario = :idUsuario ";
@@ -186,9 +186,9 @@ class Votacion
                      LEFT JOIN t_minuta m ON v.t_minuta_idMinuta = m.idMinuta
                      LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
                      $sqlWhere";
-        
+
         $stmtCount = $this->conn->prepare($sqlCount);
-        foreach($params as $k => $v) $stmtCount->bindValue($k, $v);
+        foreach ($params as $k => $v) $stmtCount->bindValue($k, $v);
         $stmtCount->execute();
         $total = $stmtCount->fetchColumn();
 
@@ -200,14 +200,17 @@ class Votacion
                         COALESCE(r.nombreReunion, 'Sin Reunión Asociada') as nombreReunion,
                         
                         -- CÁLCULO DEL RESULTADO EN TIEMPO REAL
-                        CASE 
-                            WHEN (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion) = 0 THEN 'SIN DATOS'
-                            WHEN (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto = 'SI') > 
-                                 (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto = 'NO') THEN 'APROBADA'
-                            WHEN (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto = 'NO') > 
-                                 (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto = 'SI') THEN 'RECHAZADA'
-                            ELSE 'EMPATE'
-                        END as resultado_final
+CASE 
+    WHEN (SELECT COUNT(*) FROM t_voto WHERE (t_votacion_idVotacion = v.idVotacion OR idVotacion = v.idVotacion)) = 0 THEN 'SIN DATOS'
+    
+    WHEN (SELECT COUNT(*) FROM t_voto WHERE (t_votacion_idVotacion = v.idVotacion OR idVotacion = v.idVotacion) AND opcionVoto IN ('SI', 'APRUEBO')) > 
+         (SELECT COUNT(*) FROM t_voto WHERE (t_votacion_idVotacion = v.idVotacion OR idVotacion = v.idVotacion) AND opcionVoto IN ('NO', 'RECHAZO')) THEN 'APROBADA'
+         
+    WHEN (SELECT COUNT(*) FROM t_voto WHERE (t_votacion_idVotacion = v.idVotacion OR idVotacion = v.idVotacion) AND opcionVoto IN ('NO', 'RECHAZO')) > 
+         (SELECT COUNT(*) FROM t_voto WHERE (t_votacion_idVotacion = v.idVotacion OR idVotacion = v.idVotacion) AND opcionVoto IN ('SI', 'APRUEBO')) THEN 'RECHAZADA'
+         
+    ELSE 'EMPATE'
+END as resultado_final
 
                     FROM t_voto vo
                     JOIN t_votacion v ON vo.t_votacion_idVotacion = v.idVotacion
@@ -218,11 +221,11 @@ class Votacion
                     LIMIT :limit OFFSET :offset";
 
         $stmt = $this->conn->prepare($sqlData);
-        
-        foreach($params as $k => $v) $stmt->bindValue($k, $v);
+
+        foreach ($params as $k => $v) $stmt->bindValue($k, $v);
         $stmt->bindValue(':limit', (int)$limit, \PDO::PARAM_INT);
         $stmt->bindValue(':offset', (int)$offset, \PDO::PARAM_INT);
-        
+
         $stmt->execute();
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

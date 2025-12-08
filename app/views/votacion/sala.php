@@ -512,30 +512,46 @@ $c_azul = '#0071bc';
         }
 
         registros.forEach(r => {
-            // Formatear Fecha
+            // 1. Formatear Fecha
             const fechaObj = new Date(r.fechaVoto);
             const fechaStr = fechaObj.toLocaleDateString('es-CL') + ' ' + fechaObj.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
             
-            // Colores según voto y Texto en Español
+            // 2. Lógica visual para "Mi Voto"
             let badgeClass = 'bg-secondary';
             let opcionTexto = r.opcionVoto;
             
             if(['SI', 'APRUEBO'].includes(r.opcionVoto)) {
                 badgeClass = 'bg-success';
-                opcionTexto = 'SÍ'; // CAMBIO A SÍ
+                opcionTexto = 'SÍ';
             } else if(['NO', 'RECHAZO'].includes(r.opcionVoto)) {
                 badgeClass = 'bg-danger';
-                opcionTexto = 'NO'; // CAMBIO A NO
+                opcionTexto = 'NO';
             } else {
                 badgeClass = 'bg-warning text-dark';
-                opcionTexto = 'ABSTENCIÓN'; // CAMBIO A ABSTENCIÓN
+                opcionTexto = 'ABSTENCIÓN';
+            }
+
+            // 3. Lógica visual para "Estado de la Votación" (CORRECCIÓN AQUÍ)
+            // Usamos r.resultado_final que viene de tu Modelo
+            let resultadoTexto = r.resultado_final || 'PENDIENTE';
+            let estadoClass = 'bg-secondary';
+
+            if (resultadoTexto === 'APROBADA') {
+                estadoClass = 'bg-success'; // Verde
+            } else if (resultadoTexto === 'RECHAZADA') {
+                estadoClass = 'bg-danger'; // Rojo
+            } else if (resultadoTexto === 'EMPATE') {
+                estadoClass = 'bg-warning text-dark'; // Amarillo
+            } else if (resultadoTexto === 'SIN DATOS') {
+                estadoClass = 'bg-light text-muted border'; // Gris claro
+                resultadoTexto = 'Sin Quórum'; // Texto más amigable
             }
 
             const tr = `
                 <tr>
                     <td class="fw-bold text-dark text-truncate" style="max-width: 250px;" title="${r.nombreVotacion}">
                         ${r.nombreVotacion}
-                        <div class="small text-muted fw-normal">${r.nombreComision || 'General'}</div>
+                        <div class="small text-muted fw-normal">${r.nombreReunion || 'Sin Reunión'}</div>
                     </td>
                     <td>
                         <span class="badge ${badgeClass} border border-light shadow-sm px-3">
@@ -543,7 +559,11 @@ $c_azul = '#0071bc';
                         </span>
                     </td>
                     <td>${fechaStr}</td>
-                    <td><span class="badge bg-light text-dark border">${r.estado}</span></td>
+                    <td>
+                        <span class="badge ${estadoClass} border border-light shadow-sm px-2">
+                            ${resultadoTexto}
+                        </span>
+                    </td>
                 </tr>
             `;
             tbody.innerHTML += tr;
