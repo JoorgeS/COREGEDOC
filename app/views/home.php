@@ -56,6 +56,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
         justify-content: center;
         z-index: 10;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        z-index: 10;
     }
 
     /* Contenedor del icono y el título para el fondo gris transparente */
@@ -97,7 +98,17 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
     /* Se asegura que el caption inferior se oculte si no se usa */
     .carousel-caption {
         display: none !important;
+        
     }
+
+    .carousel-control-prev,
+    .carousel-control-next,
+    .carousel-indicators {
+        z-index: 20 !important; 
+        cursor: pointer; 
+    }
+
+
 </style>
 
 <div class="container-fluid p-4">

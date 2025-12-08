@@ -45,6 +45,12 @@ class AuthController
                         
                         $_SESSION['email'] = $user['correo'];
                         $_SESSION['rutaImagenPerfil'] = $user['foto_perfil'];
+
+                        // ======================================================
+                        // [NUEVO] REGISTRAR LOG DE INGRESO (LOGIN)
+                        // ======================================================
+                        $userModel->registrarLogAcceso($user['idUsuario'], 'LOGIN');
+                        // ======================================================
                         
                         header('Location: index.php?action=home');
                         exit();
@@ -65,15 +71,26 @@ class AuthController
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+
+        // ======================================================
+        // [NUEVO] REGISTRAR LOG DE SALIDA (LOGOUT) ANTES DE DESTRUIR
+        // ======================================================
+        if (isset($_SESSION['idUsuario'])) {
+            $userModel = new User();
+            $userModel->registrarLogAcceso($_SESSION['idUsuario'], 'LOGOUT');
+        }
+        // ======================================================
+
         session_destroy();
         header('Location: index.php');
         exit();
     }
 
-    // --- RECUPERACIÓN DE CONTRASEÑA ---
-
+    // ... (El resto de funciones recuperarPassword y restablecerPassword siguen igual) ...
+    
     public function recuperarPassword()
     {
+        // ... (código existente) ...
         if (session_status() === PHP_SESSION_NONE) session_start();
         
         $message = '';
@@ -109,9 +126,9 @@ class AuthController
         require_once __DIR__ . '/../views/auth/recuperar.php';
     }
 
-    // --- AQUÍ ESTÁ LA CORRECCIÓN ---
     public function restablecerPassword()
     {
+        // ... (Tu código corregido anterior se mantiene igual) ...
         $token = $_GET['token'] ?? '';
         $userModel = new User();
         $usuario = $userModel->verificarToken($token);
@@ -134,26 +151,14 @@ class AuthController
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
                 
                 if ($userModel->actualizarPassword($usuario['idUsuario'], $hash)) {
-                    
-                    // --- CORRECCIÓN: ---
-                    // Eliminamos el 'echo script alert' y el 'exit'.
-                    // Pasamos el mensaje de éxito para que la VISTA muestre el SweetAlert.
-                    
                     $message = 'Su contraseña ha sido actualizada correctamente.';
                     $message_type = 'success'; 
-                    
-                    // NO hacemos redirección aquí. Dejamos que el código continúe
-                    // y cargue la vista de abajo.
-                    
                 } else {
                     $message = 'Error al actualizar en base de datos.';
                     $message_type = 'danger';
                 }
             }
         }
-
-        // Importante: Asegúrate de que este nombre de archivo coincida con el de tu vista
-        // (A veces lo llamaste restablecer.php y otras restablecer_password.php)
         require_once __DIR__ . '/../views/auth/restablecer.php';
     }
 }

@@ -68,11 +68,11 @@ $c_gris = '#808080';
         <div class="tab-pane fade show active" id="marcar">
             <div class="row justify-content-center">
                 <div class="col-lg-6 col-md-8">
-                    
+       
                     <!-- ESTADO A: BUSCANDO (Por defecto) -->
                     <div id="panel-scan" class="card card-status text-center p-5 bg-white">
                         <div class="card-body">
-                            <div class="scanning-pulse"><i class="fas fa-wifi fa-2x"></i></div>
+                            <div class="scanning-pulse"><i class="fa-solid fa-chalkboard-user fa-2x"></i></div>
                             <h4 class="fw-bold mb-2" style="color: var(--inst-azul);">Esperando Inicio de Sesión...</h4>
                             <p class="text-muted">El sistema le notificará automáticamente cuando el Secretario Técnico habilite la reunión.</p>
                             <div class="mt-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div> Escaneando...</div>

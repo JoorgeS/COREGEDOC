@@ -205,9 +205,12 @@ class HomeController
                 $conteo = $stmt->fetchColumn();
 
                 if ($conteo > 0) {
-                    $s = $conteo > 1 ? 'es' : '';
+                    // Corrección de Pluralización:
+                    $es = $conteo > 1 ? 'es' : ''; // Para 'votacion' -> votaciones
+                    $s  = $conteo > 1 ? 's' : '';  // Para 'activa' -> activas y 'pendiente' -> pendientes
+                    
                     $data['tareas_pendientes'][] = [
-                        'texto' => "Tienes <strong>{$conteo} votacion{$s} activa{$s}</strong> pendiente{$s}.",
+                        'texto' => "Tienes <strong>{$conteo} votacion{$es} activa{$s}</strong> pendiente{$s}.",
                         'link'  => "index.php?action=voto_autogestion",
                         'icono' => "fa-vote-yea",
                         'color' => "primary"
@@ -221,9 +224,12 @@ class HomeController
                 $stmt = $this->db->query("SELECT COUNT(*) FROM t_minuta WHERE estadoMinuta = 'REQUIERE_REVISION'");
                 $conteo = $stmt->fetchColumn();
                 if ($conteo > 0) {
+                    // Se corrige la conjugación verbal para tercera persona del plural: requiere -> requieren
                     $s = $conteo > 1 ? 's' : '';
+                    $requiere = $conteo > 1 ? 'requieren' : 'requiere';
+
                     $data['tareas_pendientes'][] = [
-                        'texto' => "Hay <strong>{$conteo} minuta{$s}</strong> que requiere{$s} tu revisión.",
+                        'texto' => "Hay <strong>{$conteo} minuta{$s}</strong> que {$requiere} tu revisión.",
                         'link'  => "index.php?action=minutas_pendientes",
                         'icono' => "fa-comment-dots",
                         'color' => "danger"

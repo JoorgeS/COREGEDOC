@@ -21,12 +21,23 @@
             <div class="row justify-content-center">
                 <div class="col-lg-6">
 
-                    <div id="panel-espera" class="card text-center shadow-sm p-5 border-0 bg-white">
-                        <div class="mb-4">
-                            <div class="spinner-grow text-warning" role="status" style="width: 3rem; height: 3rem;"></div>
+
+                    <div id="panel-espera" class="card card-status text-center p-5 bg-white">
+                        <div class="card-body">
+
+                            <div class="scanning-pulse mb-3">
+                                <i class="fa-solid fa-person-booth fa-2x" style="color: var(--inst-azul);"></i>
+                            </div>
+
+                            <h4 class="fw-bold mb-2" style="color: var(--inst-azul);">Esperando Votación...</h4>
+
+                            <p class="text-muted">La pantalla se actualizará automáticamente cuando se abra una votación.</p>
+
+                            <div class="mt-4 text-muted small">
+                                <div class="spinner-border spinner-border-sm me-2"></div>
+                                Sincronizando...
+                            </div>
                         </div>
-                        <h4 class="text-dark">Esperando Votación...</h4>
-                        <p class="text-muted">La pantalla se actualizará automáticamente cuando se abra una votación.</p>
                     </div>
 
                     <div id="panel-votacion" class="card shadow-lg border-primary" style="display: none;">
@@ -365,3 +376,33 @@
         panel.style.display = 'block';
     }
 </script>
+
+<style>
+    /* Estilo del círculo contenedor */
+    .scanning-pulse {
+        width: 80px;
+        height: 80px;
+        background-color: rgba(0, 113, 188, 0.1); /* Azul institucional muy suave */
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto; /* Para centrarlo horizontalmente */
+        position: relative;
+        /* La animación */
+        animation: pulse-blue 2s infinite;
+    }
+
+    /* Definición de la animación de expansión */
+    @keyframes pulse-blue {
+        0% {
+            box-shadow: 0 0 0 0 rgba(0, 113, 188, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 15px rgba(0, 113, 188, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(0, 113, 188, 0);
+        }
+    }
+</style>

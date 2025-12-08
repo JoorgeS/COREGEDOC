@@ -1,7 +1,17 @@
 <?php 
 $u = $data['edit_user']; 
 $isEdit = !empty($u);
+
+// Lógica para separar el usuario del dominio si estamos editando
+$emailUser = '';
+$dominioFijo = "@gobiernovalparaiso.cl";
+
+if ($isEdit && !empty($u['correo'])) {
+    // Si edita, quitamos el dominio para mostrar solo el nombre
+    $emailUser = str_replace($dominioFijo, '', $u['correo']);
+}
 ?>
+
 <div class="container mt-4" style="max-width: 800px;">
     <div class="d-flex justify-content-between mb-4">
         <h3><?php echo $isEdit ? 'Editar Usuario' : 'Crear Usuario'; ?></h3>
@@ -10,7 +20,7 @@ $isEdit = !empty($u);
 
     <div class="card shadow-sm">
         <div class="card-body p-4">
-            <form action="index.php?action=usuario_guardar" method="POST">
+            <form action="index.php?action=usuario_guardar" method="POST" autocomplete="off" id="formUsuario">
                 <input type="hidden" name="idUsuario" value="<?php echo $u['idUsuario'] ?? ''; ?>">
                 
                 <div class="row g-3 mb-3">
@@ -26,13 +36,32 @@ $isEdit = !empty($u);
 
                 <div class="mb-3">
                     <label class="form-label">Correo Electrónico *</label>
-                    <input type="email" name="correo" class="form-control" required value="<?php echo $u['correo'] ?? ''; ?>">
+                    
+                    <div class="input-group">
+                        <input type="text" 
+                               id="email_prefix" 
+                               class="form-control" 
+                               required 
+                               value="<?php echo $emailUser; ?>" 
+                               placeholder="nombre.apellido"
+                               autocomplete="off">
+                        
+                        <span class="input-group-text"><?php echo $dominioFijo; ?></span>
+                    </div>
+
+                    <input type="hidden" name="correo" id="email_full" value="<?php echo $u['correo'] ?? ''; ?>">
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Contraseña <?php echo $isEdit ? '(Dejar en blanco para mantener)' : '*'; ?></label>
-                    <input type="password" name="contrasena" class="form-control" <?php echo $isEdit ? '' : 'required'; ?>>
-                </div>
+                    <input type="password" 
+                           name="contrasena" 
+                           class="form-control" 
+                           <?php echo $isEdit ? '' : 'required'; ?> 
+                           autocomplete="new-password"
+                           readonly 
+                           onfocus="this.removeAttribute('readonly');">
+                    </div>
 
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
@@ -75,3 +104,19 @@ $isEdit = !empty($u);
         </div>
     </div>
 </div>
+
+<script>
+// Script para combinar el usuario + dominio antes de enviar
+document.getElementById('formUsuario').addEventListener('submit', function(e) {
+    var prefix = document.getElementById('email_prefix').value;
+    var domain = "<?php echo $dominioFijo; ?>";
+    // Asignamos el valor completo al input oculto que se llama 'correo'
+    document.getElementById('email_full').value = prefix + domain;
+});
+
+// Opcional: Actualizar en tiempo real por si acaso
+document.getElementById('email_prefix').addEventListener('input', function(e) {
+    var domain = "<?php echo $dominioFijo; ?>";
+    document.getElementById('email_full').value = this.value + domain;
+});
+</script>

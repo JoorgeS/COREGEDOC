@@ -302,4 +302,36 @@ class User
         }
         return false;
     }
-}
+
+// ... (resto del código del modelo User)
+
+    /**
+     * Registra el ingreso o salida del sistema
+     * CORREGIDO: Usa $this->conn directamente
+     */
+    public function registrarLogAcceso($idUsuario, $accion)
+    {
+        try {
+            // Obtenemos la IP del cliente
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
+
+            $sql = "INSERT INTO t_log_acceso (t_usuario_idUsuario, accion, ipAcceso, fechaRegistro) 
+                    VALUES (:id, :accion, :ip, NOW())";
+            
+            // --- CORRECCIÓN AQUÍ ---
+            // Usamos $this->conn directamente porque ya es el objeto PDO inicializado en el __construct
+            $stmt = $this->conn->prepare($sql);
+            
+            $stmt->bindParam(':id', $idUsuario);
+            $stmt->bindParam(':accion', $accion);
+            $stmt->bindParam(':ip', $ip);
+            $stmt->execute();
+            
+            return true;
+        } catch (Exception $e) {
+            // Si falla el log, no detenemos el sistema
+            return false;
+        }
+    }
+} // Fin de la clase User
+

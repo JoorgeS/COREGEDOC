@@ -172,16 +172,7 @@ $c_gris = '#808080';
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
             <div class="d-flex flex-column align-items-end gap-2">
-                <span class="badge-rol">
-                    <i class="fas fa-user-shield me-2"></i>
-                    <?php 
-                        if($tipoUsuario == $ROL_ADMIN) echo 'ADMINISTRADOR';
-                        elseif($tipoUsuario == $ROL_SECRETARIO) echo 'SECRETARIO TÉCNICO';
-                        elseif($tipoUsuario == $ROL_PRESIDENTE) echo 'PRESIDENTE DE COMISIÓN';
-                        elseif($tipoUsuario == $ROL_CONSEJERO) echo 'CONSEJERO REGIONAL';
-                        else echo 'USUARIO';
-                    ?>
-                </span>
+               
                 
                 <!-- Botón Volver -->
                 <a href="index.php?action=home" class="btn-inst-volver">
