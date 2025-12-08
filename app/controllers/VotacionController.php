@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Models\Votacion;
 use App\Models\Minuta;
+use App\Models\Comision;
 
 class VotacionController
 {
@@ -80,53 +81,53 @@ class VotacionController
     // API: Obtener resultados en tiempo real
     // En VotacionController.php
 
-   public function apiResultados()
-{
-    header('Content-Type: application/json');
-    $db = new \App\Config\Database();
-    $conn = $db->getConnection();
+    public function apiResultados()
+    {
+        header('Content-Type: application/json');
+        $db = new \App\Config\Database();
+        $conn = $db->getConnection();
 
-    $idVotacion = $_GET['id'] ?? 0;
+        $idVotacion = $_GET['id'] ?? 0;
 
-    try {
-        $sql = "SELECT opcionVoto, COUNT(*) as total 
+        try {
+            $sql = "SELECT opcionVoto, COUNT(*) as total 
                 FROM t_voto 
                 WHERE t_votacion_idVotacion = :id 
                 GROUP BY opcionVoto";
 
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([':id' => $idVotacion]);
-        $resultados = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([':id' => $idVotacion]);
+            $resultados = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        $conteo = [
-            'APRUEBO' => 0,
-            'RECHAZO' => 0,
-            'ABSTENCION' => 0,
-            'TOTAL' => 0
-        ];
+            $conteo = [
+                'APRUEBO' => 0,
+                'RECHAZO' => 0,
+                'ABSTENCION' => 0,
+                'TOTAL' => 0
+            ];
 
-        // --- CORRECCIÓN: MAPEO INVERSO (BD -> JSON) ---
-        foreach ($resultados as $row) {
-            $opcionBD = $row['opcionVoto'];
-            $cantidad = (int)$row['total'];
+            // --- CORRECCIÓN: MAPEO INVERSO (BD -> JSON) ---
+            foreach ($resultados as $row) {
+                $opcionBD = $row['opcionVoto'];
+                $cantidad = (int)$row['total'];
 
-            if ($opcionBD === 'SI') {
-                $conteo['APRUEBO'] = $cantidad;
-            } elseif ($opcionBD === 'NO') {
-                $conteo['RECHAZO'] = $cantidad;
-            } elseif ($opcionBD === 'ABSTENCION') {
-                $conteo['ABSTENCION'] = $cantidad;
+                if ($opcionBD === 'SI') {
+                    $conteo['APRUEBO'] = $cantidad;
+                } elseif ($opcionBD === 'NO') {
+                    $conteo['RECHAZO'] = $cantidad;
+                } elseif ($opcionBD === 'ABSTENCION') {
+                    $conteo['ABSTENCION'] = $cantidad;
+                }
+
+                $conteo['TOTAL'] += $cantidad;
             }
-            
-            $conteo['TOTAL'] += $cantidad;
-        }
-        // ----------------------------------------------
+            // ----------------------------------------------
 
-        echo json_encode(['status' => 'success', 'data' => $conteo]);
-    } catch (\Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            echo json_encode(['status' => 'success', 'data' => $conteo]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
     }
-}
 
     public function sala()
     {
@@ -138,10 +139,15 @@ class VotacionController
 
         $model = new Votacion();
 
+        // Cargar Comisiones para el Select de Filtros
+        $comisionModel = new Comision();
+        $comisiones = $comisionModel->listarTodas();
+
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'] ?? '', 'apellido' => $_SESSION['aPaterno'] ?? '', 'rol' => $_SESSION['tipoUsuario_id'] ?? 0],
             'pagina_actual' => 'sala_votaciones',
-            'historial_personal' => $model->getHistorialVotosPersonal($_SESSION['idUsuario']),
+            'historial_personal' => [], // Se carga por AJAX
+            'comisiones' => $comisiones, // <--- Pasamos las comisiones
             'resultados_generales' => $model->getResultadosHistoricos()
         ];
 
@@ -149,14 +155,46 @@ class VotacionController
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    // --- API: Polling para el Consejero (¿Hay algo activo?) ---
-   // --- API: Polling para el Consejero ---
-    // --- API: Polling para el Consejero ---
+    public function apiHistorialVotos()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        if (!isset($_SESSION['idUsuario'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Sesión no iniciada']);
+            exit;
+        }
+
+        $idUsuario = $_SESSION['idUsuario'];
+        $modelo = new Votacion();
+
+        $filtros = [
+            'desde' => $_GET['desde'] ?? null,
+            'hasta' => $_GET['hasta'] ?? null,
+            'comision' => $_GET['comision'] ?? null,
+            'q' => $_GET['q'] ?? null
+        ];
+
+        $page = (int)($_GET['page'] ?? 1);
+        $limit = (int)($_GET['limit'] ?? 10);
+        $offset = ($page - 1) * $limit;
+
+        try {
+            $resultado = $modelo->getHistorialVotosPersonalFiltrado($idUsuario, $filtros, $limit, $offset);
+            echo json_encode($resultado);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+
     public function apiCheckActive()
     {
         // 1. Limpieza preventiva de basura (espacios en blanco de otros archivos)
-        if (ob_get_length()) ob_clean(); 
-        
+        if (ob_get_length()) ob_clean();
+
         header('Content-Type: application/json');
 
         if (session_status() === PHP_SESSION_NONE) session_start();
@@ -176,7 +214,7 @@ class VotacionController
                     FROM t_votacion 
                     WHERE habilitada = 1 
                     ORDER BY idVotacion DESC LIMIT 1";
-            
+
             $stmt = $conn->prepare($sql);
             $stmt->execute();
             $votacion = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -187,7 +225,7 @@ class VotacionController
                 $sqlCheck = "SELECT opcionVoto FROM t_voto 
                              WHERE t_votacion_idVotacion = :idVoto 
                              AND t_usuario_idUsuario = :idUser";
-                
+
                 $stmtCheck = $conn->prepare($sqlCheck);
                 $stmtCheck->execute([
                     ':idVoto' => $votacion['idVotacion'],
@@ -203,15 +241,13 @@ class VotacionController
                 ];
 
                 echo json_encode(['status' => 'active', 'data' => $data]);
-
             } else {
                 echo json_encode(['status' => 'waiting', 'message' => 'Esperando votación...']);
             }
-
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
-        
+
         exit; // <--- IMPORTANTE: Detener ejecución aquí
     }
 
@@ -305,19 +341,19 @@ class VotacionController
                 exit;
             }
 
-           $sqlInsert = "INSERT INTO t_voto (t_votacion_idVotacion, t_usuario_idUsuario, opcionVoto, fechaHoraVoto, origenVoto) 
+            $sqlInsert = "INSERT INTO t_voto (t_votacion_idVotacion, t_usuario_idUsuario, opcionVoto, fechaHoraVoto, origenVoto) 
                           VALUES (:idVoto, :user, :opcion, NOW(), 'SALA_VIRTUAL')";
-                  
+
             $stmtInsert = $conn->prepare($sqlInsert);
             $stmtInsert->execute([':idVoto' => $idVotacion, ':user' => $idUsuario, ':opcion' => $opcionDb]);
 
             // --- CORRECCIÓN AQUÍ ---
             echo json_encode(['status' => 'success', 'message' => 'Voto registrado correctamente']);
             exit; // <--- AGREGAR ESTE EXIT OBLIGATORIAMENTE
-            
+
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            exit; 
+            exit;
         }
     }
 }

@@ -3,11 +3,13 @@
 namespace App\Controllers;
 
 use App\Models\Minuta;
+use App\Models\Comision; // <--- AGREGADO: Necesario para cargar el filtro de comisiones
 
 class AsistenciaController
 {
     private function jsonResponse($data)
     {
+        if (ob_get_length()) ob_clean(); // Limpia cualquier error/warning previo
         header('Content-Type: application/json');
         echo json_encode($data);
         exit;
@@ -17,7 +19,6 @@ class AsistenciaController
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
         if (!isset($_SESSION['idUsuario'])) {
-            // Si es API, error JSON; si es vista, redirect (manejado en el método)
             return false;
         }
         return true;
@@ -32,22 +33,18 @@ class AsistenciaController
         }
 
         $minutaModel = new Minuta();
-        // Necesitamos también el modelo de Reunión para el calendario/próximas
-        // Asumimos que usas ReunionModel o una consulta directa. 
-        // Por simplicidad usaremos Minuta para el historial.
+        
+        // 1. Cargar Comisiones para el Filtro
+        $comisionModel = new Comision();
+        $comisiones = $comisionModel->listarTodas();
 
-        // Cargar historial
-        $historial = $minutaModel->getHistorialAsistenciaPersonal($_SESSION['idUsuario']);
-
-        // Cargar próximas reuniones (reutilizando lógica si existe, o array vacío por ahora)
-        // Idealmente inyectar ReunionModel aquí.
-        $proximas = []; // (Se llenará con JS o lógica extra si quieres)
-
+        // 2. Pasamos las comisiones a la vista
         $data = [
             'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
             'pagina_actual' => 'sala_reuniones',
-            'historial' => $historial,
-            'proximas' => $proximas
+            'historial' => [], // Se cargará por AJAX para optimizar
+            'comisiones' => $comisiones, // <--- ESTO FALTABA PARA EL SELECT
+            'proximas' => []
         ];
 
         $childView = __DIR__ . '/../views/asistencia/sala.php';
@@ -57,30 +54,17 @@ class AsistenciaController
     // --- API: Verificar si hay reunión activa ---
     public function apiCheck()
     {
-        header('Content-Type: application/json');
         $this->verificarSesion();
+        
+        // LIMPIEZA CRÍTICA DE BUFFER
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
         $db = new \App\Config\Database();
         $conn = $db->getConnection();
-
-        // 1. Iniciar sesión si no está iniciada
-        if (session_status() === PHP_SESSION_NONE) session_start();
-
-        // 2. Verificar estrictamente si existe la variable
-        if (!isset($_SESSION['idUsuario'])) {
-            // Si no existe, devolvemos error y MATAMOS la ejecución
-            echo json_encode(['status' => 'error', 'message' => 'Sesión expirada']);
-            exit; // <--- ESTE EXIT ES CRÍTICO
-        }
-
-
-
         $idUsuario = $_SESSION['idUsuario'];
 
         try {
-            // CORRECCIÓN IMPORTANTE:
-            // Agregamos "AND r.t_minuta_idMinuta IS NOT NULL"
-            // Esto asegura que la reunión solo aparezca si el Secretario ya la inició (generó la minuta).
-
             $sql = "SELECT r.idReunion, r.nombreReunion, r.fechaInicioReunion, r.t_minuta_idMinuta,
                            (SELECT COUNT(*) FROM t_asistencia a 
                             WHERE a.t_minuta_idMinuta = r.t_minuta_idMinuta 
@@ -98,17 +82,14 @@ class AsistenciaController
             $reunion = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             if ($reunion) {
-                // Calculamos minutos transcurridos desde el inicio
                 $inicio = new \DateTime($reunion['fechaInicioReunion']);
                 $ahora = new \DateTime();
                 $diff = $inicio->diff($ahora);
                 $minutosTranscurridos = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
-
-                // --- NUEVO: CALCULAR HORA LÍMITE (Inicio + 30 min) ---
+                
                 $limite = clone $inicio;
                 $limite->modify('+30 minutes');
                 $horaLimiteStr = $limite->format('H:i'); 
-                // -----------------------------------------------------
 
                 echo json_encode([
                     'status' => 'active',
@@ -119,7 +100,7 @@ class AsistenciaController
                         'fechaInicio' => $reunion['fechaInicioReunion'],
                         'minutosTranscurridos' => $minutosTranscurridos,
                         'ya_marco' => ($reunion['ya_marco'] > 0),
-                        'horaLimite' => $horaLimiteStr // <--- AGREGAR ESTO AL ARRAY
+                        'horaLimite' => $horaLimiteStr
                     ]
                 ]);
             } else {
@@ -130,6 +111,7 @@ class AsistenciaController
         }
         exit;
     }
+
     // --- API: Marcar Presente ---
     public function apiMarcar()
     {
@@ -147,5 +129,40 @@ class AsistenciaController
         } else {
             $this->jsonResponse(['status' => 'error', 'message' => 'Error al registrar.']);
         }
+    }
+    
+    // --- API: Historial Filtrado (CORREGIDO) ---
+    public function apiHistorial() {
+        // 1. Limpieza de buffer para evitar errores de JSON
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        // 2. Verificar sesión
+        if (!$this->verificarSesion()) {
+            echo json_encode(['status' => 'error', 'message' => 'Sesión no iniciada']);
+            exit;
+        }
+
+        $idUsuario = $_SESSION['idUsuario'];
+        $modelo = new Minuta();
+        
+        $filtros = [
+            'desde' => $_GET['desde'] ?? null,
+            'hasta' => $_GET['hasta'] ?? null,
+            'comision' => $_GET['comision'] ?? null,
+            'q' => $_GET['q'] ?? null
+        ];
+        
+        $page = (int)($_GET['page'] ?? 1);
+        $limit = (int)($_GET['limit'] ?? 10);
+        $offset = ($page - 1) * $limit;
+
+        try {
+            $resultado = $modelo->getHistorialAsistenciaPersonalFiltrado($idUsuario, $filtros, $limit, $offset);
+            echo json_encode($resultado);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 }

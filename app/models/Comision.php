@@ -25,6 +25,7 @@ class Comision
                 FROM t_comision c
                 LEFT JOIN t_usuario up ON c.t_usuario_idPresidente = up.idUsuario
                 LEFT JOIN t_usuario uv ON c.t_usuario_idVicepresidente = uv.idUsuario
+                WHERE c.vigencia = 1
                 ORDER BY c.nombreComision ASC"; // Quitamos el WHERE vigencia=1 para ver todo
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();

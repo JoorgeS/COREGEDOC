@@ -1009,7 +1009,7 @@ class Minuta
         }
     }
 
-    public function getPendientesPresidente($idPresidente)
+   public function getPendientesPresidente($idPresidente)
     {
         $sql = "SELECT
                     m.idMinuta,
@@ -1024,17 +1024,28 @@ class Minuta
                     (SELECT COUNT(*) FROM t_aprobacion_minuta 
                      WHERE t_minuta_idMinuta = m.idMinuta AND estado_firma = 'FIRMADO') as firmas_actuales,
                     
-                    -- TOTAL REQUERIDO (Guardado al enviar a firma, o calculado al vuelo)
+                    -- TOTAL REQUERIDO
                     m.presidentesRequeridos,
                     
-                    -- ESTADO DE MI FIRMA (El usuario logueado)
+                    -- ESTADO DE MI FIRMA
                     ap.estado_firma as mi_estado_firma,
                     
-                    -- SI HAY FEEDBACK RESUELTO (Para mostrar alerta 'Corregido')
+                    -- SI HAY FEEDBACK RESUELTO
                     (SELECT COUNT(*) FROM t_minuta_feedback
                      WHERE t_minuta_idMinuta = m.idMinuta
                      AND resuelto = 1
-                     AND t_usuario_idPresidente = :idUserFeedback) as correcciones_realizadas
+                     AND t_usuario_idPresidente = :idUserFeedback) as correcciones_realizadas,
+
+                    /* --- CORREGIDO: SE ELIMINÓ 'nombreArchivo' QUE NO EXISTE EN BD --- */
+                    (SELECT COUNT(*) 
+                     FROM t_adjunto a 
+                     WHERE a.t_minuta_idMinuta = m.idMinuta 
+                     AND NOT (
+                        LOWER(COALESCE(a.tipoAdjunto, '')) = 'asistencia' OR
+                        LOWER(COALESCE(a.pathAdjunto, '')) LIKE '%asistencia%'
+                     )
+                    ) as numAdjuntos
+                    /* ---------------------------------------------------------- */
 
                 FROM t_minuta m
                 JOIN t_aprobacion_minuta ap ON m.idMinuta = ap.t_minuta_idMinuta
@@ -1043,12 +1054,6 @@ class Minuta
                 LEFT JOIN t_usuario us ON m.t_usuario_idSecretario = us.idUsuario
                 
                 WHERE ap.t_usuario_idPresidente = :idUserMain
-                
-                -- MOSTRAR SI:
-                -- 1. Mi estado es EN_ESPERA (tengo que firmar)
-                -- 2. Mi estado es REQUIERE_REVISION (se corrigió y debo revisar de nuevo)
-                -- 3. Mi estado es FIRMADO pero la minuta sigue PARCIAL (esperando a otros)
-                
                 AND m.estadoMinuta IN ('PENDIENTE', 'PARCIAL', 'REQUIERE_REVISION')
                 
                 ORDER BY m.idMinuta DESC";
@@ -1062,6 +1067,7 @@ class Minuta
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
     public function getDatosNotificacion($idMinuta)
     {
         // 1. Obtener datos del Secretario Técnico (ST) y la Minuta
@@ -1101,6 +1107,75 @@ class Minuta
                 'fecha' => $data['fechaMinuta'],
                 'comision' => $data['nombre_comision_principal']
             ]
+        ];
+    }
+
+    // Agregar esta función mejorada
+    // ... (resto del código de Minuta.php)
+
+    // --- NUEVA FUNCIÓN PARA FILTRAR HISTORIAL PERSONAL ---
+    public function getHistorialAsistenciaPersonalFiltrado($idUsuario, $filtros, $limit, $offset)
+    {
+        $sqlWhere = " WHERE a.t_usuario_idUsuario = :idUsuario ";
+        $params = [':idUsuario' => $idUsuario];
+
+        // Filtros dinámicos
+        if (!empty($filtros['desde'])) {
+            $sqlWhere .= " AND DATE(r.fechaInicioReunion) >= :desde ";
+            $params[':desde'] = $filtros['desde'];
+        }
+        if (!empty($filtros['hasta'])) {
+            $sqlWhere .= " AND DATE(r.fechaInicioReunion) <= :hasta ";
+            $params[':hasta'] = $filtros['hasta'];
+        }
+        if (!empty($filtros['comision'])) {
+            $sqlWhere .= " AND m.t_comision_idComision = :comision ";
+            $params[':comision'] = $filtros['comision'];
+        }
+        if (!empty($filtros['q'])) {
+            $sqlWhere .= " AND (r.nombreReunion LIKE :q OR c.nombreComision LIKE :q) ";
+            $params[':q'] = '%' . $filtros['q'] . '%';
+        }
+
+        // 1. Contar Total
+        $sqlCount = "SELECT COUNT(*) 
+                     FROM t_asistencia a
+                     JOIN t_minuta m ON a.t_minuta_idMinuta = m.idMinuta
+                     JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                     LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                     $sqlWhere";
+        
+        $stmtCount = $this->conn->prepare($sqlCount);
+        $stmtCount->execute($params);
+        $total = $stmtCount->fetchColumn();
+
+        // 2. Obtener Datos Paginados
+        $sqlData = "SELECT r.nombreReunion, r.fechaInicioReunion, a.fechaRegistroAsistencia, a.estadoAsistencia, a.origenAsistencia, c.nombreComision
+                    FROM t_asistencia a
+                    JOIN t_minuta m ON a.t_minuta_idMinuta = m.idMinuta
+                    JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                    LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                    $sqlWhere
+                    ORDER BY r.fechaInicioReunion DESC
+                    LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->conn->prepare($sqlData);
+        
+        // Bind de parámetros de filtrado
+        foreach($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        // Bind de paginación (deben ser INT)
+        $stmt->bindValue(':limit', (int)$limit, \PDO::PARAM_INT);
+        $stmt->bindValue(':offset', (int)$offset, \PDO::PARAM_INT);
+        
+        $stmt->execute();
+        $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $data,
+            'total' => $total,
+            'totalPages' => ceil($total / $limit)
         ];
     }
 }

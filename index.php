@@ -433,9 +433,18 @@ try {
             $controller->apiCambiarEstado();
             break;
 
+        case 'api_historial_votos':
+            $votacionController->apiHistorialVotos();
+            break;
+
         case 'api_filtrar_usuarios':
             $controller = new App\Controllers\UserController();
             $controller->apiFiltrarUsuarios();
+            break;
+
+        // Agregar en el switch
+        case 'api_historial_asistencia':
+            $asistenciaController->apiHistorial();
             break;
 
 

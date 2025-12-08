@@ -88,10 +88,6 @@
                                             <span class="badge bg-success text-white ms-md-auto">
                                                 <i class="fas fa-sync-alt me-1"></i> CORREGIDA
                                             </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning text-dark bg-opacity-25 border border-warning ms-md-auto">
-                                                PENDIENTE DE SU FIRMA
-                                            </span>
                                         <?php endif; ?>
                                     </div>
 
@@ -159,8 +155,15 @@
                                     </div>
 
                                     <div class="mt-3 pt-3 border-top">
-                                        <button class="btn btn-sm btn-light text-primary border" onclick="verAdjuntos(<?= $m['idMinuta'] ?>)">
+                                        <button class="btn btn-sm btn-light text-primary border position-relative" onclick="verAdjuntos(<?= $m['idMinuta'] ?>)">
                                             <i class="fas fa-paperclip me-1"></i> Ver Documentos Adjuntos
+
+                                            <?php if (!empty($m['numAdjuntos']) && $m['numAdjuntos'] > 0): ?>
+                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                                    <?= $m['numAdjuntos'] ?>
+                                                    <span class="visually-hidden">adjuntos</span>
+                                                </span>
+                                            <?php endif; ?>
                                         </button>
                                     </div>
                                 </div>
