@@ -303,12 +303,7 @@ class User
         return false;
     }
 
-// ... (resto del código del modelo User)
 
-    /**
-     * Registra el ingreso o salida del sistema
-     * CORREGIDO: Usa $this->conn directamente
-     */
     public function registrarLogAcceso($idUsuario, $accion)
     {
         try {

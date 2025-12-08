@@ -27,14 +27,20 @@ class UserController
 
         $datosUsuario = $this->userModel->getUserById($_SESSION['idUsuario']);
 
+        // [CORRECCIÓN] Mapear datos para que main.php no falle
+        if ($datosUsuario) {
+            $datosUsuario['nombre'] = $datosUsuario['pNombre'];
+            $datosUsuario['apellido'] = $datosUsuario['aPaterno'];
+            $datosUsuario['rol'] = $datosUsuario['tipoUsuario_id'];
+        }
+
         // Pasar datos a la vista
         $data = ['usuario' => $datosUsuario, 'pagina_actual' => 'perfil'];
-
+        
         // Cargar vista
         $childView = __DIR__ . '/../views/usuarios/perfil.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
-
     // --- ACTUALIZAR FOTO ---
     public function update_perfil()
     {
@@ -79,11 +85,20 @@ class UserController
     public function configuracion()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        $data = ['pagina_actual' => 'configuracion'];
+        
+        // [CORRECCIÓN] Inyectar datos de sesión para que el Navbar/Sidebar funcionen
+        $data = [
+            'pagina_actual' => 'configuracion',
+            'usuario' => [
+                'nombre' => $_SESSION['pNombre'] ?? 'Usuario',
+                'apellido' => $_SESSION['aPaterno'] ?? '',
+                'rol' => $_SESSION['tipoUsuario_id'] ?? 0
+            ]
+        ];
+
         $childView = __DIR__ . '/../views/usuarios/configuracion.php';
         require_once __DIR__ . '/../views/layouts/main.php';
     }
-
     public function update_password()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();

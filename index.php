@@ -342,10 +342,7 @@ try {
             break;
 
 
-        case 'reunion_listado':
-            $controller = new ReunionController();
-            $controller->listar();
-            break;
+  
 
         case 'perfil':
             $controller = new App\Controllers\UserController();

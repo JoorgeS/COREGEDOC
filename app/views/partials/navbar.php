@@ -47,7 +47,7 @@
                     </span>
                 </a>
                 
-                <ul class="dropdown-menu dropdown-menu-end shadow animate__animated animate__fadeIn" aria-labelledby="userDropdown">
+               <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userDropdown">
                     <li>
                         <div class="dropdown-header text-center">
                             <strong><?php echo htmlspecialchars($_SESSION['pNombre'] ?? 'Usuario'); ?></strong><br>
