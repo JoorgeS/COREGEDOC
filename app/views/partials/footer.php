@@ -1,24 +1,18 @@
 <style>
     /* --- ESTILOS ESPECÍFICOS PARA EL FOOTER --- */
-    
-    /* Efecto Hover para Iconos de Redes Sociales */
     .footer-social-link {
-        color: #6c757d; /* Gris por defecto */
+        color: #6c757d;
         transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         display: inline-block;
     }
-
     .footer-social-link:hover {
-        transform: scale(1.3) rotate(5deg); /* Crece un poco más al pasar el mouse */
+        transform: scale(1.3) rotate(5deg);
     }
-
-    /* Colores de marca al pasar el mouse */
     .footer-social-link.facebook:hover { color: #1877F2 !important; }
     .footer-social-link.twitter:hover { color: #000000 !important; }
     .footer-social-link.instagram:hover { color: #E1306C !important; }
     .footer-social-link.youtube:hover { color: #FF0000 !important; }
 
-    /* Estilos para los Botones del Footer */
     .btn-footer-inst {
         background-color: transparent;
         border: 1px solid #dee2e6;
@@ -27,12 +21,11 @@
         transition: all 0.2s ease-in-out;
         text-align: left;
     }
-
     .btn-footer-inst:hover {
-        background-color: #f7931e; /* Naranja Institucional */
+        background-color: #f7931e;
         border-color: #f7931e;
         color: white;
-        transform: translateX(5px); /* Se mueve un poco a la derecha */
+        transform: translateX(5px);
     }
 </style>
 
@@ -109,8 +102,3 @@
         </div>
     </div>
 </footer>
-
-</div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-</body>
-</html>

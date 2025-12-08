@@ -143,23 +143,31 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
             </div>
         </div>
 
-        <div class="col-lg-4">
+       <div class="col-lg-4">
             <div class="card shadow-sm border-0 h-100 bg-white">
                 <div class="card-body d-flex flex-column justify-content-center align-items-center">
                     
-                    <h5 class="fw-bold mb-0 text-uppercase ls-1 c-gris">
-                        Valparaíso
+                    <h5 class="fw-bold mb-0 text-uppercase ls-1 c-gris" id="weather-city">
+                        Cargando...
                     </h5>
                     
                     <div class="d-flex align-items-center justify-content-center my-3">
-                        <i class="fas fa-sun fa-3x me-3 c-naranja"></i>
-                        <span class="display-4 fw-bold text-dark">18°</span>
+                        <div id="weather-icon-container">
+                            <i class="fas fa-spinner fa-spin fa-3x me-3 c-naranja"></i>
+                        </div>
+                        <span class="display-4 fw-bold text-dark" id="weather-temp">--°</span>
                     </div>
 
                     <div class="d-flex align-items-center small c-gris">
-                        <span class="me-3"><i class="fas fa-wind me-1"></i> 12 km/h</span>
-                        <span><i class="fas fa-tint me-1"></i> 45%</span>
+                        <span class="me-3" id="weather-wind">
+                            <i class="fas fa-wind me-1"></i> -- km/h
+                        </span>
+                        <span id="weather-humidity">
+                            <i class="fas fa-tint me-1"></i> --%
+                        </span>
                     </div>
+                    
+                    <div class="small c-gris mt-2 text-capitalize" id="weather-desc"></div>
 
                 </div>
             </div>
@@ -327,4 +335,72 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
             
         }
     };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- CONFIGURACIÓN DE LA API (Tus datos antiguos) ---
+        const apiKey = '71852032dae024a5eb1702b278bd88fa'; 
+        const ciudad = 'Valparaíso'; 
+        const pais = 'CL'; 
+        // URL de la API
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${ciudad},${pais}&appid=${apiKey}&units=metric&lang=es`;
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Error al obtener clima');
+                return response.json();
+            })
+            .then(data => {
+                if (data.main && data.weather && data.weather[0]) {
+                    // 1. Obtener elementos del DOM
+                    const cityEl = document.getElementById('weather-city');
+                    const tempEl = document.getElementById('weather-temp');
+                    const iconContainer = document.getElementById('weather-icon-container');
+                    const windEl = document.getElementById('weather-wind');
+                    const humidEl = document.getElementById('weather-humidity');
+                    const descEl = document.getElementById('weather-desc');
+
+                    // 2. Actualizar datos básicos
+                    cityEl.innerText = data.name; // Nombre real de la ciudad que devuelve la API
+                    tempEl.innerText = Math.round(data.main.temp) + '°';
+                    descEl.innerText = data.weather[0].description;
+
+                    // 3. Viento (La API devuelve m/s, convertimos a km/h multiplicando por 3.6)
+                    const windSpeed = Math.round(data.wind.speed * 3.6);
+                    windEl.innerHTML = `<i class="fas fa-wind me-1"></i> ${windSpeed} km/h`;
+
+                    // 4. Humedad
+                    humidEl.innerHTML = `<i class="fas fa-tint me-1"></i> ${data.main.humidity}%`;
+
+                    // 5. Mapeo de Iconos (OpenWeather -> FontAwesome y Colores de tu paleta)
+                    const iconCode = data.weather[0].icon;
+                    let iconClass = 'fa-sun';
+                    let colorClass = 'c-naranja'; // Por defecto naranja
+
+                    if (iconCode.includes('01')) { 
+                        iconClass = 'fa-sun'; colorClass = 'c-naranja'; // Sol
+                    } else if (iconCode.includes('02')) { 
+                        iconClass = 'fa-cloud-sun'; colorClass = 'c-naranja'; // Nubes y sol
+                    } else if (iconCode.includes('03') || iconCode.includes('04')) { 
+                        iconClass = 'fa-cloud'; colorClass = 'c-gris'; // Nubes
+                    } else if (iconCode.includes('09') || iconCode.includes('10')) { 
+                        iconClass = 'fa-cloud-showers-heavy'; colorClass = 'c-azul'; // Lluvia
+                    } else if (iconCode.includes('11')) { 
+                        iconClass = 'fa-bolt'; colorClass = 'c-naranja-dark'; // Tormenta
+                    } else if (iconCode.includes('13')) { 
+                        iconClass = 'fa-snowflake'; colorClass = 'c-azul'; // Nieve
+                    } else if (iconCode.includes('50')) { 
+                        iconClass = 'fa-smog'; colorClass = 'c-gris'; // Niebla
+                    }
+
+                    // Insertar el icono
+                    iconContainer.innerHTML = `<i class="fas ${iconClass} fa-3x me-3 ${colorClass}"></i>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error widget clima:', error);
+                document.getElementById('weather-city').innerText = 'Clima no disponible';
+            });
+    });
+
+
 </script>
