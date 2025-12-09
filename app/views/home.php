@@ -305,9 +305,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                                             </small>
                                         </div>
                                     </div>
-                                    <a href="index.php?action=reunion_gestionar&id=<?php echo $reunion['idReunion']; ?>" class="btn btn-sm btn-light c-azul">
-                                        <i class="fas fa-external-link-alt"></i>
-                                    </a>
+
                                 </li>
                             <?php endforeach; ?>
                         </ul>
