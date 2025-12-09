@@ -124,7 +124,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold mb-1" style="color: #000;">
-                <i class="fas fa-vote-yea me-2 text-primary"></i> Sala de Votaciones
+                <i class="fa-solid fa-person-booth"></i> Sala de Votaciones
             </h2>
             <p class="text-muted mb-0">Gestión y visualización de procesos de votación.</p>
         </div>
@@ -158,7 +158,7 @@
                             <div class="scanning-pulse mb-3">
                                 <i class="fa-solid fa-person-booth fa-2x" style="color: var(--inst-azul);"></i>
                             </div>
-                            <h4 class="fw-bold mb-2 text-primary">Esperando Votación...</h4>
+                            <h4 class="fw-bold mb-2" style="color: #000000;">Esperando Votación...</h4>
                             <p class="text-muted">La pantalla se actualizará automáticamente.</p>
                             <div class="mt-4 text-muted small">
                                 <div class="spinner-border spinner-border-sm me-2"></div> Sincronizando...

@@ -109,7 +109,7 @@ color: #333;
     font-weight: 600;
 }
 .recover-link a:hover {
-    color: #0d6efd; 
+    color: #0071bc; 
 }
 
 /* Submit Button */
@@ -236,7 +236,7 @@ body {
     font-size: 0.95rem;
 }
 .input-group input:focus {
-    border-color: #86b7fe;
+    border-color:#0071bc;
     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 

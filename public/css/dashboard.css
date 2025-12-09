@@ -215,7 +215,7 @@ body.sb-sidenav-toggled #sidebar-wrapper {
 }
 .list-group-item.active {
     background-color: #e9ecef; /* Fondo gris claro en activo */
-    color: #0d6efd; /* Texto azul */
+    color: #0071bc; /* Texto azul */
     font-weight: bold;
-    border-left: 4px solid #0d6efd; /* Borde azul a la izquierda */
+    border-left: 4px solid #0071bc; /* Borde azul a la izquierda */
 }

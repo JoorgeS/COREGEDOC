@@ -1,4 +1,7 @@
 <?php
+// Obtener rol para validaciones de vista
+$tipoUsuario = $data['usuario']['rol'] ?? 0;
+
 $c_azul = '#0071bc';
 $c_naranja = '#f7931e';
 $c_verde = '#00a650';
@@ -170,7 +173,10 @@ $c_gris = '#808080';
     <ul class="nav nav-tabs nav-tabs-inst mb-4" id="asistenciaTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" id="marcar-tab" data-bs-toggle="tab" data-bs-target="#marcar"><i class="fas fa-fingerprint me-2"></i> Autoconsulta</button></li>
         <li class="nav-item"><button class="nav-link" id="historial-tab" data-bs-toggle="tab" data-bs-target="#historial"><i class="fas fa-history me-2"></i> Mi Historial</button></li>
-        <li class="nav-item"><button class="nav-link" id="calendario-tab" data-bs-toggle="tab" data-bs-target="#calendario"><i class="far fa-calendar-alt me-2"></i> Calendario</button></li>
+        
+        <?php if ($tipoUsuario != 1): ?>
+            <li class="nav-item"><button class="nav-link" id="calendario-tab" data-bs-toggle="tab" data-bs-target="#calendario"><i class="far fa-calendar-alt me-2"></i> Calendario</button></li>
+        <?php endif; ?>
     </ul>
 
     <div class="tab-content">
@@ -309,6 +315,7 @@ $c_gris = '#808080';
             </div>
         </div>
 
+        <?php if ($tipoUsuario != 1): ?>
         <div class="tab-pane fade" id="calendario">
             <div class="card card-status border-0 shadow-sm">
                 <div class="card-body p-0">
@@ -316,6 +323,8 @@ $c_gris = '#808080';
                 </div>
             </div>
         </div>
+        <?php endif; ?>
+        
     </div>
 </div>
 
@@ -562,7 +571,7 @@ function renderTablaHistorial(registros) {
 
             const tr = `
                 <tr>
-                    <td class="fw-bold text-primary text-truncate" style="max-width: 200px;" title="${r.nombreReunion}">
+                    <td class="fw-bold text-dark text-truncate" style="max-width: 200px;" title="${r.nombreReunion}">
                         ${r.nombreReunion}
                     </td>
                     <td class="text-truncate" style="max-width: 180px;" title="${nombreComision}">

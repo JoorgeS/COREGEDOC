@@ -13,11 +13,27 @@
                 </a>
             </li>
 
+            <?php 
+            // --- BLOQUE EXCLUSIVO CONSEJERO (ID 1) ---
+            if ($tipoUsuario == 1): 
+            ?>
+                <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Consultas</li>
+
+                <li class="nav-item">
+                    <a href="index.php?action=reunion_calendario" class="nav-link <?php echo ($paginaActual == 'reunion_calendario') ? 'active' : ''; ?>">
+                        <i class="fas fa-calendar-alt fa-fw me-2"></i> Calendario
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="index.php?action=minutas_aprobadas" class="nav-link <?php echo ($paginaActual == 'minutas_aprobadas') ? 'active' : ''; ?>">
+                        <i class="fas fa-check-circle fa-fw me-2"></i> Minutas Aprobadas
+                    </a>
+                </li>
+            <?php endif; ?>
+
             <?php
-
             $rolesGestion = [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO, ROL_PRESIDENTE_COMISION];
-
-
             $rolesAvanzados = [ROL_ADMINISTRADOR];
             ?>
 
@@ -40,10 +56,7 @@
                     </li>
                 <?php endif; ?>
 
-                <?php
-
-                if (in_array($tipoUsuario, $rolesAvanzados)):
-                ?>
+                <?php if (in_array($tipoUsuario, $rolesAvanzados)): ?>
                     <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Administración</li>
 
                     <li class="nav-item">
@@ -63,18 +76,11 @@
                             <i class="fas fa-file-contract fa-fw me-2"></i> Reportes Asistencia
                         </a>
                     </li>
-
-
                 <?php endif; ?>
 
             <?php endif; ?>
 
-
-
-            <?php
-
-            if (in_array($tipoUsuario, [1, 3, 7])):
-            ?>
+            <?php if (in_array($tipoUsuario, [1, 3, 7])): ?>
                 <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Sala Virtual</li>
 
                 <li class="nav-item">
@@ -90,8 +96,6 @@
                 </li>
             <?php endif; ?>
 
-
-
             <li class="nav-item mt-3 mb-1 text-muted small fw-bold text-uppercase px-2">Enlaces Externos</li>
 
             <li class="nav-item">
@@ -99,7 +103,7 @@
                     target="_blank"
                     class="nav-link text-truncate"
                     title="Ir al Correo Institucional">
-                    <i class="fas fa-envelope fa-fw me-2 text-danger"></i> Correo Institucional
+                    <i class="fas fa-envelope fa-fw me-2"></i> Correo Institucional
                 </a>
             </li>
 

@@ -1,5 +1,20 @@
+<style>
+    /* Definición del Azul Institucional */
+    .text-core-blue { color: #0071bc !important; }
+    .border-core-blue { border-color: #0071bc !important; }
+    
+    /* Paginación en Azul #0071bc */
+    .page-link { color: #0071bc; }
+    .page-link:hover { color: #005a9c; } /* Un tono un poco más oscuro para hover */
+    .page-item.active .page-link { 
+        background-color: #0071bc; 
+        border-color: #0071bc; 
+        color: white;
+    }
+</style>
+
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 text-primary fw-bold"><i class="bi bi-file-earmark-bar-graph me-2"></i>Reportes de Asistencia</h1>
+    <h1 class="h2 text-core-blue fw-bold"><i class="bi bi-file-earmark-bar-graph me-2"></i>Reportes de Asistencia</h1>
 
     <button class="btn btn-danger" onclick="generarPDF()">
         <i class="fas fa-file-pdf me-2"></i>Descargar PDF
@@ -65,6 +80,7 @@
         </nav>
     </div>
 </div>
+
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         cargarTabla(1);
@@ -97,7 +113,8 @@
         const comision = document.getElementById('filtroComision').value;
 
         const tbody = document.getElementById('tablaResultados');
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center p-5 text-muted"><div class="spinner-border text-primary mb-2"></div><br>Cargando datos...</td></tr>';
+        // Actualizado spinner a text-core-blue
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-5 text-muted"><div class="spinner-border text-core-blue mb-2"></div><br>Cargando datos...</td></tr>';
 
         fetch(`index.php?action=api_reporte_asistencia&page=${page}&desde=${desde}&hasta=${hasta}&comision=${comision}`)
             .then(res => res.json())
@@ -106,12 +123,12 @@
                     renderizarTabla(res.data);
                     renderizarPaginacion(res.current_page, res.pages);
                 } else {
-                    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger p-4">${res.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger p-4">${res.message}</td></tr>`;
                 }
             })
             .catch(err => {
                 console.error(err);
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger p-4">Error de conexión.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger p-4">Error de conexión.</td></tr>';
             });
     }
 
@@ -119,7 +136,7 @@
         const tbody = document.getElementById('tablaResultados');
 
         if (reuniones.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-5 text-muted fst-italic">No se encontraron registros.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center p-5 text-muted fst-italic">No se encontraron registros.</td></tr>';
             return;
         }
 
@@ -129,12 +146,13 @@
             // Filtro Presentes
             const presentes = reunion.asistentes.filter(a => a.estado === 'PRESENTE' || a.estado === 'ATRASADO');
 
+            // Se cambia border-primary por border-core-blue
             html += `
-                <tr class="bg-light border-top border-3 border-primary table-group-divider">
-                    <td colspan="3" class="p-3">
+                <tr class="bg-light border-top border-3 border-core-blue table-group-divider">
+                    <td colspan="4" class="p-3">
                         <div class="row align-items-center">
                             <div class="col-md-9">
-                                <h6 class="text-primary fw-bold text-uppercase mb-1">
+                                <h6 class="text-core-blue fw-bold text-uppercase mb-1">
                                     <i class="far fa-calendar-alt me-2"></i>${reunion.fecha_texto} - ${reunion.hora_inicio} hrs.
                                 </h6>
                                 <div class="fs-5 fw-bold text-dark">${reunion.titulo}</div>
@@ -155,7 +173,7 @@
             if (presentes.length > 0) {
                 html += `
                     <tr class="bg-white fade-in">
-                        <td colspan="3" class="p-0">
+                        <td colspan="4" class="p-0">
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover mb-0">
                                     <thead class="bg-white text-secondary border-bottom">
@@ -182,7 +200,7 @@
 
                     let etiquetaHora = `<span class="badge bg-light text-dark border font-monospace">${asistente.hora}</span>`;
 
-                    if (asistente.atrasado) { // Usamos el booleano 'atrasado' que envia el controlador
+                    if (asistente.atrasado) {
                         estiloNombre = 'fw-bold text-warning-emphasis';
                         etiquetaHora += ` <span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem">ATRASADO</span>`;
                     }
@@ -197,7 +215,7 @@
                 });
                 html += `</tbody></table></div></td></tr>`;
             } else {
-                html += `<tr><td colspan="3" class="text-center py-3 text-muted fst-italic bg-white border-bottom">Sin asistentes presentes.</td></tr>`;
+                html += `<tr><td colspan="4" class="text-center py-3 text-muted fst-italic bg-white border-bottom">Sin asistentes presentes.</td></tr>`;
             }
         });
 
@@ -214,11 +232,10 @@
             // Botón Anterior
             html += `<li class="page-item ${current == 1 ? 'disabled' : ''}">
                         <button class="page-link" onclick="cargarTabla(${current - 1})">Anterior</button>
-                     </li>`;
+                      </li>`;
 
             // Números de Página
             for (let i = 1; i <= total; i++) {
-                // Mostrar primera, última, y cercanas a la actual
                 if (i == 1 || i == total || (i >= current - 2 && i <= current + 2)) {
                     html += `<li class="page-item ${current == i ? 'active' : ''}">
                                 <button class="page-link" onclick="cargarTabla(${i})">${i}</button>
@@ -231,7 +248,7 @@
             // Botón Siguiente
             html += `<li class="page-item ${current == total ? 'disabled' : ''}">
                         <button class="page-link" onclick="cargarTabla(${current + 1})">Siguiente</button>
-                     </li>`;
+                      </li>`;
         }
 
         pag.innerHTML = html;

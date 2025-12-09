@@ -256,7 +256,7 @@
         }
 
         .navbar-core .usuario:hover {
-            color: #007bff;
+            color: #0071bc;
         }
 
         .navbar-core .dropdown-menu {
@@ -298,7 +298,7 @@
         }
 
         .editable-area:focus {
-            border-color: #007bff;
+            border-color: #0071bc;
             box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
         }
 
@@ -384,29 +384,6 @@
         .rrss-icon-link .fa-instagram:hover {
             color: #E1306C !important;
             /* Rosa/Púrpura Instagram */
-        }
-
-        /* Colores de redes sociales al pasar el mouse */
-        .fa-facebook:hover {
-            color: #1877F2 !important;
-        }
-
-        .fa-twitter:hover,
-        .fa-x-twitter:hover {
-            color: #000000 !important;
-        }
-
-        /* X es negro */
-        .fa-instagram:hover {
-            color: #E4405F !important;
-        }
-
-        .fa-youtube:hover {
-            color: #FF0000 !important;
-        }
-
-        .fa-linkedin:hover {
-            color: #0077B5 !important;
         }
 
         /* Opcional: transición suave */

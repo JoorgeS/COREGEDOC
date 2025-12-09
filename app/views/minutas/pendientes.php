@@ -240,7 +240,7 @@
                 html += `
                 <tr class="${rowClass}">
                     <td class="fw-bold text-muted">#${m.idMinuta}</td>
-                    <td class="fw-bold text-primary text-truncate" style="max-width: 200px;" title="${m.nombreReunion}">${reunion}</td>
+                    <td class="fw-bold text-dark text-truncate" style="max-width: 200px;" title="${m.nombreReunion}">${reunion}</td>
                     <td class="text-truncate" style="max-width: 200px;" title="${m.nombreComision}">${m.nombreComision}</td>
                     
                     <td><small>${fecha}</small></td>
