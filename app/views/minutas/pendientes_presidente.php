@@ -168,7 +168,6 @@
                                     </div>
                                 </div>
 
-                                <!-- 2. Botones de Acción -->
                                 <div class="col-lg-4 text-end border-start ps-lg-4 mt-4 mt-lg-0">
                                     <div class="d-grid gap-2">
                                         <a href="index.php?action=ver_minuta_borrador&id=<?= $m['idMinuta'] ?>" target="_blank" class="btn btn-outline-secondary btn-block">
@@ -176,15 +175,29 @@
                                         </a>
 
                                         <?php if ($enRevisionST): ?>
-                                            <!-- BOTONES DESHABILITADOS SI ESTÁ EN REVISIÓN -->
                                             <button class="btn btn-outline-secondary btn-block" disabled>
                                                 <i class="fas fa-clock me-2"></i> Esperando Corrección...
                                             </button>
                                             <button class="btn btn-secondary btn-block py-2 fw-bold shadow-sm" disabled>
                                                 <i class="fas fa-lock me-2"></i> Aprobación Pausada
                                             </button>
+
+                                        <?php elseif ($m['mi_estado_firma'] === 'FIRMADO'): ?>
+                                            <button class="btn btn-outline-secondary btn-block" disabled title="Ya has enviado tu firma">
+                                                <i class="fas fa-check-double me-2"></i> Firma Registrada
+                                            </button>
+
+                                            <button class="btn btn-success btn-block py-2 fw-bold shadow-sm opacity-75" disabled>
+                                                <i class="fas fa-check-circle me-2"></i> YA HAS FIRMADO
+                                            </button>
+
+                                            <div class="text-center mt-1">
+                                                <small class="text-muted fst-italic" style="font-size: 0.75rem;">
+                                                    Si hay una nueva corrección del ST, este botón se habilitará nuevamente.
+                                                </small>
+                                            </div>
+
                                         <?php else: ?>
-                                            <!-- BOTONES ACTIVOS SI ES TU TURNO -->
                                             <button class="btn btn-outline-danger btn-block" onclick="abrirFeedback(<?= $m['idMinuta'] ?>)">
                                                 <i class="fas fa-comment-dots me-2"></i> Solicitar Corrección
                                             </button>

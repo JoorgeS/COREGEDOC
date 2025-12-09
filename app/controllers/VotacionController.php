@@ -155,21 +155,19 @@ class VotacionController
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-
-    public function apiHistorialGlobal()
+public function apiHistorialGlobal()
     {
-        // Limpieza de buffer por si hay espacios en blanco previos
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        // 1. Verificación de Sesión
         if (session_status() === PHP_SESSION_NONE) session_start();
         if (!isset($_SESSION['idUsuario'])) {
             echo json_encode(['status' => 'error', 'message' => 'Sesión no iniciada']);
             exit;
         }
 
-        // 2. Captura de Parámetros (Filtros y Paginación)
+        $idUsuario = $_SESSION['idUsuario']; // <--- CLAVE PARA "MI VOTO"
+
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
@@ -184,14 +182,37 @@ class VotacionController
         try {
             $model = new Votacion();
             
-            // Llamamos al método optimizado del Modelo
-            $resultado = $model->getHistorialGlobalFiltrado($filtros, $limit, $offset);
+            // Pasamos $idUsuario al modelo
+            $data = $model->getHistorialGlobalFiltrado($filtros, $limit, $offset, $idUsuario);
+            $total = $model->countHistorialGlobalFiltrado($filtros);
+
+            // Procesamiento de Datos
+            foreach ($data as &$row) {
+                $si = (int)$row['votos_si'];
+                $no = (int)$row['votos_no'];
+                
+                // Resultado Global
+                if ($si > $no) $row['resultado_final'] = 'APROBADA';
+                elseif ($no > $si) $row['resultado_final'] = 'RECHAZADA';
+                elseif ($si == $no && $si > 0) $row['resultado_final'] = 'EMPATE';
+                else $row['resultado_final'] = 'SIN QUÓRUM';
+
+                // Normalizar "MI VOTO" (Manejo seguro de nulos y alias)
+                $miVoto = $row['mi_voto_personal'] ?? null;
+                
+                if ($miVoto === 'APRUEBO') $miVoto = 'SI';
+                if ($miVoto === 'RECHAZO') $miVoto = 'NO';
+                if ($miVoto === 'ABSTENCION') $miVoto = 'ABS';
+
+                // Enviamos 'mi_voto_personal' limpio para la vista
+                $row['mi_voto'] = $miVoto;
+            }
 
             echo json_encode([
                 'status'     => 'success',
-                'data'       => $resultado['data'],
-                'total'      => $resultado['total'],
-                'totalPages' => $resultado['totalPages'],
+                'data'       => $data,
+                'total'      => $total,
+                'totalPages' => ceil($total / $limit),
                 'page'       => $page
             ]);
 
@@ -201,7 +222,7 @@ class VotacionController
         exit;
     }
 
- // Fin de la clase VotacionController
+
 
     
 

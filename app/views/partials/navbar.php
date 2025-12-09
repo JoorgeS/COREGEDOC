@@ -25,7 +25,7 @@
         </button>
 
         <a class="navbar-brand fw-bold text-white" href="index.php?action=home">
-            </i>CONSEJO REGIONAL<span class="text-white-50"> REGIÓN DE VALPARAÍSO</span>
+            </i>CORE<span class="text-white-50"> REGIÓN DE VALPARAÍSO</span>
         </a>
 
         <div class="ms-auto d-flex align-items-center">

@@ -242,6 +242,8 @@ class MinutaController
             'firmas_aprobadas' => $firmasPresidentes
         ];
     }
+
+    
     public function aprobadas()
     {
         $this->verificarSesion();
@@ -742,15 +744,16 @@ class MinutaController
                 $stmtT->execute([':id' => $idMinuta]);
                 $temas = $stmtT->fetchAll(\PDO::FETCH_ASSOC);
 
-                // 4. OBTENER FIRMAS
-                $sqlF = "SELECT u.pNombre, u.aPaterno, am.fechaAprobacion
+                // 4. OBTENER FIRMAS (Con nombre de comisión)
+                $sqlF = "SELECT u.pNombre, u.aPaterno, am.fechaAprobacion, c.nombreComision
                          FROM t_aprobacion_minuta am
                          JOIN t_usuario u ON am.t_usuario_idPresidente = u.idUsuario
+                         JOIN t_comision c ON c.t_usuario_idPresidente = u.idUsuario -- Unimos para saber qué comisión preside
                          WHERE am.t_minuta_idMinuta = :id AND am.estado_firma = 'FIRMADO'";
+                
                 $stmtF = $pdo->prepare($sqlF);
                 $stmtF->execute([':id' => $idMinuta]);
                 $firmas = $stmtF->fetchAll(\PDO::FETCH_ASSOC);
-
                 // --- [NUEVO] PROCESAR NOMBRES DE PRESIDENTES PARA EL PDF ---
                 // Convertimos la lista de firmas en el formato [['nombre'=>'Juan Perez'], ...]
                 $presidentesInfo = [];

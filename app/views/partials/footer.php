@@ -20,6 +20,13 @@
         font-weight: 500;
         transition: all 0.2s ease-in-out;
         text-align: left;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        /* Evita desbordes de texto */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .btn-footer-inst:hover {
         background-color: #f7931e;
@@ -27,26 +34,41 @@
         color: white;
         transform: translateX(5px);
     }
+    
+    .doc-icon { 
+        width: 24px; 
+        text-align: center; 
+        margin-right: 8px;
+    }
 </style>
 
 <footer class="bg-white border-top mt-auto footer-core">
     <div class="container-fluid px-4 py-4">
         <div class="row gy-4">
             
-            <div class="col-md-4 col-lg-5">
+            <div class="col-md-6 col-lg-3">
                 <div class="d-flex align-items-center mb-3">
-                    <h6 class="fw-bold text-primary mb-0 text-uppercase">Acerca del Consejo Regional</h6>
+                    <h6 class="fw-bold text-primary mb-0 text-uppercase">Acerca del Consejo</h6>
                 </div>
                 <p class="text-muted small mb-2">
                     La administración superior de la Región de Valparaíso radica en el Gobierno Regional, 
-                    que tiene por objetivo el desarrollo social, cultural y económico de la misma.
-
-                    El Consejo Regional tendrá por finalidad hacer efectiva la participación de la comunidad 
-                    y está investido de facultades normativas, resolutivas y fiscalizadoras.
+                    que tiene por objetivo el desarrollo social, cultural y económico.
                 </p>
             </div>
 
-            <div class="col-md-4 col-lg-3">
+            <div class="col-md-6 col-lg-2">
+                <h6 class="fw-bold text-dark mb-3">Sitios Oficiales</h6>
+                <div class="d-flex flex-column gap-2">
+                    <a href="https://www.gobiernovalparaiso.cl" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3">
+                        <i class="fas fa-building doc-icon"></i>GORE
+                    </a>
+                    <a href="http://www.corevalparaiso.cl" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3">
+                        <i class="fas fa-landmark doc-icon"></i>CCORE
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
                 <h6 class="fw-bold text-dark mb-3">Contacto</h6>
                 <ul class="list-unstyled small text-muted mb-0">
                     <li class="mb-2">
@@ -64,10 +86,9 @@
                 </ul>
             </div>
 
-            <div class="col-md-4 col-lg-4">
-                <h6 class="fw-bold text-dark mb-3">Redes Sociales</h6>
-                
-                <div class="d-flex gap-3 mb-4">
+            <div class="col-md-6 col-lg-2">
+                <h6 class="fw-bold text-dark mb-3">Síguenos</h6>
+                <div class="d-flex gap-3 flex-wrap">
                     <a href="https://www.facebook.com/GOREValparaiso/" class="footer-social-link facebook fs-4" title="Facebook">
                         <i class="fab fa-facebook"></i>
                     </a>
@@ -80,13 +101,16 @@
                         <i class="fab fa-youtube"></i>
                     </a>
                 </div>
+            </div>
 
+            <div class="col-md-6 col-lg-2">
+                <h6 class="fw-bold text-dark mb-3">Ayuda</h6>
                 <div class="d-flex flex-column gap-2">
-                    <a href="https://www.gobiernovalparaiso.cl" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3">
-                        <i class="fas fa-building me-2"></i>Sitio Oficial GORE
+                    <a href="public/docs/Reglamento_Interno_CORE.pdf" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3" title="Descargar Reglamento">
+                        <i class="fas fa-file-contract text-danger doc-icon"></i>Reglamento
                     </a>
-                    <a href="http://www.corevalparaiso.cl" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3">
-                        <i class="fas fa-landmark me-2"></i>Sitio Oficial CORE
+                    <a href="public/docs/Manuales_Coregedoc.pdf" target="_blank" class="btn btn-sm btn-footer-inst rounded-pill px-3" title="Descargar Manuales">
+                        <i class="fas fa-book-open text-primary doc-icon"></i>Manuales
                     </a>
                 </div>
             </div>

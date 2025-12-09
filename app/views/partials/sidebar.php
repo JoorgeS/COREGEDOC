@@ -31,12 +31,14 @@
                     </a>
                 </li>
 
-                <li class="nav-item">
-                    <a href="index.php?action=reuniones_dashboard"
-                        class="nav-link <?php echo ($paginaActual == 'reuniones_menu') ? 'active' : ''; ?>">
-                        <i class="fas fa-briefcase fa-fw me-2"></i> Gestión Reuniones
-                    </a>
-                </li>
+                <?php if (in_array($tipoUsuario, [ROL_ADMINISTRADOR, ROL_SECRETARIO_TECNICO])): ?>
+                    <li class="nav-item">
+                        <a href="index.php?action=reuniones_dashboard"
+                            class="nav-link <?php echo ($paginaActual == 'reuniones_menu') ? 'active' : ''; ?>">
+                            <i class="fas fa-briefcase fa-fw me-2"></i> Gestión Reuniones
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <?php
 

@@ -16,7 +16,8 @@ class Votacion
         $this->conn = $database->getConnection();
     }
 
-    public function getVotacionById($id) {
+    public function getVotacionById($id)
+    {
         $sql = "SELECT * FROM t_votacion WHERE idVotacion = :id";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':id' => $id]);
@@ -43,7 +44,8 @@ class Votacion
         return $stmt->execute([':estado' => $nuevoEstado, ':id' => $idVotacion]);
     }
 
-    public function verificarVotoUsuario($idVotacion, $idUsuario) {
+    public function verificarVotoUsuario($idVotacion, $idUsuario)
+    {
         $sql = "SELECT opcionVoto FROM t_voto 
                 WHERE (idVotacion = :id OR t_votacion_idVotacion = :id) 
                 AND (idUsuario = :user OR t_usuario_idUsuario = :user) LIMIT 1";
@@ -86,91 +88,111 @@ class Votacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getResultadosHistoricos() {
-    return [];
-}
-public function getHistorialGlobalFiltrado($filtros, $limit, $offset)
+    public function getResultadosHistoricos()
     {
-        // 1. Construcción de filtros dinámicos
-        $where = " WHERE v.habilitada = 0 "; // Solo votaciones cerradas
+        return [];
+    }
+   public function getHistorialGlobalFiltrado($filtros, $limit, $offset, $idUsuario)
+    {
         $params = [];
+        
+        $sql = "SELECT 
+                    v.idVotacion, 
+                    v.nombreVotacion, 
+                    v.fechaCreacion, 
+                    
+                    -- Nombres seguros
+                    COALESCE(r.nombreReunion, 'Sin Reunión Asignada') as nombreReunion,
+                    COALESCE(c.nombreComision, 'General') as nombreComision,
+                    
+                    -- Contadores
+                    (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto IN ('SI', 'APRUEBO')) as votos_si,
+                    (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto IN ('NO', 'RECHAZO')) as votos_no,
+                    (SELECT COUNT(*) FROM t_voto WHERE t_votacion_idVotacion = v.idVotacion AND opcionVoto IN ('ABSTENCION', 'ABS')) as votos_abs,
+                    
+                    -- MI VOTO (Aquí recuperamos lo que votó el usuario logueado)
+                    mv.opcionVoto as mi_voto_personal
 
+                FROM t_votacion v
+                
+                -- Puentes para nombres
+                LEFT JOIN t_minuta m ON v.t_minuta_idMinuta = m.idMinuta
+                LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                LEFT JOIN t_comision c ON v.idComision = c.idComision
+                
+                -- JOIN CRÍTICO: Buscar el voto SOLO de este usuario (:idUser)
+                LEFT JOIN t_voto mv ON v.idVotacion = mv.t_votacion_idVotacion AND mv.t_usuario_idUsuario = :idUser
+
+                WHERE v.habilitada = 0 "; 
+
+        // ¡IMPORTANTE! Asignar el parámetro del usuario
+        $params[':idUser'] = $idUsuario;
+
+        // --- FILTROS DE FECHA Y COMISIÓN ---
         if (!empty($filtros['desde'])) {
-            $where .= " AND DATE(v.fechaCreacion) >= :desde ";
+            $sql .= " AND DATE(v.fechaCreacion) >= :desde ";
             $params[':desde'] = $filtros['desde'];
         }
         if (!empty($filtros['hasta'])) {
-            $where .= " AND DATE(v.fechaCreacion) <= :hasta ";
+            $sql .= " AND DATE(v.fechaCreacion) <= :hasta ";
             $params[':hasta'] = $filtros['hasta'];
         }
         if (!empty($filtros['comision'])) {
-            $where .= " AND v.idComision = :comision ";
+            $sql .= " AND v.idComision = :comision ";
             $params[':comision'] = $filtros['comision'];
         }
+
+        // --- BÚSQUEDA POR PALABRA CLAVE (La que ya funciona) ---
         if (!empty($filtros['q'])) {
             $term = '%' . trim($filtros['q']) . '%';
-            $where .= " AND (v.nombreVotacion LIKE :q OR r.nombreReunion LIKE :q OR m.objetivo LIKE :q) ";
-            $params[':q'] = $term;
+            // Usamos parámetros nombrados distintos para evitar conflictos
+            $sql .= " AND (v.nombreVotacion LIKE :q1 OR r.nombreReunion LIKE :q2) ";
+            $params[':q1'] = $term;
+            $params[':q2'] = $term;
         }
 
-        // 2. Query para contar el total (para la paginación)
-        $sqlCount = "SELECT COUNT(*) 
-                     FROM t_votacion v
-                     LEFT JOIN t_minuta m ON v.t_minuta_idMinuta = m.idMinuta
-                     LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
-                     $where";
+        $sql .= " ORDER BY v.fechaCreacion DESC LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->conn->prepare($sql);
         
-        $stmtCount = $this->conn->prepare($sqlCount);
-        foreach ($params as $key => $val) { $stmtCount->bindValue($key, $val); }
-        $stmtCount->execute();
-        $total = $stmtCount->fetchColumn();
-
-        // 3. Query principal para la tabla (Conteo de votos y Resultado)
-        $sqlData = "SELECT 
-                        v.idVotacion, 
-                        v.nombreVotacion, 
-                        v.fechaCreacion,
-                        c.nombreComision,
-                        COALESCE(r.nombreReunion, 'Sin Reunión Asignada') as nombreReunion,
-                        
-                        -- Conteos
-                        (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('SI', 'APRUEBO')) as votos_si,
-                        (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('NO', 'RECHAZO')) as votos_no,
-                        (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto = 'ABSTENCION') as votos_abs,
-
-                        -- Cálculo de Resultado SQL
-                        CASE 
-                            WHEN (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('SI', 'APRUEBO')) > 
-                                 (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('NO', 'RECHAZO')) 
-                            THEN 'APROBADA'
-                            
-                            WHEN (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('NO', 'RECHAZO')) > 
-                                 (SELECT COUNT(*) FROM t_voto WHERE (idVotacion = v.idVotacion OR t_votacion_idVotacion = v.idVotacion) AND opcionVoto IN ('SI', 'APRUEBO')) 
-                            THEN 'RECHAZADA'
-                            
-                            ELSE 'EMPATE'
-                        END as resultado_final
-
-                    FROM t_votacion v
-                    LEFT JOIN t_comision c ON v.idComision = c.idComision
-                    LEFT JOIN t_minuta m ON v.t_minuta_idMinuta = m.idMinuta
-                    LEFT JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
-                    $where
-                    ORDER BY v.fechaCreacion DESC
-                    LIMIT :limit OFFSET :offset";
-
-        $stmt = $this->conn->prepare($sqlData);
-        foreach ($params as $key => $val) { $stmt->bindValue($key, $val); }
+        // Bind de todos los parámetros (incluyendo :idUser)
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
+        }
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
-        $stmt->execute();
         
-        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return [
-            'data' => $data,
-            'total' => $total,
-            'totalPages' => ceil($total / $limit)
-        ];
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    
+    public function countHistorialGlobalFiltrado($filtros)
+    {
+        $params = [];
+        
+        // Mismos Joins para que el conteo coincida con los resultados
+        $sql = "SELECT COUNT(*) 
+                FROM t_votacion v
+                LEFT JOIN t_minuta m ON v.t_minuta_idMinuta = m.idMinuta
+                LEFT JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                LEFT JOIN t_comision c ON v.idComision = c.idComision
+                WHERE v.habilitada = 0";
+
+        if (!empty($filtros['desde'])) { $sql .= " AND DATE(v.fechaCreacion) >= :desde "; $params[':desde'] = $filtros['desde']; }
+        if (!empty($filtros['hasta'])) { $sql .= " AND DATE(v.fechaCreacion) <= :hasta "; $params[':hasta'] = $filtros['hasta']; }
+        if (!empty($filtros['comision'])) { $sql .= " AND v.idComision = :comision "; $params[':comision'] = $filtros['comision']; }
+        
+        // Búsqueda simplificada
+        if (!empty($filtros['q'])) {
+            $term = '%' . trim($filtros['q']) . '%';
+            $sql .= " AND (v.nombreVotacion LIKE :q1 OR r.nombreReunion LIKE :q2) ";
+            $params[':q1'] = $term;
+            $params[':q2'] = $term;
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
+    }
+
 }

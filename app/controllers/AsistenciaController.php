@@ -133,10 +133,10 @@ class AsistenciaController
         }
     }
 
-    // --- API: Historial Filtrado (CORREGIDO) ---
+    // --- API: Historial Filtrado (CON BUSQUEDA POR NOMBRE DE REUNION) ---
     public function apiHistorial()
     {
-        // 1. Limpieza de buffer para evitar errores de JSON
+        // 1. Limpieza de buffer y headers
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
@@ -146,23 +146,94 @@ class AsistenciaController
             exit;
         }
 
+        // 3. Conexión a Base de Datos (Directa para control total del filtro)
+        $db = new \App\Config\Database();
+        $conn = $db->getConnection();
+        
         $idUsuario = $_SESSION['idUsuario'];
-        $modelo = new Minuta();
 
-        $filtros = [
-            'desde' => $_GET['desde'] ?? null,
-            'hasta' => $_GET['hasta'] ?? null,
-            'comision' => $_GET['comision'] ?? null,
-            'q' => $_GET['q'] ?? null
-        ];
-
+        // 4. Recibir Parámetros
         $page = (int)($_GET['page'] ?? 1);
         $limit = (int)($_GET['limit'] ?? 10);
         $offset = ($page - 1) * $limit;
 
+        // Filtros
+        $desde = $_GET['desde'] ?? null;
+        $hasta = $_GET['hasta'] ?? null;
+        $comision = $_GET['comision'] ?? null;
+        $busqueda = $_GET['q'] ?? null; // Este es el texto del buscador
+
         try {
-            $resultado = $modelo->getHistorialAsistenciaPersonalFiltrado($idUsuario, $filtros, $limit, $offset);
-            echo json_encode($resultado);
+            // 5. Construcción de la Consulta SQL Dinámica
+            // Unimos: Asistencia -> Minuta -> Reunion -> Comision
+            $sqlBase = " FROM t_asistencia a
+                         INNER JOIN t_minuta m ON a.t_minuta_idMinuta = m.idMinuta
+                         INNER JOIN t_reunion r ON r.t_minuta_idMinuta = m.idMinuta
+                         LEFT JOIN t_comision c ON m.t_comision_idComision = c.idComision
+                         WHERE a.t_usuario_idUsuario = :idUsuario";
+
+            $params = [':idUsuario' => $idUsuario];
+
+            // --- APLICAR FILTROS ---
+
+            // Filtro 1: Rango de Fechas
+            if (!empty($desde) && !empty($hasta)) {
+                $sqlBase .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
+                $params[':desde'] = $desde;
+                $params[':hasta'] = $hasta;
+            }
+
+            // Filtro 2: Comisión
+            if (!empty($comision)) {
+                $sqlBase .= " AND c.idComision = :comision";
+                $params[':comision'] = $comision;
+            }
+
+            // Filtro 3: Búsqueda Inteligente (SOLO NOMBRE REUNION)
+            if (!empty($busqueda)) {
+                $sqlBase .= " AND r.nombreReunion LIKE :busqueda";
+                $params[':busqueda'] = "%" . $busqueda . "%";
+            }
+
+            // 6. Obtener Total de Registros (Para paginación)
+            $sqlCount = "SELECT COUNT(*) " . $sqlBase;
+            $stmtCount = $conn->prepare($sqlCount);
+            $stmtCount->execute($params);
+            $totalRegistros = $stmtCount->fetchColumn();
+            $totalPages = ceil($totalRegistros / $limit);
+
+            // 7. Obtener Datos Finales
+            $sqlData = "SELECT 
+                            r.nombreReunion,
+                            r.fechaInicioReunion,
+                            a.fechaRegistroAsistencia,
+                            a.estadoAsistencia,
+                            c.nombreComision
+                        " . $sqlBase . "
+                        ORDER BY r.fechaInicioReunion DESC
+                        LIMIT :limit OFFSET :offset";
+
+            // Agregamos params de paginación (PDO requiere bindValue para INT en LIMIT)
+            $stmt = $conn->prepare($sqlData);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            
+            $stmt->execute();
+            $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 8. Respuesta JSON
+            echo json_encode([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $totalRegistros,
+                'totalPages' => $totalPages,
+                'page' => $page
+            ]);
+
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

@@ -17,35 +17,139 @@ $c_gris = '#808080';
     }
 
     /* Pestañas Institucionales */
-    .nav-tabs-inst { border-bottom: 2px solid #e0e0e0; }
-    .nav-tabs-inst .nav-link { color: var(--inst-gris); font-weight: 600; border: none; padding: 12px 20px; transition: all 0.3s; }
-    .nav-tabs-inst .nav-link:hover { color: var(--inst-azul); background-color: #f8f9fa; }
-    .nav-tabs-inst .nav-link.active { color: var(--inst-azul); border-bottom: 3px solid var(--inst-azul); background: transparent; }
+    .nav-tabs-inst {
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .nav-tabs-inst .nav-link {
+        color: var(--inst-gris);
+        font-weight: 600;
+        border: none;
+        padding: 12px 20px;
+        transition: all 0.3s;
+    }
+
+    .nav-tabs-inst .nav-link:hover {
+        color: var(--inst-azul);
+        background-color: #f8f9fa;
+    }
+
+    .nav-tabs-inst .nav-link.active {
+        color: var(--inst-azul);
+        border-bottom: 3px solid var(--inst-azul);
+        background: transparent;
+    }
 
     /* Tarjetas de Estado */
-    .card-status { border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; transition: all 0.3s; }
-    
+    .card-status {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+
     /* Animación Pulso */
-    .scanning-pulse { width: 80px; height: 80px; background: rgba(0, 113, 188, 0.1); color: var(--inst-azul); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 113, 188, 0.4); } 70% { box-shadow: 0 0 0 20px rgba(0, 113, 188, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 113, 188, 0); } }
+    .scanning-pulse {
+        width: 80px;
+        height: 80px;
+        background: rgba(0, 113, 188, 0.1);
+        color: var(--inst-azul);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(0, 113, 188, 0.4);
+        }
+
+        70% {
+            box-shadow: 0 0 0 20px rgba(0, 113, 188, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(0, 113, 188, 0);
+        }
+    }
 
     /* Botón Acción Principal */
-    .btn-action-main { background: var(--inst-naranja); border: none; color: white; font-weight: bold; text-transform: uppercase; padding: 15px 30px; border-radius: 50px; box-shadow: 0 4px 10px rgba(247, 147, 30, 0.3); transition: all 0.3s; width: 100%; }
-    .btn-action-main:hover:not(:disabled) { background: #e87b00; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(247, 147, 30, 0.4); color: white; }
-    .btn-action-main:disabled { background: var(--inst-gris); cursor: not-allowed; opacity: 0.7; box-shadow: none; }
+    .btn-action-main {
+        background: var(--inst-naranja);
+        border: none;
+        color: white;
+        font-weight: bold;
+        text-transform: uppercase;
+        padding: 15px 30px;
+        border-radius: 50px;
+        box-shadow: 0 4px 10px rgba(247, 147, 30, 0.3);
+        transition: all 0.3s;
+        width: 100%;
+    }
+
+    .btn-action-main:hover:not(:disabled) {
+        background: #e87b00;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(247, 147, 30, 0.4);
+        color: white;
+    }
+
+    .btn-action-main:disabled {
+        background: var(--inst-gris);
+        cursor: not-allowed;
+        opacity: 0.7;
+        box-shadow: none;
+    }
 
     /* Botón Volver Institucional */
-    .btn-inst-volver { color: var(--inst-gris); border: 2px solid var(--inst-gris); background: transparent; border-radius: 50px; font-weight: 600; padding: 6px 20px; font-size: 0.85rem; text-decoration: none; transition: all 0.3s; display: inline-flex; align-items: center; }
-    .btn-inst-volver:hover { background: var(--inst-gris); color: white; transform: translateX(-3px); }
+    .btn-inst-volver {
+        color: var(--inst-gris);
+        border: 2px solid var(--inst-gris);
+        background: transparent;
+        border-radius: 50px;
+        font-weight: 600;
+        padding: 6px 20px;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .btn-inst-volver:hover {
+        background: var(--inst-gris);
+        color: white;
+        transform: translateX(-3px);
+    }
 
     /* Estados Visuales */
-    .status-in-meeting { border-left: 6px solid var(--inst-verde); }
-    .live-indicator { display: inline-block; width: 10px; height: 10px; background: red; border-radius: 50%; animation: blink 1s infinite; margin-right: 5px; }
-    @keyframes blink { 50% { opacity: 0; } }
+    .status-in-meeting {
+        border-left: 6px solid var(--inst-verde);
+    }
+
+    .live-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: red;
+        border-radius: 50%;
+        animation: blink 1s infinite;
+        margin-right: 5px;
+    }
+
+    @keyframes blink {
+        50% {
+            opacity: 0;
+        }
+    }
 </style>
 
 <div class="container-fluid py-5">
-    
+
     <div class="d-flex justify-content-between align-items-center mb-5">
         <div>
             <h2 class="fw-bold mb-1" style="color: var(--inst-negro);">
@@ -70,7 +174,7 @@ $c_gris = '#808080';
     </ul>
 
     <div class="tab-content">
-        
+
         <div class="tab-pane fade show active" id="marcar">
             <div class="row justify-content-center">
                 <div class="col-lg-6 col-md-8">
@@ -79,7 +183,9 @@ $c_gris = '#808080';
                             <div class="scanning-pulse"><i class="fa-solid fa-chalkboard-user fa-2x"></i></div>
                             <h4 class="fw-bold mb-2 text-inst-azul">Esperando Inicio de Sesión...</h4>
                             <p class="text-muted">El sistema le notificará automáticamente cuando el Secretario Técnico habilite la reunión.</p>
-                            <div class="mt-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div> Escaneando...</div>
+                            <div class="mt-4 text-muted small">
+                                <div class="spinner-border spinner-border-sm me-2"></div> Escaneando...
+                            </div>
                         </div>
                     </div>
 
@@ -123,7 +229,7 @@ $c_gris = '#808080';
         <div class="tab-pane fade" id="historial">
             <div class="card card-status border-0 shadow-sm">
                 <div class="card-body p-4">
-                    
+
                     <div class="mb-4">
                         <div class="d-flex align-items-center mb-3">
                             <h6 class="fw-bold text-secondary text-uppercase mb-0 me-3">
@@ -146,7 +252,7 @@ $c_gris = '#808080';
                                 <label class="form-label fw-bold text-muted small mb-1">Filtrar por Comisión</label>
                                 <select id="filtroComision" class="form-select form-select-sm">
                                     <option value="">Todas las Comisiones</option>
-                                    <?php if(!empty($data['comisiones'])): ?>
+                                    <?php if (!empty($data['comisiones'])): ?>
                                         <?php foreach ($data['comisiones'] as $c): ?>
                                             <option value="<?= $c['idComision'] ?>"><?= htmlspecialchars($c['nombreComision']) ?></option>
                                         <?php endforeach; ?>
@@ -175,14 +281,19 @@ $c_gris = '#808080';
                         <table class="table table-hover align-middle mb-0 small" id="tablaHistorial">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="40%">Nombre Reunión</th>
-                                    <th width="20%">Fecha Reunión</th>
-                                    <th width="20%">Hora Registro</th>
-                                    <th width="20%" class="text-center">Estado</th>
+                                    <th width="30%">Nombre Reunión</th>
+                                    <th width="25%">Comisión</th>
+                                    <th width="15%">Fecha Reunión</th>
+                                    <th width="15%">Hora Registro</th>
+                                    <th width="15%" class="text-center">Estado</th>
                                 </tr>
                             </thead>
                             <tbody id="tbodyHistorial">
-                                <tr><td colspan="4" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>
+                                <tr>
+                                    <td colspan="4" class="text-center py-5">
+                                        <div class="spinner-border text-primary"></div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -213,27 +324,29 @@ $c_gris = '#808080';
     let intervalAsistencia;
     let lastState = 'none';
 
-    document.addEventListener("DOMContentLoaded", () => { 
-        iniciarScanner(); 
-        
+    document.addEventListener("DOMContentLoaded", () => {
+        iniciarScanner();
+
         // Inicializar filtros del historial
-        if(document.getElementById('filtroDesde')) {
+        if (document.getElementById('filtroDesde')) {
             initFiltrosHistorial();
         }
     });
-    
-    function iniciarScanner() { 
-        intervalAsistencia = setInterval(buscarReunion, 3000); 
-        buscarReunion(); 
+
+    function iniciarScanner() {
+        intervalAsistencia = setInterval(buscarReunion, 3000);
+        buscarReunion();
     }
-    
+
     function buscarReunion() {
         const activeTab = document.querySelector('#marcar-tab.active');
-        if(!activeTab) return;
+        if (!activeTab) return;
         fetch('index.php?action=api_asistencia_check')
-        .then(r => r.json())
-        .then(resp => { procesarEstado(resp); })
-        .catch(err => console.error("Scanner waiting...", err));
+            .then(r => r.json())
+            .then(resp => {
+                procesarEstado(resp);
+            })
+            .catch(err => console.error("Scanner waiting...", err));
     }
 
     function procesarEstado(resp) {
@@ -242,25 +355,39 @@ $c_gris = '#808080';
         const pActivo = document.getElementById('panel-activo');
 
         if (resp.status === 'none') {
-            pScan.style.display = 'block'; pConf.style.display = 'none'; pActivo.style.display = 'none';
-            lastState = 'none'; return;
+            pScan.style.display = 'block';
+            pConf.style.display = 'none';
+            pActivo.style.display = 'none';
+            lastState = 'none';
+            return;
         }
 
         if (resp.status === 'active') {
             const data = resp.data;
             if (data.ya_marco) {
-                pScan.style.display = 'none'; pConf.style.display = 'none'; pActivo.style.display = 'block';
+                pScan.style.display = 'none';
+                pConf.style.display = 'none';
+                pActivo.style.display = 'block';
                 document.getElementById('nombre-reunion-activo').textContent = data.nombreReunion;
-                lastState = 'joined'; return;
+                lastState = 'joined';
+                return;
             }
 
-            pScan.style.display = 'none'; pConf.style.display = 'block'; pActivo.style.display = 'none';
+            pScan.style.display = 'none';
+            pConf.style.display = 'block';
+            pActivo.style.display = 'none';
             document.getElementById('idMinutaActiva').value = data.t_minuta_idMinuta;
             document.getElementById('idReunionActiva').value = data.idReunion;
             document.getElementById('nombre-reunion').textContent = data.nombreReunion;
 
             if (lastState === 'none') {
-                Swal.fire({ icon: 'info', title: '¡Sesión Habilitada!', text: 'El Secretario Técnico ha iniciado: ' + data.nombreReunion, confirmButtonColor: '#0071bc', confirmButtonText: 'Entendido' });
+                Swal.fire({
+                    icon: 'info',
+                    title: '¡Sesión Habilitada!',
+                    text: 'El Secretario Técnico ha iniciado: ' + data.nombreReunion,
+                    confirmButtonColor: '#0071bc',
+                    confirmButtonText: 'Entendido'
+                });
                 if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
             }
 
@@ -271,17 +398,21 @@ $c_gris = '#808080';
 
             if (minutos > 30) {
                 btn.disabled = true;
-                btn.classList.remove('btn-action-main'); btn.classList.add('btn', 'btn-secondary');
+                btn.classList.remove('btn-action-main');
+                btn.classList.add('btn', 'btn-secondary');
                 btn.innerHTML = '<i class="fas fa-lock me-2"></i> Registro Cerrado';
-                alertOk.style.display = 'none'; alertOut.style.display = 'block';
+                alertOk.style.display = 'none';
+                alertOut.style.display = 'block';
             } else {
                 btn.disabled = false;
-                if(btn.classList.contains('btn-secondary')) {
-                    btn.classList.remove('btn', 'btn-secondary'); btn.classList.add('btn-action-main');
+                if (btn.classList.contains('btn-secondary')) {
+                    btn.classList.remove('btn', 'btn-secondary');
+                    btn.classList.add('btn-action-main');
                     btn.innerHTML = '<i class="fas fa-user-check me-2"></i> Registrar mi Asistencia';
                 }
                 alertOk.innerHTML = `<i class="fas fa-clock me-1"></i> Puedes registrar tu asistencia hasta las: <strong>${data.horaLimite} hrs</strong>.`;
-                alertOk.style.display = 'block'; alertOut.style.display = 'none';
+                alertOk.style.display = 'block';
+                alertOut.style.display = 'none';
             }
             lastState = 'active';
         }
@@ -291,30 +422,54 @@ $c_gris = '#808080';
         const idMinuta = document.getElementById('idMinutaActiva').value;
         const idReunion = document.getElementById('idReunionActiva').value;
         const btn = document.getElementById('btn-marcar');
-        
-        btn.disabled = true; 
+
+        btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Conectando...';
 
         fetch('index.php?action=api_asistencia_marcar', {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ idMinuta, idReunion })
-        })
-        .then(r => r.json())
-        .then(d => {
-            if(d.status === 'success') {
-                Swal.fire({ icon: 'success', title: '¡Asistencia Registrada!', text: 'Se ha confirmado su presencia.', confirmButtonColor: '#00a650', timer: 3000, timerProgressBar: true }).then(() => { buscarReunion(); });
-            } else {
-                Swal.fire({ icon: 'error', title: 'Error', text: d.message, confirmButtonColor: '#d33' });
-                btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-check me-2"></i> Registrar mi Asistencia';
-            }
-        })
-        .catch(e => {
-            console.error(e); Swal.fire('Error', 'Problema de conexión.', 'error');
-            btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-check me-2"></i> Registrar mi Asistencia';
-        });
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idMinuta,
+                    idReunion
+                })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Asistencia Registrada!',
+                        text: 'Se ha confirmado su presencia.',
+                        confirmButtonColor: '#00a650',
+                        timer: 3000,
+                        timerProgressBar: true
+                    }).then(() => {
+                        buscarReunion();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: d.message,
+                        confirmButtonColor: '#d33'
+                    });
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-user-check me-2"></i> Registrar mi Asistencia';
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                Swal.fire('Error', 'Problema de conexión.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-user-check me-2"></i> Registrar mi Asistencia';
+            });
     }
 
     // --- NUEVA LÓGICA DE HISTORIAL (FILTROS Y PAGINACIÓN) ---
-    
+
     function initFiltrosHistorial() {
         const hoy = new Date();
         const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
@@ -324,18 +479,18 @@ $c_gris = '#808080';
         const inputHasta = document.getElementById('filtroHasta');
         const inputComision = document.getElementById('filtroComision');
         const inputKeyword = document.getElementById('filtroKeyword');
-        
+
         // Setear fechas por defecto
         if (!inputDesde.value) inputDesde.value = formatDate(primerDia);
         if (!inputHasta.value) inputHasta.value = formatDate(hoy);
 
         let debounceTimer;
-        
+
         // Event Listeners
         inputDesde.addEventListener('change', () => cargarHistorial(1));
         inputHasta.addEventListener('change', () => cargarHistorial(1));
         inputComision.addEventListener('change', () => cargarHistorial(1));
-        
+
         inputKeyword.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => cargarHistorial(1), 500);
@@ -358,7 +513,7 @@ $c_gris = '#808080';
         tbody.style.opacity = '0.5';
 
         const params = new URLSearchParams({
-            action: 'api_historial_asistencia', // Necesitas crear esta ruta en el backend
+            action: 'api_historial_asistencia', 
             page: page,
             limit: 10,
             desde: document.getElementById('filtroDesde').value,
@@ -380,13 +535,12 @@ $c_gris = '#808080';
                 tbody.style.opacity = '1';
             });
     }
-
-    function renderTablaHistorial(registros) {
+function renderTablaHistorial(registros) {
         const tbody = document.getElementById('tbodyHistorial');
         tbody.innerHTML = '';
 
         if (!registros || registros.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No se encontraron registros en este periodo.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No se encontraron registros en este periodo.</td></tr>'; // Nota: cambié colspan a 5
             return;
         }
 
@@ -403,11 +557,18 @@ $c_gris = '#808080';
             const badgeClass = esPresente ? 'bg-success' : 'bg-secondary';
             const estadoTexto = esPresente ? 'Presente' : 'Ausente';
 
+            // Determinar nombre comisión (si viene vacío, poner General o guión)
+            const nombreComision = r.nombreComision || 'Sesión General';
+
             const tr = `
                 <tr>
-                    <td class="fw-bold text-primary text-truncate" style="max-width: 250px;" title="${r.nombreReunion}">
+                    <td class="fw-bold text-primary text-truncate" style="max-width: 200px;" title="${r.nombreReunion}">
                         ${r.nombreReunion}
-                        <div class="small text-muted fw-normal">${r.nombreComision || 'General'}</div>
+                    </td>
+                    <td class="text-truncate" style="max-width: 180px;" title="${nombreComision}">
+                        <span class="badge bg-light text-dark border fw-normal">
+                            ${nombreComision}
+                        </span>
                     </td>
                     <td>${fechaStr}</td>
                     <td><i class="far fa-clock me-1 text-muted"></i> ${horaReg}</td>
