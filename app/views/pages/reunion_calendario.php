@@ -187,17 +187,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const isEmbedded = <?php echo json_encode($isEmbedded); ?>;
     const serverToday = '<?php echo $serverToday; ?>';
 
-    // Funciones auxiliares de tu código antiguo
+    // Funciones auxiliares
     function isEmpty(val) { return val === null || val === undefined || String(val).trim() === ''; }
     
     function normalizeDateString(str) {
         if (isEmpty(str)) return null;
         const s = String(str).trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00:00'; // Parche fechas sin hora
-        return s.replace(' ', 'T'); // Parche SQL timestamp
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00:00'; 
+        return s.replace(' ', 'T'); 
     }
 
-    // Mapeo de colores original
+    // Mapeo de colores
     const colorMap = {
         1: '#54a3ff', 2: '#7dd321', 3: '#ffc107', 4: '#dc3545',
         5: '#6f42c1', 6: '#20c997', 7: '#fd7e14', 8: '#6c757d',
@@ -206,9 +206,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const calendarEvents = reunionesPHP.map(reunion => {
         const comId = reunion.t_comision_idComision ? parseInt(reunion.t_comision_idComision) : 0;
-        
-        // Determinar color de TEXTO para eventos tipo "dot" (punto)
-        // Usamos el mismo color del punto para el texto
         const myColor = colorMap[comId] || colorMap.default;
 
         return {
@@ -216,11 +213,9 @@ document.addEventListener('DOMContentLoaded', function() {
             title: (reunion.nombreComision || '') + ': ' + (reunion.nombreReunion || ''),
             start: normalizeDateString(reunion.fechaInicioReunion),
             end: normalizeDateString(reunion.fechaTerminoReunion),
-            // En FullCalendar v6, 'textColor' pinta el texto
             textColor: myColor,
-            backgroundColor: 'transparent', // Fondo transparente estilo "dot"
+            backgroundColor: 'transparent',
             borderColor: 'transparent',
-            // URL corregida al formato MVC nuevo
             url: `index.php?action=reunion_editar&id=${reunion.idReunion}`
         };
     }).filter(e => e.start);
@@ -234,6 +229,9 @@ document.addEventListener('DOMContentLoaded', function() {
         height: isEmbedded ? '100%' : 'auto',
         expandRows: isEmbedded ? true : false,
         
+        // 1. CAMBIO: Forzar nombres de días completos (Lunes, Martes...)
+        dayHeaderFormat: { weekday: 'long' }, 
+
         headerToolbar: {
             left: isEmbedded ? 'prev,next' : 'prev,next today',
             center: 'title',
@@ -245,7 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
         dayMaxEvents: 3,
         navLinks: true,
 
-        // Manejo de Clics (Soporte iframe)
         eventClick: function(info) {
             info.jsEvent.preventDefault();
             if (info.event.url) {
@@ -257,21 +254,37 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
 
-        // Tu lógica para Capitalizar el Título del Mes
+        // 2. CAMBIO: Lógica personalizada para el Título "Mes de Año"
         datesSet: function(info) {
             const titleEl = document.querySelector('.fc-toolbar-title');
+            
             if (titleEl) {
-                // Capitalizar primera letra con CSS o JS simple
-                titleEl.style.textTransform = 'capitalize';
+                // Solo aplicamos formato "Mes de Año" en vistas mensuales
+                if (info.view.type === 'dayGridMonth' || info.view.type === 'listMonth') {
+                    // Obtenemos la fecha que se está mostrando actualmente
+                    const currentDate = calendar.getDate();
+                    
+                    // Obtenemos el mes y el año
+                    const mes = currentDate.toLocaleString('es-CL', { month: 'long' });
+                    const anio = currentDate.getFullYear();
+                    
+                    // Capitalizamos solo la primera letra del mes
+                    const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
+                    
+                    // Construimos el título exacto que pediste
+                    titleEl.textContent = `${mesCapitalizado}  ${anio}`;
+                } 
+                // En otras vistas (como semana), dejamos el comportamiento por defecto pero capitalizado
+                else {
+                    titleEl.style.textTransform = 'capitalize';
+                }
             }
         }
     });
 
-    // Renderizar
     setTimeout(() => {
         calendar.render();
         calendar.updateSize();
-        // Ir a la fecha del servidor si es necesario
         if(serverToday) calendar.gotoDate(serverToday);
     }, 100);
 });
