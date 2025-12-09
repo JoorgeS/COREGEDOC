@@ -341,7 +341,17 @@ try {
             $controller->index();
             break;
 
+        case 'reporte_asistencia':
+            $asistenciaController->reporte();
+            break;
 
+        case 'api_reporte_asistencia':
+            $asistenciaController->apiGetReporte();
+            break;
+
+        case 'generar_reporte_pdf':
+            $asistenciaController->generarPdfReporte();
+            break;
   
 
         case 'perfil':

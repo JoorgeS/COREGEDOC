@@ -3,7 +3,9 @@
 namespace App\Controllers;
 
 use App\Models\Minuta;
-use App\Models\Comision; // <--- AGREGADO: Necesario para cargar el filtro de comisiones
+use App\Models\Comision;
+use App\Models\Reunion;
+use App\Services\PdfService;
 
 class AsistenciaController
 {
@@ -33,7 +35,7 @@ class AsistenciaController
         }
 
         $minutaModel = new Minuta();
-        
+
         // 1. Cargar Comisiones para el Filtro
         $comisionModel = new Comision();
         $comisiones = $comisionModel->listarTodas();
@@ -55,7 +57,7 @@ class AsistenciaController
     public function apiCheck()
     {
         $this->verificarSesion();
-        
+
         // LIMPIEZA CRÍTICA DE BUFFER
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -86,10 +88,10 @@ class AsistenciaController
                 $ahora = new \DateTime();
                 $diff = $inicio->diff($ahora);
                 $minutosTranscurridos = ($diff->days * 24 * 60) + ($diff->h * 60) + $diff->i;
-                
+
                 $limite = clone $inicio;
                 $limite->modify('+30 minutes');
-                $horaLimiteStr = $limite->format('H:i'); 
+                $horaLimiteStr = $limite->format('H:i');
 
                 echo json_encode([
                     'status' => 'active',
@@ -130,13 +132,14 @@ class AsistenciaController
             $this->jsonResponse(['status' => 'error', 'message' => 'Error al registrar.']);
         }
     }
-    
+
     // --- API: Historial Filtrado (CORREGIDO) ---
-    public function apiHistorial() {
+    public function apiHistorial()
+    {
         // 1. Limpieza de buffer para evitar errores de JSON
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
+
         // 2. Verificar sesión
         if (!$this->verificarSesion()) {
             echo json_encode(['status' => 'error', 'message' => 'Sesión no iniciada']);
@@ -145,14 +148,14 @@ class AsistenciaController
 
         $idUsuario = $_SESSION['idUsuario'];
         $modelo = new Minuta();
-        
+
         $filtros = [
             'desde' => $_GET['desde'] ?? null,
             'hasta' => $_GET['hasta'] ?? null,
             'comision' => $_GET['comision'] ?? null,
             'q' => $_GET['q'] ?? null
         ];
-        
+
         $page = (int)($_GET['page'] ?? 1);
         $limit = (int)($_GET['limit'] ?? 10);
         $offset = ($page - 1) * $limit;
@@ -165,4 +168,178 @@ class AsistenciaController
         }
         exit;
     }
+
+    public function reporte()
+    {
+        $this->verificarSesion();
+        if ($_SESSION['tipoUsuario_id'] != 6) { header('Location: index.php?action=home'); exit; }
+
+        $comisionModel = new Comision();
+        $data = [
+            'usuario' => ['nombre' => $_SESSION['pNombre'], 'apellido' => $_SESSION['aPaterno'], 'rol' => $_SESSION['tipoUsuario_id']],
+            'pagina_actual' => 'reporte_asistencia',
+            'comisiones' => $comisionModel->listarTodas()
+        ];
+
+        $childView = __DIR__ . '/../views/asistencia/reporte.php';
+        require_once __DIR__ . '/../views/layouts/main.php';
+    }
+
+    private function obtenerDatosReporteConsolidado($filtros)
+    {
+        $minutaModel = new Minuta();
+        
+        // 1. Obtener lista de reuniones (Cabeceras)
+        // Esto ya filtra "inteligentemente" por comisiones mixtas gracias al SQL en Minuta.php
+        $listaReuniones = $minutaModel->getListaMinutasPorFiltro($filtros['desde'], $filtros['hasta'], $filtros['idComision']);
+        
+        $datosProcesados = [];
+        $dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+        $meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        foreach ($listaReuniones as $reu) {
+            $idMinuta = $reu['t_minuta_idMinuta'];
+            
+            // Reutilizamos tu lógica detallada (que trae 'estado_visual' y 'origenAsistencia')
+            $detalle = $minutaModel->getAsistenciaDetallada($idMinuta); 
+            $asistentesRaw = $detalle['asistentes'] ?? [];
+
+            $listaPresentes = [];
+            foreach ($asistentesRaw as $p) {
+                // Solo si está presente
+                if ($p['estaPresente'] == 1) {
+                    
+                    // Formato Hora
+                    $hora = '--:--';
+                    if (!empty($p['fechaRegistroAsistencia'])) {
+                        $hora = date('H:i', strtotime($p['fechaRegistroAsistencia']));
+                    }
+
+                    // Formato Origen
+                    $origen = 'Secretario Técnico';
+                    $origenRaw = strtoupper($p['origenAsistencia'] ?? '');
+                    
+                    if (in_array($origenRaw, ['AUTOGESTION', 'AUTOREGISTRO', 'APP'])) {
+                        $origen = 'Autogestión';
+                    } elseif ($origenRaw === 'SISTEMA') {
+                        $origen = 'Automático';
+                    }
+
+                    // Detectar Atraso (Boolean para el PDF)
+                    $esAtrasado = (isset($p['estado_visual']) && $p['estado_visual'] === 'atrasado');
+                    
+                    // Estado Texto
+                    $estadoTexto = $esAtrasado ? 'ATRASADO' : 'PRESENTE';
+
+                    // --- AQUÍ ESTABA EL ERROR DEL PDF ---
+                    // Ahora usamos las claves EXACTAS que espera PdfService
+                    $listaPresentes[] = [
+                        'nombre'   => $p['pNombre'] . ' ' . $p['aPaterno'],
+                        'origen'   => $origen,
+                        'hora'     => $hora,        // <--- Antes decíamos 'hora_marca', corregido a 'hora'
+                        'atrasado' => $esAtrasado,  // <--- Agregamos esta clave que faltaba
+                        'estado'   => $estadoTexto
+                    ];
+                }
+            }
+
+            // Solo agregamos la reunión si tiene minuta cerrada (vigente=0)
+            // (La consulta SQL ya filtra, pero esto asegura la estructura)
+            
+            $ts = strtotime($reu['fechaInicioReunion']);
+            $fechaTexto = $dias[date('w', $ts)] . ", " . date('d', $ts) . " de " . $meses[date('n', $ts)] . " de " . date('Y', $ts);
+            
+            $comisiones = array_filter([$reu['com1'], $reu['com2'], $reu['com3']]);
+            $comisionStr = implode(' + ', $comisiones);
+
+            $datosProcesados[] = [
+                'titulo'      => mb_strtoupper($reu['nombreReunion']),
+                'comision'    => mb_strtoupper($comisionStr),
+                'fecha_texto' => mb_strtoupper($fechaTexto),
+                'hora_inicio' => date('H:i', $ts),
+                'asistentes'  => $listaPresentes
+            ];
+        }
+
+        return $datosProcesados;
+    }
+
+   public function apiGetReporte()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $this->verificarSesion();
+
+        if ($_SESSION['tipoUsuario_id'] != 6) {
+            echo json_encode(['status' => 'error', 'message' => 'Acceso denegado']); exit;
+        }
+
+        $filtros = [
+            'desde'      => $_GET['desde'] ?? date('Y-m-01'),
+            'hasta'      => $_GET['hasta'] ?? date('Y-m-t'),
+            'idComision' => $_GET['comision'] ?? null
+        ];
+
+        try {
+            $data = $this->obtenerDatosReporteConsolidado($filtros);
+            
+            // Para la VISTA JS, adaptamos las claves si es necesario, 
+            // pero es mejor que el JS use las mismas claves que el PDF ('hora', 'atrasado')
+            // para mantener consistencia.
+            // (Nota: Si tu JS actual usa 'hora_marca', deberás actualizar el JS o mapear aquí)
+            // Voy a mapear para no romper tu JS que ya funciona:
+            $dataParaJS = array_map(function($reu) {
+                $reu['asistentes'] = array_map(function($asist) {
+                    $asist['hora_marca'] = $asist['hora']; // Compatibilidad con tu JS actual
+                    return $asist;
+                }, $reu['asistentes']);
+                return $reu;
+            }, $data);
+
+            echo json_encode(['status' => 'success', 'data' => $dataParaJS, 'count' => count($data)]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // --- GENERAR PDF ---
+    public function generarPdfReporte()
+    {
+        if (ob_get_length()) ob_clean();
+        $this->verificarSesion();
+        if ($_SESSION['tipoUsuario_id'] != 6) die('Acceso denegado');
+
+        $filtros = [
+            'desde'      => $_GET['desde'] ?? date('Y-m-01'),
+            'hasta'      => $_GET['hasta'] ?? date('Y-m-t'),
+            'idComision' => $_GET['comision'] ?? null
+        ];
+
+        $data = $this->obtenerDatosReporteConsolidado($filtros);
+
+        $dataPdf = [
+            'titulo'        => 'REPORTE CONSOLIDADO DE ASISTENCIA',
+            'rango'         => 'Periodo: ' . date('d/m/Y', strtotime($filtros['desde'])) . ' al ' . date('d/m/Y', strtotime($filtros['hasta'])),
+            'registros'     => $data,
+            'generado_por'  => $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'],
+            'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'https://coregedoc.cl')
+        ];
+
+        $pdfService = new PdfService();
+        $nombreArchivo = 'Reporte_Mensual_' . date('Ymd_His') . '.pdf';
+        $rutaTemp = sys_get_temp_dir() . '/' . $nombreArchivo;
+
+        if ($pdfService->generarPdfReporteAsistencia($dataPdf, $rutaTemp)) {
+            header("Content-type: application/pdf");
+            header("Content-Disposition: inline; filename={$nombreArchivo}");
+            readfile($rutaTemp);
+            unlink($rutaTemp);
+        } else {
+            echo "Error al generar PDF.";
+        }
+        exit;
+    }
+    
+
 }

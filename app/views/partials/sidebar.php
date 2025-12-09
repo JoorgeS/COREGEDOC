@@ -57,9 +57,8 @@
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link collapsed" href="index.php?controller=reporte&action=index">
-                            <i class="bi bi-file-earmark-bar-graph"></i>
-                            <span>Reportes Asistencia</span>
+                        <a class="nav-link <?php echo ($paginaActual == 'reporte_asistencia') ? 'active' : ''; ?>" href="index.php?action=reporte_asistencia">
+                            <i class="fas fa-file-contract fa-fw me-2"></i> Reportes Asistencia
                         </a>
                     </li>
 

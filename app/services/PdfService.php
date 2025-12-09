@@ -236,9 +236,211 @@ class PdfService
     }
 
 
+    public function generarPdfReporteAsistencia($data, $rutaGuardado)
+    {
+        // 1. Recursos
+        $baseImg = __DIR__ . '/../../public/img/';
+        $logoGore = $this->imageToDataUrl($baseImg . 'logo2.png');
+        $logoCore = $this->imageToDataUrl($baseImg . 'logoCore1.png');
+        $firmaImg = $this->imageToDataUrl($baseImg . 'aprobacion.png');
 
-    // CORRECCIÓN: Agregamos $aprobacionImg a los argumentos recibidos
+        // 2. HTML (Ya no pasamos el QR)
+        $html = $this->getReporteHtmlTemplate($data, $logoGore, $logoCore, $firmaImg);
 
+        // 3. Render
+        $options = new Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('letter', 'portrait');
+
+        $dompdf->render();
+
+        // 4. Pie de Página (Numeración)
+        $canvas = $dompdf->getCanvas();
+        $w = $canvas->get_width();
+        $h = $canvas->get_height();
+        $fontMetrics = $dompdf->getFontMetrics();
+        $font = $fontMetrics->getFont("Helvetica", "normal");
+        $size = 8;
+        $color = array(0.4, 0.4, 0.4);
+
+        $texto = "Página {PAGE_NUM} de {PAGE_COUNT}  |  Generado el " . date('d/m/Y H:i');
+        $canvas->page_text($w - 220, $h - 30, $texto, $font, $size, $color);
+
+        $guardado = file_put_contents($rutaGuardado, $dompdf->output());
+        return ($guardado !== false);
+    }
+    private function getReporteHtmlTemplate($data, $logoGore, $logoCore, $firmaImg)
+    {
+        $reuniones = $data['registros'];
+
+        $css = "
+            @page { margin: 120px 40px 60px 40px; }
+            body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 10pt; line-height: 1.3; }
+            
+            /* Clases de utilidad */
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .text-left { text-align: left; }
+            
+            header { position: fixed; top: -100px; left: 0px; right: 0px; height: 90px; border-bottom: 2px solid #0071bc; padding-bottom: 5px; }
+            .header-tbl { width: 100%; }
+            .header-center { text-align: center; }
+            .h-title { color: #0071bc; font-weight: bold; font-size: 13pt; text-transform: uppercase; margin: 0; }
+            .h-sub { color: #666; font-size: 9pt; margin-top: 2px; }
+
+            .meeting-container { margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+            .meeting-header { background-color: #f4f6f9; padding: 10px 15px; border-bottom: 1px solid #ddd; }
+            
+            .mt-date-row { color: #e87b00; font-weight: bold; font-size: 9pt; text-transform: uppercase; margin-bottom: 4px; }
+            .mt-title { font-weight: bold; color: #0071bc; font-size: 11pt; margin-bottom: 2px; }
+            .mt-comision { font-size: 9pt; color: #555; font-style: italic; }
+
+            .asist-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+            
+            /* Encabezados con fondo gris suave para delimitar columnas */
+            .asist-table th { background-color: #f8f9fa; border-bottom: 2px solid #ddd; padding: 6px 10px; color: #555; font-size: 8pt; text-transform: uppercase; font-weight: bold; }
+            
+            .asist-table td { border-bottom: 1px solid #eee; padding: 6px 10px; vertical-align: middle; }
+            .row-alt { background-color: #fcfcfc; }
+
+            /* BADGES DE ESTADO (Ancho fijo para alinear mejor) */
+            .tag-origen { 
+                font-size: 7pt; 
+                font-weight: bold; 
+                padding: 3px 6px; 
+                border-radius: 3px; 
+                text-transform: uppercase;
+                display: inline-block;
+                width: 110px; /* Ancho fijo para que se vean todos iguales */
+                text-align: center;
+            }
+            .tag-app { color: #198754; border: 1px solid #198754; background-color: #f0fff4; }
+            .tag-manual { color: #6c757d; border: 1px solid #6c757d; background-color: #f8f9fa; }
+
+            .tag-atrasado { color: #b58900; font-weight: bold; font-size: 7pt; margin-left: 5px; border: 1px solid #b58900; padding: 1px 3px; border-radius: 3px; }
+            .time-tag { font-weight: bold; color: #0071bc; font-size: 9pt; font-family: monospace; } /* Monospace para alinear números */
+
+            .footer-val { margin-top: 40px; border-top: 1px dashed #ccc; padding-top: 15px; }
+        ";
+
+        ob_start();
+?>
+        <!DOCTYPE html>
+        <html lang="es">
+
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                <?= $css ?>
+            </style>
+        </head>
+
+        <body>
+            <header>
+                <table class="header-tbl">
+                    <tr>
+                        <td width="70"><img src="<?= $logoGore ?>" width="50"></td>
+                        <td class="header-center">
+                            <div class="h-title"><?= $data['titulo'] ?></div>
+                            <div class="h-sub"><?= $data['rango'] ?></div>
+                        </td>
+                        <td width="90" align="right"><img src="<?= $logoCore ?>" width="80"></td>
+                    </tr>
+                </table>
+            </header>
+
+            <?php if (empty($reuniones)): ?>
+                <div style="text-align:center; padding:50px; color:#777;">Sin registros.</div>
+            <?php else: ?>
+
+                <?php foreach ($reuniones as $reu):
+                    $presentes = array_filter($reu['asistentes'], function ($a) {
+                        $st = strtoupper($a['estado']);
+                        return ($st === 'PRESENTE' || $st === 'ATRASADO');
+                    });
+                    $total = count($presentes);
+                ?>
+                    <?php if ($total > 0): ?>
+                        <div class="meeting-container">
+                            <div class="meeting-header">
+                                <div style="float:right; text-align:right;">
+                                    <span style="font-weight:bold; color:#333; font-size:9pt;">INICIO: <?= $reu['hora_inicio'] ?> HRS.</span>
+                                    <div style="font-size:8pt; color:#666; margin-top:2px;">Asistentes: <strong><?= $total ?></strong></div>
+                                </div>
+                                <div class="mt-date-row"><?= $reu['fecha_texto'] ?></div>
+                                <div class="mt-title"><?= htmlspecialchars($reu['titulo']) ?></div>
+                                <div class="mt-comision">COMISIÓN: <?= htmlspecialchars($reu['comision']) ?></div>
+                            </div>
+
+                            <table class="asist-table">
+                                <thead>
+                                    <tr>
+                                        <th width="50%" class="text-left">Consejero Regional</th>
+                                        <th width="30%" class="text-center">Tipo Registro</th>
+                                        <th width="20%" class="text-center">Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $i = 0;
+                                    foreach ($presentes as $asist):
+                                        $i++;
+                                        $bgClass = ($i % 2 == 0) ? 'row-alt' : '';
+
+                                        $origenRaw = $asist['origen'];
+                                        $esApp = (stripos($origenRaw, 'Autogestión') !== false || stripos($origenRaw, 'App') !== false);
+
+                                        $textoLabel = $esApp ? 'AUTOGESTIÓN' : 'SECRETARIO TÉC.';
+                                        $claseLabel = $esApp ? 'tag-app' : 'tag-manual';
+                                    ?>
+                                        <tr class="<?= $bgClass ?>">
+                                            <td class="text-left">
+                                                <strong><?= htmlspecialchars($asist['nombre']) ?></strong>
+                                                <?php if ($asist['atrasado']): ?>
+                                                    <span class="tag-atrasado">ATRASADO</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="tag-origen <?= $claseLabel ?>">
+                                                    <?= $textoLabel ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="time-tag"><?= $asist['hora'] ?></span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+
+            <?php endif; ?>
+
+            <div class="footer-val">
+                <div align="center">
+                    <div style="border:1px solid #28a745; border-radius:5px; padding:10px; width:300px; background-color:#f9fff9; margin: 0 auto;">
+                        <div style="color:#28a745; font-weight:bold; font-size:9pt; text-transform:uppercase;">Documento Oficial de Asistencia</div>
+                        <img src="<?= $firmaImg ?>" width="50" style="margin:5px 0; opacity:0.8;">
+                        <div style="font-size:10pt; font-weight:bold;"><?= htmlspecialchars($data['generado_por']) ?></div>
+                        <div style="font-size:8pt; color:#555;">COREGEDOC</div>
+                        <div style="font-size:7pt; color:#999; margin-top:3px;">
+                            Fecha de emisión: <?= date('d/m/Y H:i') ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+
+        </html>
+    <?php
+        return ob_get_clean();
+    }
     private function getHtmlTemplate($data, $logoGore, $logoCore, $firmaImg, $aprobacionImg, $qrBase64, $esBorrador)
 
     {
@@ -505,7 +707,7 @@ class PdfService
 
         ob_start();
 
-?>
+    ?>
 
         <!DOCTYPE html>
 

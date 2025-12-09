@@ -1178,4 +1178,46 @@ class Minuta
             'totalPages' => ceil($total / $limit)
         ];
     }
+public function getListaMinutasPorFiltro($desde, $hasta, $idComision)
+    {
+        $params = [];
+        
+        $sql = "SELECT 
+                    r.idReunion,
+                    r.nombreReunion,
+                    r.fechaInicioReunion,
+                    r.t_minuta_idMinuta,
+                    
+                    c1.nombreComision as com1,
+                    c2.nombreComision as com2,
+                    c3.nombreComision as com3
+
+                FROM t_reunion r
+                INNER JOIN t_comision c1 ON r.t_comision_idComision = c1.idComision
+                LEFT JOIN t_comision c2 ON r.t_comision_idComision_mixta = c2.idComision
+                LEFT JOIN t_comision c3 ON r.t_comision_idComision_mixta2 = c3.idComision
+                
+                WHERE r.t_minuta_idMinuta IS NOT NULL 
+                AND r.vigente = 0 -- Solo terminadas
+                ";
+
+        if (!empty($desde) && !empty($hasta)) {
+            $sql .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
+            $params[':desde'] = $desde;
+            $params[':hasta'] = $hasta;
+        }
+
+        // --- FILTRO INTELIGENTE ---
+        if (!empty($idComision)) {
+            // Busca si la comisión es la principal, O la mixta 1, O la mixta 2
+            $sql .= " AND (r.t_comision_idComision = :idc OR r.t_comision_idComision_mixta = :idc OR r.t_comision_idComision_mixta2 = :idc)";
+            $params[':idc'] = $idComision;
+        }
+
+        $sql .= " ORDER BY r.fechaInicioReunion ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
 }

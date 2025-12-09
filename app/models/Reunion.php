@@ -202,11 +202,10 @@ class Reunion
         // - t_reunion_idReunion (FK en t_asistencia)
         // - t_usuario_idUsuario (FK en t_asistencia)
         // - t_tipoAsistencia_idTipoAsistencia (FK en t_asistencia)
-        
+
         $sql = "SELECT 
                     u.nombres, 
                     u.apellidos, 
-                    u.rut,
                     r.fechaInicioReunion as fecha, 
                     r.nombreReunion,
                     ta.nombreTipoAsistencia as estado_asistencia, -- Asegúrate que esta columna se llame así en t_tipoasistencia
@@ -229,5 +228,93 @@ class Reunion
         $stmt->execute();
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getReporteAsistenciaDetallado($filtros)
+    {
+        $params = [];
+
+        $sql = "SELECT 
+                    a.idAsistencia,
+                    a.estadoAsistencia,
+                    a.origenAsistencia,
+                    a.fechaMarca,
+                    a.fechaRegistroAsistencia, 
+                    
+                    -- DATOS USUARIO
+                    u.pNombre AS nombre_user, 
+                    u.aPaterno AS apellido_user,
+                    
+                    -- DATOS REUNIÓN
+                    r.idReunion,
+                    r.nombreReunion,
+                    r.fechaInicioReunion,
+                    
+                    -- DATOS COMISIONES
+                    c1.nombreComision AS comision_1,
+                    c2.nombreComision AS comision_2,
+                    c3.nombreComision AS comision_3
+
+                FROM t_asistencia a
+                INNER JOIN t_usuario u ON a.t_usuario_idUsuario = u.idUsuario
+                
+                -- PUENTE 1: Unimos Asistencia con Minuta
+                INNER JOIN t_minuta m ON a.t_minuta_idMinuta = m.idMinuta
+                
+                -- PUENTE 2: Unimos Minuta con Reunión
+                -- (Usamos la minuta como conector, ya que la reunión 'apunta' a la minuta 361)
+                INNER JOIN t_reunion r ON m.idMinuta = r.t_minuta_idMinuta
+                
+                -- COMISIÓN PRINCIPAL
+                INNER JOIN t_comision c1 ON r.t_comision_idComision = c1.idComision
+                
+                -- COMISIONES MIXTAS
+                LEFT JOIN t_comision c2 ON r.t_comision_idComision_mixta = c2.idComision
+                LEFT JOIN t_comision c3 ON r.t_comision_idComision_mixta2 = c3.idComision
+                
+                WHERE r.vigente = 1";
+
+        // Filtros
+        if (!empty($filtros['desde']) && !empty($filtros['hasta'])) {
+            $sql .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
+            $params[':desde'] = $filtros['desde'];
+            $params[':hasta'] = $filtros['hasta'];
+        }
+
+        if (!empty($filtros['idComision'])) {
+            $sql .= " AND (r.t_comision_idComision = :idC OR r.t_comision_idComision_mixta = :idC OR r.t_comision_idComision_mixta2 = :idC)";
+            $params[':idC'] = $filtros['idComision'];
+        }
+
+        // Ordenar
+        $sql .= " ORDER BY r.fechaInicioReunion ASC, u.aPaterno ASC, u.pNombre ASC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    public function countReporteAsistencia($filtros)
+    {
+        $params = [];
+        // CORRECCIÓN: Ajuste de joins para coincidir con la consulta principal
+        $sql = "SELECT COUNT(*) as total
+                FROM t_asistencia a
+                INNER JOIN t_reunion r ON a.t_minuta_idMinuta = r.t_minuta_idMinuta
+                WHERE r.vigente = 1";
+
+        if (!empty($filtros['desde']) && !empty($filtros['hasta'])) {
+            $sql .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
+            $params[':desde'] = $filtros['desde'];
+            $params[':hasta'] = $filtros['hasta'];
+        }
+
+        if (!empty($filtros['idComision'])) {
+            $sql .= " AND r.t_comision_idComision = :idComision";
+            $params[':idComision'] = $filtros['idComision'];
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
     }
 }
