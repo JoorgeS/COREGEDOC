@@ -1178,7 +1178,10 @@ class Minuta
             'totalPages' => ceil($total / $limit)
         ];
     }
-public function getListaMinutasPorFiltro($desde, $hasta, $idComision)
+// ============================================================
+    // 🔍 BUSCADOR CON PAGINACIÓN Y FILTRO INTELIGENTE
+    // ============================================================
+    public function getListaMinutasPorFiltro($desde, $hasta, $idComision, $limit = null, $offset = null)
     {
         $params = [];
         
@@ -1201,23 +1204,75 @@ public function getListaMinutasPorFiltro($desde, $hasta, $idComision)
                 AND r.vigente = 0 -- Solo terminadas
                 ";
 
+        // Filtros
         if (!empty($desde) && !empty($hasta)) {
             $sql .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
             $params[':desde'] = $desde;
             $params[':hasta'] = $hasta;
         }
 
-        // --- FILTRO INTELIGENTE ---
         if (!empty($idComision)) {
-            // Busca si la comisión es la principal, O la mixta 1, O la mixta 2
-            $sql .= " AND (r.t_comision_idComision = :idc OR r.t_comision_idComision_mixta = :idc OR r.t_comision_idComision_mixta2 = :idc)";
-            $params[':idc'] = $idComision;
+            // Filtro Inteligente (Principal o Mixtas)
+            $sql .= " AND (
+                        r.t_comision_idComision = :idc1 
+                        OR r.t_comision_idComision_mixta = :idc2 
+                        OR r.t_comision_idComision_mixta2 = :idc3
+                      )";
+            $params[':idc1'] = $idComision;
+            $params[':idc2'] = $idComision;
+            $params[':idc3'] = $idComision;
         }
 
         $sql .= " ORDER BY r.fechaInicioReunion ASC";
 
+        // Aplicar Paginación si se solicita
+        if ($limit !== null && $offset !== null) {
+            $sql .= " LIMIT :limit OFFSET :offset";
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        
+        // Bind manual para Limit/Offset (deben ser enteros)
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
+        }
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+        }
+
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Nueva función para contar el total (necesaria para los botones de paginación)
+    public function contarMinutasPorFiltro($desde, $hasta, $idComision)
+    {
+        $params = [];
+        $sql = "SELECT COUNT(*) 
+                FROM t_reunion r
+                WHERE r.t_minuta_idMinuta IS NOT NULL 
+                AND r.vigente = 0";
+
+        if (!empty($desde) && !empty($hasta)) {
+            $sql .= " AND DATE(r.fechaInicioReunion) BETWEEN :desde AND :hasta";
+            $params[':desde'] = $desde;
+            $params[':hasta'] = $hasta;
+        }
+
+        if (!empty($idComision)) {
+            $sql .= " AND (
+                        r.t_comision_idComision = :idc1 
+                        OR r.t_comision_idComision_mixta = :idc2 
+                        OR r.t_comision_idComision_mixta2 = :idc3
+                      )";
+            $params[':idc1'] = $idComision;
+            $params[':idc2'] = $idComision;
+            $params[':idc3'] = $idComision;
+        }
+
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        return $stmt->fetchColumn();
     }
 }

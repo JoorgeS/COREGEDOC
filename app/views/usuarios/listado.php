@@ -51,7 +51,7 @@
 
                 <div class="col-md-2 d-flex align-items-end">
                     <button type="button" id="btnLimpiar" class="btn btn-outline-secondary w-100">
-                        <i class="fas fa-eraser me-1"></i> Limpiar
+                        <i class="fas fa-eraser me-1"></i> 
                     </button>
                 </div>
             </form>

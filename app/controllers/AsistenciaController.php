@@ -185,67 +185,67 @@ class AsistenciaController
         require_once __DIR__ . '/../views/layouts/main.php';
     }
 
-    private function obtenerDatosReporteConsolidado($filtros)
+  // ============================================================
+    // 📊 LÓGICA COMPARTIDA (CON PAGINACIÓN)
+    // ============================================================
+    private function obtenerDatosReporteConsolidado($filtros, $paginacion = null)
     {
-        $minutaModel = new Minuta();
+        $minutaModel = new \App\Models\Minuta();
         
-        // 1. Obtener lista de reuniones (Cabeceras)
-        // Esto ya filtra "inteligentemente" por comisiones mixtas gracias al SQL en Minuta.php
-        $listaReuniones = $minutaModel->getListaMinutasPorFiltro($filtros['desde'], $filtros['hasta'], $filtros['idComision']);
+        // 1. Obtener lista de reuniones
+        if ($paginacion) {
+            // Si es para la vista (API), usamos paginación
+            $limit = $paginacion['limit'];
+            $offset = $paginacion['offset'];
+            $listaReuniones = $minutaModel->getListaMinutasPorFiltro($filtros['desde'], $filtros['hasta'], $filtros['idComision'], $limit, $offset);
+            $totalRegistros = $minutaModel->contarMinutasPorFiltro($filtros['desde'], $filtros['hasta'], $filtros['idComision']);
+        } else {
+            // Si es para el PDF, traemos todo (sin límite)
+            $listaReuniones = $minutaModel->getListaMinutasPorFiltro($filtros['desde'], $filtros['hasta'], $filtros['idComision']);
+            $totalRegistros = count($listaReuniones);
+        }
         
         $datosProcesados = [];
         $dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
         $meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+        // 2. Bucle de Procesamiento
         foreach ($listaReuniones as $reu) {
             $idMinuta = $reu['t_minuta_idMinuta'];
             
-            // Reutilizamos tu lógica detallada (que trae 'estado_visual' y 'origenAsistencia')
+            // Reutilizamos tu lógica detallada
             $detalle = $minutaModel->getAsistenciaDetallada($idMinuta); 
             $asistentesRaw = $detalle['asistentes'] ?? [];
 
             $listaPresentes = [];
             foreach ($asistentesRaw as $p) {
-                // Solo si está presente
                 if ($p['estaPresente'] == 1) {
                     
-                    // Formato Hora
                     $hora = '--:--';
                     if (!empty($p['fechaRegistroAsistencia'])) {
                         $hora = date('H:i', strtotime($p['fechaRegistroAsistencia']));
                     }
 
-                    // Formato Origen
                     $origen = 'Secretario Técnico';
-                    $origenRaw = strtoupper($p['origenAsistencia'] ?? '');
-                    
-                    if (in_array($origenRaw, ['AUTOGESTION', 'AUTOREGISTRO', 'APP'])) {
+                    if (isset($p['origenAsistencia']) && in_array($p['origenAsistencia'], ['AUTOGESTION', 'AUTOREGISTRO', 'APP'])) {
                         $origen = 'Autogestión';
-                    } elseif ($origenRaw === 'SISTEMA') {
+                    } elseif (isset($p['origenAsistencia']) && $p['origenAsistencia'] === 'SISTEMA') {
                         $origen = 'Automático';
                     }
 
-                    // Detectar Atraso (Boolean para el PDF)
                     $esAtrasado = (isset($p['estado_visual']) && $p['estado_visual'] === 'atrasado');
-                    
-                    // Estado Texto
-                    $estadoTexto = $esAtrasado ? 'ATRASADO' : 'PRESENTE';
+                    $estadoFinal = $esAtrasado ? 'ATRASADO' : 'PRESENTE';
 
-                    // --- AQUÍ ESTABA EL ERROR DEL PDF ---
-                    // Ahora usamos las claves EXACTAS que espera PdfService
                     $listaPresentes[] = [
-                        'nombre'   => $p['pNombre'] . ' ' . $p['aPaterno'],
-                        'origen'   => $origen,
-                        'hora'     => $hora,        // <--- Antes decíamos 'hora_marca', corregido a 'hora'
-                        'atrasado' => $esAtrasado,  // <--- Agregamos esta clave que faltaba
-                        'estado'   => $estadoTexto
+                        'nombre' => $p['pNombre'] . ' ' . $p['aPaterno'],
+                        'origen' => $origen,
+                        'hora'   => $hora,
+                        'atrasado' => $esAtrasado,
+                        'estado' => $estadoFinal // Clave extra para lógica de vista
                     ];
                 }
             }
 
-            // Solo agregamos la reunión si tiene minuta cerrada (vigente=0)
-            // (La consulta SQL ya filtra, pero esto asegura la estructura)
-            
             $ts = strtotime($reu['fechaInicioReunion']);
             $fechaTexto = $dias[date('w', $ts)] . ", " . date('d', $ts) . " de " . $meses[date('n', $ts)] . " de " . date('Y', $ts);
             
@@ -253,18 +253,19 @@ class AsistenciaController
             $comisionStr = implode(' + ', $comisiones);
 
             $datosProcesados[] = [
-                'titulo'      => mb_strtoupper($reu['nombreReunion']),
-                'comision'    => mb_strtoupper($comisionStr),
+                'titulo' => mb_strtoupper($reu['nombreReunion']),
+                'comision' => mb_strtoupper($comisionStr),
                 'fecha_texto' => mb_strtoupper($fechaTexto),
                 'hora_inicio' => date('H:i', $ts),
-                'asistentes'  => $listaPresentes
+                'asistentes' => $listaPresentes
             ];
         }
 
-        return $datosProcesados;
+        return ['data' => $datosProcesados, 'total' => $totalRegistros];
     }
 
-   public function apiGetReporte()
+    // --- API JSON (Ahora soporta Paginación) ---
+    public function apiGetReporte()
     {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -274,36 +275,38 @@ class AsistenciaController
             echo json_encode(['status' => 'error', 'message' => 'Acceso denegado']); exit;
         }
 
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 10; // 10 registros por página
+        $offset = ($page - 1) * $limit;
+
         $filtros = [
-            'desde'      => $_GET['desde'] ?? date('Y-m-01'),
-            'hasta'      => $_GET['hasta'] ?? date('Y-m-t'),
+            'desde' => $_GET['desde'] ?? date('Y-m-01'),
+            'hasta' => $_GET['hasta'] ?? date('Y-m-t'),
             'idComision' => $_GET['comision'] ?? null
         ];
 
         try {
-            $data = $this->obtenerDatosReporteConsolidado($filtros);
+            // Pasamos los parámetros de paginación
+            $resultado = $this->obtenerDatosReporteConsolidado($filtros, ['limit' => $limit, 'offset' => $offset]);
             
-            // Para la VISTA JS, adaptamos las claves si es necesario, 
-            // pero es mejor que el JS use las mismas claves que el PDF ('hora', 'atrasado')
-            // para mantener consistencia.
-            // (Nota: Si tu JS actual usa 'hora_marca', deberás actualizar el JS o mapear aquí)
-            // Voy a mapear para no romper tu JS que ya funciona:
-            $dataParaJS = array_map(function($reu) {
-                $reu['asistentes'] = array_map(function($asist) {
-                    $asist['hora_marca'] = $asist['hora']; // Compatibilidad con tu JS actual
-                    return $asist;
-                }, $reu['asistentes']);
-                return $reu;
-            }, $data);
+            $data = $resultado['data'];
+            $total = $resultado['total'];
+            $totalPages = ceil($total / $limit);
 
-            echo json_encode(['status' => 'success', 'data' => $dataParaJS, 'count' => count($data)]);
+            echo json_encode([
+                'status' => 'success', 
+                'data' => $data, 
+                'total' => $total,
+                'pages' => $totalPages,
+                'current_page' => $page
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
-
-    // --- GENERAR PDF ---
+    
+    // --- IMPORTANTE: Actualiza generarPdfReporte para que NO use paginación ---
     public function generarPdfReporte()
     {
         if (ob_get_length()) ob_clean();
@@ -311,23 +314,25 @@ class AsistenciaController
         if ($_SESSION['tipoUsuario_id'] != 6) die('Acceso denegado');
 
         $filtros = [
-            'desde'      => $_GET['desde'] ?? date('Y-m-01'),
-            'hasta'      => $_GET['hasta'] ?? date('Y-m-t'),
+            'desde' => $_GET['desde'] ?? date('Y-m-01'),
+            'hasta' => $_GET['hasta'] ?? date('Y-m-t'),
             'idComision' => $_GET['comision'] ?? null
         ];
 
-        $data = $this->obtenerDatosReporteConsolidado($filtros);
+        // Llamamos SIN paginación (segundo argumento null)
+        $resultado = $this->obtenerDatosReporteConsolidado($filtros, null);
+        $data = $resultado['data'];
 
         $dataPdf = [
-            'titulo'        => 'REPORTE CONSOLIDADO DE ASISTENCIA',
-            'rango'         => 'Periodo: ' . date('d/m/Y', strtotime($filtros['desde'])) . ' al ' . date('d/m/Y', strtotime($filtros['hasta'])),
-            'registros'     => $data,
-            'generado_por'  => $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'],
+            'titulo' => 'REPORTE CONSOLIDADO DE ASISTENCIA',
+            'rango' => 'Periodo: ' . date('d/m/Y', strtotime($filtros['desde'])) . ' al ' . date('d/m/Y', strtotime($filtros['hasta'])),
+            'registros' => $data,
+            'generado_por' => $_SESSION['pNombre'] . ' ' . $_SESSION['aPaterno'],
             'urlValidacion' => (defined('BASE_URL') ? BASE_URL : 'https://coregedoc.cl')
         ];
 
-        $pdfService = new PdfService();
-        $nombreArchivo = 'Reporte_Mensual_' . date('Ymd_His') . '.pdf';
+        $pdfService = new \App\Services\PdfService();
+        $nombreArchivo = 'Reporte_Mensual_' . date('YmdHis') . '.pdf';
         $rutaTemp = sys_get_temp_dir() . '/' . $nombreArchivo;
 
         if ($pdfService->generarPdfReporteAsistencia($dataPdf, $rutaTemp)) {
@@ -340,6 +345,7 @@ class AsistenciaController
         }
         exit;
     }
+
     
 
 }
