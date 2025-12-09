@@ -115,7 +115,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
 
     <div class="row mb-4 align-items-stretch">
         
-        <div class="col-lg-8 mb-3 mb-lg-0">
+        <div class="col-lg-6 mb-3 mb-lg-0">
             <div class="card shadow-sm border-0 h-100 overflow-hidden">
                 <div class="card-body p-0 d-flex align-items-center bg-white">
                     <div class="bg-azul h-100" style="width: 10px;"></div>
@@ -125,12 +125,15 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                             <img src="<?php echo $fotoPerfil; ?>" 
                                  alt="Foto Perfil" 
                                  class="rounded shadow border border-3 border-light"
-                                 style="height: 110px; width: auto; max-width: 100%;">
+                                 style="height: 150px; width: auto; max-width: 100%;">
                         </div>
                         
                         <div>
+                            <h5 class="c-gris text-uppercase ls-1 mb-1" style="font-size: 0.9rem;">
+                                Bienvenid@ a COREGEDOC
+                            </h5>
+
                             <h2 class="fw-bold text-dark mb-1">
-                                <!-- CORRECCIÓN AQUÍ: Usamos solo la variable saludo del controlador -->
                                 <?php echo $data['saludo']; ?>
                             </h2>
 
@@ -143,7 +146,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
             </div>
         </div>
 
-       <div class="col-lg-4">
+        <div class="col-lg-3 mb-3 mb-lg-0">
             <div class="card shadow-sm border-0 h-100 bg-white">
                 <div class="card-body d-flex flex-column justify-content-center align-items-center">
                     
@@ -153,9 +156,9 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     
                     <div class="d-flex align-items-center justify-content-center my-3">
                         <div id="weather-icon-container">
-                            <i class="fas fa-spinner fa-spin fa-3x me-3 c-naranja"></i>
+                            <i class="fas fa-spinner fa-spin fa-2x me-2 c-naranja"></i>
                         </div>
-                        <span class="display-4 fw-bold text-dark" id="weather-temp">--°</span>
+                        <span class="display-6 fw-bold text-dark" id="weather-temp">--°</span>
                     </div>
 
                     <div class="d-flex align-items-center small c-gris">
@@ -168,12 +171,23 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     </div>
                     
                     <div class="small c-gris mt-2 text-capitalize" id="weather-desc"></div>
-
                 </div>
             </div>
         </div>
-    </div>
 
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-0 h-100 bg-white">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center p-2">
+                    <img src="public/img/LogoGORE.png" 
+                         alt="Logo Coregedoc" 
+                         class="img-fluid" 
+                         /* Cambié max-height de 120px a 180px */
+                         style="max-height: 180px; width: auto; max-width: 100%;">
+                </div>
+            </div>
+        </div>
+
+    </div>
     <div class="row mb-5">
         <div class="col-12">
             <div class="card shadow border-0 overflow-hidden">
@@ -181,7 +195,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                      <h5 class="mb-0 fw-bold c-azul"><i class="fas fa-map-marked-alt me-2"></i>Ejes de Gestión Regional</h5>
                 </div>
                 <div class="card-body p-0">
-                    <div id="carouselZonas" class="carousel slide" data-bs-interval="5000" style="height: 400px;">
+                    <div id="carouselZonas" class="carousel slide carousel-fade" data-bs-ride="carousel" style="height: 400px;">
                         
                         <div class="carousel-indicators">
                             <?php foreach ($data['imagenes_zonas'] as $index => $zona): ?>
@@ -192,7 +206,7 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
 
                         <div class="carousel-inner h-100 rounded-bottom">
                             <?php foreach ($data['imagenes_zonas'] as $index => $zona): ?>
-                                <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>" style="height: 400px !important;">
+                                <div class="carousel-item h-100 <?php echo $index === 0 ? 'active' : ''; ?>" data-bs-interval="5000">
                                     
                                     <img src="<?php echo htmlspecialchars($zona['file']); ?>" class="d-block w-100 h-100 object-fit-cover" alt="<?php echo htmlspecialchars($zona['title']); ?>" style="opacity: 0.8;">
 
@@ -281,17 +295,14 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     <?php else: ?>
                         <ul class="list-group list-group-flush">
                             <?php foreach ($data['proximas_reuniones'] as $reunion): 
-                                // Mantenemos $fecha solo para la hora, pero el mes/día viene del controlador
                                 $fecha = new DateTime($reunion['fechaInicioReunion']);
                             ?>
                                 <li class="list-group-item d-flex justify-content-between align-items-center py-3">
                                     <div class="d-flex align-items-center">
                                         <div class="text-center bg-light rounded p-2 me-3 border border-verde" style="min-width: 60px;">
-                                            <!-- CORRECCIÓN AQUÍ: Usamos 'mes_esp' del controlador -->
                                             <div class="small text-uppercase fw-bold c-verde">
                                                 <?php echo $reunion['mes_esp'] ?? $fecha->format('M'); ?>
                                             </div>
-                                            <!-- CORRECCIÓN AQUÍ: Usamos 'dia_fmt' del controlador -->
                                             <div class="h4 mb-0 fw-bold text-dark">
                                                 <?php echo $reunion['dia_fmt'] ?? $fecha->format('d'); ?>
                                             </div>
@@ -316,30 +327,29 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
     </div>
 
 </div>
-
 <script>
 
     window.onload = function() {
         const carouselElement = document.getElementById('carouselZonas');
         
-        // Verificamos si la clase Carousel de Bootstrap existe
         if (carouselElement && typeof bootstrap !== 'undefined' && bootstrap.Carousel) {
             
-            // Inicialización explícita, que ahora es la ÚNICA inicialización.
+            // CAMBIO: 'ride: carousel' hace que se mueva solito
             const carousel = new bootstrap.Carousel(carouselElement, {
-                interval: 5000, // Ajusta el intervalo automático
-                ride: false // Desactiva la auto-reproducción si el usuario interactúa
+                interval: 5000, 
+                ride: 'carousel', // Antes estaba en false
+                pause: 'hover'    // Se pausa si pones el mouse encima, buena práctica
             });
             
+            // Forzar inicio si bootstrap no lo toma automáticamente
+            carousel.cycle();
         }
     };
 
     document.addEventListener('DOMContentLoaded', function() {
-        // --- CONFIGURACIÓN DE LA API (Tus datos antiguos) ---
         const apiKey = '71852032dae024a5eb1702b278bd88fa'; 
         const ciudad = 'Valparaíso'; 
         const pais = 'CL'; 
-        // URL de la API
         const url = `https://api.openweathermap.org/data/2.5/weather?q=${ciudad},${pais}&appid=${apiKey}&units=metric&lang=es`;
 
         fetch(url)
@@ -349,7 +359,6 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
             })
             .then(data => {
                 if (data.main && data.weather && data.weather[0]) {
-                    // 1. Obtener elementos del DOM
                     const cityEl = document.getElementById('weather-city');
                     const tempEl = document.getElementById('weather-temp');
                     const iconContainer = document.getElementById('weather-icon-container');
@@ -357,48 +366,42 @@ if ($rolUser == 3) $nombreRol = 'Presidente de Comisión';
                     const humidEl = document.getElementById('weather-humidity');
                     const descEl = document.getElementById('weather-desc');
 
-                    // 2. Actualizar datos básicos
-                    cityEl.innerText = data.name; // Nombre real de la ciudad que devuelve la API
+                    cityEl.innerText = data.name; 
                     tempEl.innerText = Math.round(data.main.temp) + '°';
                     descEl.innerText = data.weather[0].description;
 
-                    // 3. Viento (La API devuelve m/s, convertimos a km/h multiplicando por 3.6)
                     const windSpeed = Math.round(data.wind.speed * 3.6);
                     windEl.innerHTML = `<i class="fas fa-wind me-1"></i> ${windSpeed} km/h`;
-
-                    // 4. Humedad
                     humidEl.innerHTML = `<i class="fas fa-tint me-1"></i> ${data.main.humidity}%`;
 
-                    // 5. Mapeo de Iconos (OpenWeather -> FontAwesome y Colores de tu paleta)
                     const iconCode = data.weather[0].icon;
                     let iconClass = 'fa-sun';
-                    let colorClass = 'c-naranja'; // Por defecto naranja
+                    let colorClass = 'c-naranja'; 
 
                     if (iconCode.includes('01')) { 
-                        iconClass = 'fa-sun'; colorClass = 'c-naranja'; // Sol
+                        iconClass = 'fa-sun'; colorClass = 'c-naranja'; 
                     } else if (iconCode.includes('02')) { 
-                        iconClass = 'fa-cloud-sun'; colorClass = 'c-naranja'; // Nubes y sol
+                        iconClass = 'fa-cloud-sun'; colorClass = 'c-naranja'; 
                     } else if (iconCode.includes('03') || iconCode.includes('04')) { 
-                        iconClass = 'fa-cloud'; colorClass = 'c-gris'; // Nubes
+                        iconClass = 'fa-cloud'; colorClass = 'c-gris'; 
                     } else if (iconCode.includes('09') || iconCode.includes('10')) { 
-                        iconClass = 'fa-cloud-showers-heavy'; colorClass = 'c-azul'; // Lluvia
+                        iconClass = 'fa-cloud-showers-heavy'; colorClass = 'c-azul'; 
                     } else if (iconCode.includes('11')) { 
-                        iconClass = 'fa-bolt'; colorClass = 'c-naranja-dark'; // Tormenta
+                        iconClass = 'fa-bolt'; colorClass = 'c-naranja-dark'; 
                     } else if (iconCode.includes('13')) { 
-                        iconClass = 'fa-snowflake'; colorClass = 'c-azul'; // Nieve
+                        iconClass = 'fa-snowflake'; colorClass = 'c-azul'; 
                     } else if (iconCode.includes('50')) { 
-                        iconClass = 'fa-smog'; colorClass = 'c-gris'; // Niebla
+                        iconClass = 'fa-smog'; colorClass = 'c-gris'; 
                     }
 
-                    // Insertar el icono
-                    iconContainer.innerHTML = `<i class="fas ${iconClass} fa-3x me-3 ${colorClass}"></i>`;
+                    // Ajusté un poco el tamaño del icono a 2x para que quepa mejor en el nuevo ancho
+                    iconContainer.innerHTML = `<i class="fas ${iconClass} fa-2x me-3 ${colorClass}"></i>`;
                 }
             })
             .catch(error => {
                 console.error('Error widget clima:', error);
-                document.getElementById('weather-city').innerText = 'Clima no disponible';
+                document.getElementById('weather-city').innerText = 'N/A';
             });
     });
-
 
 </script>

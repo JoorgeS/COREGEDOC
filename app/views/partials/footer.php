@@ -208,9 +208,7 @@
             <div class="mb-2 mb-md-0">
                 &copy; <?php echo date('Y'); ?> <strong>CORE Valparaíso</strong>.
             </div>
-            <div>
-                CORE Región de Valparaíso
-            </div>
+
         </div>
     </div>
 </footer>
